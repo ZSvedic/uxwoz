@@ -1,0 +1,6 @@
+Create a responsive mortgage calculator with:
+- Inputs: property price ($), down payment ($), annual interest rate (%) and term (years). Defaults: $400,000 price, $80,000 down payment, 6.5% rate, 30 years.
+- Outputs: loan principal (price minus down payment), monthly payment, total interest and total payment over the term. Use the standard fixed-rate formula with monthly compounding: payment = P × r / (1 − (1 + r)^−n), where r = annual rate / 12 and n = years × 12; if the rate is 0, payment = P / n.
+- An interactive amortization chart showing principal versus interest paid in each year of the term.
+- An annual amortization table with one row per year: year, interest paid, principal paid and remaining balance at the end of the year.
+- Changing any input updates every dependent value, the chart and the table, where the format supports it.

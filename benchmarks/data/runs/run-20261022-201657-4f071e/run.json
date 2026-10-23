@@ -1,0 +1,74 @@
+{
+ "id": "run-20261022-201657-4f071e",
+ "created_at": "2026-10-22T20:16:57.530464+00:00",
+ "code_version": "f385b4e8d2e0",
+ "status": "done",
+ "task": "mortgage",
+ "concurrency": 6,
+ "request_budget_s": 20.0,
+ "formats": [
+  "html_pico"
+ ],
+ "models": [
+  "gpt-6.1-sol-ultrafast"
+ ],
+ "reps": 3,
+ "seed": 30534,
+ "order": [
+  {
+   "format": "html_pico",
+   "model": "gpt-6.1-sol-ultrafast",
+   "rep": 1
+  },
+  {
+   "format": "html_pico",
+   "model": "gpt-6.1-sol-ultrafast",
+   "rep": 3
+  },
+  {
+   "format": "html_pico",
+   "model": "gpt-6.1-sol-ultrafast",
+   "rep": 2
+  }
+ ],
+ "attempt_ids": [
+  "att-20261022-201704-d52b84",
+  "att-20261022-201705-809371",
+  "att-20261022-201705-1ec26a"
+ ],
+ "settings": {
+  "gpt-6.1-sol-ultrafast": {
+   "model": "gpt-6.1-sol",
+   "provider": "openai",
+   "provider_order": null,
+   "service_tier": "ultrafast",
+   "reasoning_request": {
+    "effort": "low"
+   },
+   "reasoning_note": "'none' and 'minimal' rejected (supported: low, medium, high, xhigh, max); using 'low'. service_tier='ultrafast' is rejected by Chat Completions and accepted by the Responses API, so this model uses the Responses API.",
+   "cost_source": "Estimated: tokens x Ultrafast price table (6x standard)"
+  }
+ },
+ "prompt_tokens": {
+  "html_pico": 178
+ },
+ "task_tokens": 201,
+ "started_at": "2026-10-22T20:16:57.532456+00:00",
+ "warmups": [
+  {
+   "format": "html_pico",
+   "model": "gpt-6.1-sol-ultrafast",
+   "input_tokens": 389,
+   "cached_input_tokens": 0,
+   "output_tokens": 32,
+   "cost_usd": 0.006588,
+   "ms": 1036
+  }
+ ],
+ "finished_at": "2026-10-22T20:17:34.113539+00:00",
+ "recheck": {
+  "at": "2026-10-22T20:32:41.632112+00:00",
+  "code_version": "06aa8340f9cf"
+ },
+ "imported_from": "ux-woz-full-benchmark/data/runs/run-20261022-201657-4f071e (HTML + Pico attempts of the three chosen models only)"
+}

@@ -1,0 +1,70 @@
+{
+ "id": "run-20261022-212908-8aa8dc",
+ "created_at": "2026-10-22T21:29:08.156410+00:00",
+ "code_version": "af64be38efc0",
+ "status": "done",
+ "task": "bmi",
+ "concurrency": 6,
+ "request_budget_s": 20.0,
+ "formats": [
+  "html_pico"
+ ],
+ "models": [
+  "gpt-6-luna-fast"
+ ],
+ "reps": 3,
+ "seed": 441113,
+ "order": [
+  {
+   "format": "html_pico",
+   "model": "gpt-6-luna-fast",
+   "rep": 1
+  },
+  {
+   "format": "html_pico",
+   "model": "gpt-6-luna-fast",
+   "rep": 3
+  },
+  {
+   "format": "html_pico",
+   "model": "gpt-6-luna-fast",
+   "rep": 2
+  }
+ ],
+ "attempt_ids": [
+  "att-20261022-212909-5c34f5",
+  "att-20261022-212909-2d5508",
+  "att-20261022-212909-4c46eb"
+ ],
+ "settings": {
+  "gpt-6-luna-fast": {
+   "model": "gpt-6-luna",
+   "provider": "openai",
+   "provider_order": null,
+   "service_tier": "fast",
+   "reasoning_request": {
+    "effort": "none"
+   },
+   "reasoning_note": "Responses API, service_tier='fast' (Luna rejects 'ultrafast'); reasoning effort 'none' accepted.",
+   "cost_source": "Estimated: tokens x fast-tier price (2x standard, unconfirmed)"
+  }
+ },
+ "prompt_tokens": {
+  "html_pico": 208
+ },
+ "task_tokens": 119,
+ "started_at": "2026-10-22T21:29:08.157937+00:00",
+ "warmups": [
+  {
+   "format": "html_pico",
+   "model": "gpt-6-luna-fast",
+   "input_tokens": 337,
+   "cached_input_tokens": 0,
+   "output_tokens": 32,
+   "cost_usd": 9.94e-05,
+   "ms": 1456
+  }
+ ],
+ "finished_at": "2026-10-22T21:29:40.291515+00:00",
+ "imported_from": "ux-woz-full-benchmark/data/runs/run-20261022-212908-8aa8dc (HTML + Pico attempts of the three chosen models only)"
+}

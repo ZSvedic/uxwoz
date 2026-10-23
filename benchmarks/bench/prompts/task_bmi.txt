@@ -1,0 +1,6 @@
+Create a compact, attractive BMI calculator with:
+- Height (cm) and weight (kg) inputs, defaulting to 175 cm and 70 kg.
+- The calculated BMI = weight / (height in m)^2, rounded to one decimal place.
+- The BMI classification: Underweight (< 18.5), Normal (18.5 to < 25), Overweight (25 to < 30), Obese (>= 30).
+- A visual BMI category scale showing where the current BMI falls.
+- Immediate recalculation when the inputs change, where the format supports it.

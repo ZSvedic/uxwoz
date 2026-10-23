@@ -1,0 +1,860 @@
+{
+ "id": "att-20261022-214801-d2c0cf",
+ "run_id": "run-20261022-214758-7c074b",
+ "format": "html_pico",
+ "model": "claude-haiku-5.5",
+ "rep": 3,
+ "task": "bmi",
+ "status": "ok",
+ "requested": {
+  "model": "anthropic/claude-haiku-5.5",
+  "provider_order": [
+   "anthropic"
+  ],
+  "service_tier": null,
+  "reasoning": {
+   "enabled": false
+  }
+ },
+ "cache_policy": "warm",
+ "timings": {
+  "request_start_epoch_ms": 1792705682281.602,
+  "first_byte_ms": 622.48291015625,
+  "first_token_ms": 622.499755859375,
+  "content_complete_ms": 3820.270263671875,
+  "generation_complete_ms": 3821.781982421875,
+  "first_visible_ui_ms": 625.39794921875,
+  "fully_rendered_ms": 3840.674072265625,
+  "harness_first_chunk_ms": 622.39794921875,
+  "relay_latency_ms": -0.101806640625
+ },
+ "errors": [],
+ "system_prompt_tokens": 208,
+ "actual": {
+  "model": "anthropic/claude-haiku-5.5",
+  "provider": "Anthropic",
+  "service_tier": null,
+  "reasoning": null,
+  "finish_reason": "stop"
+ },
+ "model_substituted": false,
+ "tier_substituted": false,
+ "usage": {
+  "input_tokens": 508,
+  "cached_input_tokens": 0,
+  "cache_write_tokens": 0,
+  "output_tokens": 912,
+  "reasoning_tokens": 0
+ },
+ "usage_raw": {
+  "prompt_tokens": 508,
+  "completion_tokens": 912,
+  "total_tokens": 1420,
+  "cost": 0.0005068,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.0005068,
+   "upstream_inference_prompt_cost": 5.08e-05,
+   "upstream_inference_completions_cost": 0.000456
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ },
+ "cost_usd": 0.0005068,
+ "cost_source": "OpenRouter usage.cost (billed)",
+ "output_tokens_per_s": 285.2,
+ "harness": {
+  "extractedSource": "<article>\n<h1>BMI Calculator</h1>\n<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:1rem\">\n<label>Height (cm)<input id=\"h\" type=\"number\" value=\"175\" min=\"50\" max=\"260\" step=\"1\"></label>\n<label>Weight (kg)<input id=\"w\" type=\"number\" value=\"70\" min=\"10\" max=\"400\" step=\"0.1\"></label>\n</div>\n</article>\n<article>\n<h2 id=\"bmi\">22.9</h2>\n<p><mark id=\"cat\">Normal</mark></p>\n<svg id=\"scale\" viewBox=\"0 0 400 70\" width=\"100%\" role=\"img\" aria-label=\"BMI category scale\">\n<rect x=\"0\" y=\"20\" width=\"74\" height=\"20\" fill=\"#60a5fa\"/>\n<rect x=\"74\" y=\"20\" width=\"106\" height=\"20\" fill=\"#34d399\"/>\n<rect x=\"180\" y=\"20\" width=\"110\" height=\"20\" fill=\"#fbbf24\"/>\n<rect x=\"290\" y=\"20\" width=\"110\" height=\"20\" fill=\"#f87171\"/>\n<text x=\"37\" y=\"60\" font-size=\"11\" text-anchor=\"middle\">Under</text>\n<text x=\"127\" y=\"60\" font-size=\"11\" text-anchor=\"middle\">Normal</text>\n<text x=\"235\" y=\"60\" font-size=\"11\" text-anchor=\"middle\">Over</text>\n<text x=\"345\" y=\"60\" font-size=\"11\" text-anchor=\"middle\">Obese</text>\n<polygon id=\"marker\" points=\"0,14 10,14 5,22\" fill=\"currentColor\"/>\n</svg>\n<small id=\"range\">Scale spans BMI 10 to 40</small>\n</article>\n<script>\nconst h=document.getElementById('h'),w=document.getElementById('w');\nconst bmiEl=document.getElementById('bmi'),catEl=document.getElementById('cat'),mk=document.getElementById('marker');\nfunction upd(){\nconst m=h.value/100,b=w.value/(m*m);\nconst v=isFinite(b)?b:0;\nbmiEl.textContent=v.toFixed(1);\nlet c,col;\nif(v<18.5){c='Underweight';col='#60a5fa'}\nelse if(v<25){c='Normal';col='#34d399'}\nelse if(v<30){c='Overweight';col='#fbbf24'}\nelse{c='Obese';col='#f87171'}\ncatEl.textContent=c;catEl.style.background=col;\nconst clamped=Math.min(Math.max(v,10),40);\nconst x=(clamped-10)/30*400;\nmk.setAttribute('transform',`translate(${x-5},0)`);\nmk.style.color=col;\n}\nh.addEventListener('input',upd);w.addEventListener('input',upd);upd();\n</script>",
+  "fenced": false,
+  "firstChunkAt": 1792705682904,
+  "firstVisibleAt": 1792705682907,
+  "streamEndAt": 1792705686102,
+  "fullyRenderedAt": 1792705686122.2761,
+  "renderErrors": [],
+  "rendered": true,
+  "parseOk": true,
+  "renderedText": "",
+  "visibleText": "BMI Calculator\nHeight (cm)\nWeight (kg)\n22.9\n\nNormal\n\nUnder\nNormal\nOver\nObese\n Scale spans BMI 10 to 40\n175\n70",
+  "overflow": []
+ },
+ "screenshot": "/api/shots/run-20261022-214758-7c074b/att-20261022-214801-d2c0cf.png",
+ "parse": {
+  "ok": true,
+  "rendered": true,
+  "errors": [],
+  "fenced": false
+ },
+ "checklist": {
+  "mentions_height": true,
+  "mentions_weight": true,
+  "units_cm_kg": true,
+  "shows_default_bmi_22.9": true,
+  "shows_default_category": true,
+  "names_all_four_categories": true
+ },
+ "checklist_basis": "sandbox frame text + control values/labels",
+ "interactive": {
+  "status": "pass",
+  "passed": 4,
+  "total": 4,
+  "immediate": true,
+  "input_lookup": {
+   "height": "label:text",
+   "weight": "label:text"
+  },
+  "cases": [
+   {
+    "height": 160,
+    "weight": 45,
+    "bmi": "17.6",
+    "category": "underweight",
+    "value_ok": true,
+    "trigger": "input",
+    "category_ok": true,
+    "category_counts": {
+     "underweight": 2,
+     "normal": 1,
+     "overweight": 1,
+     "obese": 1
+    },
+    "pass": true
+   },
+   {
+    "height": 180,
+    "weight": 75,
+    "bmi": "23.1",
+    "category": "normal",
+    "value_ok": true,
+    "trigger": "input",
+    "category_ok": true,
+    "category_counts": {
+     "underweight": 1,
+     "normal": 2,
+     "overweight": 1,
+     "obese": 1
+    },
+    "pass": true
+   },
+   {
+    "height": 170,
+    "weight": 80,
+    "bmi": "27.7",
+    "category": "overweight",
+    "value_ok": true,
+    "trigger": "input",
+    "category_ok": true,
+    "category_counts": {
+     "underweight": 1,
+     "normal": 1,
+     "overweight": 2,
+     "obese": 1
+    },
+    "pass": true
+   },
+   {
+    "height": 165,
+    "weight": 95,
+    "bmi": "34.9",
+    "category": "obese",
+    "value_ok": true,
+    "trigger": "input",
+    "category_ok": true,
+    "category_counts": {
+     "underweight": 1,
+     "normal": 1,
+     "overweight": 1,
+     "obese": 2
+    },
+    "pass": true
+   }
+  ],
+  "scale": {
+   "status": "wrong",
+   "correct": 4,
+   "total": 5,
+   "marker": "polygon (0/1/2/8)",
+   "positions": [
+    {
+     "bmi": "22.9",
+     "expected": "normal",
+     "shown": "normal",
+     "ok": true
+    },
+    {
+     "bmi": "17.6",
+     "expected": "underweight",
+     "shown": "normal",
+     "ok": false
+    },
+    {
+     "bmi": "23.1",
+     "expected": "normal",
+     "shown": "normal",
+     "ok": true
+    },
+    {
+     "bmi": "27.7",
+     "expected": "overweight",
+     "shown": "overweight",
+     "ok": true
+    },
+    {
+     "bmi": "34.9",
+     "expected": "obese",
+     "shown": "obese",
+     "ok": true
+    }
+   ]
+  },
+  "duration_ms": 933
+ },
+ "after_inputs": {
+  "height": 165,
+  "weight": 95
+ },
+ "screenshot_after": "/api/shots/run-20261022-214758-7c074b/att-20261022-214801-d2c0cf-after.png",
+ "source": "<article>\n<h1>BMI Calculator</h1>\n<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:1rem\">\n<label>Height (cm)<input id=\"h\" type=\"number\" value=\"175\" min=\"50\" max=\"260\" step=\"1\"></label>\n<label>Weight (kg)<input id=\"w\" type=\"number\" value=\"70\" min=\"10\" max=\"400\" step=\"0.1\"></label>\n</div>\n</article>\n<article>\n<h2 id=\"bmi\">22.9</h2>\n<p><mark id=\"cat\">Normal</mark></p>\n<svg id=\"scale\" viewBox=\"0 0 400 70\" width=\"100%\" role=\"img\" aria-label=\"BMI category scale\">\n<rect x=\"0\" y=\"20\" width=\"74\" height=\"20\" fill=\"#60a5fa\"/>\n<rect x=\"74\" y=\"20\" width=\"106\" height=\"20\" fill=\"#34d399\"/>\n<rect x=\"180\" y=\"20\" width=\"110\" height=\"20\" fill=\"#fbbf24\"/>\n<rect x=\"290\" y=\"20\" width=\"110\" height=\"20\" fill=\"#f87171\"/>\n<text x=\"37\" y=\"60\" font-size=\"11\" text-anchor=\"middle\">Under</text>\n<text x=\"127\" y=\"60\" font-size=\"11\" text-anchor=\"middle\">Normal</text>\n<text x=\"235\" y=\"60\" font-size=\"11\" text-anchor=\"middle\">Over</text>\n<text x=\"345\" y=\"60\" font-size=\"11\" text-anchor=\"middle\">Obese</text>\n<polygon id=\"marker\" points=\"0,14 10,14 5,22\" fill=\"currentColor\"/>\n</svg>\n<small id=\"range\">Scale spans BMI 10 to 40</small>\n</article>\n<script>\nconst h=document.getElementById('h'),w=document.getElementById('w');\nconst bmiEl=document.getElementById('bmi'),catEl=document.getElementById('cat'),mk=document.getElementById('marker');\nfunction upd(){\nconst m=h.value/100,b=w.value/(m*m);\nconst v=isFinite(b)?b:0;\nbmiEl.textContent=v.toFixed(1);\nlet c,col;\nif(v<18.5){c='Underweight';col='#60a5fa'}\nelse if(v<25){c='Normal';col='#34d399'}\nelse if(v<30){c='Overweight';col='#fbbf24'}\nelse{c='Obese';col='#f87171'}\ncatEl.textContent=c;catEl.style.background=col;\nconst clamped=Math.min(Math.max(v,10),40);\nconst x=(clamped-10)/30*400;\nmk.setAttribute('transform',`translate(${x-5},0)`);\nmk.style.color=col;\n}\nh.addEventListener('input',upd);w.addEventListener('input',upd);upd();\n</script>",
+ "reasoning_text": "",
+ "chunks": [
+  [
+   622.5,
+   "<article"
+  ],
+  [
+   781.3,
+   ">\n<h1>BM"
+  ],
+  [
+   873.2,
+   "I Calculator</h1"
+  ],
+  [
+   873.3,
+   ">\n<div"
+  ],
+  [
+   873.3,
+   " style=\"display"
+  ],
+  [
+   873.3,
+   ":grid;grid-template"
+  ],
+  [
+   873.5,
+   "-columns:1fr "
+  ],
+  [
+   873.5,
+   "1fr;gap:1"
+  ],
+  [
+   873.6,
+   "rem\">\n<label>"
+  ],
+  [
+   949.8,
+   "Height (cm)<input"
+  ],
+  [
+   949.9,
+   " id=\"h"
+  ],
+  [
+   949.9,
+   "\" type=\"number\" value"
+  ],
+  [
+   950.0,
+   "=\"175\" min=\"50"
+  ],
+  [
+   950.0,
+   "\" max"
+  ],
+  [
+   950.0,
+   "=\"260"
+  ],
+  [
+   950.1,
+   "\" step=\"1\"></label>"
+  ],
+  [
+   950.1,
+   "\n<label>Weight ("
+  ],
+  [
+   1119.8,
+   "kg)<input id=\"w"
+  ],
+  [
+   1119.8,
+   "\" type=\"number\" value=\"70"
+  ],
+  [
+   1120.0,
+   "\" min=\"10"
+  ],
+  [
+   1120.0,
+   "\" max=\"400"
+  ],
+  [
+   1120.1,
+   "\" step=\"0"
+  ],
+  [
+   1120.1,
+   ".1\"></label>\n</"
+  ],
+  [
+   1120.1,
+   "div>\n</"
+  ],
+  [
+   1278.9,
+   "article>\n<article>"
+  ],
+  [
+   1279.0,
+   "\n<h"
+  ],
+  [
+   1279.0,
+   "2 "
+  ],
+  [
+   1279.1,
+   "id"
+  ],
+  [
+   1279.1,
+   "=\"b"
+  ],
+  [
+   1279.1,
+   "mi\">"
+  ],
+  [
+   1279.2,
+   "22"
+  ],
+  [
+   1279.2,
+   ".9"
+  ],
+  [
+   1279.2,
+   "</h2>\n<p>"
+  ],
+  [
+   1447.8,
+   "<m"
+  ],
+  [
+   1447.8,
+   "ark id=\"cat\">Norm"
+  ],
+  [
+   1447.8,
+   "al</mark></p>"
+  ],
+  [
+   1447.8,
+   "\n<svg id"
+  ],
+  [
+   1447.9,
+   "=\"scale\" viewBox"
+  ],
+  [
+   1447.9,
+   "=\"0 0 400"
+  ],
+  [
+   1447.9,
+   " 70"
+  ],
+  [
+   1447.9,
+   "\" width"
+  ],
+  [
+   1610.0,
+   "=\"100%\" role"
+  ],
+  [
+   1610.2,
+   "=\"img\" aria-label=\""
+  ],
+  [
+   1610.3,
+   "BMI category scale\">"
+  ],
+  [
+   1610.3,
+   "\n<rect x=\"0\" y"
+  ],
+  [
+   1610.3,
+   "=\"20"
+  ],
+  [
+   1610.3,
+   "\" width=\"74"
+  ],
+  [
+   1610.4,
+   "\" height=\"20"
+  ],
+  [
+   1610.4,
+   "\" f"
+  ],
+  [
+   1767.4,
+   "ill=\"#60"
+  ],
+  [
+   1767.5,
+   "a5fa\"/"
+  ],
+  [
+   1767.5,
+   ">\n<rect x=\"74"
+  ],
+  [
+   1767.5,
+   "\" y=\"20\" width=\"106"
+  ],
+  [
+   1767.6,
+   "\" height=\"20\" fill=\""
+  ],
+  [
+   1767.6,
+   "#34"
+  ],
+  [
+   1767.6,
+   "d399\"/>\n<r"
+  ],
+  [
+   1767.7,
+   "ect x=\"180"
+  ],
+  [
+   1932.9,
+   "\" y=\"20\" width=\"110"
+  ],
+  [
+   1932.9,
+   "\" height=\"20\" fill=\""
+  ],
+  [
+   1932.9,
+   "#f"
+  ],
+  [
+   1933.0,
+   "bbf24\"/>"
+  ],
+  [
+   1933.1,
+   "\n<rect x=\"290\" y"
+  ],
+  [
+   1933.1,
+   "=\"20\" width=\"110\" height"
+  ],
+  [
+   1933.1,
+   "=\"20\" fill=\"#f"
+  ],
+  [
+   1933.2,
+   "87171\"/>\n<text"
+  ],
+  [
+   2094.5,
+   " x=\"37"
+  ],
+  [
+   2096.7,
+   "\" y=\"60"
+  ],
+  [
+   2096.7,
+   "\" font-size=\"11"
+  ],
+  [
+   2096.7,
+   "\" text-anchor=\"midd"
+  ],
+  [
+   2096.7,
+   "le\">Under"
+  ],
+  [
+   2096.7,
+   "</"
+  ],
+  [
+   2096.7,
+   "text>\n<text x=\"127"
+  ],
+  [
+   2096.7,
+   "\" y=\"60\" font-size"
+  ],
+  [
+   2265.7,
+   "=\"11\" text-anchor"
+  ],
+  [
+   2267.9,
+   "=\"middle\">Normal</"
+  ],
+  [
+   2268.0,
+   "text>\n<text x=\"235"
+  ],
+  [
+   2268.0,
+   "\" y=\"60\" font-size"
+  ],
+  [
+   2268.0,
+   "=\"11\" text-anchor"
+  ],
+  [
+   2268.0,
+   "=\"middle\">Over</text"
+  ],
+  [
+   2268.0,
+   ">\n<text x=\"345\""
+  ],
+  [
+   2268.1,
+   " y=\"60\" font-size=\""
+  ],
+  [
+   2446.7,
+   "11\" text-anchor=\""
+  ],
+  [
+   2446.8,
+   "middle\">Obese</text"
+  ],
+  [
+   2446.9,
+   ">\n<polygon id=\""
+  ],
+  [
+   2446.9,
+   "marker\" points=\"0"
+  ],
+  [
+   2446.9,
+   ",14"
+  ],
+  [
+   2446.9,
+   " 10"
+  ],
+  [
+   2446.9,
+   ",14"
+  ],
+  [
+   2446.9,
+   " 5"
+  ],
+  [
+   2587.2,
+   ",22"
+  ],
+  [
+   2587.3,
+   "\" fill=\"curr"
+  ],
+  [
+   2587.3,
+   "entColor\"/>\n</"
+  ],
+  [
+   2587.3,
+   "svg>\n<small id"
+  ],
+  [
+   2587.3,
+   "=\"range"
+  ],
+  [
+   2587.3,
+   "\">Sc"
+  ],
+  [
+   2587.4,
+   "ale sp"
+  ],
+  [
+   2587.4,
+   "ans B"
+  ],
+  [
+   2752.5,
+   "MI 10 to 40"
+  ],
+  [
+   2752.6,
+   "</small>\n</article>"
+  ],
+  [
+   2752.7,
+   "\n<script>\nconst h="
+  ],
+  [
+   2752.7,
+   "document.getElementById('h"
+  ],
+  [
+   2752.7,
+   "'),w=document.getEl"
+  ],
+  [
+   2752.7,
+   "ementById('w');"
+  ],
+  [
+   2752.7,
+   "\nconst bmi"
+  ],
+  [
+   2970.9,
+   "El=document.getElement"
+  ],
+  [
+   2970.9,
+   "ById('bmi'),cat"
+  ],
+  [
+   2970.9,
+   "El=document.getElement"
+  ],
+  [
+   2970.9,
+   "ById('cat'),m"
+  ],
+  [
+   2971.0,
+   "k"
+  ],
+  [
+   2971.0,
+   "=document.getElementById('"
+  ],
+  [
+   2971.0,
+   "marker');\nfunction"
+  ],
+  [
+   2971.0,
+   " up"
+  ],
+  [
+   3051.6,
+   "d(){\nconst m=h"
+  ],
+  [
+   3051.7,
+   ".value/100,"
+  ],
+  [
+   3051.9,
+   "b=w.value/("
+  ],
+  [
+   3051.9,
+   "m*m);\nconst v"
+  ],
+  [
+   3051.9,
+   "=is"
+  ],
+  [
+   3051.9,
+   "Finite(b)?b"
+  ],
+  [
+   3051.9,
+   ":0;\nbmiE"
+  ],
+  [
+   3051.9,
+   "l.textContent=v."
+  ],
+  [
+   3218.1,
+   "toFixed(1);"
+  ],
+  [
+   3218.1,
+   "\nlet c,"
+  ],
+  [
+   3218.2,
+   "col"
+  ],
+  [
+   3218.2,
+   ";"
+  ],
+  [
+   3218.2,
+   "\nif(v<18.5"
+  ],
+  [
+   3218.4,
+   "){"
+  ],
+  [
+   3218.4,
+   "c='"
+  ],
+  [
+   3218.4,
+   "Underweight';col='#"
+  ],
+  [
+   3378.1,
+   "60a5fa'}"
+  ],
+  [
+   3378.1,
+   "\nelse if(v<25"
+  ],
+  [
+   3378.2,
+   "){c='Normal';col"
+  ],
+  [
+   3378.2,
+   "='#34d399'}"
+  ],
+  [
+   3378.2,
+   "\nelse if(v<30){c"
+  ],
+  [
+   3378.2,
+   "='Overweight';col='"
+  ],
+  [
+   3378.2,
+   "#fbbf24'}"
+  ],
+  [
+   3378.2,
+   "\nelse{c='Obese"
+  ],
+  [
+   3543.8,
+   "';col='#f87171'"
+  ],
+  [
+   3543.9,
+   "}\ncatEl.textCont"
+  ],
+  [
+   3543.9,
+   "ent=c;catEl."
+  ],
+  [
+   3543.9,
+   "style.background=col;\nconst"
+  ],
+  [
+   3543.9,
+   " cl"
+  ],
+  [
+   3543.9,
+   "amped=Math.min("
+  ],
+  [
+   3543.9,
+   "Math.max(v,10"
+  ],
+  [
+   3544.0,
+   "),40);\nconst"
+  ],
+  [
+   3711.1,
+   " x=("
+  ],
+  [
+   3711.2,
+   "clamped-10)/30"
+  ],
+  [
+   3711.2,
+   "*400;\nmk.set"
+  ],
+  [
+   3711.2,
+   "Attribute('transform',"
+  ],
+  [
+   3711.2,
+   "`translate(${x-"
+  ],
+  [
+   3711.2,
+   "5},0)`);\nm"
+  ],
+  [
+   3711.2,
+   "k.style.color=col;"
+  ],
+  [
+   3711.2,
+   "\n}\nh.addEvent"
+  ],
+  [
+   3816.7,
+   "Listener('input',upd);"
+  ],
+  [
+   3816.9,
+   "w.addEventListener('"
+  ],
+  [
+   3820.2,
+   "input',upd);upd();"
+  ],
+  [
+   3820.3,
+   "\n</script>"
+  ]
+ ],
+ "grade": {
+  "grade": "partial",
+  "reason": null,
+  "defects": [
+   "scale marker in the wrong category at BMI 17.6"
+  ]
+ }
+}

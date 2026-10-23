@@ -1,0 +1,435 @@
+{
+ "id": "att-20261022-201705-809371",
+ "run_id": "run-20261022-201657-4f071e",
+ "format": "html_pico",
+ "model": "gpt-6.1-sol-ultrafast",
+ "rep": 2,
+ "task": "mortgage",
+ "status": "ok",
+ "requested": {
+  "model": "gpt-6.1-sol",
+  "provider_order": null,
+  "service_tier": "ultrafast",
+  "reasoning": {
+   "effort": "low"
+  }
+ },
+ "cache_policy": "warm",
+ "timings": {
+  "request_start_epoch_ms": 1792700226589.74,
+  "first_byte_ms": 465.794189453125,
+  "first_token_ms": 954.597900390625,
+  "content_complete_ms": 6197.354248046875,
+  "generation_complete_ms": 6199.802001953125,
+  "first_visible_ui_ms": 955.260009765625,
+  "fully_rendered_ms": 6216.72705078125,
+  "harness_first_chunk_ms": 954.260009765625,
+  "relay_latency_ms": -0.337890625
+ },
+ "errors": [],
+ "system_prompt_tokens": 178,
+ "actual": {
+  "model": "gpt-6.1-sol",
+  "provider": "OpenAI",
+  "service_tier": "ultrafast",
+  "reasoning": {
+   "context": "all_turns",
+   "effort": "low",
+   "mode": "standard",
+   "summary": null
+  },
+  "finish_reason": "stop"
+ },
+ "model_substituted": false,
+ "tier_substituted": false,
+ "usage": {
+  "input_tokens": 389,
+  "cached_input_tokens": 0,
+  "cache_write_tokens": 0,
+  "output_tokens": 2398,
+  "reasoning_tokens": 0
+ },
+ "usage_raw": {
+  "input_tokens": 389,
+  "input_tokens_details": {
+   "cache_write_tokens": 0,
+   "cached_tokens": 0
+  },
+  "output_tokens": 2398,
+  "output_tokens_details": {
+   "reasoning_tokens": 0
+  },
+  "total_tokens": 2787
+ },
+ "cost_usd": 0.148548,
+ "cost_source": "Estimated: tokens x Ultrafast price table (6x standard)",
+ "output_tokens_per_s": 457.4,
+ "harness": {
+  "extractedSource": "<main>\n  <h1>Mortgage calculator</h1>\n  <p>Estimate your fixed-rate mortgage payments and see how your balance changes over time.</p>\n\n  <section aria-label=\"Mortgage inputs\" style=\"display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1rem\">\n    <label for=\"price\">Property price ($)\n      <input id=\"price\" type=\"number\" min=\"0\" step=\"1000\" value=\"400000\" inputmode=\"decimal\">\n    </label>\n    <label for=\"down\">Down payment ($)\n      <input id=\"down\" type=\"number\" min=\"0\" step=\"1000\" value=\"80000\" inputmode=\"decimal\">\n    </label>\n    <label for=\"rate\">Annual interest rate (%)\n      <input id=\"rate\" type=\"number\" min=\"0\" max=\"100\" step=\"0.01\" value=\"6.5\" inputmode=\"decimal\">\n    </label>\n    <label for=\"term\">Term (years)\n      <input id=\"term\" type=\"number\" min=\"1\" max=\"100\" step=\"1\" value=\"30\" inputmode=\"numeric\">\n    </label>\n  </section>\n  <p id=\"error\" role=\"alert\" hidden></p>\n\n  <section id=\"results\" aria-label=\"Mortgage results\">\n    <div style=\"display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem\" aria-live=\"polite\">\n      <article><header>Loan principal</header><h2 id=\"principal\"></h2></article>\n      <article><header>Monthly payment</header><h2 id=\"monthly\"></h2></article>\n      <article><header>Total interest</header><h2 id=\"interest\"></h2></article>\n      <article><header>Total payment</header><h2 id=\"total\"></h2></article>\n    </div>\n    <p><small>Principal and interest only. Excludes taxes, insurance, fees and mortgage insurance. Total payment excludes your down payment. Calculations use unrounded monthly payments.</small></p>\n\n    <article>\n      <h2>Annual payment breakdown</h2>\n      <p><span style=\"color:#2474b5\">\u25cf</span> Principal paid &nbsp; <span style=\"color:#bc5617\">\u25cf</span> Interest paid</p>\n      <label for=\"selectedYear\">Explore year <output id=\"yearNumber\" for=\"selectedYear\">1</output>\n        <input id=\"selectedYear\" type=\"range\" min=\"1\" max=\"30\" value=\"1\" step=\"1\">\n      </label>\n      <p id=\"yearDetails\" aria-live=\"polite\"></p>\n      <svg id=\"chart\" viewBox=\"0 0 900 340\" role=\"img\" aria-labelledby=\"chartTitle chartDescription\" style=\"width:100%;height:auto\">\n        <title id=\"chartTitle\">Annual principal and interest payments</title>\n        <desc id=\"chartDescription\">Stacked bars show principal and interest paid each year. Select a bar or use the year slider to explore.</desc>\n      </svg>\n      <small>Select a bar, use the year slider, or focus a bar and press Enter to explore a year.</small>\n    </article>\n\n    <h2>Annual amortization schedule</h2>\n    <div style=\"overflow-x:auto\">\n      <table>\n        <caption>Payments and remaining loan balance by year</caption>\n        <thead><tr><th scope=\"col\">Year</th><th scope=\"col\">Interest paid</th><th scope=\"col\">Principal paid</th><th scope=\"col\">Remaining balance</th></tr></thead>\n        <tbody id=\"schedule\"></tbody>\n      </table>\n    </div>\n  </section>\n</main>\n<script>\n(() => {\n  const $ = id => document.getElementById(id);\n  const money = value => value.toLocaleString('en-US', {style:'currency', currency:'USD'});\n  const fields = ['price','down','rate','term'].map($);\n  const slider = $('selectedYear');\n  const svg = $('chart');\n  const ns = 'http://www.w3.org/2000/svg';\n  let years = [];\n  let bars = [];\n  function node(tag, attrs, text) {\n    const el = document.createElementNS(ns, tag);\n    Object.entries(attrs || {}).forEach(([key,value]) => el.setAttribute(key,value));\n    if (text !== undefined) el.textContent = text;\n    return el;\n  }\n  function selectYear(value) {\n    const index = Math.max(0, Math.min(years.length - 1, Number(value) - 1));\n    slider.value = index + 1;\n    $('yearNumber').textContent = index + 1;\n    const row = years[index];\n    if (!row) return;\n    $('yearDetails').textContent = `Year ${index + 1}: ${money(row.principal)} principal \u00b7 ${money(row.interest)} interest \u00b7 ${money(row.balance)} remaining`;\n    bars.forEach((bar,i) => {\n      bar.setAttribute('stroke', i === index ? 'currentColor' : 'none');\n      bar.setAttribute('stroke-width', i === index ? '2' : '0');\n      bar.setAttribute('aria-pressed', String(i === index));\n    });\n  }\n  function draw() {\n    while (svg.children.length > 2) svg.lastChild.remove();\n    bars = [];\n    const left = 85, top = 20, width = 795, height = 265;\n    const max = Math.max(1, ...years.map(y => y.principal + y.interest));\n    for (let i = 0; i <= 4; i++) {\n      const y = top + height - height * i / 4;\n      svg.append(node('line',{x1:left,y1:y,x2:left+width,y2:y,stroke:'currentColor','stroke-opacity':'.15'}));\n      svg.append(node('text',{x:left-10,y:y+4,'text-anchor':'end',fill:'currentColor','font-size':12},money(max*i/4)));\n    }\n    const step = width / years.length;\n    years.forEach((row,i) => {\n      const x = left + i * step + step * .12;\n      const w = step * .76;\n      const ph = row.principal / max * height;\n      const ih = row.interest / max * height;\n      const g = node('g',{tabindex:'0',role:'button','aria-label':`Year ${i+1}: principal ${money(row.principal)}, interest ${money(row.interest)}, remaining ${money(row.balance)}`,style:'cursor:pointer'});\n      g.append(node('title',{},`Year ${i+1}\\nPrincipal: ${money(row.principal)}\\nInterest: ${money(row.interest)}\\nBalance: ${money(row.balance)}`));\n      g.append(node('rect',{x,y:top,width:w,height,fill:'transparent',stroke:'none'}));\n      g.append(node('rect',{x,y:top+height-ph,width:w,height:ph,fill:'#2474b5'}));\n      g.append(node('rect',{x,y:top+height-ph-ih,width:w,height:ih,fill:'#bc5617'}));\n      g.addEventListener('click',() => selectYear(i+1));\n      g.addEventListener('keydown', e => {\n        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectYear(i+1); }\n      });\n      svg.append(g);\n      bars.push(g);\n      const interval = Math.max(1,Math.ceil(years.length/15));\n      if (i === 0 || (i+1)%interval === 0 || i === years.length-1) {\n        svg.append(node('text',{x:x+w/2,y:306,'text-anchor':'middle',fill:'currentColor','font-size':12},i+1));\n      }\n    });\n    svg.append(node('text',{x:left+width/2,y:332,'text-anchor':'middle',fill:'currentColor','font-size':13},'Year'));\n    selectYear(slider.value);\n  }\n  function calculate() {\n    const [price,down,rate,term] = fields.map(el => el.valueAsNumber);\n    let error = '';\n    if (fields.some(el => el.value === '' || !Number.isFinite(el.valueAsNumber))) error = 'Enter a valid number in every field.';\n    else if (price < 0 || down < 0) error = 'Property price and down payment cannot be negative.';\n    else if (down > price) error = 'Down payment cannot exceed the property price.';\n    else if (rate < 0 || rate > 100) error = 'Enter an annual interest rate from 0% to 100%.';\n    else if (!Number.isInteger(term) || term < 1 || term > 100) error = 'Enter a whole-number term from 1 to 100 years.';\n    $('error').hidden = !error;\n    $('error').textContent = error;\n    $('results').hidden = !!error;\n    if (error) return;\n    const principal = price-down;\n    const r = rate/100/12;\n    const n = term*12;\n    const payment = r === 0 ? principal/n : principal*r / (-Math.expm1(-n*Math.log1p(r)));\n    years = [];\n    let balance = principal;\n    let totalInterest = 0;\n    for (let year=1; year<=term; year++) {\n      let interestPaid=0, principalPaid=0;\n      for (let month=1; month<=12; month++) {\n        const interest = balance*r;\n        const paidPrincipal = year === term && month === 12 ? balance : Math.min(balance,Math.max(0,payment-interest));\n        balance = Math.max(0,balance-paidPrincipal);\n        interestPaid += interest;\n        principalPaid += paidPrincipal;\n      }\n      totalInterest += interestPaid;\n      years.push({interest:interestPaid,principal:principalPaid,balance});\n    }\n    $('principal').textContent = money(principal);\n    $('monthly').textContent = money(payment);\n    $('interest').textContent = money(totalInterest);\n    $('total').textContent = money(principal+totalInterest);\n    $('schedule').replaceChildren();\n    const fragment = document.createDocumentFragment();\n    years.forEach((row,i) => {\n      const tr = document.createElement('tr');\n      [i+1,money(row.interest),money(row.principal),money(row.balance)].forEach((value,j) => {\n        const cell = document.createElement(j === 0 ? 'th' : 'td');\n        if (j === 0) cell.scope = 'row';\n        cell.textContent = value;\n        tr.append(cell);\n      });\n      fragment.append(tr);\n    });\n    $('schedule').append(fragment);\n    slider.max = term;\n    draw();\n  }\n  fields.forEach(el => el.addEventListener('input',calculate));\n  slider.addEventListener('input',() => selectYear(slider.value));\n  calculate();\n})();\n</script>",
+  "fenced": false,
+  "firstChunkAt": 1792700227544,
+  "firstVisibleAt": 1792700227545,
+  "streamEndAt": 1792700232787,
+  "fullyRenderedAt": 1792700232806.467,
+  "renderErrors": [],
+  "rendered": true,
+  "parseOk": true,
+  "renderedText": "",
+  "visibleText": "Mortgage calculator\n\nEstimate your fixed-rate mortgage payments and see how your balance changes over time.\n\nProperty price ($) \nDown payment ($) \nAnnual interest rate (%) \nTerm (years) \nLoan principal\n$320,000.00\nMonthly payment\n$2,022.62\nTotal interest\n$408,142.36\nTotal payment\n$728,142.36\n\nPrincipal and interest only. Excludes taxes, insurance, fees and mortgage insurance. Total payment excludes your down payment. Calculations use unrounded monthly payments.\n\nAnnual payment breakdown\n\n\u25cf Principal paid \u00a0 \u25cf Interest paid\n\nExplore year 1 \n\nYear 1: $3,576.72 principal \u00b7 $20,694.69 interest \u00b7 $316,423.28 remaining\n\n$0.00\n$6,067.85\n$12,135.71\n$18,203.56\n$24,271.41\n1\n2\n4\n6\n8\n10\n12\n14\n16\n18\n20\n22\n24\n26\n28\n30\nYear\n Select a bar, use the year slider, or focus a bar and press Enter to explore a year.\nAnnual amortization schedule\nPayments and remaining loan balance by year\nYear\tInterest paid\tPrincipal paid\tRemaining balance\n1\t$20,694.69\t$3,576.72\t$316,423.28\n2\t$20,455.15\t$3,816.26\t$312,607.02\n3\t$20,199.57\t$4,071.84\t$308,535.17\n4\t$19,926.87\t$4,344.54\t$304,190.63\n5\t$19,635.91\t$4,635.50\t$299,555.13\n6\t$19,325.46\t$4,945.95\t$294,609.18\n7\t$18,994.22\t$5,277.19\t$289,331.98\n8\t$18,640.80\t$5,630.62\t$283,701.37\n9\t$18,263.70\t$6,007.71\t$277,693.66\n10\t$17,861.36\t$6,410.06\t$271,283.60\n11\t$17,432.06\t$6,839.35\t$264,444.26\n12\t$16,974.02\t$7,297.39\t$257,146.86\n13\t$16,485.30\t$7,786.11\t$249,360.75\n14\t$15,963.85\t$8,307.56\t$241,053.19\n15\t$15,407.48\t$8,863.94\t$232,189.25\n16\t$14,813.84\t$9,457.57\t$222,731.68\n17\t$14,180.45\t$10,090.96\t$212,640.72\n18\t$13,504.64\t$10,766.77\t$201,873.95\n19\t$12,783.57\t$11,487.84\t$190,386.11\n20\t$12,014.21\t$12,257.20\t$178,128.90\n21\t$11,193.32\t$13,078.09\t$165,050.81\n22\t$10,317.46\t$13,953.96\t$151,096.86\n23\t$9,382.93\t$14,888.48\t$136,208.38\n24\t$8,385.83\t$15,885.59\t$120,322.79\n25\t$7,321.94\t$16,949.47\t$103,373.32\n26\t$6,186.80\t$18,084.61\t$85,288.71\n27\t$4,975.64\t$19,295.77\t$65,992.94\n28\t$3,683.37\t$20,588.05\t$45,404.89\n29\t$2,304.55\t$21,966.86\t$23,438.03\n30\t$833.39\t$23,438.03\t$0.00\n400000\n80000\n6.5\n30",
+  "overflow": []
+ },
+ "screenshot": "/api/shots/run-20261022-201657-4f071e/att-20261022-201705-809371.png",
+ "parse": {
+  "ok": true,
+  "rendered": true,
+  "errors": [],
+  "fenced": false
+ },
+ "checklist": {
+  "labels_inputs": true,
+  "labels_outputs": true,
+  "mentions_amortization": true,
+  "chart_legend_principal_interest": true,
+  "default_principal": true,
+  "default_monthly_payment": true,
+  "default_total_interest": true,
+  "default_total_payment": true,
+  "default_table_year1": true
+ },
+ "checklist_basis": "sandbox frame text + control values/labels",
+ "interactive": {
+  "status": "pass",
+  "passed": 4,
+  "total": 4,
+  "immediate": true,
+  "input_lookup": {
+   "price": "label:text",
+   "down": "label:text",
+   "rate": "label:text",
+   "years": "label:text"
+  },
+  "cases": [
+   {
+    "price": 500000,
+    "down": 100000,
+    "rate": 5.0,
+    "years": 30,
+    "inputs_set": true,
+    "expected": {
+     "principal": "400000.00",
+     "monthly": "2147.29",
+     "total_interest": "373023.14",
+     "total_payment": "773023.14"
+    },
+    "checks": {
+     "principal": true,
+     "monthly_payment": true,
+     "total_interest": true,
+     "total_payment": true,
+     "table_year1": true
+    },
+    "table_rows": 30,
+    "table_rows_ok": true,
+    "trigger": "input",
+    "pass": true
+   },
+   {
+    "price": 300000,
+    "down": 60000,
+    "rate": 7.25,
+    "years": 15,
+    "inputs_set": true,
+    "expected": {
+     "principal": "240000.00",
+     "monthly": "2190.87",
+     "total_interest": "154356.76",
+     "total_payment": "394356.76"
+    },
+    "checks": {
+     "principal": true,
+     "monthly_payment": true,
+     "total_interest": true,
+     "total_payment": true,
+     "table_year1": true
+    },
+    "table_rows": 15,
+    "table_rows_ok": true,
+    "trigger": "input",
+    "pass": true
+   },
+   {
+    "price": 650000,
+    "down": 130000,
+    "rate": 6.75,
+    "years": 20,
+    "inputs_set": true,
+    "expected": {
+     "principal": "520000.00",
+     "monthly": "3953.89",
+     "total_interest": "428934.28",
+     "total_payment": "948934.28"
+    },
+    "checks": {
+     "principal": true,
+     "monthly_payment": true,
+     "total_interest": true,
+     "total_payment": true,
+     "table_year1": true
+    },
+    "table_rows": 20,
+    "table_rows_ok": true,
+    "trigger": "input",
+    "pass": true
+   },
+   {
+    "price": 250000,
+    "down": 50000,
+    "rate": 0.0,
+    "years": 10,
+    "inputs_set": true,
+    "expected": {
+     "principal": "200000.00",
+     "monthly": "1666.67",
+     "total_interest": "0.00",
+     "total_payment": "200000.00"
+    },
+    "checks": {
+     "principal": true,
+     "monthly_payment": true,
+     "total_interest": true,
+     "total_payment": true,
+     "table_year1": true
+    },
+    "table_rows": 10,
+    "table_rows_ok": true,
+    "trigger": "input",
+    "pass": true
+   }
+  ],
+  "chart": {
+   "found": true,
+   "updates": true
+  }
+ },
+ "after_inputs": {
+  "price": 250000,
+  "down": 50000,
+  "rate": 0.0,
+  "years": 10
+ },
+ "screenshot_after": "/api/shots/run-20261022-201657-4f071e/att-20261022-201705-809371-after.png",
+ "source": "<main>\n  <h1>Mortgage calculator</h1>\n  <p>Estimate your fixed-rate mortgage payments and see how your balance changes over time.</p>\n\n  <section aria-label=\"Mortgage inputs\" style=\"display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1rem\">\n    <label for=\"price\">Property price ($)\n      <input id=\"price\" type=\"number\" min=\"0\" step=\"1000\" value=\"400000\" inputmode=\"decimal\">\n    </label>\n    <label for=\"down\">Down payment ($)\n      <input id=\"down\" type=\"number\" min=\"0\" step=\"1000\" value=\"80000\" inputmode=\"decimal\">\n    </label>\n    <label for=\"rate\">Annual interest rate (%)\n      <input id=\"rate\" type=\"number\" min=\"0\" max=\"100\" step=\"0.01\" value=\"6.5\" inputmode=\"decimal\">\n    </label>\n    <label for=\"term\">Term (years)\n      <input id=\"term\" type=\"number\" min=\"1\" max=\"100\" step=\"1\" value=\"30\" inputmode=\"numeric\">\n    </label>\n  </section>\n  <p id=\"error\" role=\"alert\" hidden></p>\n\n  <section id=\"results\" aria-label=\"Mortgage results\">\n    <div style=\"display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem\" aria-live=\"polite\">\n      <article><header>Loan principal</header><h2 id=\"principal\"></h2></article>\n      <article><header>Monthly payment</header><h2 id=\"monthly\"></h2></article>\n      <article><header>Total interest</header><h2 id=\"interest\"></h2></article>\n      <article><header>Total payment</header><h2 id=\"total\"></h2></article>\n    </div>\n    <p><small>Principal and interest only. Excludes taxes, insurance, fees and mortgage insurance. Total payment excludes your down payment. Calculations use unrounded monthly payments.</small></p>\n\n    <article>\n      <h2>Annual payment breakdown</h2>\n      <p><span style=\"color:#2474b5\">\u25cf</span> Principal paid &nbsp; <span style=\"color:#bc5617\">\u25cf</span> Interest paid</p>\n      <label for=\"selectedYear\">Explore year <output id=\"yearNumber\" for=\"selectedYear\">1</output>\n        <input id=\"selectedYear\" type=\"range\" min=\"1\" max=\"30\" value=\"1\" step=\"1\">\n      </label>\n      <p id=\"yearDetails\" aria-live=\"polite\"></p>\n      <svg id=\"chart\" viewBox=\"0 0 900 340\" role=\"img\" aria-labelledby=\"chartTitle chartDescription\" style=\"width:100%;height:auto\">\n        <title id=\"chartTitle\">Annual principal and interest payments</title>\n        <desc id=\"chartDescription\">Stacked bars show principal and interest paid each year. Select a bar or use the year slider to explore.</desc>\n      </svg>\n      <small>Select a bar, use the year slider, or focus a bar and press Enter to explore a year.</small>\n    </article>\n\n    <h2>Annual amortization schedule</h2>\n    <div style=\"overflow-x:auto\">\n      <table>\n        <caption>Payments and remaining loan balance by year</caption>\n        <thead><tr><th scope=\"col\">Year</th><th scope=\"col\">Interest paid</th><th scope=\"col\">Principal paid</th><th scope=\"col\">Remaining balance</th></tr></thead>\n        <tbody id=\"schedule\"></tbody>\n      </table>\n    </div>\n  </section>\n</main>\n<script>\n(() => {\n  const $ = id => document.getElementById(id);\n  const money = value => value.toLocaleString('en-US', {style:'currency', currency:'USD'});\n  const fields = ['price','down','rate','term'].map($);\n  const slider = $('selectedYear');\n  const svg = $('chart');\n  const ns = 'http://www.w3.org/2000/svg';\n  let years = [];\n  let bars = [];\n  function node(tag, attrs, text) {\n    const el = document.createElementNS(ns, tag);\n    Object.entries(attrs || {}).forEach(([key,value]) => el.setAttribute(key,value));\n    if (text !== undefined) el.textContent = text;\n    return el;\n  }\n  function selectYear(value) {\n    const index = Math.max(0, Math.min(years.length - 1, Number(value) - 1));\n    slider.value = index + 1;\n    $('yearNumber').textContent = index + 1;\n    const row = years[index];\n    if (!row) return;\n    $('yearDetails').textContent = `Year ${index + 1}: ${money(row.principal)} principal \u00b7 ${money(row.interest)} interest \u00b7 ${money(row.balance)} remaining`;\n    bars.forEach((bar,i) => {\n      bar.setAttribute('stroke', i === index ? 'currentColor' : 'none');\n      bar.setAttribute('stroke-width', i === index ? '2' : '0');\n      bar.setAttribute('aria-pressed', String(i === index));\n    });\n  }\n  function draw() {\n    while (svg.children.length > 2) svg.lastChild.remove();\n    bars = [];\n    const left = 85, top = 20, width = 795, height = 265;\n    const max = Math.max(1, ...years.map(y => y.principal + y.interest));\n    for (let i = 0; i <= 4; i++) {\n      const y = top + height - height * i / 4;\n      svg.append(node('line',{x1:left,y1:y,x2:left+width,y2:y,stroke:'currentColor','stroke-opacity':'.15'}));\n      svg.append(node('text',{x:left-10,y:y+4,'text-anchor':'end',fill:'currentColor','font-size':12},money(max*i/4)));\n    }\n    const step = width / years.length;\n    years.forEach((row,i) => {\n      const x = left + i * step + step * .12;\n      const w = step * .76;\n      const ph = row.principal / max * height;\n      const ih = row.interest / max * height;\n      const g = node('g',{tabindex:'0',role:'button','aria-label':`Year ${i+1}: principal ${money(row.principal)}, interest ${money(row.interest)}, remaining ${money(row.balance)}`,style:'cursor:pointer'});\n      g.append(node('title',{},`Year ${i+1}\\nPrincipal: ${money(row.principal)}\\nInterest: ${money(row.interest)}\\nBalance: ${money(row.balance)}`));\n      g.append(node('rect',{x,y:top,width:w,height,fill:'transparent',stroke:'none'}));\n      g.append(node('rect',{x,y:top+height-ph,width:w,height:ph,fill:'#2474b5'}));\n      g.append(node('rect',{x,y:top+height-ph-ih,width:w,height:ih,fill:'#bc5617'}));\n      g.addEventListener('click',() => selectYear(i+1));\n      g.addEventListener('keydown', e => {\n        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectYear(i+1); }\n      });\n      svg.append(g);\n      bars.push(g);\n      const interval = Math.max(1,Math.ceil(years.length/15));\n      if (i === 0 || (i+1)%interval === 0 || i === years.length-1) {\n        svg.append(node('text',{x:x+w/2,y:306,'text-anchor':'middle',fill:'currentColor','font-size':12},i+1));\n      }\n    });\n    svg.append(node('text',{x:left+width/2,y:332,'text-anchor':'middle',fill:'currentColor','font-size':13},'Year'));\n    selectYear(slider.value);\n  }\n  function calculate() {\n    const [price,down,rate,term] = fields.map(el => el.valueAsNumber);\n    let error = '';\n    if (fields.some(el => el.value === '' || !Number.isFinite(el.valueAsNumber))) error = 'Enter a valid number in every field.';\n    else if (price < 0 || down < 0) error = 'Property price and down payment cannot be negative.';\n    else if (down > price) error = 'Down payment cannot exceed the property price.';\n    else if (rate < 0 || rate > 100) error = 'Enter an annual interest rate from 0% to 100%.';\n    else if (!Number.isInteger(term) || term < 1 || term > 100) error = 'Enter a whole-number term from 1 to 100 years.';\n    $('error').hidden = !error;\n    $('error').textContent = error;\n    $('results').hidden = !!error;\n    if (error) return;\n    const principal = price-down;\n    const r = rate/100/12;\n    const n = term*12;\n    const payment = r === 0 ? principal/n : principal*r / (-Math.expm1(-n*Math.log1p(r)));\n    years = [];\n    let balance = principal;\n    let totalInterest = 0;\n    for (let year=1; year<=term; year++) {\n      let interestPaid=0, principalPaid=0;\n      for (let month=1; month<=12; month++) {\n        const interest = balance*r;\n        const paidPrincipal = year === term && month === 12 ? balance : Math.min(balance,Math.max(0,payment-interest));\n        balance = Math.max(0,balance-paidPrincipal);\n        interestPaid += interest;\n        principalPaid += paidPrincipal;\n      }\n      totalInterest += interestPaid;\n      years.push({interest:interestPaid,principal:principalPaid,balance});\n    }\n    $('principal').textContent = money(principal);\n    $('monthly').textContent = money(payment);\n    $('interest').textContent = money(totalInterest);\n    $('total').textContent = money(principal+totalInterest);\n    $('schedule').replaceChildren();\n    const fragment = document.createDocumentFragment();\n    years.forEach((row,i) => {\n      const tr = document.createElement('tr');\n      [i+1,money(row.interest),money(row.principal),money(row.balance)].forEach((value,j) => {\n        const cell = document.createElement(j === 0 ? 'th' : 'td');\n        if (j === 0) cell.scope = 'row';\n        cell.textContent = value;\n        tr.append(cell);\n      });\n      fragment.append(tr);\n    });\n    $('schedule').append(fragment);\n    slider.max = term;\n    draw();\n  }\n  fields.forEach(el => el.addEventListener('input',calculate));\n  slider.addEventListener('input',() => selectYear(slider.value));\n  calculate();\n})();\n</script>",
+ "reasoning_text": "",
+ "chunks": [
+  [
+   954.6,
+   "<main>\n  <h1>Mortgage calculator</h1>\n  <p>Estimate your fixed-rate mortgage payments and see how your balance changes over time.</p>\n\n  <section aria-label=\"Mortgage inputs\" style=\"display:grid"
+  ],
+  [
+   1018.3,
+   ";grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1rem\">\n    <label for=\"price\">Property price ($)\n      <input id=\"price\" type=\"number\" min=\"0\""
+  ],
+  [
+   1123.9,
+   " step=\"1000\" value=\"400000\" inputmode=\"decimal\">\n    </label>\n    <label for=\"down\">Down payment ($)\n      <input id=\"down\" type=\"number\" min=\"0\" step=\"100"
+  ],
+  [
+   1235.2,
+   "0\" value=\"80000\" inputmode=\"decimal\">\n    </label>\n    <label for=\"rate\">Annual interest rate (%)\n      <input id=\"rate\" type=\"number\" min=\"0\" max=\"100\" step"
+  ],
+  [
+   1342.5,
+   "=\"0.01\" value=\"6.5\" inputmode=\"decimal\">\n    </label>\n    <label for=\"term\">Term (years)\n      <input id=\"term\" type=\"number\" min=\"1\" max=\""
+  ],
+  [
+   1481.0,
+   "100\" step=\"1\" value=\"30\" inputmode=\"numeric\">\n    </label>\n  </section>\n  <p id=\"error\" role=\"alert\" hidden></p>\n\n  <section id=\"results\" aria-label=\""
+  ],
+  [
+   1545.2,
+   "Mortgage results\">\n    <div style=\"display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem\" aria-live=\"polite\">\n      <article><header>Loan principal</header"
+  ],
+  [
+   1651.0,
+   "><h2 id=\"principal\"></h2></article>\n      <article><header>Monthly payment</header><h2 id=\"monthly\"></h2></article>\n      <article><header>Total interest</header><h2 id=\""
+  ],
+  [
+   1754.9,
+   "interest\"></h2></article>\n      <article><header>Total payment</header><h2 id=\"total\"></h2></article>\n    </div>\n    <p><small>Principal and interest only. Excludes taxes, insurance"
+  ],
+  [
+   1859.2,
+   ", fees and mortgage insurance. Total payment excludes your down payment. Calculations use unrounded monthly payments.</small></p>\n\n    <article>\n      <h2>Annual payment breakdown</h2>\n      <p><span style=\""
+  ],
+  [
+   2005.2,
+   "color:#2474b5\">\u25cf</span> Principal paid &nbsp; <span style=\"color:#bc5617\">\u25cf</span> Interest paid</p>\n      <label for=\"selectedYear\">Explore year <output id"
+  ],
+  [
+   2068.3,
+   "=\"yearNumber\" for=\"selectedYear\">1</output>\n        <input id=\"selectedYear\" type=\"range\" min=\"1\" max=\"30\" value=\"1\" step=\"1\">\n      </label>\n      <p"
+  ],
+  [
+   2184.6,
+   " id=\"yearDetails\" aria-live=\"polite\"></p>\n      <svg id=\"chart\" viewBox=\"0 0 900 340\" role=\"img\" aria-labelledby=\"chartTitle chartDescription\" style=\"width:100"
+  ],
+  [
+   2291.8,
+   "%;height:auto\">\n        <title id=\"chartTitle\">Annual principal and interest payments</title>\n        <desc id=\"chartDescription\">Stacked bars show principal and interest paid each year. Select a bar or use the year slider to"
+  ],
+  [
+   2402.1,
+   " explore.</desc>\n      </svg>\n      <small>Select a bar, use the year slider, or focus a bar and press Enter to explore a year.</small>\n    </article>\n\n    <h2>Annual amortization schedule</"
+  ],
+  [
+   2529.5,
+   "h2>\n    <div style=\"overflow-x:auto\">\n      <table>\n        <caption>Payments and remaining loan balance by year</caption>\n        <thead><tr><th scope=\"col\">Year</th><th scope=\""
+  ],
+  [
+   2622.4,
+   "col\">Interest paid</th><th scope=\"col\">Principal paid</th><th scope=\"col\">Remaining balance</th></tr></thead>\n        <tbody id=\"schedule\"></tbody>\n      </table>\n    </div>\n"
+  ],
+  [
+   2735.9,
+   "  </section>\n</main>\n<script>\n(() => {\n  const $ = id => document.getElementById(id);\n  const money = value => value.toLocaleString('en-US', {style:'currency', currency:'USD'});\n"
+  ],
+  [
+   2833.3,
+   "  const fields = ['price','down','rate','term'].map($);\n  const slider = $('selectedYear');\n  const svg = $('chart');\n  const ns = 'http://www.w3.org/2000/svg';\n "
+  ],
+  [
+   2939.2,
+   " let years = [];\n  let bars = [];\n  function node(tag, attrs, text) {\n    const el = document.createElementNS(ns, tag);\n    Object.entries(attrs || {}).forEach(([key,value]) => el.setAttribute(key"
+  ],
+  [
+   3054.1,
+   ",value));\n    if (text !== undefined) el.textContent = text;\n    return el;\n  }\n  function selectYear(value) {\n    const index = Math.max(0, Math.min(years.length - 1, Number(value"
+  ],
+  [
+   3140.5,
+   ") - 1));\n    slider.value = index + 1;\n    $('yearNumber').textContent = index + 1;\n    const row = years[index];\n    if (!row) return;\n    $('yearDetails').textContent"
+  ],
+  [
+   3241.6,
+   " = `Year ${index + 1}: ${money(row.principal)} principal \u00b7 ${money(row.interest)} interest \u00b7 ${money(row.balance)} remaining`;\n    bars.forEach((bar,i) => {\n      bar.setAttribute('stroke"
+  ],
+  [
+   3342.4,
+   "', i === index ? 'currentColor' : 'none');\n      bar.setAttribute('stroke-width', i === index ? '2' : '0');\n      bar.setAttribute('aria-pressed', String(i === index));\n    });\n"
+  ],
+  [
+   3686.3,
+   "  }\n  function draw() {\n    while (svg.children.length > 2) svg.lastChild.remove();\n    bars = [];\n    const left = 85, top = 20, width = 795, height = 265;\n"
+  ],
+  [
+   3686.3,
+   "    const max = Math.max(1, ...years.map(y => y.principal + y.interest));\n    for (let i = 0; i <= 4; i++) {\n      const y = top + height - height"
+  ],
+  [
+   3686.3,
+   " * i / 4;\n      svg.append(node('line',{x1:left,y1:y,x2:left+width,y2:y,stroke:'currentColor','stroke-opacity':'.15'}));\n      svg.append(node('text',{x"
+  ],
+  [
+   3750.1,
+   ":left-10,y:y+4,'text-anchor':'end',fill:'currentColor','font-size':12},money(max*i/4)));\n    }\n    const step = width / years.length;\n    years.forEach((row,i)"
+  ],
+  [
+   3861.4,
+   " => {\n      const x = left + i * step + step * .12;\n      const w = step * .76;\n      const ph = row.principal / max * height;\n      const ih = row.interest / max *"
+  ],
+  [
+   3970.6,
+   " height;\n      const g = node('g',{tabindex:'0',role:'button','aria-label':`Year ${i+1}: principal ${money(row.principal)}, interest ${money(row.interest)}, remaining ${money(row.balance"
+  ],
+  [
+   4101.8,
+   ")}`,style:'cursor:pointer'});\n      g.append(node('title',{},`Year ${i+1}\\nPrincipal: ${money(row.principal)}\\nInterest: ${money(row.interest)}\\nBalance: ${money(row"
+  ],
+  [
+   4181.5,
+   ".balance)}`));\n      g.append(node('rect',{x,y:top,width:w,height,fill:'transparent',stroke:'none'}));\n      g.append(node('rect',{x,y:top+height-ph,width:w,height:ph,"
+  ],
+  [
+   4284.3,
+   "fill:'#2474b5'}));\n      g.append(node('rect',{x,y:top+height-ph-ih,width:w,height:ih,fill:'#bc5617'}));\n      g.addEventListener('click',() => select"
+  ],
+  [
+   4385.0,
+   "Year(i+1));\n      g.addEventListener('keydown', e => {\n        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectYear(i+1); }\n      });\n      svg.append"
+  ],
+  [
+   4485.4,
+   "(g);\n      bars.push(g);\n      const interval = Math.max(1,Math.ceil(years.length/15));\n      if (i === 0 || (i+1)%interval === 0 || i === years.length-1"
+  ],
+  [
+   4626.3,
+   ") {\n        svg.append(node('text',{x:x+w/2,y:306,'text-anchor':'middle',fill:'currentColor','font-size':12},i+1));\n      }\n    });\n    svg.append(node('text',{"
+  ],
+  [
+   4694.4,
+   "x:left+width/2,y:332,'text-anchor':'middle',fill:'currentColor','font-size':13},'Year'));\n    selectYear(slider.value);\n  }\n  function calculate() {\n    const [price,down"
+  ],
+  [
+   4800.1,
+   ",rate,term] = fields.map(el => el.valueAsNumber);\n    let error = '';\n    if (fields.some(el => el.value === '' || !Number.isFinite(el.valueAsNumber))) error = 'Enter a valid number"
+  ],
+  [
+   4905.7,
+   " in every field.';\n    else if (price < 0 || down < 0) error = 'Property price and down payment cannot be negative.';\n    else if (down > price) error = 'Down payment cannot exceed the property price"
+  ],
+  [
+   5010.5,
+   ".';\n    else if (rate < 0 || rate > 100) error = 'Enter an annual interest rate from 0% to 100%.';\n    else if (!Number.isInteger(term) || term < 1 || term"
+  ],
+  [
+   5149.4,
+   " > 100) error = 'Enter a whole-number term from 1 to 100 years.';\n    $('error').hidden = !error;\n    $('error').textContent = error;\n    $('results').hidden = !!error;\n   "
+  ],
+  [
+   5237.0,
+   " if (error) return;\n    const principal = price-down;\n    const r = rate/100/12;\n    const n = term*12;\n    const payment = r === 0 ? principal/n : principal*r / (-Math"
+  ],
+  [
+   5350.6,
+   ".expm1(-n*Math.log1p(r)));\n    years = [];\n    let balance = principal;\n    let totalInterest = 0;\n    for (let year=1; year<=term; year++) {\n      let interestPaid"
+  ],
+  [
+   5462.4,
+   "=0, principalPaid=0;\n      for (let month=1; month<=12; month++) {\n        const interest = balance*r;\n        const paidPrincipal = year === term && month === 12 ? balance : Math.min"
+  ],
+  [
+   5566.7,
+   "(balance,Math.max(0,payment-interest));\n        balance = Math.max(0,balance-paidPrincipal);\n        interestPaid += interest;\n        principalPaid += paidPrincipal;\n      }\n      totalInterest += interestPaid;\n      years.push({"
+  ],
+  [
+   5674.8,
+   "interest:interestPaid,principal:principalPaid,balance});\n    }\n    $('principal').textContent = money(principal);\n    $('monthly').textContent = money(payment);\n    $('interest').textContent = money(totalInterest);\n    $('"
+  ],
+  [
+   5768.6,
+   "total').textContent = money(principal+totalInterest);\n    $('schedule').replaceChildren();\n    const fragment = document.createDocumentFragment();\n    years.forEach((row,i) => {\n      const tr = document.createElement('tr');\n"
+  ],
+  [
+   5864.4,
+   "      [i+1,money(row.interest),money(row.principal),money(row.balance)].forEach((value,j) => {\n        const cell = document.createElement(j === 0 ? 'th' : 'td');\n       "
+  ],
+  [
+   5961.0,
+   " if (j === 0) cell.scope = 'row';\n        cell.textContent = value;\n        tr.append(cell);\n      });\n      fragment.append(tr);\n    });\n    $('schedule').append(fragment);\n    slider.max = term;\n   "
+  ],
+  [
+   6083.7,
+   " draw();\n  }\n  fields.forEach(el => el.addEventListener('input',calculate));\n  slider.addEventListener('input',() => selectYear(slider.value));\n  calculate();\n})();\n</script>"
+  ]
+ ],
+ "grade": {
+  "grade": "pass",
+  "reason": null,
+  "defects": []
+ },
+ "recheck": {
+  "at": "2026-10-22T20:32:37.858878+00:00",
+  "code_version": "06aa8340f9cf",
+  "note": "screenshot, layout checks, checklist, interaction test (live formats) and grade re-derived from the stored output; timings, usage and parse errors are from the original run"
+ }
+}

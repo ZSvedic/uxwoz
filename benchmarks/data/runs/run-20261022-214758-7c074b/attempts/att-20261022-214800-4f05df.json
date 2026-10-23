@@ -1,0 +1,906 @@
+{
+ "id": "att-20261022-214800-4f05df",
+ "run_id": "run-20261022-214758-7c074b",
+ "format": "html_pico",
+ "model": "claude-haiku-5.5",
+ "rep": 1,
+ "task": "bmi",
+ "status": "ok",
+ "requested": {
+  "model": "anthropic/claude-haiku-5.5",
+  "provider_order": [
+   "anthropic"
+  ],
+  "service_tier": null,
+  "reasoning": {
+   "enabled": false
+  }
+ },
+ "cache_policy": "warm",
+ "timings": {
+  "request_start_epoch_ms": 1792705681302.721,
+  "first_byte_ms": 804.31396484375,
+  "first_token_ms": 804.3330078125,
+  "content_complete_ms": 4207.6181640625,
+  "generation_complete_ms": 4208.677978515625,
+  "first_visible_ui_ms": 807.279052734375,
+  "fully_rendered_ms": 4227.06591796875,
+  "harness_first_chunk_ms": 805.279052734375,
+  "relay_latency_ms": 0.946044921875
+ },
+ "errors": [],
+ "system_prompt_tokens": 208,
+ "actual": {
+  "model": "anthropic/claude-haiku-5.5",
+  "provider": "Anthropic",
+  "service_tier": null,
+  "reasoning": null,
+  "finish_reason": "stop"
+ },
+ "model_substituted": false,
+ "tier_substituted": false,
+ "usage": {
+  "input_tokens": 508,
+  "cached_input_tokens": 0,
+  "cache_write_tokens": 0,
+  "output_tokens": 1084,
+  "reasoning_tokens": 0
+ },
+ "usage_raw": {
+  "prompt_tokens": 508,
+  "completion_tokens": 1084,
+  "total_tokens": 1592,
+  "cost": 0.0005928,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.0005928,
+   "upstream_inference_prompt_cost": 5.08e-05,
+   "upstream_inference_completions_cost": 0.000542
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ },
+ "cost_usd": 0.0005928,
+ "cost_source": "OpenRouter usage.cost (billed)",
+ "output_tokens_per_s": 318.5,
+ "harness": {
+  "extractedSource": "<article>\n<h2>BMI Calculator</h2>\n<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:1rem\">\n<label>Height (cm)<input id=\"h\" type=\"number\" value=\"175\" min=\"50\" max=\"250\" step=\"1\"></label>\n<label>Weight (kg)<input id=\"w\" type=\"number\" value=\"70\" min=\"10\" max=\"300\" step=\"0.1\"></label>\n</div>\n</article>\n<article>\n<p>Your BMI</p>\n<h1 id=\"bmi\">22.9</h1>\n<h3 id=\"cat\">Normal</h3>\n<svg id=\"scale\" viewBox=\"0 0 400 70\" width=\"100%\" role=\"img\" aria-label=\"BMI category scale\">\n<rect x=\"0\" y=\"20\" width=\"74\" height=\"26\" fill=\"#60a5fa\"/>\n<rect x=\"74\" y=\"20\" width=\"108\" height=\"26\" fill=\"#34d399\"/>\n<rect x=\"182\" y=\"20\" width=\"108\" height=\"26\" fill=\"#fbbf24\"/>\n<rect x=\"290\" y=\"20\" width=\"110\" height=\"26\" fill=\"#f87171\"/>\n<text x=\"37\" y=\"16\" font-size=\"11\" text-anchor=\"middle\">&lt;18.5</text>\n<text x=\"128\" y=\"16\" font-size=\"11\" text-anchor=\"middle\">18.5\u201325</text>\n<text x=\"236\" y=\"16\" font-size=\"11\" text-anchor=\"middle\">25\u201330</text>\n<text x=\"345\" y=\"16\" font-size=\"11\" text-anchor=\"middle\">&ge;30</text>\n<polygon id=\"marker\" points=\"0,10 10,10 5,20\" fill=\"currentColor\"/>\n<text x=\"37\" y=\"64\" font-size=\"11\" text-anchor=\"middle\">Underweight</text>\n<text x=\"128\" y=\"64\" font-size=\"11\" text-anchor=\"middle\">Normal</text>\n<text x=\"236\" y=\"64\" font-size=\"11\" text-anchor=\"middle\">Overweight</text>\n<text x=\"345\" y=\"64\" font-size=\"11\" text-anchor=\"middle\">Obese</text>\n</svg>\n</article>\n<script>\nconst h=document.getElementById('h'),w=document.getElementById('w'),\nb=document.getElementById('bmi'),c=document.getElementById('cat'),m=document.getElementById('marker');\nfunction update(){\nconst hm=h.value/100,v=w.value/(hm*hm);\nif(!isFinite(v)){b.textContent='\u2014';c.textContent='Enter valid values';return;}\nconst bmi=Math.round(v*10)/10;\nb.textContent=bmi.toFixed(1);\nlet cat,col;\nif(bmi<18.5){cat='Underweight';col='#60a5fa';}\nelse if(bmi<25){cat='Normal';col='#34d399';}\nelse if(bmi<30){cat='Overweight';col='#fbbf24';}\nelse{cat='Obese';col='#f87171';}\nc.textContent=cat;c.style.color=col;\nconst clamped=Math.min(Math.max(bmi,15),40);\nconst x=(clamped-15)/25*400;\nm.setAttribute('points',`${x-5},10 ${x+5},10 ${x},20`);\nm.style.color=col;\n}\nh.addEventListener('input',update);\nw.addEventListener('input',update);\nupdate();\n</script>",
+  "fenced": false,
+  "firstChunkAt": 1792705682108,
+  "firstVisibleAt": 1792705682110,
+  "streamEndAt": 1792705685510,
+  "fullyRenderedAt": 1792705685529.7869,
+  "renderErrors": [],
+  "rendered": true,
+  "parseOk": true,
+  "renderedText": "",
+  "visibleText": "BMI Calculator\nHeight (cm)\nWeight (kg)\n\nYour BMI\n\n22.9\nNormal\n<18.5\n18.5\u201325\n25\u201330\n\u226530\nUnderweight\nNormal\nOverweight\nObese\n175\n70",
+  "overflow": []
+ },
+ "screenshot": "/api/shots/run-20261022-214758-7c074b/att-20261022-214800-4f05df.png",
+ "parse": {
+  "ok": true,
+  "rendered": true,
+  "errors": [],
+  "fenced": false
+ },
+ "checklist": {
+  "mentions_height": true,
+  "mentions_weight": true,
+  "units_cm_kg": true,
+  "shows_default_bmi_22.9": true,
+  "shows_default_category": true,
+  "names_all_four_categories": true
+ },
+ "checklist_basis": "sandbox frame text + control values/labels",
+ "interactive": {
+  "status": "pass",
+  "passed": 4,
+  "total": 4,
+  "immediate": true,
+  "input_lookup": {
+   "height": "label:text",
+   "weight": "label:text"
+  },
+  "cases": [
+   {
+    "height": 160,
+    "weight": 45,
+    "bmi": "17.6",
+    "category": "underweight",
+    "value_ok": true,
+    "trigger": "input",
+    "category_ok": true,
+    "category_counts": {
+     "underweight": 2,
+     "normal": 1,
+     "overweight": 1,
+     "obese": 1
+    },
+    "pass": true
+   },
+   {
+    "height": 180,
+    "weight": 75,
+    "bmi": "23.1",
+    "category": "normal",
+    "value_ok": true,
+    "trigger": "input",
+    "category_ok": true,
+    "category_counts": {
+     "underweight": 1,
+     "normal": 2,
+     "overweight": 1,
+     "obese": 1
+    },
+    "pass": true
+   },
+   {
+    "height": 170,
+    "weight": 80,
+    "bmi": "27.7",
+    "category": "overweight",
+    "value_ok": true,
+    "trigger": "input",
+    "category_ok": true,
+    "category_counts": {
+     "underweight": 1,
+     "normal": 1,
+     "overweight": 2,
+     "obese": 1
+    },
+    "pass": true
+   },
+   {
+    "height": 165,
+    "weight": 95,
+    "bmi": "34.9",
+    "category": "obese",
+    "value_ok": true,
+    "trigger": "input",
+    "category_ok": true,
+    "category_counts": {
+     "underweight": 1,
+     "normal": 1,
+     "overweight": 1,
+     "obese": 2
+    },
+    "pass": true
+   }
+  ],
+  "scale": {
+   "status": "ok",
+   "correct": 5,
+   "total": 5,
+   "marker": "polygon (0/1/3/8)",
+   "positions": [
+    {
+     "bmi": "22.9",
+     "expected": "normal",
+     "shown": "normal",
+     "ok": true
+    },
+    {
+     "bmi": "17.6",
+     "expected": "underweight",
+     "shown": "underweight",
+     "ok": true
+    },
+    {
+     "bmi": "23.1",
+     "expected": "normal",
+     "shown": "normal",
+     "ok": true
+    },
+    {
+     "bmi": "27.7",
+     "expected": "overweight",
+     "shown": "overweight",
+     "ok": true
+    },
+    {
+     "bmi": "34.9",
+     "expected": "obese",
+     "shown": "obese",
+     "ok": true
+    }
+   ]
+  },
+  "duration_ms": 940
+ },
+ "after_inputs": {
+  "height": 165,
+  "weight": 95
+ },
+ "screenshot_after": "/api/shots/run-20261022-214758-7c074b/att-20261022-214800-4f05df-after.png",
+ "source": "<article>\n<h2>BMI Calculator</h2>\n<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:1rem\">\n<label>Height (cm)<input id=\"h\" type=\"number\" value=\"175\" min=\"50\" max=\"250\" step=\"1\"></label>\n<label>Weight (kg)<input id=\"w\" type=\"number\" value=\"70\" min=\"10\" max=\"300\" step=\"0.1\"></label>\n</div>\n</article>\n<article>\n<p>Your BMI</p>\n<h1 id=\"bmi\">22.9</h1>\n<h3 id=\"cat\">Normal</h3>\n<svg id=\"scale\" viewBox=\"0 0 400 70\" width=\"100%\" role=\"img\" aria-label=\"BMI category scale\">\n<rect x=\"0\" y=\"20\" width=\"74\" height=\"26\" fill=\"#60a5fa\"/>\n<rect x=\"74\" y=\"20\" width=\"108\" height=\"26\" fill=\"#34d399\"/>\n<rect x=\"182\" y=\"20\" width=\"108\" height=\"26\" fill=\"#fbbf24\"/>\n<rect x=\"290\" y=\"20\" width=\"110\" height=\"26\" fill=\"#f87171\"/>\n<text x=\"37\" y=\"16\" font-size=\"11\" text-anchor=\"middle\">&lt;18.5</text>\n<text x=\"128\" y=\"16\" font-size=\"11\" text-anchor=\"middle\">18.5\u201325</text>\n<text x=\"236\" y=\"16\" font-size=\"11\" text-anchor=\"middle\">25\u201330</text>\n<text x=\"345\" y=\"16\" font-size=\"11\" text-anchor=\"middle\">&ge;30</text>\n<polygon id=\"marker\" points=\"0,10 10,10 5,20\" fill=\"currentColor\"/>\n<text x=\"37\" y=\"64\" font-size=\"11\" text-anchor=\"middle\">Underweight</text>\n<text x=\"128\" y=\"64\" font-size=\"11\" text-anchor=\"middle\">Normal</text>\n<text x=\"236\" y=\"64\" font-size=\"11\" text-anchor=\"middle\">Overweight</text>\n<text x=\"345\" y=\"64\" font-size=\"11\" text-anchor=\"middle\">Obese</text>\n</svg>\n</article>\n<script>\nconst h=document.getElementById('h'),w=document.getElementById('w'),\nb=document.getElementById('bmi'),c=document.getElementById('cat'),m=document.getElementById('marker');\nfunction update(){\nconst hm=h.value/100,v=w.value/(hm*hm);\nif(!isFinite(v)){b.textContent='\u2014';c.textContent='Enter valid values';return;}\nconst bmi=Math.round(v*10)/10;\nb.textContent=bmi.toFixed(1);\nlet cat,col;\nif(bmi<18.5){cat='Underweight';col='#60a5fa';}\nelse if(bmi<25){cat='Normal';col='#34d399';}\nelse if(bmi<30){cat='Overweight';col='#fbbf24';}\nelse{cat='Obese';col='#f87171';}\nc.textContent=cat;c.style.color=col;\nconst clamped=Math.min(Math.max(bmi,15),40);\nconst x=(clamped-15)/25*400;\nm.setAttribute('points',`${x-5},10 ${x+5},10 ${x},20`);\nm.style.color=col;\n}\nh.addEventListener('input',update);\nw.addEventListener('input',update);\nupdate();\n</script>",
+ "reasoning_text": "",
+ "chunks": [
+  [
+   804.3,
+   "<article>\n<h2"
+  ],
+  [
+   894.1,
+   ">BMI Calculator"
+  ],
+  [
+   901.1,
+   "</h2>\n<div"
+  ],
+  [
+   901.1,
+   " style=\"display"
+  ],
+  [
+   901.1,
+   ":grid;grid-template"
+  ],
+  [
+   901.2,
+   "-columns:1fr "
+  ],
+  [
+   901.2,
+   "1fr;gap:1"
+  ],
+  [
+   901.3,
+   "rem\">\n<label>"
+  ],
+  [
+   1056.7,
+   "Height (cm)<input"
+  ],
+  [
+   1056.8,
+   " id=\"h"
+  ],
+  [
+   1056.9,
+   "\" type=\"number\" value"
+  ],
+  [
+   1056.9,
+   "=\"175\" min=\"50"
+  ],
+  [
+   1056.9,
+   "\" max"
+  ],
+  [
+   1056.9,
+   "=\"250\" step=\"1\"></"
+  ],
+  [
+   1057.0,
+   "label>\n<label>We"
+  ],
+  [
+   1057.0,
+   "ight (kg)<input id"
+  ],
+  [
+   1222.5,
+   "=\"w\" type=\"number\" value"
+  ],
+  [
+   1222.6,
+   "=\"70\" min=\"10"
+  ],
+  [
+   1222.6,
+   "\" max=\"300"
+  ],
+  [
+   1222.6,
+   "\" step=\"0"
+  ],
+  [
+   1222.6,
+   ".1\"></label>\n</"
+  ],
+  [
+   1222.6,
+   "div>\n</"
+  ],
+  [
+   1222.6,
+   "article>\n<article>"
+  ],
+  [
+   1222.7,
+   "\n<p>"
+  ],
+  [
+   1402.1,
+   "Your"
+  ],
+  [
+   1402.1,
+   " BMI</"
+  ],
+  [
+   1402.1,
+   "p>\n<h1"
+  ],
+  [
+   1402.2,
+   " id=\"bmi\">"
+  ],
+  [
+   1402.2,
+   "22"
+  ],
+  [
+   1402.2,
+   ".9"
+  ],
+  [
+   1402.3,
+   "</h1>\n<h"
+  ],
+  [
+   1402.3,
+   "3 id=\"cat\">"
+  ],
+  [
+   1558.7,
+   "Normal</h3>"
+  ],
+  [
+   1558.7,
+   "\n<svg id=\"sc"
+  ],
+  [
+   1558.7,
+   "ale\" viewBox=\"0"
+  ],
+  [
+   1558.7,
+   " 0 400"
+  ],
+  [
+   1558.8,
+   " 70"
+  ],
+  [
+   1558.8,
+   "\" width=\"100%\" role"
+  ],
+  [
+   1558.9,
+   "=\"img\" aria-label=\""
+  ],
+  [
+   1558.9,
+   "BMI category"
+  ],
+  [
+   1709.6,
+   " scale\">\n<rect x"
+  ],
+  [
+   1709.6,
+   "=\"0\" y=\"20"
+  ],
+  [
+   1709.7,
+   "\" width=\"74"
+  ],
+  [
+   1709.7,
+   "\" height=\"26\" f"
+  ],
+  [
+   1709.8,
+   "ill=\"#60"
+  ],
+  [
+   1709.8,
+   "a5"
+  ],
+  [
+   1709.8,
+   "fa\"/"
+  ],
+  [
+   1709.8,
+   ">\n<rect x=\"74"
+  ],
+  [
+   1873.4,
+   "\" y=\"20\" width=\"108"
+  ],
+  [
+   1873.5,
+   "\" height=\"26\" fill=\""
+  ],
+  [
+   1873.5,
+   "#34"
+  ],
+  [
+   1873.5,
+   "d399\"/>\n<r"
+  ],
+  [
+   1873.7,
+   "ect x=\"182"
+  ],
+  [
+   1873.7,
+   "\" y=\"20\" width=\"108"
+  ],
+  [
+   1873.8,
+   "\" height=\"26\" fill=\""
+  ],
+  [
+   2021.7,
+   "#fbbf24\"/"
+  ],
+  [
+   2021.7,
+   ">\n<rect x=\"290"
+  ],
+  [
+   2021.7,
+   "\" y=\"20\" width=\"110"
+  ],
+  [
+   2021.7,
+   "\" height=\"26\" fill=\""
+  ],
+  [
+   2021.8,
+   "#f87171\"/>"
+  ],
+  [
+   2021.9,
+   "\n<text x=\"37"
+  ],
+  [
+   2021.9,
+   "\" y=\"16"
+  ],
+  [
+   2021.9,
+   "\" font-size=\"11"
+  ],
+  [
+   2179.6,
+   "\" text-anchor=\"midd"
+  ],
+  [
+   2179.6,
+   "le\">&"
+  ],
+  [
+   2179.7,
+   "lt;18.5</text"
+  ],
+  [
+   2179.7,
+   ">\n<text x=\"128\""
+  ],
+  [
+   2179.8,
+   " y=\"16\" font-size=\""
+  ],
+  [
+   2179.8,
+   "11\" text-anchor=\""
+  ],
+  [
+   2179.8,
+   "middle\">18.5\u2013"
+  ],
+  [
+   2179.8,
+   "25</text>\n<text x"
+  ],
+  [
+   2380.2,
+   "=\"236\" y=\"16\" font"
+  ],
+  [
+   2380.2,
+   "-size=\"11\" text-an"
+  ],
+  [
+   2380.3,
+   "chor=\"middle\">25\u2013"
+  ],
+  [
+   2380.3,
+   "30</text>\n<text x"
+  ],
+  [
+   2380.3,
+   "=\"345"
+  ],
+  [
+   2380.3,
+   "\" y=\"16\" font-size"
+  ],
+  [
+   2380.3,
+   "=\"11\" text-anchor"
+  ],
+  [
+   2380.3,
+   "=\"middle\">&"
+  ],
+  [
+   2507.2,
+   "ge;30</text>"
+  ],
+  [
+   2507.3,
+   "\n<pol"
+  ],
+  [
+   2507.3,
+   "ygon id=\"marker\" points"
+  ],
+  [
+   2507.3,
+   "=\"0,10 10"
+  ],
+  [
+   2507.4,
+   ",10"
+  ],
+  [
+   2507.4,
+   " 5"
+  ],
+  [
+   2507.5,
+   ",20"
+  ],
+  [
+   2507.6,
+   "\" fill=\"curr"
+  ],
+  [
+   2671.5,
+   "entColor\"/>"
+  ],
+  [
+   2671.5,
+   "\n<text x=\"37"
+  ],
+  [
+   2671.5,
+   "\" y=\"64\" font-size"
+  ],
+  [
+   2671.5,
+   "=\"11\" text-anchor"
+  ],
+  [
+   2671.6,
+   "=\"middle\">Under"
+  ],
+  [
+   2671.6,
+   "weight</text>\n<text"
+  ],
+  [
+   2671.6,
+   " x=\"128\" y=\"64\""
+  ],
+  [
+   2671.6,
+   " font-size=\"11\" text-"
+  ],
+  [
+   2902.7,
+   "anchor=\"middle\">"
+  ],
+  [
+   2902.9,
+   "Normal</text>\n<text"
+  ],
+  [
+   2902.9,
+   " x=\"236\" y=\"64\""
+  ],
+  [
+   2902.9,
+   " font-size=\"11\" text-"
+  ],
+  [
+   2902.9,
+   "anchor=\"middle\">"
+  ],
+  [
+   2903.0,
+   "Overweight</text>"
+  ],
+  [
+   2903.0,
+   "\n<text x=\"345\" y=\"64"
+  ],
+  [
+   2978.3,
+   "\" font-size=\"11\" text"
+  ],
+  [
+   2978.4,
+   "-anchor=\"middle\">"
+  ],
+  [
+   2978.4,
+   "Obese</text>\n</"
+  ],
+  [
+   2978.4,
+   "svg>\n</article>"
+  ],
+  [
+   2978.5,
+   "\n<script>\nconst h="
+  ],
+  [
+   2978.9,
+   "document.getElementById('h"
+  ],
+  [
+   2979.0,
+   "'),w=document.getEl"
+  ],
+  [
+   2979.2,
+   "ementById('w'),"
+  ],
+  [
+   3139.2,
+   "\nb=document.getElementById"
+  ],
+  [
+   3139.3,
+   "('bmi'),c="
+  ],
+  [
+   3139.3,
+   "document.getElementById('c"
+  ],
+  [
+   3140.8,
+   "at'),m"
+  ],
+  [
+   3140.8,
+   "=document.getElementById('"
+  ],
+  [
+   3140.8,
+   "marker');\nfunction update(){"
+  ],
+  [
+   3140.8,
+   "\nconst h"
+  ],
+  [
+   3140.9,
+   "m"
+  ],
+  [
+   3303.3,
+   "=h.value/"
+  ],
+  [
+   3303.3,
+   "100,v"
+  ],
+  [
+   3303.3,
+   "=w"
+  ],
+  [
+   3303.3,
+   ".value/(hm*h"
+  ],
+  [
+   3303.3,
+   "m);\nif"
+  ],
+  [
+   3303.3,
+   "(!isFinite(v"
+  ],
+  [
+   3303.3,
+   ")){b.textContent='"
+  ],
+  [
+   3303.3,
+   "\u2014';c.textContent='"
+  ],
+  [
+   3465.5,
+   "Enter valid values"
+  ],
+  [
+   3465.6,
+   "';return;"
+  ],
+  [
+   3465.6,
+   "}\nconst bmi="
+  ],
+  [
+   3465.6,
+   "Math.round(v*"
+  ],
+  [
+   3465.6,
+   "10)/10;\nb"
+  ],
+  [
+   3465.6,
+   ".textContent=bmi"
+  ],
+  [
+   3465.6,
+   ".toFixed(1);"
+  ],
+  [
+   3465.7,
+   "\nlet c"
+  ],
+  [
+   3629.3,
+   "at,col"
+  ],
+  [
+   3629.4,
+   ";\nif(bmi"
+  ],
+  [
+   3629.4,
+   "<18.5){"
+  ],
+  [
+   3629.4,
+   "cat='Underweight';"
+  ],
+  [
+   3629.5,
+   "col='#60a5fa"
+  ],
+  [
+   3629.5,
+   "';}\nelse if(bm"
+  ],
+  [
+   3629.5,
+   "i<25){cat='"
+  ],
+  [
+   3629.5,
+   "Normal';col='#34d"
+  ],
+  [
+   3796.3,
+   "399';}\nelse if(b"
+  ],
+  [
+   3796.3,
+   "mi<30){cat='"
+  ],
+  [
+   3796.3,
+   "Overweight';col='#"
+  ],
+  [
+   3796.3,
+   "fbbf24';}"
+  ],
+  [
+   3796.3,
+   "\nelse{cat='Obese"
+  ],
+  [
+   3796.3,
+   "';col='#f87171';"
+  ],
+  [
+   3796.3,
+   "}\nc.textContent="
+  ],
+  [
+   3797.8,
+   "cat;c"
+  ],
+  [
+   3958.6,
+   ".style.color=col;"
+  ],
+  [
+   3958.6,
+   "\nconst cl"
+  ],
+  [
+   3958.6,
+   "amped=Math.min("
+  ],
+  [
+   3958.6,
+   "Math.max(bmi"
+  ],
+  [
+   3958.6,
+   ",15"
+  ],
+  [
+   3958.6,
+   "),40);\nconst x=("
+  ],
+  [
+   3958.6,
+   "clamped-15)/"
+  ],
+  [
+   3958.6,
+   "25*400;\nm.set"
+  ],
+  [
+   4120.5,
+   "Attribute('points',`"
+  ],
+  [
+   4120.5,
+   "${x-5},10"
+  ],
+  [
+   4120.5,
+   " ${x+"
+  ],
+  [
+   4120.6,
+   "5},10 ${x},"
+  ],
+  [
+   4120.6,
+   "20`);\nm.style."
+  ],
+  [
+   4120.6,
+   "color=col;\n}\nh"
+  ],
+  [
+   4120.6,
+   ".addEventListener('input"
+  ],
+  [
+   4120.7,
+   "',update);\nw.addE"
+  ],
+  [
+   4207.6,
+   "ventListener('input',update);"
+  ],
+  [
+   4207.6,
+   "\nupdate();\n</script>"
+  ]
+ ],
+ "grade": {
+  "grade": "pass",
+  "reason": null,
+  "defects": []
+ }
+}

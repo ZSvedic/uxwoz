@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Harness</title>
+<style>
+  body { margin: 0; background: #fff; font-family: system-ui, sans-serif; }
+  /* The stage is what screenshots capture; its size matches the full benchmark's. */
+  .stage { padding: 20px; max-width: 880px; }
+  .stage iframe { width: 100%; height: 1100px; border: 0; display: block; }
+</style>
+</head>
+<body>
+<div id="stage" class="stage"></div>
+<script>
+// Bare render surface, used three ways:
+//   mode=live    the headless benchmark browser subscribes to the backend relay and renders chunks
+//                as they arrive, timestamping paint events;
+//   mode=replay  re-streams a stored attempt with its recorded chunk timing;
+//   mode=static  renders a stored attempt's final source at once.
+// The UI runs in a cross-origin sandbox iframe (scripts and forms allowed, no same-origin access).
+// Metrics are published on window.__harness for Playwright to read; the runner reads the frame's
+// text itself, because this page cannot look inside the frame.
+const params = new URLSearchParams(location.search)
+const attemptId = params.get('attempt') || ''
+const mode = params.get('mode') || 'static'
+const stage = document.getElementById('stage')
+const m = {}
+window.__harness = { ready: false, done: false, metrics: m }
+
+// Only a markdown code fence (and prose around a fenced block) is removed, reported as `fenced`;
+// the program itself is never changed, so failures stay the model's.
+function extractProgram(raw) {
+  const block = raw.match(/(?:^|\n)[ \t]*```[^\n`]*\n([\s\S]*?)(?:\n[ \t]*```|$)/)
+  if (block) return { text: block[1], fenced: true }
+  if (/^\s*`{1,3}[^\n`]*$/.test(raw)) return { text: '', fenced: true } // an opening fence mid-stream
+  return { text: raw, fenced: false }
+}
+
+// Pico is inlined, not linked: some browsers never fetch a stylesheet for a null-origin sandbox
+// frame, and inlining also spares every rebuild a request.
+const pico = fetch('/vendor/pico.classless.min.css').then((r) => r.text())
+let picoCss = ''
+
+function framePage(fragment) {
+  return `<!doctype html><html data-theme="light"><head><meta charset="utf-8"><style>${picoCss}</style></head><body><main>${fragment}</main></body></html>`
+}
+
+// Visible once the fragment holds text outside tags, scripts and styles.
+const hasText = (html) => html.replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>|<[^>]*>/g, '').trim() !== ''
+
+let raw = '', shown = null, lastBuild = 0, timer = null, streaming = mode !== 'static', lastMutation = 0, finished = false
+
+// While streaming, the page is rebuilt at most every 300 ms (each rebuild reloads the frame);
+// the final program is rendered at once.
+function render() {
+  const program = extractProgram(raw)
+  m.extractedSource = program.text
+  m.fenced = program.fenced
+  const now = Date.now()
+  if (streaming && now - lastBuild < 300) {
+    timer ??= setTimeout(() => { timer = null; render() }, 300 - (now - lastBuild))
+    return
+  }
+  lastBuild = now
+  if (program.text === shown) return
+  shown = program.text
+  let frame = stage.querySelector('iframe')
+  if (!frame) {
+    frame = document.createElement('iframe')
+    frame.title = 'ui'
+    frame.setAttribute('sandbox', 'allow-scripts allow-forms')
+    stage.appendChild(frame)
+  }
+  frame.srcdoc = framePage(shown)
+  stage.dataset.contentful = hasText(shown) ? '1' : '0'
+}
+
+// First visible UI: checked on the frame after each change to the stage (approximates paint).
+new MutationObserver(() => {
+  lastMutation = Date.now()
+  if (!m.firstVisibleAt && stage.dataset.contentful === '1')
+    requestAnimationFrame(() => { m.firstVisibleAt ??= Date.now() })
+}).observe(stage, { subtree: true, childList: true, characterData: true, attributes: true })
+
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r(Date.now())))
+const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+
+async function finish() {
+  if (finished) return
+  finished = true
+  m.streamEndAt = Date.now()
+  streaming = false
+  clearTimeout(timer)
+  timer = null
+  render()
+  await document.fonts.ready
+  let painted = await nextFrame()
+  painted = await nextFrame()
+  // Fully rendered: the frame after the last change, once the stage has been quiet for 150 ms.
+  const deadline = Date.now() + 5000
+  while (Date.now() - lastMutation < 150 && Date.now() < deadline) await wait(30)
+  m.fullyRenderedAt = Math.max(painted, lastMutation)
+  const contentful = stage.dataset.contentful === '1'
+  if (!m.firstVisibleAt && contentful) m.firstVisibleAt = m.fullyRenderedAt
+  m.renderErrors = (shown || '').trim() ? [] : ['empty reply']
+  m.rendered = contentful
+  m.parseOk = contentful && m.renderErrors.length === 0
+  m.visibleText = '' // read by the runner from inside the frame
+  m.overflow = []
+  window.__harness.done = true
+}
+
+pico.then((css) => { picoCss = css; start() })
+
+function start() {
+  if (mode === 'live') {
+    const es = new EventSource(`/api/live/${attemptId}`)
+    es.addEventListener('ready', () => { window.__harness.ready = true })
+    // No reconnects: EventSource would replay the channel and duplicate every chunk.
+    es.onerror = () => {
+      if (!window.__harness.ready) return
+      es.close()
+      m.streamError ??= 'relay connection lost'
+      finish()
+    }
+    es.onmessage = (e) => {
+      const ev = JSON.parse(e.data)
+      if (ev.type === 'chunk') {
+        m.firstChunkAt ??= Date.now()
+        raw += ev.text
+        render()
+      } else if (ev.type === 'end' || ev.type === 'error') {
+        if (ev.type === 'error') m.streamError = ev.message
+        es.close()
+        finish()
+      }
+    }
+  } else if (attemptId) {
+    fetch(`/api/attempts/${attemptId}`).then((r) => r.json()).then(async (a) => {
+      await document.fonts.ready
+      if (mode === 'static' || !a.chunks?.length) {
+        raw = a.source || ''
+        finish()
+        return
+      }
+      window.__harness.ready = true
+      for (const [t, text] of a.chunks) setTimeout(() => { raw += text; render() }, t)
+      const end = a.timings.generation_complete_ms ?? a.chunks[a.chunks.length - 1][0]
+      setTimeout(finish, end + 5)
+    })
+  }
+}
+</script>
+</body>
+</html>

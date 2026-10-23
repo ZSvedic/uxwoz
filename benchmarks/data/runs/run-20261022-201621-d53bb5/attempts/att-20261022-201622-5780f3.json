@@ -1,0 +1,346 @@
+{
+ "id": "att-20261022-201622-5780f3",
+ "run_id": "run-20261022-201621-d53bb5",
+ "format": "html_pico",
+ "model": "gpt-6.1-sol-ultrafast",
+ "rep": 2,
+ "task": "bmi",
+ "status": "ok",
+ "requested": {
+  "model": "gpt-6.1-sol",
+  "provider_order": null,
+  "service_tier": "ultrafast",
+  "reasoning": {
+   "effort": "low"
+  }
+ },
+ "cache_policy": "warm",
+ "timings": {
+  "request_start_epoch_ms": 1792700183142.724,
+  "first_byte_ms": 496.0146484375,
+  "first_token_ms": 1047.935791015625,
+  "content_complete_ms": 5182.72265625,
+  "generation_complete_ms": 5235.0107421875,
+  "first_visible_ui_ms": 1050.27587890625,
+  "fully_rendered_ms": 5199.11181640625,
+  "harness_first_chunk_ms": 1048.27587890625,
+  "relay_latency_ms": 0.340087890625
+ },
+ "errors": [],
+ "system_prompt_tokens": 178,
+ "actual": {
+  "model": "gpt-6.1-sol",
+  "provider": "OpenAI",
+  "service_tier": "ultrafast",
+  "reasoning": {
+   "context": "all_turns",
+   "effort": "low",
+   "mode": "standard",
+   "summary": null
+  },
+  "finish_reason": "stop"
+ },
+ "model_substituted": false,
+ "tier_substituted": false,
+ "usage": {
+  "input_tokens": 307,
+  "cached_input_tokens": 0,
+  "cache_write_tokens": 0,
+  "output_tokens": 1357,
+  "reasoning_tokens": 0
+ },
+ "usage_raw": {
+  "input_tokens": 307,
+  "input_tokens_details": {
+   "cache_write_tokens": 0,
+   "cached_tokens": 0
+  },
+  "output_tokens": 1357,
+  "output_tokens_details": {
+   "reasoning_tokens": 0
+  },
+  "total_tokens": 1664
+ },
+ "cost_usd": 0.085104,
+ "cost_source": "Estimated: tokens x Ultrafast price table (6x standard)",
+ "output_tokens_per_s": 328.2,
+ "harness": {
+  "extractedSource": "<section aria-labelledby=\"bmi-title\" style=\"max-width: 560px; margin: 0 auto;\">\n  <header>\n    <h1 id=\"bmi-title\">BMI calculator</h1>\n    <p>Check your body mass index in a moment.</p>\n  </header>\n\n  <article>\n    <div style=\"display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;\">\n      <label for=\"height\">Height <small>(cm)</small>\n        <input id=\"height\" type=\"number\" min=\"1\" step=\"any\" value=\"175\" inputmode=\"decimal\">\n      </label>\n      <label for=\"weight\">Weight <small>(kg)</small>\n        <input id=\"weight\" type=\"number\" min=\"1\" step=\"any\" value=\"70\" inputmode=\"decimal\">\n      </label>\n    </div>\n\n    <div aria-live=\"polite\" aria-atomic=\"true\">\n      <small>Your BMI</small>\n      <h2><output id=\"bmi\" for=\"height weight\">22.9</output> <small id=\"category\">Normal</small></h2>\n      <p id=\"message\">Within the normal BMI range.</p>\n    </div>\n\n    <svg viewBox=\"0 0 440 90\" role=\"img\" aria-labelledby=\"scale-title scale-description\" style=\"display: block; width: 100%; height: auto;\">\n      <title id=\"scale-title\">BMI category scale</title>\n      <desc id=\"scale-description\">BMI 22.9, Normal. Scale shown from 10 to 40.</desc>\n      <rect x=\"20\" y=\"26\" width=\"113.33\" height=\"16\" fill=\"#4385b5\"/>\n      <rect x=\"133.33\" y=\"26\" width=\"86.67\" height=\"16\" fill=\"#39845c\"/>\n      <rect x=\"220\" y=\"26\" width=\"66.67\" height=\"16\" fill=\"#bc8525\"/>\n      <rect x=\"286.67\" y=\"26\" width=\"133.33\" height=\"16\" fill=\"#b65151\"/>\n      <g fill=\"currentColor\" font-size=\"12\" text-anchor=\"middle\">\n        <text x=\"20\" y=\"60\">10</text>\n        <text x=\"133.33\" y=\"60\">18.5</text>\n        <text x=\"220\" y=\"60\">25</text>\n        <text x=\"286.67\" y=\"60\">30</text>\n        <text x=\"420\" y=\"60\">40</text>\n      </g>\n      <path id=\"marker\" d=\"M 186 22 L 180 10 L 192 10 Z\" fill=\"currentColor\"/>\n    </svg>\n\n    <small>Blue: Underweight \u00b7 Green: Normal \u00b7 Amber: Overweight \u00b7 Red: Obese</small>\n    <p><small>Scale: BMI 10\u201340. Values outside this range appear at the nearest end.</small></p>\n\n    <details>\n      <summary>How to interpret your result</summary>\n      <table>\n        <thead><tr><th scope=\"col\">Category</th><th scope=\"col\">BMI</th></tr></thead>\n        <tbody>\n          <tr><td>Underweight</td><td>Below 18.5</td></tr>\n          <tr><td>Normal</td><td>18.5 to below 25</td></tr>\n          <tr><td>Overweight</td><td>25 to below 30</td></tr>\n          <tr><td>Obese</td><td>30 or above</td></tr>\n        </tbody>\n      </table>\n      <p><small>BMI = weight (kg) \u00f7 height (m)\u00b2. Categories use the unrounded result.</small></p>\n    </details>\n  </article>\n  <p><small>BMI is a general screening measure for adults, not a diagnosis. It does not account for muscle mass, pregnancy, or individual health differences.</small></p>\n</section>\n\n<script>\n(() => {\n  const height = document.getElementById('height');\n  const weight = document.getElementById('weight');\n  const result = document.getElementById('bmi');\n  const category = document.getElementById('category');\n  const message = document.getElementById('message');\n  const marker = document.getElementById('marker');\n  const description = document.getElementById('scale-description');\n\n  function update() {\n    const h = height.valueAsNumber;\n    const w = weight.valueAsNumber;\n    const bmi = w / ((h / 100) ** 2);\n\n    if (!Number.isFinite(h) || !Number.isFinite(w) || h <= 0 || w <= 0 || !Number.isFinite(bmi) || bmi <= 0) {\n      result.textContent = '\u2014';\n      category.textContent = '';\n      message.textContent = 'Enter a valid height and weight greater than zero.';\n      marker.setAttribute('visibility', 'hidden');\n      description.textContent = 'Enter valid measurements to show your BMI on the scale.';\n      return;\n    }\n\n    const label = bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Normal' : bmi < 30 ? 'Overweight' : 'Obese';\n    const formatted = bmi.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });\n    result.textContent = formatted;\n    category.textContent = label;\n    message.textContent = label === 'Normal' ? 'Within the normal BMI range.' : 'In the ' + label.toLowerCase() + ' BMI range.';\n    const x = 20 + ((Math.min(40, Math.max(10, bmi)) - 10) / 30) * 400;\n    marker.setAttribute('d', `M ${x} 22 L ${x - 6} 10 L ${x + 6} 10 Z`);\n    marker.removeAttribute('visibility');\n    description.textContent = `BMI ${formatted}, ${label}. Scale shown from 10 to 40.`;\n  }\n\n  height.addEventListener('input', update);\n  weight.addEventListener('input', update);\n  update();\n})();\n</script>",
+  "fenced": false,
+  "firstChunkAt": 1792700184191,
+  "firstVisibleAt": 1792700184193,
+  "streamEndAt": 1792700188325,
+  "fullyRenderedAt": 1792700188341.836,
+  "renderErrors": [],
+  "rendered": true,
+  "parseOk": true,
+  "renderedText": "",
+  "visibleText": "BMI calculator\n\nCheck your body mass index in a moment.\n\nHeight (cm) \nWeight (kg) \nYour BMI\n22.9 Normal\n\nWithin the normal BMI range.\n\n10\n18.5\n25\n30\n40\nBlue: Underweight \u00b7 Green: Normal \u00b7 Amber: Overweight \u00b7 Red: Obese\n\nScale: BMI 10\u201340. Values outside this range appear at the nearest end.\n\nHow to interpret your result\n\nBMI is a general screening measure for adults, not a diagnosis. It does not account for muscle mass, pregnancy, or individual health differences.\n175\n70",
+  "overflow": []
+ },
+ "screenshot": "/api/shots/run-20261022-201621-d53bb5/att-20261022-201622-5780f3.png",
+ "parse": {
+  "ok": true,
+  "rendered": true,
+  "errors": [],
+  "fenced": false
+ },
+ "checklist": {
+  "mentions_height": true,
+  "mentions_weight": true,
+  "units_cm_kg": true,
+  "shows_default_bmi_22.9": true,
+  "shows_default_category": true,
+  "names_all_four_categories": true
+ },
+ "checklist_basis": "sandbox frame text + control values/labels",
+ "interactive": {
+  "status": "pass",
+  "passed": 4,
+  "total": 4,
+  "immediate": true,
+  "input_lookup": {
+   "height": "label:text",
+   "weight": "label:text"
+  },
+  "cases": [
+   {
+    "height": 160,
+    "weight": 45,
+    "bmi": "17.6",
+    "category": "underweight",
+    "value_ok": true,
+    "trigger": "input",
+    "category_ok": true,
+    "category_counts": {
+     "underweight": 3,
+     "normal": 1,
+     "overweight": 1,
+     "obese": 1
+    },
+    "pass": true
+   },
+   {
+    "height": 180,
+    "weight": 75,
+    "bmi": "23.1",
+    "category": "normal",
+    "value_ok": true,
+    "trigger": "input",
+    "category_ok": true,
+    "category_counts": {
+     "underweight": 1,
+     "normal": 3,
+     "overweight": 1,
+     "obese": 1
+    },
+    "pass": true
+   },
+   {
+    "height": 170,
+    "weight": 80,
+    "bmi": "27.7",
+    "category": "overweight",
+    "value_ok": true,
+    "trigger": "input",
+    "category_ok": true,
+    "category_counts": {
+     "underweight": 1,
+     "normal": 1,
+     "overweight": 3,
+     "obese": 1
+    },
+    "pass": true
+   },
+   {
+    "height": 165,
+    "weight": 95,
+    "bmi": "34.9",
+    "category": "obese",
+    "value_ok": true,
+    "trigger": "input",
+    "category_ok": true,
+    "category_counts": {
+     "underweight": 1,
+     "normal": 1,
+     "overweight": 1,
+     "obese": 3
+    },
+    "pass": true
+   }
+  ],
+  "scale": {
+   "status": "ok",
+   "correct": 5,
+   "total": 5,
+   "marker": "path (0/0/1/2/7)",
+   "positions": [
+    {
+     "bmi": "22.9",
+     "expected": "normal",
+     "shown": "normal",
+     "ok": true
+    },
+    {
+     "bmi": "17.6",
+     "expected": "underweight",
+     "shown": "underweight",
+     "ok": true
+    },
+    {
+     "bmi": "23.1",
+     "expected": "normal",
+     "shown": "normal",
+     "ok": true
+    },
+    {
+     "bmi": "27.7",
+     "expected": "overweight",
+     "shown": "overweight",
+     "ok": true
+    },
+    {
+     "bmi": "34.9",
+     "expected": "obese",
+     "shown": "obese",
+     "ok": true
+    }
+   ]
+  }
+ },
+ "after_inputs": {
+  "height": 165,
+  "weight": 95
+ },
+ "screenshot_after": "/api/shots/run-20261022-201621-d53bb5/att-20261022-201622-5780f3-after.png",
+ "source": "<section aria-labelledby=\"bmi-title\" style=\"max-width: 560px; margin: 0 auto;\">\n  <header>\n    <h1 id=\"bmi-title\">BMI calculator</h1>\n    <p>Check your body mass index in a moment.</p>\n  </header>\n\n  <article>\n    <div style=\"display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;\">\n      <label for=\"height\">Height <small>(cm)</small>\n        <input id=\"height\" type=\"number\" min=\"1\" step=\"any\" value=\"175\" inputmode=\"decimal\">\n      </label>\n      <label for=\"weight\">Weight <small>(kg)</small>\n        <input id=\"weight\" type=\"number\" min=\"1\" step=\"any\" value=\"70\" inputmode=\"decimal\">\n      </label>\n    </div>\n\n    <div aria-live=\"polite\" aria-atomic=\"true\">\n      <small>Your BMI</small>\n      <h2><output id=\"bmi\" for=\"height weight\">22.9</output> <small id=\"category\">Normal</small></h2>\n      <p id=\"message\">Within the normal BMI range.</p>\n    </div>\n\n    <svg viewBox=\"0 0 440 90\" role=\"img\" aria-labelledby=\"scale-title scale-description\" style=\"display: block; width: 100%; height: auto;\">\n      <title id=\"scale-title\">BMI category scale</title>\n      <desc id=\"scale-description\">BMI 22.9, Normal. Scale shown from 10 to 40.</desc>\n      <rect x=\"20\" y=\"26\" width=\"113.33\" height=\"16\" fill=\"#4385b5\"/>\n      <rect x=\"133.33\" y=\"26\" width=\"86.67\" height=\"16\" fill=\"#39845c\"/>\n      <rect x=\"220\" y=\"26\" width=\"66.67\" height=\"16\" fill=\"#bc8525\"/>\n      <rect x=\"286.67\" y=\"26\" width=\"133.33\" height=\"16\" fill=\"#b65151\"/>\n      <g fill=\"currentColor\" font-size=\"12\" text-anchor=\"middle\">\n        <text x=\"20\" y=\"60\">10</text>\n        <text x=\"133.33\" y=\"60\">18.5</text>\n        <text x=\"220\" y=\"60\">25</text>\n        <text x=\"286.67\" y=\"60\">30</text>\n        <text x=\"420\" y=\"60\">40</text>\n      </g>\n      <path id=\"marker\" d=\"M 186 22 L 180 10 L 192 10 Z\" fill=\"currentColor\"/>\n    </svg>\n\n    <small>Blue: Underweight \u00b7 Green: Normal \u00b7 Amber: Overweight \u00b7 Red: Obese</small>\n    <p><small>Scale: BMI 10\u201340. Values outside this range appear at the nearest end.</small></p>\n\n    <details>\n      <summary>How to interpret your result</summary>\n      <table>\n        <thead><tr><th scope=\"col\">Category</th><th scope=\"col\">BMI</th></tr></thead>\n        <tbody>\n          <tr><td>Underweight</td><td>Below 18.5</td></tr>\n          <tr><td>Normal</td><td>18.5 to below 25</td></tr>\n          <tr><td>Overweight</td><td>25 to below 30</td></tr>\n          <tr><td>Obese</td><td>30 or above</td></tr>\n        </tbody>\n      </table>\n      <p><small>BMI = weight (kg) \u00f7 height (m)\u00b2. Categories use the unrounded result.</small></p>\n    </details>\n  </article>\n  <p><small>BMI is a general screening measure for adults, not a diagnosis. It does not account for muscle mass, pregnancy, or individual health differences.</small></p>\n</section>\n\n<script>\n(() => {\n  const height = document.getElementById('height');\n  const weight = document.getElementById('weight');\n  const result = document.getElementById('bmi');\n  const category = document.getElementById('category');\n  const message = document.getElementById('message');\n  const marker = document.getElementById('marker');\n  const description = document.getElementById('scale-description');\n\n  function update() {\n    const h = height.valueAsNumber;\n    const w = weight.valueAsNumber;\n    const bmi = w / ((h / 100) ** 2);\n\n    if (!Number.isFinite(h) || !Number.isFinite(w) || h <= 0 || w <= 0 || !Number.isFinite(bmi) || bmi <= 0) {\n      result.textContent = '\u2014';\n      category.textContent = '';\n      message.textContent = 'Enter a valid height and weight greater than zero.';\n      marker.setAttribute('visibility', 'hidden');\n      description.textContent = 'Enter valid measurements to show your BMI on the scale.';\n      return;\n    }\n\n    const label = bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Normal' : bmi < 30 ? 'Overweight' : 'Obese';\n    const formatted = bmi.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });\n    result.textContent = formatted;\n    category.textContent = label;\n    message.textContent = label === 'Normal' ? 'Within the normal BMI range.' : 'In the ' + label.toLowerCase() + ' BMI range.';\n    const x = 20 + ((Math.min(40, Math.max(10, bmi)) - 10) / 30) * 400;\n    marker.setAttribute('d', `M ${x} 22 L ${x - 6} 10 L ${x + 6} 10 Z`);\n    marker.removeAttribute('visibility');\n    description.textContent = `BMI ${formatted}, ${label}. Scale shown from 10 to 40.`;\n  }\n\n  height.addEventListener('input', update);\n  weight.addEventListener('input', update);\n  update();\n})();\n</script>",
+ "reasoning_text": "",
+ "chunks": [
+  [
+   1047.9,
+   "<section aria-labelledby=\"bmi-title\" style=\"max-width: 560px; margin: 0 auto;\">\n  <header>\n    <h1 id=\"bmi-title\">BMI calculator</h1>\n    <p>Check"
+  ],
+  [
+   1208.6,
+   " your body mass index in a moment.</p>\n  </header>\n\n  <article>\n    <div style=\"display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;\">\n      <label for"
+  ],
+  [
+   1412.4,
+   "=\"height\">Height <small>(cm)</small>\n        <input id=\"height\" type=\"number\" min=\"1\" step=\"any\" value=\"175\" inputmode=\"decimal\">\n      </label>\n      <label for=\""
+  ],
+  [
+   1529.0,
+   "weight\">Weight <small>(kg)</small>\n        <input id=\"weight\" type=\"number\" min=\"1\" step=\"any\" value=\"70\" inputmode=\"decimal\">\n      </label>\n    </div>\n\n    <"
+  ],
+  [
+   1678.2,
+   "div aria-live=\"polite\" aria-atomic=\"true\">\n      <small>Your BMI</small>\n      <h2><output id=\"bmi\" for=\"height weight\">22.9</output> <small id=\"category"
+  ],
+  [
+   1836.3,
+   "\">Normal</small></h2>\n      <p id=\"message\">Within the normal BMI range.</p>\n    </div>\n\n    <svg viewBox=\"0 0 440 90\" role=\"img\" aria-labelledby=\""
+  ],
+  [
+   1988.8,
+   "scale-title scale-description\" style=\"display: block; width: 100%; height: auto;\">\n      <title id=\"scale-title\">BMI category scale</title>\n      <desc id=\"scale-description\">BMI 22.9,"
+  ],
+  [
+   2145.5,
+   " Normal. Scale shown from 10 to 40.</desc>\n      <rect x=\"20\" y=\"26\" width=\"113.33\" height=\"16\" fill=\"#4385b5\"/>\n      <rect x=\"133."
+  ],
+  [
+   2290.4,
+   "33\" y=\"26\" width=\"86.67\" height=\"16\" fill=\"#39845c\"/>\n      <rect x=\"220\" y=\"26\" width=\"66.67\" height=\"16\" fill=\"#bc8525"
+  ],
+  [
+   2459.4,
+   "\"/>\n      <rect x=\"286.67\" y=\"26\" width=\"133.33\" height=\"16\" fill=\"#b65151\"/>\n      <g fill=\"currentColor\" font-size=\"12\" text-anchor=\"middle\">\n"
+  ],
+  [
+   2556.1,
+   "        <text x=\"20\" y=\"60\">10</text>\n        <text x=\"133.33\" y=\"60\">18.5</text>\n        <text x=\"220\" y=\"60\">25</text"
+  ],
+  [
+   2710.9,
+   ">\n        <text x=\"286.67\" y=\"60\">30</text>\n        <text x=\"420\" y=\"60\">40</text>\n      </g>\n      <path id=\"marker\" d=\"M "
+  ],
+  [
+   2846.0,
+   "186 22 L 180 10 L 192 10 Z\" fill=\"currentColor\"/>\n    </svg>\n\n    <small>Blue: Underweight \u00b7 Green: Normal \u00b7 Amber: Overweight \u00b7 Red: Obese</small"
+  ],
+  [
+   2983.3,
+   ">\n    <p><small>Scale: BMI 10\u201340. Values outside this range appear at the nearest end.</small></p>\n\n    <details>\n      <summary>How to interpret your result</summary>\n      <table"
+  ],
+  [
+   3140.6,
+   ">\n        <thead><tr><th scope=\"col\">Category</th><th scope=\"col\">BMI</th></tr></thead>\n        <tbody>\n          <tr><td>Underweight</td><td>Below "
+  ],
+  [
+   3296.5,
+   "18.5</td></tr>\n          <tr><td>Normal</td><td>18.5 to below 25</td></tr>\n          <tr><td>Overweight</td><td>25 to below"
+  ],
+  [
+   3508.6,
+   " 30</td></tr>\n          <tr><td>Obese</td><td>30 or above</td></tr>\n        </tbody>\n      </table>\n      <p><small>BMI = weight (kg)"
+  ],
+  [
+   3584.2,
+   " \u00f7 height (m)\u00b2. Categories use the unrounded result.</small></p>\n    </details>\n  </article>\n  <p><small>BMI is a general screening measure for adults, not a diagnosis. It does not"
+  ],
+  [
+   3717.3,
+   " account for muscle mass, pregnancy, or individual health differences.</small></p>\n</section>\n\n<script>\n(() => {\n  const height = document.getElementById('height');\n  const weight = document.getElementById('weight');\n"
+  ],
+  [
+   3827.8,
+   "  const result = document.getElementById('bmi');\n  const category = document.getElementById('category');\n  const message = document.getElementById('message');\n  const marker = document.getElementById('marker"
+  ],
+  [
+   4033.3,
+   "');\n  const description = document.getElementById('scale-description');\n\n  function update() {\n    const h = height.valueAsNumber;\n    const w = weight.valueAsNumber;\n    const bmi = w / ((h / 100"
+  ],
+  [
+   4068.6,
+   ") ** 2);\n\n    if (!Number.isFinite(h) || !Number.isFinite(w) || h <= 0 || w <= 0 || !Number.isFinite(bmi) || bmi <= 0) {\n      result.text"
+  ],
+  [
+   4179.4,
+   "Content = '\u2014';\n      category.textContent = '';\n      message.textContent = 'Enter a valid height and weight greater than zero.';\n      marker.setAttribute('visibility', 'hidden');\n      description.textContent = 'Enter valid measurements to show"
+  ],
+  [
+   4556.9,
+   " your BMI on the scale.';\n      return;\n    }\n\n    const label = bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Normal' : bmi < 30 ? 'Overweight' : 'Ob"
+  ],
+  [
+   4556.9,
+   "ese';\n    const formatted = bmi.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });\n    result.textContent = formatted;\n    category.textContent = label;\n    message.textContent = label ==="
+  ],
+  [
+   4557.0,
+   " 'Normal' ? 'Within the normal BMI range.' : 'In the ' + label.toLowerCase() + ' BMI range.';\n    const x = 20 + ((Math.min(40, Math.max(10, bmi)) -"
+  ],
+  [
+   4653.3,
+   " 10) / 30) * 400;\n    marker.setAttribute('d', `M ${x} 22 L ${x - 6} 10 L ${x + 6} 10 Z`);\n    marker.remove"
+  ],
+  [
+   4766.9,
+   "Attribute('visibility');\n    description.textContent = `BMI ${formatted}, ${label}. Scale shown from 10 to 40.`;\n  }\n\n  height.addEventListener('input', update);\n  weight.addEventListener('input', update"
+  ],
+  [
+   4861.9,
+   ");\n  update();\n})();\n</script>"
+  ]
+ ],
+ "grade": {
+  "grade": "pass",
+  "reason": null,
+  "defects": []
+ },
+ "recheck": {
+  "at": "2026-10-22T20:32:28.612531+00:00",
+  "code_version": "06aa8340f9cf",
+  "note": "screenshot, layout checks, checklist, interaction test (live formats) and grade re-derived from the stored output; timings, usage and parse errors are from the original run"
+ }
+}

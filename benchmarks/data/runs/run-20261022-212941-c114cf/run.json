@@ -1,0 +1,70 @@
+{
+ "id": "run-20261022-212941-c114cf",
+ "created_at": "2026-10-22T21:29:41.691398+00:00",
+ "code_version": "af64be38efc0",
+ "status": "done",
+ "task": "mortgage",
+ "concurrency": 6,
+ "request_budget_s": 20.0,
+ "formats": [
+  "html_pico"
+ ],
+ "models": [
+  "gpt-6-luna-fast"
+ ],
+ "reps": 3,
+ "seed": 500496,
+ "order": [
+  {
+   "format": "html_pico",
+   "model": "gpt-6-luna-fast",
+   "rep": 2
+  },
+  {
+   "format": "html_pico",
+   "model": "gpt-6-luna-fast",
+   "rep": 3
+  },
+  {
+   "format": "html_pico",
+   "model": "gpt-6-luna-fast",
+   "rep": 1
+  }
+ ],
+ "attempt_ids": [
+  "att-20261022-212943-f52a39",
+  "att-20261022-212943-e9c13c",
+  "att-20261022-212943-491106"
+ ],
+ "settings": {
+  "gpt-6-luna-fast": {
+   "model": "gpt-6-luna",
+   "provider": "openai",
+   "provider_order": null,
+   "service_tier": "fast",
+   "reasoning_request": {
+    "effort": "none"
+   },
+   "reasoning_note": "Responses API, service_tier='fast' (Luna rejects 'ultrafast'); reasoning effort 'none' accepted.",
+   "cost_source": "Estimated: tokens x fast-tier price (2x standard, unconfirmed)"
+  }
+ },
+ "prompt_tokens": {
+  "html_pico": 208
+ },
+ "task_tokens": 201,
+ "started_at": "2026-10-22T21:29:41.693285+00:00",
+ "warmups": [
+  {
+   "format": "html_pico",
+   "model": "gpt-6-luna-fast",
+   "input_tokens": 419,
+   "cached_input_tokens": 0,
+   "output_tokens": 32,
+   "cost_usd": 0.00011580000000000001,
+   "ms": 1420
+  }
+ ],
+ "finished_at": "2026-10-22T21:30:20.653870+00:00",
+ "imported_from": "ux-woz-full-benchmark/data/runs/run-20261022-212941-c114cf (HTML + Pico attempts of the three chosen models only)"
+}

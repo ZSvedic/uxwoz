@@ -1,0 +1,14 @@
+temp/*
+!temp/.gitkeep
+*-output.*
+.DS_Store
+.env
+.env.local
+.claude/settings.local.json
+.claude/cache/
+.claude/worktrees/
+node_modules/
+dist/
+.venv/
+__pycache__/
+.pytest_cache/

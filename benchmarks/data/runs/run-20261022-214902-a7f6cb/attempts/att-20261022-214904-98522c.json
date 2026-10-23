@@ -1,0 +1,648 @@
+{
+ "id": "att-20261022-214904-98522c",
+ "run_id": "run-20261022-214902-a7f6cb",
+ "format": "html_pico",
+ "model": "claude-haiku-5.5",
+ "rep": 1,
+ "task": "todo",
+ "status": "ok",
+ "requested": {
+  "model": "anthropic/claude-haiku-5.5",
+  "provider_order": [
+   "anthropic"
+  ],
+  "service_tier": null,
+  "reasoning": {
+   "enabled": false
+  }
+ },
+ "cache_policy": "warm",
+ "timings": {
+  "request_start_epoch_ms": 1792705745582.078,
+  "first_byte_ms": 909.201904296875,
+  "first_token_ms": 909.228271484375,
+  "content_complete_ms": 3424.625244140625,
+  "generation_complete_ms": 3425.7099609375,
+  "first_visible_ui_ms": 1213.922119140625,
+  "fully_rendered_ms": 3444.0283203125,
+  "harness_first_chunk_ms": 908.922119140625,
+  "relay_latency_ms": -0.30615234375
+ },
+ "errors": [],
+ "system_prompt_tokens": 208,
+ "actual": {
+  "model": "anthropic/claude-haiku-5.5",
+  "provider": "Anthropic",
+  "service_tier": null,
+  "reasoning": null,
+  "finish_reason": "stop"
+ },
+ "model_substituted": false,
+ "tier_substituted": false,
+ "usage": {
+  "input_tokens": 531,
+  "cached_input_tokens": 0,
+  "cache_write_tokens": 0,
+  "output_tokens": 832,
+  "reasoning_tokens": 0
+ },
+ "usage_raw": {
+  "prompt_tokens": 531,
+  "completion_tokens": 832,
+  "total_tokens": 1363,
+  "cost": 0.0004691,
+  "is_byok": false,
+  "prompt_tokens_details": {
+   "cached_tokens": 0,
+   "cache_write_tokens": 0,
+   "audio_tokens": 0,
+   "video_tokens": 0
+  },
+  "cost_details": {
+   "upstream_inference_cost": 0.0004691,
+   "upstream_inference_prompt_cost": 5.31e-05,
+   "upstream_inference_completions_cost": 0.000416
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 0,
+   "image_tokens": 0,
+   "audio_tokens": 0
+  }
+ },
+ "cost_usd": 0.0004691,
+ "cost_source": "OpenRouter usage.cost (billed)",
+ "output_tokens_per_s": 330.8,
+ "harness": {
+  "extractedSource": "<article>\n<h1>Todo list</h1>\n<form id=\"addForm\" style=\"display:grid;grid-template-columns:1fr auto;gap:0.5rem;align-items:end;\">\n<label>New task<input id=\"newTask\" type=\"text\" autocomplete=\"off\"></label>\n<button type=\"submit\">Add</button>\n</form>\n<label>Filter\n<select id=\"filter\">\n<option value=\"all\">All</option>\n<option value=\"active\">Active</option>\n<option value=\"done\">Done</option>\n</select>\n</label>\n<table>\n<tbody id=\"list\"></tbody>\n</table>\n<p><small id=\"counter\"></small></p>\n</article>\n<script>\nconst tasks = [\n{ text: \"Buy milk\", done: false },\n{ text: \"Write report\", done: true },\n{ text: \"Call Alice\", done: false }\n];\nconst form = document.getElementById(\"addForm\");\nconst input = document.getElementById(\"newTask\");\nconst filter = document.getElementById(\"filter\");\nconst list = document.getElementById(\"list\");\nconst counter = document.getElementById(\"counter\");\n\nfunction render() {\nconst f = filter.value;\nlist.innerHTML = \"\";\ntasks.forEach((t, i) => {\nif (f === \"active\" && t.done) return;\nif (f === \"done\" && !t.done) return;\nconst tr = document.createElement(\"tr\");\nconst tdCheck = document.createElement(\"td\");\nconst cb = document.createElement(\"input\");\ncb.type = \"checkbox\";\ncb.checked = t.done;\ncb.addEventListener(\"change\", () => { t.done = cb.checked; render(); });\ntdCheck.appendChild(cb);\nconst tdText = document.createElement(\"td\");\ntdText.textContent = t.text;\nif (t.done) tdText.style.textDecoration = \"line-through\";\nconst tdDel = document.createElement(\"td\");\nconst del = document.createElement(\"button\");\ndel.type = \"button\";\ndel.textContent = \"Delete\";\ndel.addEventListener(\"click\", () => { tasks.splice(i, 1); render(); });\ntdDel.appendChild(del);\ntr.append(tdCheck, tdText, tdDel);\nlist.appendChild(tr);\n});\nconst left = tasks.filter(t => !t.done).length;\ncounter.textContent = left + (left === 1 ? \" item left\" : \" items left\");\n}\n\nform.addEventListener(\"submit\", e => {\ne.preventDefault();\nconst text = input.value.trim();\nif (text) tasks.push({ text, done: false });\ninput.value = \"\";\nrender();\n});\nfilter.addEventListener(\"input\", render);\nrender();\n</script>",
+  "fenced": false,
+  "firstChunkAt": 1792705746491,
+  "firstVisibleAt": 1792705746796,
+  "streamEndAt": 1792705749007,
+  "fullyRenderedAt": 1792705749026.1062,
+  "renderErrors": [],
+  "rendered": true,
+  "parseOk": true,
+  "renderedText": "",
+  "visibleText": "Todo list\nNew task\nAdd\nFilter \nAll\nActive\nDone\n\tBuy milk\tDelete\n\tWrite report\tDelete\n\tCall Alice\tDelete\n\n2 items left\nall\non\non\non",
+  "overflow": []
+ },
+ "screenshot": "/api/shots/run-20261022-214902-a7f6cb/att-20261022-214904-98522c.png",
+ "parse": {
+  "ok": true,
+  "rendered": true,
+  "errors": [],
+  "fenced": false
+ },
+ "checklist": {
+  "shows_three_start_tasks": true,
+  "new_task_input": true,
+  "filters_all_active_done": true,
+  "counter_2_left": true
+ },
+ "checklist_basis": "sandbox frame text + control values/labels",
+ "interactive": {
+  "status": "pass",
+  "passed": 6,
+  "total": 6,
+  "cases": [
+   {
+    "step": "initial: 3 tasks, 2 left",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "step": "add 'Pay rent': shown, 3 left",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "step": "mark 'Buy milk' done: 2 left",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "step": "filter Active",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "step": "filter Done",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "step": "delete 'Call Alice': gone, 1 left",
+    "ok": true,
+    "detail": ""
+   }
+  ],
+  "duration_ms": 1659
+ },
+ "after_inputs": {},
+ "screenshot_after": "/api/shots/run-20261022-214902-a7f6cb/att-20261022-214904-98522c-after.png",
+ "source": "<article>\n<h1>Todo list</h1>\n<form id=\"addForm\" style=\"display:grid;grid-template-columns:1fr auto;gap:0.5rem;align-items:end;\">\n<label>New task<input id=\"newTask\" type=\"text\" autocomplete=\"off\"></label>\n<button type=\"submit\">Add</button>\n</form>\n<label>Filter\n<select id=\"filter\">\n<option value=\"all\">All</option>\n<option value=\"active\">Active</option>\n<option value=\"done\">Done</option>\n</select>\n</label>\n<table>\n<tbody id=\"list\"></tbody>\n</table>\n<p><small id=\"counter\"></small></p>\n</article>\n<script>\nconst tasks = [\n{ text: \"Buy milk\", done: false },\n{ text: \"Write report\", done: true },\n{ text: \"Call Alice\", done: false }\n];\nconst form = document.getElementById(\"addForm\");\nconst input = document.getElementById(\"newTask\");\nconst filter = document.getElementById(\"filter\");\nconst list = document.getElementById(\"list\");\nconst counter = document.getElementById(\"counter\");\n\nfunction render() {\nconst f = filter.value;\nlist.innerHTML = \"\";\ntasks.forEach((t, i) => {\nif (f === \"active\" && t.done) return;\nif (f === \"done\" && !t.done) return;\nconst tr = document.createElement(\"tr\");\nconst tdCheck = document.createElement(\"td\");\nconst cb = document.createElement(\"input\");\ncb.type = \"checkbox\";\ncb.checked = t.done;\ncb.addEventListener(\"change\", () => { t.done = cb.checked; render(); });\ntdCheck.appendChild(cb);\nconst tdText = document.createElement(\"td\");\ntdText.textContent = t.text;\nif (t.done) tdText.style.textDecoration = \"line-through\";\nconst tdDel = document.createElement(\"td\");\nconst del = document.createElement(\"button\");\ndel.type = \"button\";\ndel.textContent = \"Delete\";\ndel.addEventListener(\"click\", () => { tasks.splice(i, 1); render(); });\ntdDel.appendChild(del);\ntr.append(tdCheck, tdText, tdDel);\nlist.appendChild(tr);\n});\nconst left = tasks.filter(t => !t.done).length;\ncounter.textContent = left + (left === 1 ? \" item left\" : \" items left\");\n}\n\nform.addEventListener(\"submit\", e => {\ne.preventDefault();\nconst text = input.value.trim();\nif (text) tasks.push({ text, done: false });\ninput.value = \"\";\nrender();\n});\nfilter.addEventListener(\"input\", render);\nrender();\n</script>",
+ "reasoning_text": "",
+ "chunks": [
+  [
+   909.2,
+   "<article>\n<h1>"
+  ],
+  [
+   1012.5,
+   "Todo list</h1>"
+  ],
+  [
+   1068.6,
+   "\n<form id=\"add"
+  ],
+  [
+   1068.6,
+   "Form\" style=\"display"
+  ],
+  [
+   1068.7,
+   ":grid;"
+  ],
+  [
+   1068.7,
+   "grid-template-columns:"
+  ],
+  [
+   1068.8,
+   "1fr au"
+  ],
+  [
+   1068.9,
+   "to;gap:0.5"
+  ],
+  [
+   1068.9,
+   "rem;align-items:end"
+  ],
+  [
+   1084.5,
+   ";\">\n<label>"
+  ],
+  [
+   1251.9,
+   "New task"
+  ],
+  [
+   1251.9,
+   "<input id=\"new"
+  ],
+  [
+   1251.9,
+   "T"
+  ],
+  [
+   1251.9,
+   "ask\" type=\"text\" aut"
+  ],
+  [
+   1252.0,
+   "ocomplete=\"off\"></"
+  ],
+  [
+   1252.0,
+   "label>\n<button type=\"subm"
+  ],
+  [
+   1252.0,
+   "it\">Add</button>"
+  ],
+  [
+   1252.0,
+   "\n</form>\n<label>"
+  ],
+  [
+   1395.4,
+   "Filter\n<select id=\"fil"
+  ],
+  [
+   1395.7,
+   "ter\">\n<option value=\"all"
+  ],
+  [
+   1395.7,
+   "\">All</option>\n<option"
+  ],
+  [
+   1395.8,
+   " value=\"active\">Active</option"
+  ],
+  [
+   1398.8,
+   ">\n<option value=\"done\">"
+  ],
+  [
+   1398.8,
+   "Done</option>\n</select"
+  ],
+  [
+   1398.9,
+   ">\n</label>\n<table"
+  ],
+  [
+   1551.1,
+   ">"
+  ],
+  [
+   1551.1,
+   "\n<t"
+  ],
+  [
+   1551.1,
+   "body id=\"list\""
+  ],
+  [
+   1551.2,
+   "></tbody>\n</table"
+  ],
+  [
+   1551.2,
+   ">\n<p><small id=\""
+  ],
+  [
+   1551.2,
+   "counter\"></small></p>"
+  ],
+  [
+   1551.2,
+   "\n</article>"
+  ],
+  [
+   1551.3,
+   "\n<script>\nconst"
+  ],
+  [
+   1717.0,
+   " tasks = ["
+  ],
+  [
+   1717.0,
+   "\n{ text: \"Buy"
+  ],
+  [
+   1717.1,
+   " milk\", done: false },"
+  ],
+  [
+   1717.1,
+   "\n{ text: \"Write report"
+  ],
+  [
+   1717.3,
+   "\", done: true },\n{"
+  ],
+  [
+   1717.3,
+   " text: \"Call Alice"
+  ],
+  [
+   1717.4,
+   "\", done: false }\n];"
+  ],
+  [
+   1717.4,
+   "\nconst form = document.getElement"
+  ],
+  [
+   1880.2,
+   "ById(\"addForm\");\nconst"
+  ],
+  [
+   1880.9,
+   " input"
+  ],
+  [
+   1880.9,
+   " = document.getElementById(\""
+  ],
+  [
+   1880.9,
+   "newTask\");\nconst filter"
+  ],
+  [
+   1881.0,
+   " = document.getElementById(\""
+  ],
+  [
+   1881.0,
+   "filter\");\nconst list = document"
+  ],
+  [
+   1881.0,
+   ".getElementById(\"list\");"
+  ],
+  [
+   2061.1,
+   "\nconst counter = document.get"
+  ],
+  [
+   2061.2,
+   "ElementById(\"counter\");"
+  ],
+  [
+   2061.3,
+   "\n\nfunction render() {\nconst"
+  ],
+  [
+   2061.3,
+   " f"
+  ],
+  [
+   2061.3,
+   " = filter.value;\nlist"
+  ],
+  [
+   2061.3,
+   ".innerHTML = \""
+  ],
+  [
+   2061.4,
+   "\";\ntasks.forE"
+  ],
+  [
+   2061.4,
+   "ach((t, i) => {"
+  ],
+  [
+   2185.6,
+   "\nif (f === \"active"
+  ],
+  [
+   2185.6,
+   "\" && t"
+  ],
+  [
+   2185.6,
+   ".done) return;\nif ("
+  ],
+  [
+   2185.6,
+   "f === \"done\" && !t"
+  ],
+  [
+   2185.7,
+   ".done) return;\nconst t"
+  ],
+  [
+   2185.7,
+   "r = document.createElement(\""
+  ],
+  [
+   2185.7,
+   "tr\");\nconst t"
+  ],
+  [
+   2330.2,
+   "dC"
+  ],
+  [
+   2330.3,
+   "heck = document.createElement"
+  ],
+  [
+   2330.3,
+   "(\"td\");\nconst cb ="
+  ],
+  [
+   2330.5,
+   " document.createElement(\"input"
+  ],
+  [
+   2330.6,
+   "\");\ncb.type = \""
+  ],
+  [
+   2331.3,
+   "checkbox\";\ncb"
+  ],
+  [
+   2331.3,
+   ".checked = t.done;"
+  ],
+  [
+   2331.3,
+   "\ncb.addEventList"
+  ],
+  [
+   2495.9,
+   "ener(\"change\", () => {"
+  ],
+  [
+   2495.9,
+   " t"
+  ],
+  [
+   2496.0,
+   ".done = cb.checked"
+  ],
+  [
+   2496.0,
+   "; render(); });\ntd"
+  ],
+  [
+   2496.1,
+   "Check.appendChild"
+  ],
+  [
+   2496.1,
+   "(cb);\nconst td"
+  ],
+  [
+   2496.1,
+   "Text = document.createElement(\""
+  ],
+  [
+   2496.1,
+   "td\");\nt"
+  ],
+  [
+   2658.8,
+   "dText.textContent = t"
+  ],
+  [
+   2658.8,
+   ".text;\nif"
+  ],
+  [
+   2658.8,
+   " (t.done) tdText"
+  ],
+  [
+   2658.8,
+   ".style.text"
+  ],
+  [
+   2658.9,
+   "Decoration = \"line-"
+  ],
+  [
+   2658.9,
+   "through\";\nconst tdD"
+  ],
+  [
+   2658.9,
+   "el = document.createElement(\""
+  ],
+  [
+   2658.9,
+   "td\");\nconst del = document."
+  ],
+  [
+   2820.9,
+   "createElement(\"button\");\ndel"
+  ],
+  [
+   2820.9,
+   ".type = \"button\";\ndel"
+  ],
+  [
+   2821.0,
+   ".textContent = \"Del"
+  ],
+  [
+   2821.0,
+   "ete\";\ndel.addEvent"
+  ],
+  [
+   2821.0,
+   "Listener(\"click\", () => {"
+  ],
+  [
+   2821.1,
+   " tasks.splice(i"
+  ],
+  [
+   2821.1,
+   ", 1); render(); });"
+  ],
+  [
+   2968.4,
+   "\nt"
+  ],
+  [
+   2968.4,
+   "dDel.appendChild"
+  ],
+  [
+   2969.0,
+   "(del);\ntr"
+  ],
+  [
+   2969.0,
+   ".append"
+  ],
+  [
+   2969.0,
+   "(tdCheck, t"
+  ],
+  [
+   2969.0,
+   "dText, tdDel);"
+  ],
+  [
+   2969.0,
+   "\nlist.appendChild("
+  ],
+  [
+   2969.0,
+   "tr);\n});\nconst left"
+  ],
+  [
+   3129.5,
+   " = tasks.filter("
+  ],
+  [
+   3129.5,
+   "t => !t.done).length"
+  ],
+  [
+   3129.5,
+   ";\ncounter.textContent"
+  ],
+  [
+   3129.5,
+   " = left"
+  ],
+  [
+   3129.5,
+   " + ("
+  ],
+  [
+   3129.5,
+   "left === 1 ? \""
+  ],
+  [
+   3129.5,
+   " item left"
+  ],
+  [
+   3129.5,
+   "\" : \" items left\");\n}"
+  ],
+  [
+   3292.6,
+   "\n\nform.addEventListener"
+  ],
+  [
+   3292.6,
+   "(\"submit\", e"
+  ],
+  [
+   3292.6,
+   " => {\ne.preventD"
+  ],
+  [
+   3292.6,
+   "efault();\nconst text = input"
+  ],
+  [
+   3292.6,
+   ".value.trim();\nif"
+  ],
+  [
+   3292.6,
+   " (text"
+  ],
+  [
+   3292.6,
+   ") t"
+  ],
+  [
+   3292.7,
+   "asks.push({ text,"
+  ],
+  [
+   3415.2,
+   " done: false });\ninput.value"
+  ],
+  [
+   3424.5,
+   " = \"\";\nrender();\n});"
+  ],
+  [
+   3424.5,
+   "\nfilter.addEventList"
+  ],
+  [
+   3424.6,
+   "ener(\"input"
+  ],
+  [
+   3424.6,
+   "\", render);\nrender();\n</"
+  ],
+  [
+   3424.6,
+   "script>"
+  ]
+ ],
+ "grade": {
+  "grade": "pass",
+  "reason": null,
+  "defects": []
+ }
+}
