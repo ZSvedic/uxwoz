@@ -1,0 +1,70 @@
+# Code contract
+
+This doc owns the shapes the code agrees on: packages, the HTTP API, the stored types, env vars and
+the test setup. It does not own what the user sees ([behavior.md](behavior.md)) or the screen format
+and model settings ([ui-generation.md](ui-generation.md)).
+
+## Example
+
+```
+POST /api/screen  {"app": "A coffee shop ordering app", "action": null, "model": "claude-haiku-5.5"}
+
+{"type":"meta","key":"a coffee shop ordering app","cached":false}
+{"type":"chunk","text":"<h1>Brew"}
+...
+{"type":"done","entry":{...CacheEntry},"index":0}
+```
+
+## Packages
+
+- `@uxwoz/core` (`src/packages/core`): models, prompt, provider streaming, screen cache, frame page.
+  `frame.ts` runs in the browser too, so it uses no Node or Bun APIs.
+- `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`, bundled
+  by Bun's HTML import), and the themes in `themes/`.
+
+There are no runtime dependencies; `@types/bun` and `typescript` are dev-only.
+
+## HTTP API
+
+The server listens on 127.0.0.1 only. Every POST must be `application/json` (else 415) and must not
+come from another origin (`Origin` or `Sec-Fetch-Site: cross-site`, else 403), so no other web page
+can spend model credits.
+
+- `GET /api/config`: models (id, label, costEstimated), themes, default model.
+- `POST /api/screen {app, action?, model?, regenerate?}`: NDJSON stream of `meta`, `chunk`*,
+  then `done` or `error`. A cache hit sends `meta` (cached true) and `done` only. 400 on an empty
+  or too long `app` (2,000), `action` (500), or an unknown model. A closed browser connection aborts
+  the model call.
+- `POST /api/choose {key, index}`: set the version revisits show; 404 if either is unknown.
+- `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
+- `GET /themes/{pico,sketch}.css`: the theme stylesheets.
+
+## Types
+
+```ts
+CacheEntry { key; app; action: string | null; chosen: number; candidates: Candidate[] }
+Candidate  { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
+             costEstimated; firstChunkMs; totalMs; finishReason }
+ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast'
+key        normalize(app) or normalize(app) + ' » ' + normalize(action); normalize turns » into >
+```
+
+## Env vars
+
+Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never sees them.
+
+| Var | Use |
+|---|---|
+| `OPENROUTER_API_KEY` | Claude Haiku 5.5 |
+| `OPENAI_API_KEY` | GPT-6 Luna, GPT-6.1 Sol |
+| `PORT` | server port, default 3000 |
+| `UXWOZ_HOST` | listen address, default `127.0.0.1` |
+| `UXWOZ_CACHE_FILE` | screen cache, default `temp/screen-cache.json` |
+| `UXWOZ_RECORD` | `1` makes tests call the live APIs and rewrite `cassettes/` |
+
+## Tests
+
+`bun test` runs `src/tests/*.test.ts`. Model calls go through `tests/cassette.ts`, which replays
+`cassettes/<feature>.json` keyed by a hash of URL and request body; `tests/no-network.ts` makes any
+other non-localhost call throw. Cucumber `.feature` files are not set up yet: the feature name is
+the test file name.

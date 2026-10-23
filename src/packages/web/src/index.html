@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UX Woz</title>
+<link rel="stylesheet" href="./shell.css">
+</head>
+<body>
+<header>
+  <form id="promptForm">
+    <strong class="logo">UX Woz</strong>
+    <input id="prompt" name="prompt" placeholder="Describe a product, e.g. a coffee shop ordering app" autocomplete="off" required maxlength="2000">
+    <button id="go" type="submit">Generate</button>
+  </form>
+  <div class="pickers">
+    <label>Model <select id="model"></select></label>
+    <label>Theme <select id="theme"></select></label>
+  </div>
+  <div class="examples">Try:
+    <button type="button" class="example">A coffee shop ordering app</button>
+    <button type="button" class="example">A mortgage calculator with a yearly balance chart</button>
+    <button type="button" class="example">A todo list with filters</button>
+  </div>
+</header>
+<nav id="toolbar" hidden>
+  <button id="back" type="button" title="Previous screen">← Back</button>
+  <button id="home" type="button" title="First screen">Home</button>
+  <span id="where" class="where"></span>
+  <span class="spacer"></span>
+  <span id="versions" class="versions">
+    <button id="prev" type="button" title="Previous version">‹</button>
+    <span id="versionLabel"></span>
+    <button id="next" type="button" title="Next version">›</button>
+    <button id="choose" type="button" hidden>Use this version</button>
+  </span>
+  <button id="regen" type="button" title="Make a new version of this screen; the current one stays">Regenerate</button>
+</nav>
+<div id="metrics" class="metrics"></div>
+<div id="error" class="error" hidden></div>
+<section id="stage" class="stage">
+  <p class="empty">Type a product idea above. Every button in the generated screen opens the next screen.</p>
+</section>
+<script type="module" src="./app.ts"></script>
+</body>
+</html>

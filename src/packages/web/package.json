@@ -1,0 +1,7 @@
+{
+  "name": "@uxwoz/web",
+  "private": true,
+  "type": "module",
+  "exports": { "./src/server.ts": "./src/server.ts" },
+  "dependencies": { "@uxwoz/core": "workspace:*" }
+}

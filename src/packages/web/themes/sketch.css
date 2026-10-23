@@ -1,0 +1,64 @@
+/* Hand-drawn wireframe: a drop-in stylesheet loaded after Pico. Monochrome, handwriting font,
+   thick dark borders, wobbly corners. No web font: a null-origin frame cannot fetch one, so this
+   uses handwriting fonts the OS already has. SVG charts keep the colours the model chose. */
+:root {
+  --sk-ink: #222;
+  --sk-paper: #fdfcf7;
+  --sk-wobble: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  --pico-font-family: "Comic Neue", "Chalkboard SE", "Marker Felt", "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  --pico-font-family-sans-serif: var(--pico-font-family);
+  --pico-background-color: var(--sk-paper);
+  --pico-color: var(--sk-ink);
+  --pico-h1-color: var(--sk-ink);
+  --pico-h2-color: var(--sk-ink);
+  --pico-h3-color: var(--sk-ink);
+  --pico-muted-color: #555;
+  --pico-muted-border-color: #999;
+  --pico-primary: var(--sk-ink);
+  --pico-primary-background: var(--sk-paper);
+  --pico-primary-border: var(--sk-ink);
+  --pico-primary-underline: var(--sk-ink);
+  --pico-primary-hover: #000;
+  --pico-primary-hover-background: #eee;
+  --pico-primary-hover-border: #000;
+  --pico-primary-focus: rgba(0, 0, 0, .2);
+  --pico-primary-inverse: var(--sk-ink);
+  --pico-secondary: #444;
+  --pico-secondary-background: var(--sk-paper);
+  --pico-secondary-border: var(--sk-ink);
+  --pico-secondary-inverse: var(--sk-ink);
+  --pico-contrast-background: var(--sk-paper);
+  --pico-contrast-inverse: var(--sk-ink);
+  --pico-form-element-background-color: #fff;
+  --pico-form-element-border-color: var(--sk-ink);
+  --pico-form-element-focus-color: var(--sk-ink);
+  --pico-card-background-color: var(--sk-paper);
+  --pico-card-sectioning-background-color: #f4f2ea;
+  --pico-table-border-color: var(--sk-ink);
+  --pico-mark-background-color: #ffef9e;
+  --pico-mark-color: var(--sk-ink);
+  --pico-border-width: 2px;
+  --pico-border-radius: var(--sk-wobble);
+  --pico-box-shadow: none;
+  --pico-card-box-shadow: none;
+}
+body { background: var(--sk-paper); letter-spacing: .01em; }
+button, input, select, textarea, article, fieldset, [role="button"] {
+  border: 2px solid var(--sk-ink) !important;
+  border-radius: var(--sk-wobble) !important;
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, .15) !important;
+}
+button, [role="button"], input[type="submit"], input[type="button"] {
+  background: var(--sk-paper) !important;
+  color: var(--sk-ink) !important;
+}
+button:hover, [role="button"]:hover { background: #eee !important; }
+input[type="checkbox"], input[type="radio"] { box-shadow: none !important; }
+input[type="checkbox"]:checked, input[type="radio"]:checked { background-color: var(--sk-ink) !important; }
+article { padding: 1rem 1.25rem; }
+table { border: 2px solid var(--sk-ink); }
+th, td { border-bottom: 1px dashed var(--sk-ink); }
+progress { border-radius: var(--sk-wobble); }
+hr { border-top: 2px dashed var(--sk-ink); }
+h1, h2, h3 { font-weight: 700; }
+a { color: var(--sk-ink); text-decoration: underline wavy; }

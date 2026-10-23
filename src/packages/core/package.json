@@ -1,0 +1,6 @@
+{
+  "name": "@uxwoz/core",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts", "./frame": "./src/frame.ts" }
+}

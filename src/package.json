@@ -1,0 +1,19 @@
+{
+  "name": "uxwoz",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev": "bun --env-file=../.env --hot packages/web/src/server.ts",
+    "start": "NODE_ENV=production bun --env-file=../.env packages/web/src/server.ts",
+    "test": "bun test",
+    "test:record": "UXWOZ_RECORD=1 bun --env-file=../.env test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "@uxwoz/core": "workspace:*",
+    "@uxwoz/web": "workspace:*",
+    "typescript": "^7.0.2"
+  }
+}
