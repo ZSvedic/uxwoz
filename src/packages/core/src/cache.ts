@@ -32,10 +32,21 @@ export function normalizePrompt(s: string): string {
   return s.normalize('NFKC').toLowerCase().replace(/»/g, '>').replace(/\s+/g, ' ').trim().replace(/[\s.!?;:,]+$/, '')
 }
 
+/** The action prompt that means "the first screen"; the model writes it on back-to-start links. */
+export const HOME_ACTION = 'home'
+
+/** The action as stored: null for the first screen, whether asked for as no action, "home", or the product prompt. */
+export function canonicalAction(app: string, action: string | null): string | null {
+  if (!action) return null
+  const a = normalizePrompt(action)
+  return a === '' || a === HOME_ACTION || a === normalizePrompt(app) ? null : action
+}
+
 /** The cache key: the normalized product prompt, plus the normalized action prompt for later screens. */
 export function screenKey(app: string, action: string | null): string {
   const root = normalizePrompt(app)
-  return action ? `${root} » ${normalizePrompt(action)}` : root
+  const a = canonicalAction(app, action)
+  return a ? `${root} » ${normalizePrompt(a)}` : root
 }
 
 export class ScreenCache {
@@ -61,6 +72,7 @@ export class ScreenCache {
 
   /** Store a new candidate. The first candidate of a key becomes the chosen one; later ones do not. */
   add(app: string, action: string | null, candidate: Candidate): { entry: CacheEntry; index: number } {
+    action = canonicalAction(app, action)
     const key = screenKey(app, action)
     let entry = this.entries.get(key)
     if (!entry) {
@@ -70,6 +82,15 @@ export class ScreenCache {
     entry.candidates.push(candidate)
     this.save()
     return { entry, index: entry.candidates.length - 1 }
+  }
+
+  /** The action prompts of this mockup's later screens, newest first. */
+  existingScreens(app: string): string[] {
+    const root = normalizePrompt(app)
+    return [...this.entries.values()]
+      .filter((e) => e.action && normalizePrompt(e.app) === root)
+      .map((e) => e.action!)
+      .reverse()
   }
 
   choose(key: string, index: number): CacheEntry | undefined {

@@ -38,7 +38,9 @@ Each control that opens another screen carries a short action prompt written by 
 it asks for the screen *product prompt + action prompt*. A plain link without one, which the
 screen's own script does not handle, asks for "the screen shown after clicking *label*"; in-page
 links (`#…`) stay put. Controls without an action prompt (filters, inputs, add to list) work inside
-the screen as the model wrote them. Only a real click opens a screen: a screen's script cannot start
+the screen as the model wrote them. To keep one screen per place, each request lists the screens
+the mockup already has; the model links to them with their exact prompt, and to the first screen
+with `home`, so going back lands on the cached screen. Only a real click opens a screen: a screen's script cannot start
 generations by itself. **← Back** walks the history; **Home** opens the first
 screen of the mockup.
 

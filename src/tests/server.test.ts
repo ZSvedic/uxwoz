@@ -18,6 +18,8 @@ async function screen(body: object): Promise<ScreenEvent[]> {
   expect(res.headers.get('content-type')).toContain('application/x-ndjson')
   return (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
 }
+/** The action prompts in a screen, in page order, without "home". */
+const actions = (html: string) => [...html.matchAll(/data-action="([^"]+)"/g)].map((m) => m[1]!).filter((a) => a.toLowerCase() !== 'home')
 const done = (evs: ScreenEvent[]) => evs.find((e) => e.type === 'done') as Extract<ScreenEvent, { type: 'done' }>
 
 describe('web server', () => {
@@ -36,11 +38,29 @@ describe('web server', () => {
 
   test('clicking an action opens a new screen under its own key', async () => {
     const first = done(await screen({ app: APP })).entry.candidates[0]!.html
-    const action = first.match(/data-action="([^"]+)"/)?.[1]
+    const action = actions(first)[0]
     expect(action).toBeTruthy()
     const evs = await screen({ app: APP, action })
     expect(done(evs).entry.key).toBe(`a tiny bakery website » ${action!.toLowerCase().replace(/\s+/g, ' ').replace(/[\s.!?;:,]+$/, '')}`)
   }, 30_000)
+
+  test('a "home" link opens the cached first screen with no model call', async () => {
+    const evs = await screen({ app: APP, action: 'home' })
+    expect(evs.map((e) => e.type)).toEqual(['meta', 'done'])
+    expect(done(evs).entry.key).toBe('a tiny bakery website')
+  })
+
+  test('a later screen is told which screens exist, so it can link back to them', async () => {
+    const first = done(await screen({ app: APP })).entry.candidates[0]!.html
+    const action = actions(first)[0]!
+    const second = done(await screen({ app: APP, action })).entry.candidates[0]!.html
+    const next = actions(second).find((a) => a !== action)
+    expect(next).toBeTruthy()
+    const third = done(await screen({ app: APP, action: next })).entry.candidates[0]!.html
+    // The third screen may link to "home" or the first action; either way it reuses a known prompt.
+    const links = third.match(/data-action="([^"]+)"/g)!.map((m) => m.slice(13, -1))
+    expect(links.some((a) => a === 'home' || a === action)).toBe(true)
+  }, 60_000)
 
   test('regenerate adds a version; revisits keep the old one until the user chooses', async () => {
     const regen = done(await screen({ app: APP, regenerate: true }))

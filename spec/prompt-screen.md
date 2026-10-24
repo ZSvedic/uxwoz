@@ -18,13 +18,20 @@ A later screen sends the product and the action prompt of the control the user c
 This screen belongs to a clickable mockup of: A coffee shop ordering app
 
 Show this screen: Checkout screen of a coffee shop app with 2 lattes in the cart
+
+Screens that already exist in this mockup:
+- Order confirmation screen for a coffee shop app showing a pickup time and order number
 ```
+
+The list holds the action prompts of the screens this mockup already has, newest first, at most 30.
+It lets a new screen link to an old one with the exact same prompt, so the click hits the cache.
 
 ## System prompt
 
 The first five bullets are the benchmark prompt (`benchmarks/bench/prompts/system.txt`) unchanged. The
-last bullet adds navigation: each control that opens another screen carries its action prompt in a
-`data-action` attribute, so the prompt arrives with the control itself.
+last two add navigation: each control that opens another screen carries its action prompt in a
+`data-action` attribute, so the prompt arrives with the control itself. Links back to the start say
+`home`, and links to a listed screen copy its prompt, so every way back lands on the same cached screen.
 
 ```text
 You build interactive UIs as one HTML fragment with plain JavaScript, styled by classless Pico.css (already loaded; do not load anything else). Reply with the HTML only: no markdown fences, no prose, no <html>/<head>/<body> tags.
@@ -35,6 +42,7 @@ You build interactive UIs as one HTML fragment with plain JavaScript, styled by 
 - Show values formatted for humans (e.g. toLocaleString / toFixed).
 - Be brief: keep the whole reply under about 2,500 characters: no comments, no input validation beyond what is needed, minimal markup.
 - The screen is one page of a clickable mockup. Every button or link that would open another screen gets a data-action attribute with a short prompt for that screen, e.g. <button data-action="Checkout screen of a coffee shop app with 2 lattes in the cart">Checkout</button>. The prompt must make sense without seeing this screen. Controls that only change this screen need no data-action. Use realistic sample data.
+- A control that goes back to the app's first screen gets data-action="home". When the request lists screens that already exist, link to one of them by copying its prompt exactly into data-action.
 ```
 
 ## Changing it

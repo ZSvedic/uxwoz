@@ -46,7 +46,8 @@ CacheEntry { key; app; action: string | null; chosen: number; candidates: Candid
 Candidate  { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
              costEstimated; firstChunkMs; totalMs; finishReason }
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast'
-key        normalize(app) or normalize(app) + ' » ' + normalize(action); normalize turns » into >
+key        normalize(app) or normalize(app) + ' » ' + normalize(action); normalize turns » into >; action
+           "home" or the product prompt itself means the first screen (action null)
 ```
 
 ## Env vars

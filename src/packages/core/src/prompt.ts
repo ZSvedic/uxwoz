@@ -8,12 +8,21 @@ export const SYSTEM_PROMPT = `You build interactive UIs as one HTML fragment wit
 - Everything must work offline: no fetch, no external images or fonts. Draw charts as inline SVG.
 - Show values formatted for humans (e.g. toLocaleString / toFixed).
 - Be brief: keep the whole reply under about 2,500 characters: no comments, no input validation beyond what is needed, minimal markup.
-- The screen is one page of a clickable mockup. Every button or link that would open another screen gets a data-action attribute with a short prompt for that screen, e.g. <button data-action="Checkout screen of a coffee shop app with 2 lattes in the cart">Checkout</button>. The prompt must make sense without seeing this screen. Controls that only change this screen need no data-action. Use realistic sample data.`
+- The screen is one page of a clickable mockup. Every button or link that would open another screen gets a data-action attribute with a short prompt for that screen, e.g. <button data-action="Checkout screen of a coffee shop app with 2 lattes in the cart">Checkout</button>. The prompt must make sense without seeing this screen. Controls that only change this screen need no data-action. Use realistic sample data.
+- A control that goes back to the app's first screen gets data-action="home". When the request lists screens that already exist, link to one of them by copying its prompt exactly into data-action.`
 
-/** The user message for one screen: the product prompt alone, or the product plus an action prompt. */
-export function screenRequest(app: string, action: string | null): string {
-  if (!action) return app
-  return `This screen belongs to a clickable mockup of: ${app}\n\nShow this screen: ${action}`
+/** The most existing screens one request lists, newest first, so a long session keeps requests short. */
+export const MAX_EXISTING_SCREENS = 30
+
+/**
+ * The user message for one screen: the product prompt alone, or the product plus an action prompt,
+ * then the screens that already exist, so links to them reuse the exact prompt (and the cache).
+ */
+export function screenRequest(app: string, action: string | null, existing: string[] = []): string {
+  let msg = action ? `This screen belongs to a clickable mockup of: ${app}\n\nShow this screen: ${action}` : app
+  const list = existing.slice(0, MAX_EXISTING_SCREENS)
+  if (list.length) msg += `\n\nScreens that already exist in this mockup:\n${list.map((p) => `- ${p}`).join('\n')}`
+  return msg
 }
 
 export const WARMUP_REQUEST = 'Reply with OK.'

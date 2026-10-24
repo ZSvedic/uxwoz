@@ -205,6 +205,7 @@ async function open(nav: Nav, { push = true, regenerate = false } = {}) {
       else if (ev.type === 'error') throw new Error(ev.message)
       else if (ev.type === 'done') {
         state.entry = ev.entry
+        state.nav = { app: nav.app, action: ev.entry.action } // "home" arrives as the first screen
         state.index = ev.index
         const c = ev.entry.candidates[ev.index]!
         if (!cached) state.spent += c.costUsd ?? 0

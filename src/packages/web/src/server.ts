@@ -3,7 +3,7 @@
 
 import { join, resolve } from 'node:path'
 import {
-  DEFAULT_MODEL, MODELS, ScreenCache, generateScreen, isModelId, screenKey, warmUp,
+  DEFAULT_MODEL, MODELS, ScreenCache, canonicalAction, generateScreen, isModelId, screenKey, warmUp,
   type CacheEntry, type Fetch, type ModelId,
 } from '@uxwoz/core'
 import index from './index.html'
@@ -60,6 +60,7 @@ export function createServer(opts: ServerOptions = {}) {
   const log = opts.log ?? ((m: string) => console.warn(m))
 
   async function* screenEvents(app: string, action: string | null, model: ModelId, regenerate: boolean, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
+    action = canonicalAction(app, action)
     const key = screenKey(app, action)
     const hit = cache.get(key)
     if (hit && !regenerate) {
@@ -69,7 +70,7 @@ export function createServer(opts: ServerOptions = {}) {
     }
     yield { type: 'meta', key, cached: false }
     try {
-      for await (const ev of generateScreen({ app, action, model, signal, fetch: opts.fetch, env: opts.env, log })) {
+      for await (const ev of generateScreen({ app, action, existing: cache.existingScreens(app).filter((a) => a !== action), model, signal, fetch: opts.fetch, env: opts.env, log })) {
         if (ev.type === 'chunk') yield ev
         else yield { type: 'done', ...cache.add(app, action, ev.candidate) }
       }

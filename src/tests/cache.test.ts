@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ScreenCache, normalizePrompt, screenKey, type Candidate } from '@uxwoz/core'
+import { ScreenCache, normalizePrompt, screenKey, screenRequest, type Candidate } from '@uxwoz/core'
 
 const cand = (html: string): Candidate => ({
   html, model: 'claude-haiku-5.5', servedModel: null, createdAt: '2026-10-23T00:00:00Z',
@@ -25,6 +25,24 @@ describe('screen cache', () => {
     expect(entry.chosen).toBe(0)
     expect(cache.choose(entry.key, 1)?.chosen).toBe(1)
     expect(cache.choose(entry.key, 5)).toBeUndefined()
+  })
+
+  test('"home" and the product prompt as an action both mean the first screen', () => {
+    expect(screenKey('Coffee app', 'Home')).toBe(screenKey('Coffee app', null))
+    expect(screenKey('Coffee app', 'coffee app.')).toBe(screenKey('Coffee app', null))
+    const cache = new ScreenCache()
+    expect(cache.add('Coffee app', 'home', cand('<h1>Menu</h1>')).entry.action).toBeNull()
+  })
+
+  test('a mockup lists its later screens, newest first, for the next request', () => {
+    const cache = new ScreenCache()
+    cache.add('Coffee app', null, cand('<h1>Menu</h1>'))
+    cache.add('Coffee app', 'Cart', cand('<h1>Cart</h1>'))
+    cache.add('Coffee app', 'Receipt', cand('<h1>Receipt</h1>'))
+    cache.add('Tea app', 'Cart', cand('<h1>Tea cart</h1>'))
+    expect(cache.existingScreens('coffee APP')).toEqual(['Receipt', 'Cart'])
+    expect(screenRequest('Coffee app', 'Pay', ['Receipt', 'Cart'])).toEndWith('Screens that already exist in this mockup:\n- Receipt\n- Cart')
+    expect(screenRequest('Coffee app', null)).toBe('Coffee app')
   })
 
   test('a cache file survives a restart', () => {

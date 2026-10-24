@@ -12,6 +12,8 @@ export const DEADLINE_MS = 20_000
 export interface GenerateOptions {
   app: string
   action: string | null
+  /** Action prompts of screens the mockup already has; the model links to them by exact prompt. */
+  existing?: string[]
   model: ModelId
   signal?: AbortSignal
   fetch?: Fetch
@@ -31,7 +33,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
   let firstChunkMs: number | null = null
   try {
     for await (const ev of streamModel({
-      model: o.model, system: SYSTEM_PROMPT, user: screenRequest(o.app, o.action),
+      model: o.model, system: SYSTEM_PROMPT, user: screenRequest(o.app, o.action, o.existing),
       signal, fetch: o.fetch, env: o.env,
     })) {
       if (ev.type === 'text') {
