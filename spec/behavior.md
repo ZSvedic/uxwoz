@@ -1,7 +1,7 @@
 # Behavior: what the user sees
 
-This doc owns the product flow of the MVP: the prompt box, navigation, the cache, versions, pickers
-and the numbers on screen. It does not own the screen format, rendering or model settings (see
+This doc owns the product flow of the MVP: the prompt box, the canvas, navigation, the cache,
+versions, pickers and the numbers on screen. It does not own the screen format, rendering or model settings (see
 [ui-generation.md](ui-generation.md)) or types and env vars (see [code-contract.md](code-contract.md)).
 
 ## Example
@@ -9,8 +9,10 @@ and the numbers on screen. It does not own the screen format, rendering or model
 1. Zel types *A coffee shop ordering app* and presses **Generate**.
 2. The screen fills in while the model writes it. After about 1 s the metrics line reads
    *First visible screen 0.8 s*; at the end it adds *interactive 6.0 s · $0.0008 · Claude Haiku 5.5*.
-3. Zel clicks **Checkout** inside the screen. A new checkout screen streams in.
-4. Zel clicks **← Back**. The first screen is back at once: *Cached · shown in 0.01 s · $0 now*.
+3. Zel clicks **Checkout** inside the screen. A new card streams in to the right, joined by an
+   arrow labelled *Checkout*, and the canvas glides over to it.
+4. Zel clicks **Back to menu** inside the checkout. The first card is current again at once
+   (*Cached · shown in 0.01 s · $0 now*), and a dashed arrow arcs back to it.
 5. Zel clicks **Regenerate**: a second version streams in, and the toolbar shows
    *Version 2 of 2* with **Use this version**. Without that click, a revisit still shows version 1.
 
@@ -18,6 +20,21 @@ and the numbers on screen. It does not own the screen format, rendering or model
 
 The prompt box takes a product description (up to 2,000 characters); the three example buttons fill
 it in and submit. A new prompt starts a new mockup and clears the Back history.
+
+## Canvas
+
+Every screen of the mockup is a card on one canvas, and every click that led from one screen to
+another is an arrow labelled with the control's text. Screens sit left to right in the order clicks
+found them; a screen's place is fixed by the first click that reached it, and later clicks to it
+(back to the menu, a shortcut) are dashed arrows that arc above the cards.
+
+- **The current card** has a blue outline and is the only live one: its controls work.
+- **Other cards** are previews. Clicking one makes it the current screen, from the cache.
+- **Focus**: after each step the canvas zooms to the current card, a little right of centre, so
+  the edge of the screen that led to it and the arrow stay in view. **Current screen** does it again.
+- **Fit all** zooms out to show every screen and arrow.
+- Drag or scroll to pan; pinch or Ctrl/Cmd + scroll to zoom. A prompt that already has screens
+  shows all of them at once.
 
 ## Streaming and timing
 
@@ -34,22 +51,20 @@ error; nothing is cached, and the previous screen comes back.
 
 ## Navigation
 
-Each control that opens another screen carries a short action prompt written by the model. Clicking
-it asks for the screen *product prompt + action prompt*. A plain link without one, which the
-screen's own script does not handle, asks for "the screen shown after clicking *label*"; in-page
-links (`#…`) stay put. Controls without an action prompt (filters, inputs, add to list) work inside
-the screen as the model wrote them. To keep one screen per place, each request lists the screens
-the mockup already has; the model links to them with their exact prompt, and to the first screen
-with `home`, so going back lands on the cached screen. Only a real click opens a screen: a screen's script cannot start
-generations by itself. **← Back** walks the history; **Home** opens the first
-screen of the mockup.
+Each control that opens another screen carries a short action prompt written by the model; clicking
+it asks for *product prompt + action prompt*. A plain link the screen does not handle asks for "the
+screen shown after clicking *label*"; in-page links (`#…`) stay put. Other controls (filters,
+inputs) work inside the screen. Each request lists the screens that already exist, and the model
+links to them by their exact prompt, and to the first screen with `home`, so going back lands on
+the cached screen. Only a real click opens a screen. **← Back** walks the history; **Home** opens
+the first screen.
 
 ## Cache and versions
 
 Every screen is stored under its normalized prompt: lowercase, single spaces, no trailing
-punctuation. Two browsers that open the same new screen at the same moment both generate it, and
-the second becomes version 2. Opening a stored screen makes no model call, costs nothing, and shows the same screen
-every time. The cache lives on the server and survives restarts, so every browser shares it.
+punctuation. Opening a stored screen makes no model call, costs nothing, and shows the same screen
+every time. The cache lives on the server and survives restarts, so every browser shares it. Two
+browsers opening the same new screen at once both generate it; the second becomes version 2.
 
 **Regenerate** always makes a new version and never replaces an old one. The ‹ › buttons flip
 between versions. Revisits show the version marked *(shown on revisit)*; only **Use this version**
@@ -59,8 +74,7 @@ changes it.
 
 - **Model**: Claude Haiku 5.5 (default), GPT-6 Luna fast, GPT-6.1 Sol Ultrafast. It applies to the
   next generated screen; cached screens stay as they are, with their maker named in the metrics.
-  Loading the page and picking a model each send one short warm-up request so the model's prompt
-  cache is ready.
+  Loading the page and picking a model each send a short warm-up request to warm the prompt cache.
 - **Theme**: Mockup (default) or Clean. Mockup is black and white with a handwriting font and
   wobbly borders, so a screen reads as a sketch; even the model's chart colours turn grey. Clean
   is plain Pico. Switching restyles the screens at once; the model never sees the theme.

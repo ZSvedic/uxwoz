@@ -27,6 +27,15 @@ export interface CacheEntry {
   candidates: Candidate[]
 }
 
+/** One click that led from one screen to another: the arrows on the canvas. */
+export interface Link {
+  from: string
+  to: string
+  /** The text of the control that was clicked, e.g. "Checkout". */
+  label: string
+  createdAt: string
+}
+
 /** Lowercase, Unicode-normalized, single-spaced, without trailing punctuation. » becomes >, as it separates key parts. */
 export function normalizePrompt(s: string): string {
   return s.normalize('NFKC').toLowerCase().replace(/»/g, '>').replace(/\s+/g, ' ').trim().replace(/[\s.!?;:,]+$/, '')
@@ -51,13 +60,18 @@ export function screenKey(app: string, action: string | null): string {
 
 export class ScreenCache {
   private entries = new Map<string, CacheEntry>()
+  /** Keyed by "from\nto": the first click between two screens names the arrow. */
+  private links = new Map<string, Link>()
 
   /** With a file, the cache loads it now and rewrites it after every change. */
   constructor(private file: string | null = null) {
     if (file && existsSync(file)) {
       try {
-        const data = JSON.parse(readFileSync(file, 'utf8')) as CacheEntry[]
-        for (const e of data) this.entries.set(e.key, e)
+        // The first file format was a bare list of entries.
+        const data = JSON.parse(readFileSync(file, 'utf8')) as CacheEntry[] | { entries: CacheEntry[]; links: Link[] }
+        const { entries, links } = Array.isArray(data) ? { entries: data, links: [] } : data
+        for (const e of entries) this.entries.set(e.key, e)
+        for (const l of links) this.links.set(`${l.from}\n${l.to}`, l)
       } catch (err) {
         const aside = `${file}.corrupt-${Date.now()}`
         renameSync(file, aside)
@@ -93,6 +107,28 @@ export class ScreenCache {
       .reverse()
   }
 
+  /** Record that a click on `from` led to `to`. Both must be screens of the same mockup. */
+  link(from: string, to: string, label: string): Link | undefined {
+    const a = this.entries.get(from), b = this.entries.get(to)
+    if (!a || !b || from === to || normalizePrompt(a.app) !== normalizePrompt(b.app)) return undefined
+    const id = `${from}\n${to}`
+    const existing = this.links.get(id)
+    if (existing) return existing
+    const l: Link = { from, to, label: label.trim().replace(/\s+/g, ' ').slice(0, 80), createdAt: new Date().toISOString() }
+    this.links.set(id, l)
+    this.save()
+    return l
+  }
+
+  /** Everything the canvas needs for one mockup: its screens (oldest first) and the clicks between them. */
+  map(app: string): { root: string; entries: CacheEntry[]; links: Link[] } {
+    const root = normalizePrompt(app)
+    const entries = [...this.entries.values()].filter((e) => normalizePrompt(e.app) === root)
+    const keys = new Set(entries.map((e) => e.key))
+    const links = [...this.links.values()].filter((l) => keys.has(l.from) && keys.has(l.to))
+    return { root, entries, links }
+  }
+
   choose(key: string, index: number): CacheEntry | undefined {
     const entry = this.entries.get(key)
     if (!entry || !Number.isInteger(index) || index < 0 || index >= entry.candidates.length) return undefined
@@ -110,7 +146,7 @@ export class ScreenCache {
     mkdirSync(dirname(this.file), { recursive: true })
     // Write a temp file, then rename, so a crash never leaves half a cache file.
     const tmp = `${this.file}.tmp`
-    writeFileSync(tmp, JSON.stringify([...this.entries.values()], null, 1))
+    writeFileSync(tmp, JSON.stringify({ entries: [...this.entries.values()], links: [...this.links.values()] }, null, 1))
     renameSync(tmp, this.file)
   }
 }

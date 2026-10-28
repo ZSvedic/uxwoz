@@ -29,6 +29,15 @@ describe('frame page', () => {
   })
 })
 
+test('the frame script reports the clicked control by its own words', () => {
+  // Runs the bootstrap script's label helper as the browser would see it after template escaping.
+  const script = framePage('', '', true).match(/<script>([\s\S]*?)<\/script>/)![1]!
+  const helper = script.match(/const labelOf = (\(el\) => [^\n]*)/)![1]!
+  const labelOf = new Function(`return ${helper}`)() as (el: unknown) => string
+  const el = { getAttribute: () => null, textContent: '  View   past orders ', value: '' }
+  expect(labelOf(el)).toBe('View past orders')
+})
+
 test('spec/prompt-screen.md holds the exact system prompt the app sends', () => {
   const spec = readFileSync(resolve(import.meta.dir, '../../spec/prompt-screen.md'), 'utf8')
   const block = spec.match(/```text\n([\s\S]*?)\n```/)?.[1]

@@ -62,6 +62,16 @@ describe('web server', () => {
     expect(links.some((a) => a === 'home' || a === action)).toBe(true)
   }, 60_000)
 
+  test('a click inside a screen is recorded as an arrow on the map', async () => {
+    const first = done(await screen({ app: APP })).entry
+    const action = actions(first.candidates[first.chosen]!.html)[0]!
+    const evs = await screen({ app: APP, action, from: first.key, label: 'Our breads' })
+    expect(done(evs).link).toMatchObject({ from: first.key, to: done(evs).entry.key, label: 'Our breads' })
+    const map = await (await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}`, server.url))).json()
+    expect(map.root).toBe('a tiny bakery website')
+    expect(map.links.some((l: { label: string }) => l.label === 'Our breads')).toBe(true)
+  })
+
   test('regenerate adds a version; revisits keep the old one until the user chooses', async () => {
     const regen = done(await screen({ app: APP, regenerate: true }))
     expect(regen.entry.candidates).toHaveLength(2)

@@ -22,18 +22,20 @@ export const hasVisibleText = (html: string): boolean =>
 const bootstrap = (final: boolean) => `(() => {
   const final = ${final}
   // Only a real click may open a screen, so a screen's script cannot start paid generations by itself.
-  const go = (prompt) => {
+  const go = (prompt, label) => {
     if (!final || typeof prompt !== 'string' || !prompt.trim()) return
     if (navigator.userActivation && !navigator.userActivation.isActive) return
-    parent.postMessage({ uxwoz: 'action', prompt: prompt.trim().slice(0, 500) }, '*')
+    parent.postMessage({ uxwoz: 'action', prompt: prompt.trim().slice(0, 500), label: String(label || '').slice(0, 80) }, '*')
   }
+  // The arrow label on the canvas: what the control says.
+  const labelOf = (el) => el ? (el.getAttribute('aria-label') || el.textContent || el.value || '').trim().replace(/\\s+/g, ' ') : ''
   window.uxwoz = { go }
   document.addEventListener('click', (e) => {
     const el = e.target instanceof Element && e.target.closest('[data-action], a[href]')
     if (!el) return
     if (!final) { e.preventDefault(); e.stopImmediatePropagation(); return }
     const prompt = el.getAttribute('data-action')
-    if (prompt) { e.preventDefault(); go(prompt) }
+    if (prompt) { e.preventDefault(); go(prompt, labelOf(el)) }
   }, true)
   // A plain link the screen's own script did not handle opens "the screen behind this link".
   // In-page links (#, #tab, javascript:) stay in the screen.
@@ -45,11 +47,11 @@ const bootstrap = (final: boolean) => `(() => {
     const href = a.getAttribute('href') || ''
     const label = (a.textContent || '').trim()
     if (handled || href.startsWith('#') || href.startsWith('javascript:') || !label) return
-    go('The screen shown after clicking the "' + label + '" link on the "' + document.title + '" screen')
+    go('The screen shown after clicking the "' + label + '" link on the "' + document.title + '" screen', label)
   })
   document.addEventListener('submit', (e) => {
     const p = e.target.getAttribute('data-action') || e.submitter?.getAttribute('data-action')
-    if (p) { e.preventDefault(); go(p) }
+    if (p) { e.preventDefault(); go(p, labelOf(e.submitter) || labelOf(e.target.querySelector('button,[type=submit]'))) }
   }, true)
   // A sandboxed form submit would blank the frame; the model's own handlers run first.
   window.addEventListener('submit', (e) => e.preventDefault())

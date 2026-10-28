@@ -4,7 +4,7 @@
 import { join, resolve } from 'node:path'
 import {
   DEFAULT_MODEL, MODELS, ScreenCache, canonicalAction, generateScreen, isModelId, screenKey, warmUp,
-  type CacheEntry, type Fetch, type ModelId,
+  type CacheEntry, type Fetch, type Link, type ModelId,
 } from '@uxwoz/core'
 import index from './index.html'
 
@@ -17,7 +17,7 @@ const THEME_FILES = new Set(['pico', 'mockup'])
 export type ScreenEvent =
   | { type: 'meta'; key: string; cached: boolean }
   | { type: 'chunk'; text: string }
-  | { type: 'done'; entry: CacheEntry; index: number }
+  | { type: 'done'; entry: CacheEntry; index: number; link: Link | null }
   | { type: 'error'; message: string }
 
 export interface ServerOptions {
@@ -61,20 +61,27 @@ export function createServer(opts: ServerOptions = {}) {
   const cache = opts.cache ?? new ScreenCache()
   const log = opts.log ?? ((m: string) => console.warn(m))
 
-  async function* screenEvents(app: string, action: string | null, model: ModelId, regenerate: boolean, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
+  /** A click from screen `from`, on a control labelled `label`. Absent for the first screen, Back, Home and Regenerate. */
+  interface Click { from: string; label: string }
+
+  async function* screenEvents(app: string, action: string | null, model: ModelId, regenerate: boolean, click: Click | null, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
     action = canonicalAction(app, action)
     const key = screenKey(app, action)
+    const linkFrom = () => (click ? cache.link(click.from, key, click.label || action || 'home') ?? null : null)
     const hit = cache.get(key)
     if (hit && !regenerate) {
       yield { type: 'meta', key, cached: true }
-      yield { type: 'done', entry: hit, index: hit.chosen }
+      yield { type: 'done', entry: hit, index: hit.chosen, link: linkFrom() }
       return
     }
     yield { type: 'meta', key, cached: false }
     try {
       for await (const ev of generateScreen({ app, action, existing: cache.existingScreens(app).filter((a) => a !== action), model, signal, fetch: opts.fetch, env: opts.env, log })) {
         if (ev.type === 'chunk') yield ev
-        else yield { type: 'done', ...cache.add(app, action, ev.candidate) }
+        else {
+          const added = cache.add(app, action, ev.candidate)
+          yield { type: 'done', ...added, link: linkFrom() }
+        }
       }
     } catch (err) {
       if (signal.aborted) return // the browser left; nothing to report, nothing cached
@@ -115,8 +122,14 @@ export function createServer(opts: ServerOptions = {}) {
           if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
           if (action && action.length > 500) return json({ error: 'action must be at most 500 characters' }, 400)
           if (!isModelId(model)) return json({ error: `unknown model ${model}` }, 400)
-          return ndjson(screenEvents(app, action, model, b?.regenerate === true, req.signal))
+          const click = typeof b?.from === 'string' && b.from ? { from: b.from.slice(0, 3000), label: String(b?.label ?? '').slice(0, 200) } : null
+          return ndjson(screenEvents(app, action, model, b?.regenerate === true, click, req.signal))
         },
+      },
+      '/api/map': (req) => {
+        const app = new URL(req.url).searchParams.get('app')?.trim() ?? ''
+        if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
+        return json(cache.map(app))
       },
       '/api/choose': {
         POST: async (req) => {

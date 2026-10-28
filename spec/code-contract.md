@@ -12,15 +12,15 @@ POST /api/screen  {"app": "A coffee shop ordering app", "action": null, "model":
 {"type":"meta","key":"a coffee shop ordering app","cached":false}
 {"type":"chunk","text":"<h1>Brew"}
 ...
-{"type":"done","entry":{...CacheEntry},"index":0}
+{"type":"done","entry":{...CacheEntry},"index":0,"link":null}
 ```
 
 ## Packages
 
-- `@uxwoz/core` (`src/packages/core`): models, prompt, provider streaming, screen cache, frame page.
-  `frame.ts` runs in the browser too, so it uses no Node or Bun APIs.
-- `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`, bundled
-  by Bun's HTML import), and the themes in `themes/`.
+- `@uxwoz/core` (`src/packages/core`): models, prompt, provider streaming, screen cache, frame page,
+  canvas layout. `frame.ts` and `layout.ts` run in the browser too, so they use no Node or Bun APIs.
+- `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`,
+  `canvas.ts`, bundled by Bun's HTML import), and the themes in `themes/`.
 
 There are no runtime dependencies; `@types/bun` and `typescript` are dev-only.
 
@@ -32,10 +32,13 @@ can spend model credits.
 
 - `GET /api/config`: models (id, label, costEstimated), themes (`mockup`, `clean`), default model
   and theme.
-- `POST /api/screen {app, action?, model?, regenerate?}`: NDJSON stream of `meta`, `chunk`*,
-  then `done` or `error`. A cache hit sends `meta` (cached true) and `done` only. 400 on an empty
+- `POST /api/screen {app, action?, model?, regenerate?, from?, label?}`: NDJSON stream of `meta`,
+  `chunk`*, then `done` or `error`. A cache hit sends `meta` (cached true) and `done` only. With
+  `from` (the key of the screen clicked in) and `label` (the control's text), `done` carries the
+  `Link` it recorded, or null. 400 on an empty
   or too long `app` (2,000), `action` (500), or an unknown model. A closed browser connection aborts
   the model call.
+- `GET /api/map?app=…`: `{root, entries: CacheEntry[], links: Link[]}` for one mockup, oldest first.
 - `POST /api/choose {key, index}`: set the version revisits show; 404 if either is unknown.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
@@ -47,6 +50,7 @@ can spend model credits.
 CacheEntry { key; app; action: string | null; chosen: number; candidates: Candidate[] }
 Candidate  { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
              costEstimated; firstChunkMs; totalMs; finishReason }
+Link       { from: key; to: key; label; createdAt }  // first click between two screens wins
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast'
 key        normalize(app) or normalize(app) + ' » ' + normalize(action); normalize turns » into >; action
            "home" or the product prompt itself means the first screen (action null)
@@ -62,7 +66,7 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 | `OPENAI_API_KEY` | GPT-6 Luna, GPT-6.1 Sol |
 | `PORT` | server port, default 3000 |
 | `UXWOZ_HOST` | listen address, default `127.0.0.1` |
-| `UXWOZ_CACHE_FILE` | screen cache, default `temp/screen-cache.json` |
+| `UXWOZ_CACHE_FILE` | screen cache `{entries, links}`, default `temp/screen-cache.json` |
 | `UXWOZ_RECORD` | `1` makes tests call the live APIs and rewrite `cassettes/` |
 
 ## Tests

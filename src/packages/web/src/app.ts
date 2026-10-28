@@ -1,7 +1,9 @@
-// The browser side: prompt box, streaming renderer, click-to-navigate, versions, pickers, metrics.
+// The browser side: prompt box, canvas of screens, streaming renderer, click-to-navigate,
+// versions, pickers, metrics.
 
-import { FRAME_SANDBOX, REBUILD_MS, extractFragment, framePage, hasVisibleText } from '@uxwoz/core/frame'
-import type { CacheEntry, Candidate } from '@uxwoz/core'
+import { REBUILD_MS, extractFragment, hasVisibleText } from '@uxwoz/core/frame'
+import type { CacheEntry, Candidate, Link } from '@uxwoz/core'
+import { Canvas, type CanvasScreen } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -14,10 +16,18 @@ const metrics = $('metrics')
 const errorBox = $('error')
 
 interface Nav { app: string; action: string | null }
+interface MapData { root: string; entries: CacheEntry[]; links: Link[] }
 
 const state = {
   nav: null as Nav | null,
   history: [] as Nav[],
+  /** Every screen of this mockup and the clicks between them, as drawn on the canvas. */
+  map: null as MapData | null,
+  /** The current screen's key, and the one streaming now (a new screen, or a new version). */
+  key: null as string | null,
+  streaming: null as string | null,
+  /** While a new screen streams, the click that led to it, drawn as a provisional arrow. */
+  pendingLink: null as Link | null,
   entry: null as CacheEntry | null,
   /** The candidate on screen; may differ from entry.chosen while comparing versions. */
   index: 0,
@@ -33,18 +43,40 @@ const store = {
 
 // ---- Rendering --------------------------------------------------------------------------------
 
-let frame: HTMLIFrameElement | null = null
-let onFrameLoad: (() => void) | null = null
+let canvas: Canvas | null = null
 
-function getFrame(): HTMLIFrameElement {
-  if (frame) return frame
-  stage.replaceChildren()
-  frame = document.createElement('iframe')
-  frame.title = 'Generated screen'
-  frame.setAttribute('sandbox', FRAME_SANDBOX)
-  frame.addEventListener('load', () => onFrameLoad?.())
-  stage.appendChild(frame)
-  return frame
+function getCanvas(): Canvas {
+  canvas ??= new Canvas(stage, (key) => pick(key))
+  return canvas
+}
+
+/** A card's title: the screen's first heading, else its prompt. */
+function titleOf(e: CacheEntry, html: string | null): string {
+  const h = html?.match(/<h[12][^>]*>([\s\S]*?)<\/h[12]>/i)?.[1]?.replace(/<[^>]*>/g, '').trim()
+  return (h || e.action || e.app).slice(0, 80)
+}
+
+/** Redraw the canvas from state. The streaming card's frame is left to the stream. */
+async function redraw() {
+  const m = state.map
+  if (!m) return
+  const css = await themeCss(themeSelect.value)
+  const screens: CanvasScreen[] = m.entries.map((e) => {
+    const c = e.candidates[e.key === state.key ? state.index : e.chosen]
+    const n = e.candidates.length
+    const html = e.key === state.streaming ? null : c?.html ?? null
+    return {
+      key: e.key,
+      title: titleOf(e, c?.html ?? null) + (n > 1 ? `  (v${(e.key === state.key ? state.index : e.chosen) + 1}/${n})` : ''),
+      tooltip: e.action ?? e.app,
+      html,
+    }
+  })
+  // A screen still streaming for the first time has no entry yet: show its card already.
+  if (state.streaming && !m.entries.some((e) => e.key === state.streaming))
+    screens.push({ key: state.streaming, title: 'Making this screen…', tooltip: state.nav?.action ?? '', html: null })
+  const links = state.pendingLink ? [...m.links, state.pendingLink] : m.links
+  getCanvas().update(screens, links, css, state.key)
 }
 
 async function fetchText(url: string): Promise<string> {
@@ -69,6 +101,8 @@ class StreamRenderer {
   private lastBuild = 0
   private timer: ReturnType<typeof setTimeout> | null = null
   private visible = false
+  /** The card being streamed into; set when the server names the screen. */
+  key: string | null = null
   constructor(private css: string, private onVisible: () => void) {}
 
   push(text: string) {
@@ -77,9 +111,9 @@ class StreamRenderer {
   }
 
   /** Show the final screen in the theme picked now; `onLoaded` runs once the frame has loaded it. */
-  finish(html: string, css: string, onLoaded: () => void) {
+  finish(key: string, html: string, css: string, onLoaded: () => void) {
     this.cancel()
-    showFinal(html, css, () => { this.notify(); onLoaded() })
+    getCanvas().show(key, html, true, css, () => { this.notify(); onLoaded() })
   }
 
   private notify() {
@@ -100,20 +134,11 @@ class StreamRenderer {
       return
     }
     const fragment = extractFragment(this.raw)
-    if (fragment === this.shown || !hasVisibleText(fragment)) return
+    if (!this.key || fragment === this.shown || !hasVisibleText(fragment)) return
     this.lastBuild = now
     this.shown = fragment
-    const f = getFrame()
-    onFrameLoad = this.visible ? null : () => { onFrameLoad = null; this.notify() }
-    f.srcdoc = framePage(fragment, this.css, false)
+    getCanvas().show(this.key, fragment, false, this.css, this.visible ? undefined : () => this.notify())
   }
-}
-
-/** Without `onLoad`, a callback still waiting for a load is kept: it fires on this load instead. */
-function showFinal(html: string, css: string, onLoad: (() => void) | null = null) {
-  const f = getFrame()
-  if (onLoad) onFrameLoad = () => { onFrameLoad = null; onLoad() }
-  f.srcdoc = framePage(html, css, true)
 }
 
 // ---- Screens ----------------------------------------------------------------------------------
@@ -171,13 +196,15 @@ async function* readEvents(res: Response): AsyncGenerator<ScreenEvent> {
 }
 
 /** Open a screen: from the cache when it is there, else streamed from the model. */
-async function open(nav: Nav, { push = true, regenerate = false } = {}) {
+async function open(nav: Nav, { push = true, regenerate = false, label = null as string | null } = {}) {
   state.busy?.abort()
   const ctrl = new AbortController()
   state.busy = ctrl
   const t0 = performance.now()
   // What to go back to if this screen fails.
-  const before = { nav: state.nav, entry: state.entry, index: state.index, historyLength: state.history.length }
+  const before = { nav: state.nav, key: state.key, entry: state.entry, index: state.index, historyLength: state.history.length }
+  // A click inside a screen (label set) draws an arrow from that screen.
+  const from = label != null ? state.key : null
   if (push && state.nav && !regenerate) state.history.push(state.nav)
   state.nav = nav
   showError(null)
@@ -196,20 +223,36 @@ async function open(nav: Nav, { push = true, regenerate = false } = {}) {
     const res = await fetch('/api/screen', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...nav, model, regenerate }),
+      body: JSON.stringify({ ...nav, model, regenerate, from, label }),
       signal: ctrl.signal,
     })
     for await (const ev of readEvents(res)) {
-      if (ev.type === 'meta') cached = ev.cached
-      else if (ev.type === 'chunk') renderer.push(ev.text)
+      if (ev.type === 'meta') {
+        cached = ev.cached
+        renderer.key = ev.key
+        if (!cached) {
+          // Show the new card (or the new version) at once, and stream into it.
+          state.streaming = ev.key
+          state.pendingLink = from && from !== ev.key && !state.map?.entries.some((e) => e.key === ev.key)
+            ? { from, to: ev.key, label: label || '…', createdAt: new Date().toISOString() }
+            : null
+          state.key = ev.key
+          await redraw()
+          getCanvas().focus()
+        }
+      } else if (ev.type === 'chunk') renderer.push(ev.text)
       else if (ev.type === 'error') throw new Error(ev.message)
       else if (ev.type === 'done') {
         state.entry = ev.entry
         state.nav = { app: nav.app, action: ev.entry.action } // "home" arrives as the first screen
         state.index = ev.index
+        state.key = ev.entry.key
+        state.streaming = null
+        state.pendingLink = null
+        upsert(ev.entry, ev.link)
         const c = ev.entry.candidates[ev.index]!
         if (!cached) state.spent += c.costUsd ?? 0
-        renderer.finish(c.html, await themeCss(themeSelect.value), () => {
+        renderer.finish(ev.entry.key, c.html, await themeCss(themeSelect.value), () => {
           if (state.busy && state.busy !== ctrl) return // a newer screen is on its way
           const total = performance.now() - t0
           if (cached) {
@@ -219,6 +262,8 @@ async function open(nav: Nav, { push = true, regenerate = false } = {}) {
           setMetrics(`First visible screen <b>${fmtS(firstVisible ?? total)}</b> · interactive <b>${fmtS(total)}</b>`
             + ` · <b>${fmtCost(c)}</b> · ${modelLabel(c.model)} · this session $${state.spent.toFixed(4)}`)
         })
+        await redraw()
+        getCanvas().focus()
       }
     }
   } catch (err) {
@@ -228,16 +273,45 @@ async function open(nav: Nav, { push = true, regenerate = false } = {}) {
     setMetrics('')
     // Put the previous screen back, working, so the toolbar and the frame agree again.
     state.nav = before.nav
+    state.key = before.key
     state.entry = before.entry
     state.index = before.index
     state.history.length = before.historyLength
+    state.streaming = null
+    state.pendingLink = null
+    // Redrawing drops a half-built new card and puts a regenerated card's old version back.
     const c = state.entry?.candidates[state.index]
-    if (c) themeCss(themeSelect.value).then((css) => showFinal(c.html, css)).catch(() => {})
-    else if (frame) { frame.remove(); frame = null } // no earlier screen: drop the half-built one
+    if (c && state.key) themeCss(themeSelect.value).then((css) => getCanvas().show(state.key!, c.html, true, css)).catch(() => {})
+    redraw().then(() => getCanvas().focus()).catch(() => {})
   } finally {
     if (state.busy === ctrl) state.busy = null
     updateToolbar()
   }
+}
+
+/** Put a screen and the click that reached it into the local map. */
+function upsert(entry: CacheEntry, link: Link | null) {
+  const m = state.map
+  if (!m) return
+  const i = m.entries.findIndex((e) => e.key === entry.key)
+  if (i >= 0) m.entries[i] = entry
+  else m.entries.push(entry)
+  if (link && !m.links.some((l) => l.from === link.from && l.to === link.to)) m.links.push(link)
+}
+
+/** Clicking a preview card on the canvas opens that screen (from the cache). */
+function pick(key: string) {
+  const e = state.map?.entries.find((x) => x.key === key)
+  if (!e || state.busy || key === state.key) return
+  open({ app: e.app, action: e.action })
+}
+
+/** Load a mockup's existing screens, so typing a known prompt shows everything made so far. */
+async function loadMap(app: string) {
+  const res = await fetch(`/api/map?app=${encodeURIComponent(app)}`)
+  if (!res.ok) throw new Error(`could not load the map: HTTP ${res.status}`)
+  state.map = await res.json()
+  state.map!.entries.sort((a, b) => Number(b.key === state.map!.root) - Number(a.key === state.map!.root))
 }
 
 function showVersion(i: number) {
@@ -245,7 +319,9 @@ function showVersion(i: number) {
   if (!e || i < 0 || i >= e.candidates.length) return
   state.index = i
   const c = e.candidates[i]!
-  themeCss(themeSelect.value).then((css) => showFinal(c.html, css)).catch((e) => showError(String(e)))
+  themeCss(themeSelect.value)
+    .then((css) => { getCanvas().show(e.key, c.html, true, css); return redraw() })
+    .catch((err) => showError(String(err)))
   setMetrics(`Version ${i + 1} · made by ${modelLabel(c.model)} in ${fmtS(c.totalMs)} for ${fmtCost(c)}`)
   updateToolbar()
 }
@@ -258,7 +334,10 @@ promptForm.addEventListener('submit', (e) => {
   if (!app) return
   state.history = []
   state.entry = null
-  open({ app, action: null }, { push: false })
+  state.key = null
+  loadMap(app)
+    .then(() => open({ app, action: null }, { push: false }))
+    .catch((err) => showError(String(err)))
 })
 
 for (const b of document.querySelectorAll<HTMLButtonElement>('.example')) {
@@ -266,11 +345,12 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('.example')) {
 }
 
 // Clicks inside the screen arrive as postMessage from our bootstrap script in the frame.
+// Only the current screen's card is live, so only its messages count.
 addEventListener('message', (e) => {
-  if (!frame || e.source !== frame.contentWindow) return
+  if (!canvas || e.source !== canvas.frameWindow(state.key)) return
   const d = e.data
   if (d?.uxwoz !== 'action' || typeof d.prompt !== 'string' || !state.nav || state.busy) return
-  open({ app: state.nav.app, action: d.prompt.slice(0, 500) })
+  open({ app: state.nav.app, action: d.prompt.slice(0, 500) }, { label: typeof d.label === 'string' ? d.label.slice(0, 80) : '' })
 })
 
 $('back').addEventListener('click', () => {
@@ -281,6 +361,8 @@ $('home').addEventListener('click', () => {
   if (state.nav) open({ app: state.nav.app, action: null })
 })
 $('regen').addEventListener('click', () => { if (state.nav) open(state.nav, { push: false, regenerate: true }) })
+$('fit').addEventListener('click', () => canvas?.fitAll())
+$('focus').addEventListener('click', () => canvas?.focus())
 $('prev').addEventListener('click', () => showVersion(state.index - 1))
 $('next').addEventListener('click', () => showVersion(state.index + 1))
 $('choose').addEventListener('click', async () => {
@@ -290,18 +372,20 @@ $('choose').addEventListener('click', async () => {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key: e.key, index: state.index }),
   })
-  if (res.ok) state.entry = (await res.json()).entry
-  else showError('Could not save the version choice')
+  if (res.ok) {
+    state.entry = (await res.json()).entry
+    upsert(state.entry!, null)
+    redraw()
+  } else showError('Could not save the version choice')
   updateToolbar()
 })
 
 // While a screen streams, the new theme applies when it finishes.
 themeSelect.addEventListener('change', async () => {
   store.set('uxwoz:theme', themeSelect.value)
-  const c = state.entry?.candidates[state.index]
   try {
-    const css = await themeCss(themeSelect.value)
-    if (c && !state.busy) showFinal(c.html, css)
+    await themeCss(themeSelect.value)
+    if (!state.busy) await redraw()
   } catch (e) {
     showError(`Could not load the theme: ${e instanceof Error ? e.message : e}`)
   }

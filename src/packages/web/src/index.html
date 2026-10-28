@@ -26,6 +26,8 @@
 <nav id="toolbar" hidden>
   <button id="back" type="button" title="Previous screen">← Back</button>
   <button id="home" type="button" title="First screen">Home</button>
+  <button id="focus" type="button" title="Zoom to the current screen">Current screen</button>
+  <button id="fit" type="button" title="Zoom out to show every screen and the clicks between them">Fit all</button>
   <span id="where" class="where"></span>
   <span class="spacer"></span>
   <span id="versions" class="versions">
@@ -39,7 +41,8 @@
 <div id="metrics" class="metrics"></div>
 <div id="error" class="error" hidden></div>
 <section id="stage" class="stage">
-  <p class="empty">Type a product idea above. Every button in the generated screen opens the next screen.</p>
+  <p class="empty">Type a product idea above. Every button in the generated screen opens the next screen,
+    and each new screen appears on this canvas with an arrow from the button that made it.</p>
 </section>
 <script type="module" src="./app.ts"></script>
 </body>
