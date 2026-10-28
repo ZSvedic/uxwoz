@@ -16,6 +16,13 @@ export function extractFragment(raw: string): string {
 export const hasVisibleText = (html: string): boolean =>
   html.replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?(<\/script>|$)|<[^>]*>|<[^>]*$/g, '').trim() !== ''
 
+/**
+ * The window height a screen is designed for. A card grows to fit its whole screen, so the frame's
+ * real window is as tall as the screen; vh units would then feed back into the card's height
+ * forever. Our script converts vh units to pixels of this height instead.
+ */
+export const VIEWPORT_H = 800
+
 // Our script, added before the model's markup. It turns clicks on data-action controls (and links)
 // into postMessage calls to the app, and keeps the frame from navigating away. While the screen is
 // still streaming (`final` false), controls do nothing: their handlers are not ready yet.
@@ -58,10 +65,25 @@ const bootstrap = (final: boolean) => `(() => {
   addEventListener('DOMContentLoaded', () => {
     if (!document.title) document.title = (document.querySelector('h1,h2')?.textContent || '').trim()
   })
+  // vh, dvh, svh and lvh in the screen's inline styles and <style> elements become pixels of a
+  // ${VIEWPORT_H} px window (see VIEWPORT_H). Run again before each measure, for styles set by script.
+  const vhToPx = (css) => css.replace(/(-?\\d*\\.?\\d+)[dsl]?vh\\b/g, (m, n) => (parseFloat(n) * ${VIEWPORT_H / 100}) + 'px')
+  const fixVh = () => {
+    for (const el of document.querySelectorAll('main [style*="vh"], main[style*="vh"]')) {
+      const before = el.getAttribute('style'), after = vhToPx(before)
+      if (after !== before) el.setAttribute('style', after)
+    }
+    for (const st of document.querySelectorAll('main style')) {
+      const after = vhToPx(st.textContent)
+      if (after !== st.textContent) st.textContent = after
+    }
+  }
+  addEventListener('DOMContentLoaded', fixVh)
   // The card on the canvas grows to fit the whole screen, so the frame never scrolls: it reports
   // its height, and hands scroll and pinch gestures to the canvas.
   let lastHeight = 0
   const report = () => {
+    fixVh()
     const main = document.querySelector('main')
     const h = Math.ceil(main ? main.getBoundingClientRect().bottom + 16 : document.body.scrollHeight)
     if (h !== lastHeight) { lastHeight = h; parent.postMessage({ uxwoz: 'size', height: h }, '*') }

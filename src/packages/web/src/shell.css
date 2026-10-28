@@ -53,7 +53,8 @@ nav[hidden] { display: none; }
 .links .link { fill: none; stroke: currentColor; stroke-width: 2.5px; vector-effect: non-scaling-stroke; }
 .links .link.back { stroke-dasharray: 8 6; }
 .links .link.near { stroke: var(--accent); }
-.link-labels { position: absolute; left: 0; top: 0; }
+/* Arrows run behind the cards; their labels sit on top so they stay readable. */
+.link-labels { position: absolute; left: 0; top: 0; z-index: 2; }
 /* Labels keep their on-screen size whatever the zoom: --inv is 1 / zoom. */
 .link-label { position: absolute; transform: translate(-50%, -50%) scale(var(--inv, 1)); padding: 2px 10px; font-size: 13px;
   background: var(--card); color: var(--fg); border: 1px solid var(--line); border-radius: 999px; white-space: nowrap;

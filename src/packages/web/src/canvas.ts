@@ -30,7 +30,15 @@ interface Card {
   title: HTMLElement
   shown: { html: string; final: boolean; css: string } | null
   onLoad: (() => void) | null
+  /** Growth reports in a row, each soon after the last: a screen whose height follows its window. */
+  growth: { count: number; at: number }
+  /** Set once that happens; the card then keeps its height until it shows a new screen. */
+  frozen: boolean
 }
+
+/** A card that grows this many times in a row, each within GROWTH_MS of the last, stops growing. */
+const GROWTH_LIMIT = 4
+const GROWTH_MS = 1500
 
 const svgNS = 'http://www.w3.org/2000/svg'
 
@@ -104,7 +112,17 @@ export class Canvas {
     if (!key) return
     if (d.uxwoz === 'size' && Number.isFinite(d.height)) {
       const h = TITLE_H + Math.min(MAX_SCREEN_H, Math.max(MIN_SCREEN_H, Math.round(d.height)))
-      if (this.heights.get(key) === h) return
+      const old = this.heights.get(key)
+      if (old === h) return
+      // A screen sized by its window (100% heights, script reading innerHeight) grows each time its
+      // card grows. Stop that loop instead of following it to MAX_SCREEN_H.
+      const card = this.cards.get(key)!
+      if (old != null && h > old) {
+        if (card.frozen) return
+        const now = performance.now()
+        card.growth = { count: now - card.growth.at < GROWTH_MS ? card.growth.count + 1 : 1, at: now }
+        if (card.growth.count >= GROWTH_LIMIT) { card.frozen = true; return }
+      }
       this.heights.set(key, h)
       this.relayout()
       this.autoView?.()
@@ -125,6 +143,7 @@ export class Canvas {
       if (onLoad) requestAnimationFrame(() => this.loaded(card))
       return
     }
+    if (card.shown?.html !== html) { card.frozen = false; card.growth = { count: 0, at: 0 } }
     card.shown = { html, final, css }
     card.frame.srcdoc = framePage(html, css, final)
   }
@@ -181,7 +200,7 @@ export class Canvas {
     cover.className = 'card-cover'
     el.append(title, frame, cover)
     this.world.appendChild(el)
-    c = { el, frame, title, shown: null, onLoad: null }
+    c = { el, frame, title, shown: null, onLoad: null, growth: { count: 0, at: 0 }, frozen: false }
     const card = c
     frame.addEventListener('load', () => this.loaded(card))
     this.cards.set(key, c)

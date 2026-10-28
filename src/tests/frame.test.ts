@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { FRAME_SANDBOX, SYSTEM_PROMPT, extractFragment, framePage, hasVisibleText } from '@uxwoz/core'
+import { FRAME_SANDBOX, SYSTEM_PROMPT, VIEWPORT_H, extractFragment, framePage, hasVisibleText } from '@uxwoz/core'
 
 describe('frame page', () => {
   test('only a markdown fence is stripped; the code is left alone', () => {
@@ -36,6 +36,14 @@ test('the frame script reports the clicked control by its own words', () => {
   const labelOf = new Function(`return ${helper}`)() as (el: unknown) => string
   const el = { getAttribute: () => null, textContent: '  View   past orders ', value: '' }
   expect(labelOf(el)).toBe('View past orders')
+})
+
+test('vh units become pixels of a fixed window, so a card cannot grow without end', () => {
+  const script = framePage('', '', true).match(/<script>([\s\S]*?)<\/script>/)![1]!
+  const helper = script.match(/const vhToPx = (\(css\) => [^\n]*)/)![1]!
+  const vhToPx = new Function(`return ${helper}`)() as (css: string) => string
+  expect(vhToPx('min-height:100vh;height:50dvh;top:-2.5svh')).toBe(`min-height:${VIEWPORT_H}px;height:${VIEWPORT_H / 2}px;top:${-VIEWPORT_H * 0.025}px`)
+  expect(vhToPx('width:100vw;height:100%')).toBe('width:100vw;height:100%')
 })
 
 test('spec/prompt-screen.md holds the exact system prompt the app sends', () => {

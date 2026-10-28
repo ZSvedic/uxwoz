@@ -30,6 +30,8 @@ found them; a screen's place is fixed by the first click that reached it, and la
 
 - **Cards are as tall as their screens**, so nothing scrolls inside a card: scrolling anywhere,
   also over a screen, moves the canvas. Screens fill the card's width with tight Pico spacing.
+  A screen sees an 800 px tall window (`100vh` is 800 px), so "full-screen" screens keep a normal
+  size; a card that still keeps growing with its window stops after four steps.
 - **The current card** has a blue outline and is the only live one: its controls work.
 - **Other cards** are previews. Clicking one makes it the current screen, from the cache.
 - **Focus**: after each step the canvas shows the top of the current card at full width, a little
