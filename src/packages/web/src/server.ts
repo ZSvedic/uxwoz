@@ -9,7 +9,9 @@ import {
 import index from './index.html'
 
 const THEMES_DIR = resolve(import.meta.dir, '../themes')
-export const THEMES = { pico: 'Pico (default)', sketch: 'Hand-drawn sketch' } as const
+/** Theme ids and labels; the first is the default. `clean` is Pico alone, `mockup` is Pico plus mockup.css. */
+export const THEMES = { mockup: 'Mockup (sketch)', clean: 'Clean (Pico)' } as const
+const THEME_FILES = new Set(['pico', 'mockup'])
 
 /** One line of the /api/screen NDJSON stream. */
 export type ScreenEvent =
@@ -93,13 +95,14 @@ export function createServer(opts: ServerOptions = {}) {
       '/': index,
       '/themes/:name': (req) => {
         const name = req.params.name.replace(/\.css$/, '')
-        if (!(name in THEMES)) return new Response('Not found', { status: 404 })
+        if (!THEME_FILES.has(name)) return new Response('Not found', { status: 404 })
         return new Response(Bun.file(join(THEMES_DIR, `${name}.css`)), { headers: { 'Content-Type': 'text/css' } })
       },
       '/api/config': () => json({
         defaultModel: DEFAULT_MODEL,
         models: Object.values(MODELS).map((m) => ({ id: m.id, label: m.label, costEstimated: m.costEstimated })),
         themes: Object.entries(THEMES).map(([id, label]) => ({ id, label })),
+        defaultTheme: 'mockup',
       }),
       '/api/screen': {
         POST: async (req) => {

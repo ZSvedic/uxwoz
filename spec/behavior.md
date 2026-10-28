@@ -61,7 +61,8 @@ changes it.
   next generated screen; cached screens stay as they are, with their maker named in the metrics.
   Loading the page and picking a model each send one short warm-up request so the model's prompt
   cache is ready.
-- **Theme**: Pico (default) or Hand-drawn sketch. Switching restyles the current screen at once;
-  the model never sees the theme.
+- **Theme**: Mockup (default) or Clean. Mockup is black and white with a handwriting font and
+  wobbly borders, so a screen reads as a sketch; even the model's chart colours turn grey. Clean
+  is plain Pico. Switching restyles the screens at once; the model never sees the theme.
 
 Both choices are remembered in this browser.

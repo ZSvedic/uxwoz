@@ -79,6 +79,15 @@ describe('web server', () => {
     expect((await post('/api/screen', { app: '' })).status).toBe(400)
   })
 
+  test('the mockup theme is the default and its stylesheet is served', async () => {
+    const cfg = await (await fetch(new URL('/api/config', server.url))).json()
+    expect(cfg.defaultTheme).toBe('mockup')
+    expect(cfg.themes.map((t: { id: string }) => t.id)).toEqual(['mockup', 'clean'])
+    const css = await (await fetch(new URL('/themes/mockup.css', server.url))).text()
+    expect(css).toContain('grayscale(1)')
+    expect((await fetch(new URL('/themes/clean.css', server.url))).status).toBe(404)
+  })
+
   test('another web page cannot spend model credits', async () => {
     expect((await post('/api/screen', { app: APP, regenerate: true }, { Origin: 'https://evil.example' })).status).toBe(403)
     expect((await post('/api/screen', { app: APP, regenerate: true }, { 'Sec-Fetch-Site': 'cross-site' })).status).toBe(403)

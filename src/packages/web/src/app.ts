@@ -56,8 +56,8 @@ async function fetchText(url: string): Promise<string> {
 async function themeCss(theme: string): Promise<string> {
   if (state.css[theme] == null) {
     const pico = state.css.pico ?? (state.css.pico = await fetchText('/themes/pico.css'))
-    // A theme other than Pico is a drop-in stylesheet loaded after Pico.
-    state.css[theme] = theme === 'pico' ? pico : pico + '\n' + await fetchText(`/themes/${theme}.css`)
+    // `clean` is Pico alone; any other theme is a drop-in stylesheet loaded after Pico.
+    state.css[theme] = theme === 'clean' ? pico : pico + '\n' + await fetchText(`/themes/${theme}.css`)
   }
   return state.css[theme]!
 }
@@ -322,7 +322,7 @@ async function init() {
   const savedModel = store.get('uxwoz:model')
   modelSelect.value = cfg.models.some((m: { id: string }) => m.id === savedModel) ? savedModel! : cfg.defaultModel
   const savedTheme = store.get('uxwoz:theme')
-  if (savedTheme && cfg.themes.some((t: { id: string }) => t.id === savedTheme)) themeSelect.value = savedTheme
+  themeSelect.value = cfg.themes.some((t: { id: string }) => t.id === savedTheme) ? savedTheme! : cfg.defaultTheme
   warmUp(modelSelect.value)
   await themeCss(themeSelect.value)
   updateToolbar()

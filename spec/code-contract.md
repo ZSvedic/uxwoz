@@ -30,14 +30,16 @@ The server listens on 127.0.0.1 only. Every POST must be `application/json` (els
 come from another origin (`Origin` or `Sec-Fetch-Site: cross-site`, else 403), so no other web page
 can spend model credits.
 
-- `GET /api/config`: models (id, label, costEstimated), themes, default model.
+- `GET /api/config`: models (id, label, costEstimated), themes (`mockup`, `clean`), default model
+  and theme.
 - `POST /api/screen {app, action?, model?, regenerate?}`: NDJSON stream of `meta`, `chunk`*,
   then `done` or `error`. A cache hit sends `meta` (cached true) and `done` only. 400 on an empty
   or too long `app` (2,000), `action` (500), or an unknown model. A closed browser connection aborts
   the model call.
 - `POST /api/choose {key, index}`: set the version revisits show; 404 if either is unknown.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
-- `GET /themes/{pico,sketch}.css`: the theme stylesheets.
+- `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
+  `pico.css` followed by `mockup.css`.
 
 ## Types
 

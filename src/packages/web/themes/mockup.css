@@ -1,6 +1,7 @@
-/* Hand-drawn wireframe: a drop-in stylesheet loaded after Pico. Monochrome, handwriting font,
-   thick dark borders, wobbly corners. No web font: a null-origin frame cannot fetch one, so this
-   uses handwriting fonts the OS already has. SVG charts keep the colours the model chose. */
+/* Mockup: the default theme, a hand-drawn wireframe loaded after Pico, so a screen reads as a
+   sketch and not a finished product. Black and white, handwriting font, thick dark borders,
+   wobbly corners. No web font: a null-origin frame cannot fetch one, so this uses handwriting
+   fonts the OS already has. */
 :root {
   --sk-ink: #222;
   --sk-paper: #fdfcf7;
@@ -43,6 +44,8 @@
   --pico-card-box-shadow: none;
 }
 body { background: var(--sk-paper); letter-spacing: .01em; }
+/* The model's own colours (inline styles, SVG charts) turn grey too. */
+main { filter: grayscale(1); }
 button, input, select, textarea, article, fieldset, [role="button"] {
   border: 2px solid var(--sk-ink) !important;
   border-radius: var(--sk-wobble) !important;
