@@ -340,8 +340,9 @@ promptForm.addEventListener('submit', (e) => {
     .catch((err) => showError(String(err)))
 })
 
+// An example with a long prompt shows a short name and keeps the full prompt in data-prompt.
 for (const b of document.querySelectorAll<HTMLButtonElement>('.example')) {
-  b.addEventListener('click', () => { promptInput.value = b.textContent ?? ''; promptForm.requestSubmit() })
+  b.addEventListener('click', () => { promptInput.value = b.dataset.prompt ?? b.textContent ?? ''; promptForm.requestSubmit() })
 }
 
 // Clicks inside the screen arrive as postMessage from our bootstrap script in the frame.
