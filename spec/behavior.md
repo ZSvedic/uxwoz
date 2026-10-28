@@ -28,10 +28,13 @@ another is an arrow labelled with the control's text. Screens sit left to right 
 found them; a screen's place is fixed by the first click that reached it, and later clicks to it
 (back to the menu, a shortcut) are dashed arrows that arc above the cards.
 
+- **Cards are as tall as their screens**, so nothing scrolls inside a card: scrolling anywhere,
+  also over a screen, moves the canvas. Screens fill the card's width with tight Pico spacing.
 - **The current card** has a blue outline and is the only live one: its controls work.
 - **Other cards** are previews. Clicking one makes it the current screen, from the cache.
-- **Focus**: after each step the canvas zooms to the current card, a little right of centre, so
-  the edge of the screen that led to it and the arrow stay in view. **Current screen** does it again.
+- **Focus**: after each step the canvas shows the top of the current card at full width, a little
+  right of centre, so the screen that led to it and the arrow stay in view. **Current screen**
+  does it again.
 - **Fit all** zooms out to show every screen and arrow.
 - Drag or scroll to pan; pinch or Ctrl/Cmd + scroll to zoom. A prompt that already has screens
   shows all of them at once.

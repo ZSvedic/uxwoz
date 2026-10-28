@@ -13,14 +13,18 @@ export interface MapLayout {
   parent: Map<string, string>
 }
 
-/** Card size and gaps, in canvas units (1 unit = 1 CSS pixel at 100% zoom). */
-export const CARD = { w: 960, h: 768, gapX: 280, gapY: 140 }
+/**
+ * Card width, the height of a card whose screen has not reported its size yet, and the gaps, in
+ * canvas units (1 unit = 1 CSS pixel at 100% zoom). A card is as tall as its screen.
+ */
+export const CARD = { w: 800, h: 600, gapX: 180, gapY: 64 }
 
 /**
- * `keys` are the screens oldest first, starting with the first screen. Screens no click reached
- * (opened with Back, Home, or before links were recorded) start their own rows below.
+ * `keys` are the screens oldest first, starting with the first screen; `heights` are card heights
+ * where known. Screens no click reached (opened with Back, Home, or before links were recorded)
+ * start their own rows below.
  */
-export function layoutMap(keys: string[], links: Link[]): MapLayout {
+export function layoutMap(keys: string[], links: Link[], heights: Map<string, number> = new Map()): MapLayout {
   const known = new Set(keys)
   const ordered = links.filter((l) => known.has(l.from) && known.has(l.to)).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   const parent = new Map<string, string>()
@@ -46,15 +50,28 @@ export function layoutMap(keys: string[], links: Link[]): MapLayout {
     }
   }
 
-  // Depth first: leaves take the next free row, a parent sits level with the middle of its children.
+  // Depth first: a leaf goes below everything placed so far; a parent is centred on its children's
+  // band, pushed down if that would overlap the card above it in its own column.
   const boxes = new Map<string, Box>()
-  let nextRow = 0
-  const place = (k: string, depth: number): number => {
-    const kids = children.get(k) ?? []
-    const rows = kids.map((c) => place(c, depth + 1))
-    const row = rows.length ? (rows[0]! + rows[rows.length - 1]!) / 2 : nextRow++
-    boxes.set(k, { x: depth * (CARD.w + CARD.gapX), y: row * (CARD.h + CARD.gapY), w: CARD.w, h: CARD.h })
-    return row
+  const columnBottom: number[] = []
+  let nextY = 0
+  const place = (k: string, depth: number): { top: number; bottom: number } => {
+    const h = heights.get(k) ?? CARD.h
+    const bands = (children.get(k) ?? []).map((c) => place(c, depth + 1))
+    const free = (columnBottom[depth] ?? -Infinity) + CARD.gapY
+    let y: number
+    if (bands.length) {
+      const top = bands[0]!.top, bottom = bands[bands.length - 1]!.bottom
+      // Centred when shorter than the band, else level with its first child.
+      y = Math.max(free, top + Math.max(0, (bottom - top - h) / 2))
+    } else {
+      y = Math.max(free, nextY)
+    }
+    boxes.set(k, { x: depth * (CARD.w + CARD.gapX), y, w: CARD.w, h })
+    columnBottom[depth] = y + h
+    nextY = Math.max(nextY, y + h + CARD.gapY)
+    const band = { top: Math.min(y, bands[0]?.top ?? y), bottom: Math.max(y + h, bands.at(-1)?.bottom ?? y + h) }
+    return band
   }
   for (const r of roots) place(r, 0)
   return { boxes, parent }

@@ -1,6 +1,7 @@
 // The canvas: every screen of the mockup as a card, with a labelled arrow for each click that
 // led from one screen to another. The current card is live; the others are previews you can click.
-// Drag or scroll to pan, pinch or Ctrl/Cmd + scroll to zoom.
+// A card is as tall as its screen, so only the canvas scrolls: drag or scroll to pan, pinch or
+// Ctrl/Cmd + scroll to zoom, also over a screen.
 
 import { FRAME_SANDBOX, framePage } from '@uxwoz/core/frame'
 import { CARD, layoutMap, type Box } from '@uxwoz/core/layout'
@@ -10,6 +11,9 @@ import type { Link } from '@uxwoz/core'
 const TITLE_H = 44
 const MIN_SCALE = 0.05
 const MAX_SCALE = 1.5
+/** Limits on the height a screen may report, so a broken screen cannot make a huge card. */
+const MIN_SCREEN_H = 160
+const MAX_SCREEN_H = 8000
 
 export interface CanvasScreen {
   key: string
@@ -37,6 +41,10 @@ export class Canvas {
   private cards = new Map<string, Card>()
   private boxes = new Map<string, Box>()
   private parent = new Map<string, string>()
+  /** Card heights, from the heights the screens report. */
+  private heights = new Map<string, number>()
+  private keys: string[] = []
+  private links: Link[] = []
   private scale = 1
   private tx = 0
   private ty = 0
@@ -55,26 +63,56 @@ export class Canvas {
     this.viewport.replaceChildren(this.world)
     this.wireGestures()
     new ResizeObserver(() => this.autoView?.()).observe(this.viewport)
+    addEventListener('message', (e) => this.onFrameMessage(e))
   }
 
   /** Lay out and draw every card and arrow. Cards keep their frames, so unchanged screens do not reload. */
   update(screens: CanvasScreen[], links: Link[], css: string, current: string | null) {
     this.current = current
-    const { boxes, parent } = layoutMap(screens.map((s) => s.key), links)
-    this.boxes = boxes
-    this.parent = parent
-    const keep = new Set(screens.map((s) => s.key))
-    for (const [k, c] of this.cards) if (!keep.has(k)) { c.el.remove(); this.cards.delete(k) }
+    this.keys = screens.map((s) => s.key)
+    this.links = links
+    const keep = new Set(this.keys)
+    for (const [k, c] of this.cards) if (!keep.has(k)) { c.el.remove(); this.cards.delete(k); this.heights.delete(k) }
     for (const s of screens) {
       const card = this.card(s.key)
-      const b = boxes.get(s.key)!
-      Object.assign(card.el.style, { left: `${b.x}px`, top: `${b.y}px`, width: `${b.w}px`, height: `${b.h}px` })
       card.el.classList.toggle('current', s.key === current)
       card.title.textContent = s.title
       card.el.title = s.tooltip
       if (s.html != null) this.show(s.key, s.html, true, css)
     }
-    this.drawLinks(links)
+    this.relayout()
+  }
+
+  /** Place the cards and draw the arrows again, e.g. after a screen reported a new height. */
+  private relayout() {
+    const { boxes, parent } = layoutMap(this.keys, this.links, this.heights)
+    this.boxes = boxes
+    this.parent = parent
+    for (const [k, b] of boxes) {
+      const el = this.cards.get(k)?.el
+      if (el) Object.assign(el.style, { left: `${b.x}px`, top: `${b.y}px`, width: `${b.w}px`, height: `${b.h}px` })
+    }
+    this.drawLinks(this.links)
+  }
+
+  /** Screens report their height and hand over scroll gestures (see the frame script). */
+  private onFrameMessage(e: MessageEvent) {
+    const d = e.data
+    if (d?.uxwoz !== 'size' && d?.uxwoz !== 'wheel') return
+    let key: string | null = null
+    for (const [k, c] of this.cards) if (c.frame.contentWindow === e.source) key = k
+    if (!key) return
+    if (d.uxwoz === 'size' && Number.isFinite(d.height)) {
+      const h = TITLE_H + Math.min(MAX_SCREEN_H, Math.max(MIN_SCREEN_H, Math.round(d.height)))
+      if (this.heights.get(key) === h) return
+      this.heights.set(key, h)
+      this.relayout()
+      this.autoView?.()
+    } else if (d.uxwoz === 'wheel' && key === this.current) {
+      // The frame's coordinates, scaled by the zoom, from the frame's corner on the canvas.
+      const r = this.cards.get(key)!.frame.getBoundingClientRect()
+      this.wheel(Number(d.dx) || 0, Number(d.dy) || 0, !!d.zoom, r.left + (Number(d.x) || 0) * this.scale, r.top + (Number(d.y) || 0) * this.scale)
+    }
   }
 
   /** Put a screen into a card's frame; `onLoad` runs once the frame has loaded it. */
@@ -96,17 +134,20 @@ export class Canvas {
     return key ? this.cards.get(key)?.frame.contentWindow ?? null : null
   }
 
-  /** Zoom to the current screen, leaving room to see the screen that led to it. */
+  /**
+   * Show the current screen at full width, its top near the top of the canvas, leaving room to see
+   * the screen that led to it. Scroll to read further down.
+   */
   focus(key = this.current, animate = true) {
     const b = key && this.boxes.get(key)
     if (!b) return
     this.autoView = () => this.focus(key, false)
     const { width: vw, height: vh } = this.viewport.getBoundingClientRect()
     if (!vw || !vh) return // not laid out yet: the resize observer calls again
-    const scale = clamp(Math.min(1, (vh - 32) / b.h, (vw * 0.78) / b.w))
+    const scale = clamp(Math.min(1, (vw * 0.8) / b.w))
     // Shift right of centre when there is a parent, so its edge and the arrow stay in view.
     const cx = this.parent.has(key) ? vw * 0.56 : vw / 2
-    this.setView(scale, cx - (b.x + b.w / 2) * scale, vh / 2 - (b.y + b.h / 2) * scale, animate)
+    this.setView(scale, cx - (b.x + b.w / 2) * scale, 16 - b.y * scale, animate)
   }
 
   /** Zoom out until every screen fits. */
@@ -190,19 +231,24 @@ export class Canvas {
     this.world.style.setProperty('--inv', String(1 / scale))
   }
 
+  /** Scroll pans; pinch or Ctrl/Cmd + scroll zooms around the pointer (page coordinates). */
+  private wheel(dx: number, dy: number, zoom: boolean, clientX: number, clientY: number) {
+    this.autoView = null
+    if (zoom) {
+      const r = this.viewport.getBoundingClientRect()
+      const mx = clientX - r.left, my = clientY - r.top
+      const s = clamp(this.scale * Math.exp(-dy * 0.01))
+      this.setView(s, mx - ((mx - this.tx) * s) / this.scale, my - ((my - this.ty) * s) / this.scale, false)
+    } else {
+      this.setView(this.scale, this.tx - dx, this.ty - dy, false)
+    }
+  }
+
   private wireGestures() {
     const vp = this.viewport
     vp.addEventListener('wheel', (e) => {
       e.preventDefault()
-      this.autoView = null
-      if (e.ctrlKey || e.metaKey) {
-        const r = vp.getBoundingClientRect()
-        const mx = e.clientX - r.left, my = e.clientY - r.top
-        const s = clamp(this.scale * Math.exp(-e.deltaY * 0.01))
-        this.setView(s, mx - ((mx - this.tx) * s) / this.scale, my - ((my - this.ty) * s) / this.scale, false)
-      } else {
-        this.setView(this.scale, this.tx - e.deltaX, this.ty - e.deltaY, false)
-      }
+      this.wheel(e.deltaX, e.deltaY, e.ctrlKey || e.metaKey, e.clientX, e.clientY)
     }, { passive: false })
 
     let down: { x: number; y: number; tx: number; ty: number; target: EventTarget | null; id: number } | null = null
@@ -242,8 +288,9 @@ type Pt = [number, number]
  */
 function curve(a: Box, b: Box, tree: boolean): [Pt, Pt, Pt, Pt] {
   if (tree || b.x > a.x + a.w) {
-    const p0: Pt = [a.x + a.w, a.y + TITLE_H + (a.h - TITLE_H) / 2]
-    const p3: Pt = [b.x, b.y + TITLE_H + (b.h - TITLE_H) / 2]
+    // Near the top of a tall card, where you are looking when you arrive.
+    const p0: Pt = [a.x + a.w, a.y + TITLE_H + Math.min(200, (a.h - TITLE_H) / 2)]
+    const p3: Pt = [b.x, b.y + TITLE_H + Math.min(200, (b.h - TITLE_H) / 2)]
     const dx = Math.max(80, (p3[0] - p0[0]) / 2)
     return [p0, [p0[0] + dx, p0[1]], [p3[0] - dx, p3[1]], p3]
   }

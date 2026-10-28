@@ -58,14 +58,35 @@ const bootstrap = (final: boolean) => `(() => {
   addEventListener('DOMContentLoaded', () => {
     if (!document.title) document.title = (document.querySelector('h1,h2')?.textContent || '').trim()
   })
+  // The card on the canvas grows to fit the whole screen, so the frame never scrolls: it reports
+  // its height, and hands scroll and pinch gestures to the canvas.
+  let lastHeight = 0
+  const report = () => {
+    const main = document.querySelector('main')
+    const h = Math.ceil(main ? main.getBoundingClientRect().bottom + 16 : document.body.scrollHeight)
+    if (h !== lastHeight) { lastHeight = h; parent.postMessage({ uxwoz: 'size', height: h }, '*') }
+  }
+  addEventListener('load', () => { report(); new ResizeObserver(report).observe(document.body) })
+  addEventListener('wheel', (e) => {
+    e.preventDefault()
+    parent.postMessage({ uxwoz: 'wheel', dx: e.deltaX, dy: e.deltaY, zoom: e.ctrlKey || e.metaKey, x: e.clientX, y: e.clientY }, '*')
+  }, { passive: false })
 })()`
+
+// Our layout rules, after the theme: the screen fills the card's width with less padding, and
+// the page never scrolls (the card is as tall as the screen).
+const FRAME_CSS = `html, body { overflow: hidden; }
+body > main { max-width: none; padding: 20px 24px; }
+:root { --pico-spacing: .75rem; --pico-typography-spacing-vertical: .75rem;
+  --pico-block-spacing-vertical: .75rem; --pico-block-spacing-horizontal: 1rem;
+  --pico-form-element-spacing-vertical: .5rem; --pico-form-element-spacing-horizontal: .75rem; }`
 
 /** The full page for the iframe's srcdoc: theme CSS inlined, our bootstrap, the fragment in <main>. */
 export function framePage(fragment: string, css: string, final: boolean): string {
   const style = css.replace(/<\/style/gi, '<\\/style')
   return `<!doctype html><html data-theme="light"><head><meta charset="utf-8">`
     + `<meta name="viewport" content="width=device-width, initial-scale=1">`
-    + `<style>${style}</style><script>${bootstrap(final)}</script></head>`
+    + `<style>${style}</style><style>${FRAME_CSS}</style><script>${bootstrap(final)}</script></head>`
     + `<body${final ? '' : ' style="cursor:progress"'}><main>${fragment}</main></body></html>`
 }
 

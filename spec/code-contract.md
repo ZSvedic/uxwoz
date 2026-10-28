@@ -44,6 +44,17 @@ can spend model credits.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
   `pico.css` followed by `mockup.css`.
 
+## Frame messages
+
+The script we add to every screen talks to the app with `postMessage`; the app accepts a message
+only from a card's own frame, and `action` only from the current card.
+
+```ts
+{ uxwoz: 'action', prompt, label }   // a click on a control with an action prompt
+{ uxwoz: 'size', height }            // the screen's height, so the card fits it (160-8000 px)
+{ uxwoz: 'wheel', dx, dy, zoom, x, y } // scroll or pinch over the screen, applied to the canvas
+```
+
 ## Types
 
 ```ts

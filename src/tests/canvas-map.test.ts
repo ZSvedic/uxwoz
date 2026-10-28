@@ -52,3 +52,14 @@ test('a cache file from before links existed still loads', () => {
   expect(cache.map('Cafe').entries).toHaveLength(1)
   expect(cache.map('Cafe').links).toEqual([])
 })
+
+test('cards as tall as their screens never overlap in a column', () => {
+  const heights = new Map([['menu', 300], ['cart', 1400], ['history', 500], ['pay', 900]])
+  const { boxes } = layoutMap(['menu', 'cart', 'history', 'pay'], [link('menu', 'cart', 1), link('menu', 'history', 2), link('cart', 'pay', 3)], heights)
+  const cart = boxes.get('cart')!, history = boxes.get('history')!
+  expect(cart.h).toBe(1400)
+  expect(history.y).toBeGreaterThanOrEqual(cart.y + cart.h + CARD.gapY)
+  // The short menu sits in the middle of its children's band.
+  const menu = boxes.get('menu')!
+  expect(menu.y + menu.h / 2).toBeCloseTo((cart.y + history.y + history.h) / 2)
+})
