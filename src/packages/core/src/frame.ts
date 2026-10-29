@@ -12,9 +12,15 @@ export function extractFragment(raw: string): string {
   return raw
 }
 
-/** True once the fragment holds text outside tags, scripts and styles. */
+/** True once the fragment holds text outside tags, the title, scripts and styles. */
 export const hasVisibleText = (html: string): boolean =>
-  html.replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?(<\/script>|$)|<[^>]*>|<[^>]*$/g, '').trim() !== ''
+  html.replace(/<(style|script|title)[\s\S]*?(<\/\1>|$)|<[^>]*>|<[^>]*$/g, '').trim() !== ''
+
+/** The short name the model gives a screen in its <title>, or '' if it gave none. */
+export function screenName(html: string): string {
+  const t = html.match(/<title>([^<]*)<\/title>/i)?.[1] ?? ''
+  return t.replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim().slice(0, 60)
+}
 
 /**
  * The window height a screen is designed for. A frame grows to fit its whole screen, so its real

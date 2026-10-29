@@ -13,7 +13,7 @@ const THEMES_DIR = resolve(import.meta.dir, '../themes')
 export const THEMES = { mockup: 'Mockup (sketch)', clean: 'Clean (Pico)' } as const
 const THEME_FILES = new Set(['pico', 'mockup'])
 
-/** How many variants one request makes: the first screen, a new screen, or a regenerate. */
+/** How many variants a new screen comes with; Regenerate and Change add one. */
 export const VARIANTS = 2
 
 /**
@@ -98,28 +98,33 @@ export function createServer(opts: ServerOptions = {}) {
   const cache = opts.cache ?? new ScreenCache()
   const log = opts.log ?? ((m: string) => console.warn(m))
 
-  /** A click from screen `from`, on a control labelled `label`. Absent for the first screen and Regenerate. */
-  interface Click { from: string; label: string }
-  interface ScreenRequest { app: string; action: string | null; model: ModelId; device: Device; regenerate: boolean; feedback: string; click: Click | null }
+  /** A click in variant `variant` of screen `from`, on a control labelled `label`. Absent for the first screen and Regenerate. */
+  interface Click { from: string; variant: number; label: string }
+  /**
+   * `regenerate` adds one variant to a screen even when it is cached; `prompt`, when given, is what
+   * the model is asked for instead of the screen's own prompt (the user's Change).
+   */
+  interface ScreenRequest { app: string; action: string | null; model: ModelId; device: Device; regenerate: boolean; prompt: string | null; click: Click | null }
 
   async function* screenEvents(r: ScreenRequest, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
-    const { app, model, device, feedback, click } = r
+    const { app, model, device, click, prompt } = r
     const action = canonicalAction(app, r.action)
     const key = screenKey(app, action)
-    const linkFrom = () => (click ? cache.link(click.from, key, click.label || action || 'home') ?? null : null)
+    const linkFrom = () => (click ? cache.link(click.from, click.variant, key, click.label || action || 'home') ?? null : null)
     const hit = cache.get(key)
     if (hit && !r.regenerate) {
       yield { type: 'meta', key, cached: true, variants: 0 }
       yield { type: 'done', entry: hit, variants: [], failed: [], link: linkFrom() }
       return
     }
-    yield { type: 'meta', key, cached: false, variants: VARIANTS }
+    const count = r.regenerate ? 1 : VARIANTS
+    yield { type: 'meta', key, cached: false, variants: count }
     const existing = cache.existingScreens(app).filter((a) => a !== action)
-    const streams = Array.from({ length: VARIANTS }, (_, slot) => tagged(slot, generateScreen({
-      app, action, existing, model, device, alternative: slot % 2 === 1, feedback: feedback || undefined,
+    const streams = Array.from({ length: count }, (_, slot) => tagged(slot, generateScreen({
+      app, action: prompt ?? action, existing, model, device, alternative: slot % 2 === 1,
       signal, fetch: opts.fetch, env: opts.env, log,
     })))
-    const made: (Candidate | null)[] = Array(VARIANTS).fill(null)
+    const made: (Candidate | null)[] = Array(count).fill(null)
     const failed: string[] = []
     for await (const t of merge(streams)) {
       if ('error' in t) {
@@ -128,12 +133,13 @@ export function createServer(opts: ServerOptions = {}) {
         log(`screen failed (${model}): ${message}`)
         failed.push(message)
       } else if (t.ev.type === 'chunk') yield { type: 'chunk', variant: t.slot, text: t.ev.text }
-      else made[t.slot] = t.ev.candidate
+      else made[t.slot] = prompt ? { ...t.ev.candidate, prompt } : t.ev.candidate
     }
     const ok = made.filter((c): c is Candidate => c != null)
+    const parent = click && { key: click.from, variant: click.variant, label: click.label }
     // A variant that finished is paid for: keep it, even if the browser left before the other one.
     if (signal.aborted) {
-      if (ok.length) cache.add(app, action, ...ok)
+      if (ok.length) cache.add(app, action, ok, { parent })
       return
     }
     if (!ok.length) {
@@ -141,7 +147,7 @@ export function createServer(opts: ServerOptions = {}) {
       return
     }
     // Both variants are stored together, in slot order, so the first stays first whichever finished first.
-    const { entry, index } = cache.add(app, action, ...ok)
+    const { entry, index } = cache.add(app, action, ok, { parent })
     let n = index
     yield { type: 'done', entry, variants: made.map((c) => (c ? n++ : null)), failed, link: linkFrom() }
   }
@@ -177,14 +183,16 @@ export function createServer(opts: ServerOptions = {}) {
           const action = typeof b?.action === 'string' && b.action.trim() ? b.action.trim() : null
           const model = b?.model ?? DEFAULT_MODEL
           const device = b?.device ?? DEFAULT_DEVICE
-          const feedback = typeof b?.feedback === 'string' ? b.feedback.trim() : ''
+          const prompt = typeof b?.prompt === 'string' && b.prompt.trim() ? b.prompt.trim() : null
           if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
           if (action && action.length > 500) return json({ error: 'action must be at most 500 characters' }, 400)
-          if (feedback.length > 500) return json({ error: 'feedback must be at most 500 characters' }, 400)
+          if (prompt && prompt.length > 2000) return json({ error: 'prompt must be at most 2000 characters' }, 400)
           if (!isModelId(model)) return json({ error: `unknown model ${model}` }, 400)
           if (!isDevice(device)) return json({ error: `unknown device ${device}` }, 400)
-          const click = typeof b?.from === 'string' && b.from ? { from: b.from.slice(0, 3000), label: String(b?.label ?? '').slice(0, 200) } : null
-          return ndjson(screenEvents({ app, action, model, device, regenerate: b?.regenerate === true, feedback, click }, req.signal))
+          const click = typeof b?.from === 'string' && b.from
+            ? { from: b.from.slice(0, 3000), variant: Number(b?.variant ?? 0), label: String(b?.label ?? '').slice(0, 200) }
+            : null
+          return ndjson(screenEvents({ app, action, model, device, regenerate: b?.regenerate === true, prompt, click }, req.signal))
         },
       },
       '/api/map': (req) => {
@@ -199,7 +207,7 @@ export function createServer(opts: ServerOptions = {}) {
           const refused = refuseForeign(req)
           if (refused) return refused
           const b = await req.json().catch(() => null)
-          const link = cache.link(String(b?.from ?? ''), String(b?.to ?? ''), String(b?.label ?? '').slice(0, 200))
+          const link = cache.link(String(b?.from ?? ''), Number(b?.variant ?? 0), String(b?.to ?? ''), String(b?.label ?? '').slice(0, 200))
           return link ? json({ link }) : json({ error: 'no such screens, or not in the same mockup' }, 404)
         },
       },
@@ -210,6 +218,27 @@ export function createServer(opts: ServerOptions = {}) {
           const b = await req.json().catch(() => null)
           const entry = cache.choose(String(b?.key ?? ''), Number(b?.index))
           return entry ? json({ entry }) : json({ error: 'no such screen or variant' }, 404)
+        },
+      },
+      // Delete one variant; screens only it reached go too.
+      '/api/delete': {
+        POST: async (req) => {
+          const refused = refuseForeign(req)
+          if (refused) return refused
+          const b = await req.json().catch(() => null)
+          const done = cache.deleteVariant(String(b?.key ?? ''), Number(b?.index))
+          return done ? json({ entry: done.entry ?? null, removed: done.removed }) : json({ error: 'no such screen or variant' }, 404)
+        },
+      },
+      // Delete a whole mockup, so its prompt starts over.
+      '/api/delete-app': {
+        POST: async (req) => {
+          const refused = refuseForeign(req)
+          if (refused) return refused
+          const b = await req.json().catch(() => null)
+          const app = typeof b?.app === 'string' ? b.app.trim() : ''
+          if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
+          return json({ removed: cache.deleteApp(app) })
         },
       },
       '/api/warmup': {

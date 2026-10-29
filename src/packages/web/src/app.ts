@@ -23,6 +23,8 @@ interface Row {
   action: string | null
   /** The control clicked in the row above to get here; null for the first row. */
   via: string | null
+  /** The variant of the row above that the click was made in; null for the first row. */
+  parent: number | null
   /** Null until the screen arrives the first time. */
   entry: CacheEntry | null
   /** The variants streaming into this row now, one renderer each. */
@@ -32,8 +34,10 @@ interface Row {
 const state = {
   app: null as string | null,
   rows: [] as Row[],
+  /** Every screen of this mockup, by key, as the server last sent it. */
+  entries: new Map<string, CacheEntry>(),
   /** Clicks between this mockup's screens, for the lines between rows. */
-  links: [] as FeedLink[],
+  links: [] as Link[],
   busy: null as AbortController | null,
   /** Counts prompts started, so a slower earlier start gives way to a newer one. */
   starts: 0,
@@ -96,7 +100,7 @@ function feedRow(r: Row): FeedRow {
 
 /** Draw every row and put each stored variant in its frame. Streaming frames are left to their streams. */
 async function draw() {
-  feed.render(state.rows.map(feedRow), !!state.busy, state.links)
+  feed.render(state.rows.map(feedRow), !!state.busy, state.links.map(({ from, to, label }): FeedLink => ({ from, to, label })))
   const theme = themeSelect.value
   const css = await themeCss(theme)
   if (theme !== themeSelect.value) return // a newer draw shows the newer theme
@@ -193,6 +197,7 @@ async function* readEvents(res: Response): AsyncGenerator<ScreenEvent> {
  * With `regenerate`, two more variants join the row, shaped by the user's feedback if any.
  */
 async function load(row: Row, { regenerate = false, feedback = '', from = null as Row | null } = {}) {
+  const variant = row.parent
   state.busy?.abort()
   const ctrl = new AbortController()
   state.busy = ctrl
@@ -211,7 +216,7 @@ async function load(row: Row, { regenerate = false, feedback = '', from = null a
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         app, action: row.action, model, device: deviceSelect.value, regenerate, feedback,
-        from: from?.key ?? null, label: from ? row.via : null,
+        from: from?.key ?? null, variant, label: from ? row.via : null,
       }),
       signal: ctrl.signal,
     })
@@ -236,6 +241,7 @@ async function load(row: Row, { regenerate = false, feedback = '', from = null a
         for (const s of row.streaming) s.cancel()
         row.streaming = []
         row.entry = ev.entry
+        state.entries.set(ev.entry.key, ev.entry)
         const added = ev.variants.filter((i): i is number => i != null)
         if (added.length) loadHistory()
         ev.variants.forEach((i, slot) => { if (i != null) feed.rename(streamId(row.key, slot), candidateId(row.key, i)) })
@@ -291,32 +297,62 @@ function onAction(rowKey: string, id: string, prompt: string, label: string) {
   const known = !!rowOf(key)
   if (state.busy && !known) return
   if (row.entry && row.entry.chosen !== index) choose(row, index)
-  if (known) {
+  if (rowOf(key)) {
     feed.scrollToRow(key)
-    recordLink(row.key, key, label)
+    recordLink(row.key, index, key, label)
     return
   }
   // A new screen from an earlier row replaces the rows below it.
-  const next: Row = { key, action: prompt, via: label, entry: null, streaming: [] }
+  const next: Row = { key, action: prompt, via: label, parent: index, entry: null, streaming: [] }
   state.rows = [...state.rows.slice(0, r + 1), next]
   savePath(app)
   load(next, { from: row })
 }
 
-function addLink(l: Link | FeedLink) {
-  if (!state.links.some((x) => x.from === l.from && x.to === l.to)) state.links.push({ from: l.from, to: l.to, label: l.label })
+function addLink(l: Link) {
+  if (!state.links.some((x) => x.from === l.from && x.variant === l.variant && x.to === l.to)) state.links.push(l)
 }
 
 /** A click to a screen already in the flow: draw it now, and store it with the mockup. */
-async function recordLink(from: string, to: string, label: string) {
+async function recordLink(from: string, variant: number, to: string, label: string) {
   if (from === to) return
-  addLink({ from, to, label })
+  addLink({ from, variant, to, label, createdAt: new Date().toISOString() })
   draw()
   await fetch('/api/link', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to, label }),
+    body: JSON.stringify({ from, variant, to, label }),
   }).catch(() => null)
 }
+
+/**
+ * The rows below a row belong to its pick. After a new pick, the next row stays only if the new
+ * pick also leads there; otherwise the rows below go, and the new pick's own path comes back.
+ */
+function followPick(row: Row) {
+  const r = state.rows.indexOf(row)
+  const next = state.rows[r + 1]
+  const v = row.entry?.chosen
+  if (r < 0 || v == null || next?.parent === v) return
+  const link = next && state.links.find((l) => l.from === row.key && l.variant === v && l.to === next.key)
+  if (next && link) { next.parent = v; next.via = link.label; return }
+  if (state.busy && state.rows.slice(r + 1).some((x) => x.streaming.length || !x.entry)) state.busy.abort()
+  state.rows = state.rows.slice(0, r + 1)
+  extendPath()
+  if (state.app) savePath(state.app)
+}
+
+/** Walk on from the last row: each pick's newest child screen, as long as there is one. */
+function extendPath() {
+  for (let last = state.rows.at(-1); last?.entry; last = state.rows.at(-1)) {
+    const { key, chosen } = last.entry
+    const kids = [...state.entries.values()].filter((e) => e.parent?.key === key && e.parent.variant === chosen && !rowOf(e.key))
+    const kid = kids.sort((a, b) => newest(b).localeCompare(newest(a)))[0]
+    if (!kid) return
+    state.rows.push({ key: kid.key, action: kid.action, via: kid.parent!.label, parent: chosen, entry: kid, streaming: [] })
+  }
+}
+
+const newest = (e: CacheEntry) => e.candidates.reduce((t, c) => (c.createdAt > t ? c.createdAt : t), '')
 
 /** Make a variant the one revisits show. */
 async function choose(row: Row, index: number) {
@@ -324,6 +360,7 @@ async function choose(row: Row, index: number) {
   if (!entry || !Number.isInteger(index) || entry.chosen === index) return
   const before = entry.chosen
   entry.chosen = index // at once, so the row shows it; undone below if the server says no
+  followPick(row)
   draw()
   const res = await fetch('/api/choose', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -339,12 +376,12 @@ async function choose(row: Row, index: number) {
 // ---- The flow, remembered per mockup in this browser --------------------------------------------
 
 const pathKey = (app: string) => `uxwoz:path:${normalizePrompt(app)}`
-interface SavedRow { key: string; action: string | null; via: string | null }
+interface SavedRow { key: string; action: string | null; via: string | null; parent: number | null }
 
 /** Save the rows shown now, if they still belong to `app` (a newer prompt may have replaced them). */
 function savePath(app: string) {
   if (state.app !== app) return
-  const rows: SavedRow[] = state.rows.filter((r) => r.entry).map(({ key, action, via }) => ({ key, action, via }))
+  const rows: SavedRow[] = state.rows.filter((r) => r.entry).map(({ key, action, via, parent }) => ({ key, action, via, parent }))
   store.set(pathKey(app), JSON.stringify(rows))
 }
 
@@ -360,17 +397,20 @@ async function start(app: string) {
   const map = await res.json() as { entries: CacheEntry[]; links: Link[] }
   const entries = new Map(map.entries.map((e) => [e.key, e]))
   if (n !== state.starts) return // a newer prompt was submitted meanwhile
-  state.links = map.links.map(({ from, to, label }) => ({ from, to, label }))
+  state.entries = entries
+  state.links = map.links
   let saved: SavedRow[] = []
   try { saved = JSON.parse(store.get(pathKey(app)) ?? '[]') } catch { /* start fresh */ }
   const root = screenKey(app, null)
   const rows: Row[] = []
+  // A saved row stays while it still follows the pick above it (another browser may have picked again).
   for (const s of saved) {
-    const entry = entries.get(s.key)
-    if (!entry || (rows.length === 0 && s.key !== root)) break
+    const entry = entries.get(s.key), above = rows.at(-1)
+    if (!entry || (above ? s.parent !== above.entry!.chosen : s.key !== root)) break
     rows.push({ ...s, entry, streaming: [] })
   }
-  state.rows = rows.length ? rows : [{ key: root, action: null, via: null, entry: null, streaming: [] }]
+  state.rows = rows.length ? rows : [{ key: root, action: null, via: null, parent: null, entry: entries.get(root) ?? null, streaming: [] }]
+  extendPath()
   const first = state.rows[0]!
   if (first.entry) {
     await draw()

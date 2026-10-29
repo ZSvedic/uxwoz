@@ -23,21 +23,18 @@ export interface RequestExtras {
   device?: string
   /** True for the second variant of a pair: ask for a different design. */
   alternative?: boolean
-  /** What the user wants changed, typed when they regenerated a screen. */
-  feedback?: string
 }
 
 /**
  * The user message for one screen: the product prompt alone, or the product plus an action prompt,
  * then the screens that already exist, so links to them reuse the exact prompt (and the cache).
- * The device, the alternative request and the user's feedback follow when given.
+ * The device and the alternative request follow when given.
  */
 export function screenRequest(app: string, action: string | null, existing: string[] = [], extras: RequestExtras = {}): string {
   let msg = action ? `This screen belongs to a clickable mockup of: ${app}\n\nShow this screen: ${action}` : app
   const list = existing.slice(0, MAX_EXISTING_SCREENS)
   if (list.length) msg += `\n\nScreens that already exist in this mockup:\n${list.map((p) => `- ${p}`).join('\n')}`
   if (extras.device) msg += `\n\nDesign it for ${extras.device}.`
-  if (extras.feedback) msg += `\n\nThe user saw earlier versions of this screen and asks: ${extras.feedback}`
   if (extras.alternative) msg += `\n\n${ALTERNATIVE_REQUEST}`
   return msg
 }

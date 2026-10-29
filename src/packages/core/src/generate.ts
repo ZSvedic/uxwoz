@@ -1,7 +1,7 @@
 // One screen generation: stream the model's fragment, then report what it cost and who served it.
 
 import type { Candidate } from './cache.ts'
-import { extractFragment } from './frame.ts'
+import { extractFragment, screenName } from './frame.ts'
 import { DEVICES, type Device } from './frame.ts'
 import { MODELS, type ModelId } from './models.ts'
 import { SYSTEM_PROMPT, WARMUP_REQUEST, screenRequest } from './prompt.ts'
@@ -20,8 +20,6 @@ export interface GenerateOptions {
   device?: Device
   /** True for the second variant of a pair: ask for a clearly different design. */
   alternative?: boolean
-  /** What the user wants changed, from a regenerate. */
-  feedback?: string
   signal?: AbortSignal
   fetch?: Fetch
   env?: Record<string, string | undefined>
@@ -41,7 +39,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
   try {
     for await (const ev of streamModel({
       model: o.model, system: SYSTEM_PROMPT,
-      user: screenRequest(o.app, o.action, o.existing, { device: o.device && DEVICES[o.device].request, alternative: o.alternative, feedback: o.feedback }),
+      user: screenRequest(o.app, o.action, o.existing, { device: o.device && DEVICES[o.device].request, alternative: o.alternative }),
       signal, fetch: o.fetch, env: o.env,
     })) {
       if (ev.type === 'text') {
@@ -73,7 +71,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
           totalMs: Math.round(performance.now() - t0),
           finishReason: ev.finishReason,
           ...(o.device && { device: o.device }),
-          ...(o.feedback && { feedback: o.feedback }),
+          ...(screenName(html) && { name: screenName(html) }),
         },
       }
       return

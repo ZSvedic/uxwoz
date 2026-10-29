@@ -22,3 +22,13 @@ export function screenKey(app: string, action: string | null): string {
   const a = canonicalAction(app, action)
   return a ? `${root} » ${normalizePrompt(a)}` : root
 }
+
+/** The letter of the n-th variant made at a level (0-based): A to Z, then AA, AB, and so on. */
+export function letterAt(n: number): string {
+  let s = ''
+  for (let i = n + 1; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + ((i - 1) % 26)) + s
+  return s
+}
+
+/** A variant's canonical name, e.g. "L2-B": the level its screen was made at, and its letter there. */
+export const variantId = (level: number, letter: string) => `L${level}-${letter}`
