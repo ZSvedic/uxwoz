@@ -62,7 +62,9 @@ only from a variant's own frame.
 
 ```ts
 { uxwoz: 'action', prompt, label }   // a click on a control with an action prompt
-{ uxwoz: 'size', height }            // the screen's height, so the frame fits it (160-8000 px)
+{ uxwoz: 'touch' }                   // any press in the screen: picks this variant
+{ uxwoz: 'size', height, width }     // the screen's size, so the frame fits it (160-8000 px tall;
+                                     // the card shows only `width`, at least 280 px)
 { uxwoz: 'wheel', dx, dy }          // scroll over the screen: dy scrolls the page, dx the row;
                                      // Ctrl/Cmd + scroll stays in the browser, to zoom
 ```

@@ -1,6 +1,6 @@
 // The feed: the mockup as rows, one per step of the flow, top to bottom. A row holds the variants
-// of one screen side by side, then a "Neither" tile to ask for more. Every variant is live: a click
-// inside one picks it and opens the next row. The page scrolls normally, also over a screen.
+// of one screen side by side, then a "Neither" tile to ask for more. Every variant is live: any
+// click in one picks it, and a click that opens another screen also opens the next row. The page scrolls normally, also over a screen.
 // Screens always show at 100% and only as wide as their content: the frame keeps the device's
 // width, so the screen's layout never changes, and the part it does not use is cut off. A row
 // that is too wide scrolls sideways. A stepped line joins the picked variant of each row to the
@@ -60,7 +60,6 @@ export interface FeedHandlers {
 interface Frame {
   el: HTMLElement
   caption: HTMLElement
-  pick: HTMLButtonElement
   /** Cuts the frame to the width the screen uses. */
   screen: HTMLElement
   frame: HTMLIFrameElement
@@ -112,7 +111,6 @@ export class Feed {
         f.el.classList.toggle('streaming', v.streaming)
         f.el.title = v.tooltip
         f.caption.textContent = v.caption
-        f.pick.hidden = v.chosen || v.streaming
         if (f.width !== v.width) { f.width = v.width; f.frame.style.width = f.screen.style.width = `${v.width}px` }
       })
       placeAt(row.strip, row.neither, r.variants.length)
@@ -246,7 +244,7 @@ export class Feed {
     const more = el('button', 'more', 'Make 2 more') as HTMLButtonElement
     more.type = 'button'
     more.addEventListener('click', () => this.on.regenerate(key, feedback.value.trim()))
-    neither.append(el('b', '', 'Neither?'), el('p', '', 'Click a button inside the variant you like, or ask for two more.'), feedback, more)
+    neither.append(el('b', '', 'Neither?'), el('p', '', 'Click anything in the variant you like to pick it, or ask for two more.'), feedback, more)
     strip.append(neither)
     r.append(head, strip)
     const row = { el: r, head, strip, neither, feedback, more }
@@ -261,10 +259,8 @@ export class Feed {
     v.dataset.id = id
     const bar = el('div', 'variant-bar')
     const caption = el('span', 'caption')
-    const pick = el('button', 'pick', 'Pick') as HTMLButtonElement
-    pick.type = 'button'
-    pick.title = 'Use this variant when the flow comes back to this screen'
-    bar.append(caption, el('span', 'picked', '✓ Picked'), pick)
+    bar.title = 'Click anything in a variant to pick it'
+    bar.append(caption, el('span', 'picked', '✓ Picked'))
     const screen = el('div', 'screen')
     const frame = document.createElement('iframe')
     frame.setAttribute('sandbox', FRAME_SANDBOX)
@@ -272,8 +268,8 @@ export class Feed {
     frame.style.height = `${START_H}px`
     screen.append(frame)
     v.append(bar, screen)
-    const f: Frame = { el: v, caption, pick, screen, frame, rowKey, width: 0, shown: null, onLoad: null, growth: { count: 0, at: 0 }, frozen: false }
-    pick.addEventListener('click', () => this.on.pick(f.rowKey, v.dataset.id!))
+    const f: Frame = { el: v, caption, screen, frame, rowKey, width: 0, shown: null, onLoad: null, growth: { count: 0, at: 0 }, frozen: false }
+    bar.addEventListener('click', () => this.on.pick(f.rowKey, v.dataset.id!))
     frame.addEventListener('load', () => this.loaded(f))
     this.frames.set(id, f)
     return f
@@ -311,6 +307,8 @@ export class Feed {
       }
       f.frame.style.height = `${h}px`
       this.queueLines()
+    } else if (d.uxwoz === 'touch') {
+      this.on.pick(f.rowKey, id)
     } else if (d.uxwoz === 'wheel') {
       // The frame never scrolls itself: its gestures scroll the page and the row.
       this.stage.scrollBy(0, Number(d.dy) || 0)

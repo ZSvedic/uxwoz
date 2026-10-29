@@ -48,12 +48,11 @@ button:disabled { opacity: .45; cursor: default; }
   box-shadow: 0 2px 10px rgba(0, 0, 0, .12); }
 .variant.chosen { outline: 3px solid var(--accent); outline-offset: 1px; }
 .variant.streaming { opacity: .85; }
-.variant-bar { display: flex; gap: 8px; align-items: center; min-height: 36px; padding: 4px 8px 4px 12px; font-size: 13px;
+.variant-bar { cursor: pointer; display: flex; gap: 8px; align-items: center; min-height: 36px; padding: 4px 8px 4px 12px; font-size: 13px;
   color: var(--muted); border-bottom: 1px solid var(--line); }
 .variant-bar .caption { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .variant-bar .picked { display: none; color: var(--accent); font-weight: 600; }
 .variant.chosen .picked { display: inline; }
-.variant-bar .pick { padding: 2px 10px; font-size: 13px; }
 .screen { overflow: hidden; }
 .screen iframe { display: block; border: 0; background: #fff; }
 .neither { flex: none; width: 240px; display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 2px dashed var(--line);

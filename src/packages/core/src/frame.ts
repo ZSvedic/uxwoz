@@ -48,6 +48,8 @@ const bootstrap = (final: boolean) => `(() => {
   // What the control says, shown between the two screens it joins.
   const labelOf = (el) => el ? (el.getAttribute('aria-label') || el.textContent || el.value || '').trim().replace(/\\s+/g, ' ') : ''
   window.uxwoz = { go }
+  // Any press in the screen picks this variant; the app ignores it while the screen streams.
+  addEventListener('pointerdown', () => parent.postMessage({ uxwoz: 'touch' }, '*'), true)
   document.addEventListener('click', (e) => {
     const el = e.target instanceof Element && e.target.closest('[data-action], a[href]')
     if (!el) return

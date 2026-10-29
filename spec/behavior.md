@@ -10,7 +10,7 @@ vars (see [code-contract.md](code-contract.md)).
 1. Zel types *A coffee shop ordering app* and presses **Generate**.
 2. Two variants of the first screen stream in side by side. After about 1 s the metrics line reads
    *First visible screen 0.9 s*; at the end it reads *all variants interactive 6.0 s · $0.0016 for 2*.
-3. Zel likes variant 2 and clicks **Checkout** inside it. That picks variant 2, and a second row
+3. Zel likes variant 2 and clicks **Checkout** inside it. That picks variant 2 (any click in it would), and a second row
    appears below with two variants of the checkout. A line runs from variant 2 down into it,
    labelled *Checkout*. The page scrolls to it.
 4. Neither checkout is right. Zel types *one big pay button* in the **Neither?** tile and clicks
@@ -65,7 +65,7 @@ to one variant at a time, so the next variant is one swipe away.
   takes. The model is told to start small: only what this step needs. A row too wide for the window scrolls sideways. For an overview, use the
   browser's zoom: it shrinks the whole page evenly.
 - Each variant's bar names its model and cost. The picked variant has a blue outline and
-  *✓ Picked*; the others have a **Pick** button.
+  *✓ Picked*.
 
 ## Variants and picking
 
@@ -73,8 +73,9 @@ Every new screen comes as two variants made at the same time. The second is aske
 different design, so the two are not near copies. If one fails, the other still arrives, with an
 error line naming the failure.
 
-- **Pick by using**: a click inside a variant that opens another screen picks that variant, then
-  opens the next row. **Pick** picks without going anywhere.
+- **Pick by using**: any click in a variant, on its screen or its bar, picks it. A click that
+  opens another screen also opens the next row; typing, ticking boxes or playing with a screen
+  only picks it.
 - **Neither?**: an optional note on what to change, then **Make 2 more**. Two more variants join
   the end of the row, made with the note; older variants never go away. Hovering a variant shows
   the note it was made with.
