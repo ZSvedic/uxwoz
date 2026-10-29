@@ -221,6 +221,7 @@ class StreamRenderer {
   cancel() {
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
+    feed.forgetLoad(this.id) // a refresh reuses a frame: its next load must not count as this stream's
   }
 
   private build(force: boolean) {
@@ -298,7 +299,8 @@ async function load(row: Row, { regenerate = false, prompt = null as string | nu
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        app, action: row.action, model, device: deviceSelect.value, regenerate, prompt, replace,
+        // A refresh keeps the variant's own device; anything else uses the picker's.
+        app, action: row.action, model, device: (replace != null && row.entry?.candidates[replace]?.device) || deviceSelect.value, regenerate, prompt, replace,
         from: from?.key ?? null, variant, label: from ? row.via : null,
       }),
       signal: ctrl.signal,
@@ -340,6 +342,15 @@ async function load(row: Row, { regenerate = false, prompt = null as string | nu
         if (replace != null) {
           const res = await fetch(`/api/map?app=${encodeURIComponent(app)}`).catch(() => null)
           if (res?.ok) applyMap(app, await res.json(), row)
+          else if (ev.removed.length) {
+            // Without the map, at least drop the screens the server says went with the old version.
+            const gone = new Set(ev.removed)
+            for (const k of gone) state.entries.delete(k)
+            const cut = state.rows.findIndex((r) => gone.has(r.key))
+            if (cut >= 0) state.rows = state.rows.slice(0, cut)
+            followPick(row)
+            savePath(app)
+          }
         }
         savePath(app)
         if (ev.failed.length) showError(`${ev.failed.length} of ${ev.variants.length} variants failed: ${ev.failed[0]}`)

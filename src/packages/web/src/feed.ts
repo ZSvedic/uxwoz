@@ -156,7 +156,14 @@ export class Feed {
     }
     const h = this.list.scrollHeight
     if (!w || !h) return 1
-    return Math.min(1, (this.stage.clientWidth - 32) / (w + GUTTER), (this.stage.clientHeight - 16) / h)
+    const { left, right } = this.visible()
+    return Math.min(1, (right - left - 16) / (w + GUTTER), (this.stage.clientHeight - 16) / h)
+  }
+
+  /** The part of the page the feed shows in, left and right: the stage's padding keeps room for the tree. */
+  private visible() {
+    const st = this.stage, s = st.getBoundingClientRect(), css = getComputedStyle(st)
+    return { left: s.left + parseFloat(css.paddingLeft), right: s.left + st.clientWidth - parseFloat(css.paddingRight) }
   }
 
   private zoomBy(dy: number, x: number, y: number) {
@@ -212,6 +219,12 @@ export class Feed {
     f.frame.srcdoc = framePage(html, css, final)
   }
 
+  /** Drop the callback waiting for a frame's next load, once its stream is cancelled. */
+  forgetLoad(id: string) {
+    const f = this.frames.get(id)
+    if (f) f.onLoad = null
+  }
+
   /** A streamed variant became a stored candidate: keep its frame under the new id. */
   rename(from: string, to: string) {
     const f = this.frames.get(from)
@@ -232,7 +245,7 @@ export class Feed {
   scrollToVariant(id: string, smooth = true) {
     const f = this.frames.get(id)
     if (!f) return
-    const st = this.stage, s = st.getBoundingClientRect(), v = f.el.getBoundingClientRect()
+    const st = this.stage, s = this.visible(), v = f.el.getBoundingClientRect()
     if (v.left >= s.left && v.right <= s.right) return
     st.scrollTo({ left: Math.max(0, st.scrollLeft + v.left - s.left - GAP), behavior: smooth ? 'smooth' : 'auto' })
   }
@@ -254,6 +267,9 @@ export class Feed {
     const base = this.list.getBoundingClientRect(), z = this.z
     const X = (vx: number) => (vx - base.left) / z, Y = (vy: number) => (vy - base.top) / z
     const svg = this.lines
+    // The lines are part of what the feed measures, so they shrink first: else the size only grows.
+    svg.setAttribute('width', '0')
+    svg.setAttribute('height', '0')
     svg.setAttribute('width', String(this.list.scrollWidth))
     svg.setAttribute('height', String(this.list.scrollHeight))
     const marker = svgEl('marker', { id: 'uxwoz-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' })

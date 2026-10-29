@@ -32,6 +32,7 @@ describe('web server', () => {
     expect(d.variants).toEqual([0, 1])
     expect(d.entry.candidates).toHaveLength(2)
     expect(d.entry.candidates.map((c) => c.device)).toEqual(['phone', 'phone'])
+    expect(d.entry.candidates.map((c) => !!c.alternative)).toEqual([false, true]) // a refresh asks for it again
     expect(d.entry.candidates[0]!.html).not.toBe(d.entry.candidates[1]!.html)
   }, 30_000)
 

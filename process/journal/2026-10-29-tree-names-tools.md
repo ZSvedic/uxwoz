@@ -49,3 +49,12 @@ Feedback round a-o on the feed. One commit per step; the specs follow in the las
 - The arcs for back links still need the feed's rows; the tree does not show back links yet.
 - A "More detail" button to grow a screen's fidelity on request.
 - Export for a coding agent (brief steps 3-4).
+
+## Later: one canvas, floating tree, orange chrome
+
+- **Refresh** makes a new variant with a new name in the old one's place; the old one is deleted
+  with the screens only it led to (asked first). Keeping the name would have lied about content.
+- The feed is one surface on a dot grid that scales with zoom; rows no longer scroll on their own.
+- The tree floats top right, draggable and foldable. Burnt orange is UX Woz, blue is the mockup.
+- Two critic reviews (subagents) found 7 and 8 issues; all fixed. Worth doing every round: they
+  caught letter reuse, a delete that could wipe old screens, and a lines SVG that only grew.

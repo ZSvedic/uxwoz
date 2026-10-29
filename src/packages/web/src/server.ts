@@ -135,8 +135,8 @@ export function createServer(opts: ServerOptions = {}) {
     yield { type: 'meta', key, cached: false, variants: count }
     const existing = cache.existingScreens(app).filter((a) => a !== action)
     const streams = Array.from({ length: count }, (_, slot) => tagged(slot, generateScreen({
-      // A refreshed second variant of a pair stays the different design it was asked to be.
-      app, action: prompt ?? action, existing, model, device, alternative: replace != null ? replace === 1 : slot % 2 === 1,
+      // A refreshed alternative stays the different design it was asked to be (index 1 before the flag existed).
+      app, action: prompt ?? action, existing, model, device, alternative: old ? old.alternative ?? (replace === 1 && old.replaces == null) : slot % 2 === 1,
       signal, fetch: opts.fetch, env: opts.env, log,
     })))
     const made: (Candidate | null)[] = Array(count).fill(null)

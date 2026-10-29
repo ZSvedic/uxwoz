@@ -44,17 +44,22 @@ export class Tree {
   /** Drag the panel by its header, kept inside the area around it. */
   private drag(head: HTMLElement) {
     head.addEventListener('pointerdown', (e) => {
-      if ((e.target as Element).closest('button')) return
+      if (e.button !== 0 || (e.target as Element).closest('button')) return
       const box = this.box.getBoundingClientRect(), area = this.box.offsetParent!.getBoundingClientRect()
       const dx = e.clientX - box.left, dy = e.clientY - box.top
       head.setPointerCapture(e.pointerId)
       const move = (m: PointerEvent) => {
         const x = Math.min(Math.max(0, m.clientX - dx - area.left), area.width - box.width)
         const y = Math.min(Math.max(0, m.clientY - dy - area.top), area.height - 40)
-        Object.assign(this.box.style, { left: `${x}px`, top: `${y}px`, right: 'auto' })
+        // A panel moved down gets shorter, so its last lines stay reachable.
+        Object.assign(this.box.style, { left: `${x}px`, top: `${y}px`, right: 'auto', maxHeight: `${area.height - y - 12}px` })
+      }
+      const stop = () => {
+        head.removeEventListener('pointermove', move)
+        for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) head.removeEventListener(t, stop)
       }
       head.addEventListener('pointermove', move)
-      head.addEventListener('pointerup', () => head.removeEventListener('pointermove', move), { once: true })
+      for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) head.addEventListener(t, stop)
     })
   }
 

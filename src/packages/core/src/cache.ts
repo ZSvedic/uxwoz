@@ -32,6 +32,8 @@ export interface Candidate {
   feedback?: string
   /** Deleted by the user: its markup is gone, its letter stays taken. */
   deleted?: boolean
+  /** Asked for as a clearly different design (the second of a pair); a refresh asks again. */
+  alternative?: boolean
   /** The variant this one replaced by a refresh: it shows in that variant's place. */
   replaces?: number
 }

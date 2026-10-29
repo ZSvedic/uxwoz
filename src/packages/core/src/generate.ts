@@ -72,6 +72,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
           finishReason: ev.finishReason,
           ...(o.device && { device: o.device }),
           ...(screenName(html) && { name: screenName(html) }),
+          ...(o.alternative && { alternative: true }),
         },
       }
       return

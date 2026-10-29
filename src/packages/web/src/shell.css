@@ -59,7 +59,7 @@ button:disabled { opacity: .45; cursor: default; }
 .tree .line .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree .line.flow { color: var(--accent); }
 .tree .line.flow .name { color: var(--fg); font-weight: 600; }
-@media (max-width: 700px) { .tree { display: none; } }
+@media (max-width: 700px) { .tree { display: none; } .stage { padding-right: 16px; } }
 /* The feed: one row per step of the flow, top to bottom; a row's variants sit side by side. It is
    one surface that scrolls both ways, on a dot grid whose spacing follows the zoom. Room on the
    right lets the last variant scroll out from under the floating tree. */
