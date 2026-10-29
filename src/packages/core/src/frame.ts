@@ -17,11 +17,22 @@ export const hasVisibleText = (html: string): boolean =>
   html.replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?(<\/script>|$)|<[^>]*>|<[^>]*$/g, '').trim() !== ''
 
 /**
- * The window height a screen is designed for. A card grows to fit its whole screen, so the frame's
- * real window is as tall as the screen; vh units would then feed back into the card's height
- * forever. Our script converts vh units to pixels of this height instead.
+ * The window height a screen is designed for. A frame grows to fit its whole screen, so its real
+ * window is as tall as the screen; vh units would then feed back into the frame's height forever.
+ * Our script converts vh units to pixels of this height instead.
  */
 export const VIEWPORT_H = 800
+
+/** The devices a screen can be designed for, and the width of the window it gets. */
+export const DEVICES = {
+  phone: { label: 'Phone', width: 390, request: 'a phone screen, about 390 px wide' },
+  desktop: { label: 'Desktop', width: 1280, request: 'a desktop browser window, about 1280 px wide' },
+} as const
+export type Device = keyof typeof DEVICES
+export const DEFAULT_DEVICE: Device = 'phone'
+/** The window width of screens made before devices existed. */
+export const LEGACY_WIDTH = 800
+export const isDevice = (v: unknown): v is Device => typeof v === 'string' && Object.hasOwn(DEVICES, v)
 
 // Our script, added before the model's markup. It turns clicks on data-action controls (and links)
 // into postMessage calls to the app, and keeps the frame from navigating away. While the screen is
@@ -34,7 +45,7 @@ const bootstrap = (final: boolean) => `(() => {
     if (navigator.userActivation && !navigator.userActivation.isActive) return
     parent.postMessage({ uxwoz: 'action', prompt: prompt.trim().slice(0, 500), label: String(label || '').slice(0, 80) }, '*')
   }
-  // The arrow label on the canvas: what the control says.
+  // What the control says, shown between the two screens it joins.
   const labelOf = (el) => el ? (el.getAttribute('aria-label') || el.textContent || el.value || '').trim().replace(/\\s+/g, ' ') : ''
   window.uxwoz = { go }
   document.addEventListener('click', (e) => {
@@ -79,8 +90,8 @@ const bootstrap = (final: boolean) => `(() => {
     }
   }
   addEventListener('DOMContentLoaded', fixVh)
-  // The card on the canvas grows to fit the whole screen, so the frame never scrolls: it reports
-  // its height, and hands scroll and pinch gestures to the canvas.
+  // The frame grows to fit the whole screen, so it never scrolls: it reports its height, and hands
+  // scroll gestures to the page around it.
   let lastHeight = 0
   const report = () => {
     fixVh()
@@ -89,17 +100,21 @@ const bootstrap = (final: boolean) => `(() => {
     if (h !== lastHeight) { lastHeight = h; parent.postMessage({ uxwoz: 'size', height: h }, '*') }
   }
   addEventListener('load', () => { report(); new ResizeObserver(report).observe(document.body) })
+  // Ctrl/Cmd + scroll (and pinch) is left to the browser, to zoom the page.
   addEventListener('wheel', (e) => {
+    if (e.ctrlKey || e.metaKey) return
     e.preventDefault()
-    parent.postMessage({ uxwoz: 'wheel', dx: e.deltaX, dy: e.deltaY, zoom: e.ctrlKey || e.metaKey, x: e.clientX, y: e.clientY }, '*')
+    parent.postMessage({ uxwoz: 'wheel', dx: e.deltaX, dy: e.deltaY }, '*')
   }, { passive: false })
 })()`
 
-// Our layout rules, after the theme: the screen fills the card's width with less padding, and
-// the page never scrolls (the card is as tall as the screen).
+// Our layout rules, after the theme: the screen fills the frame's width with less padding, and
+// the page never scrolls (the frame is as tall as the screen). Pico grows its text with the window
+// (20 px at 1280 px); a fixed 16 px keeps screens in scale with the app around them.
 const FRAME_CSS = `html, body { overflow: hidden; }
 body > main { max-width: none; padding: 20px 24px; }
-:root { --pico-spacing: .75rem; --pico-typography-spacing-vertical: .75rem;
+@media (max-width: 600px) { body > main { padding: 16px; } }
+:root { --pico-font-size: 100%; --pico-spacing: .75rem; --pico-typography-spacing-vertical: .75rem;
   --pico-block-spacing-vertical: .75rem; --pico-block-spacing-horizontal: 1rem;
   --pico-form-element-spacing-vertical: .5rem; --pico-form-element-spacing-horizontal: .75rem; }`
 

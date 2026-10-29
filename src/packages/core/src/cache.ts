@@ -1,8 +1,11 @@
 // Cached generative exploration: every screen is stored under its normalized prompt.
-// Regenerating adds a candidate; only an explicit choose() changes which one revisits show.
+// Each screen has variants (candidates); regenerating adds more, and only an explicit choose()
+// changes which one revisits show.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { canonicalAction, normalizePrompt, screenKey } from './keys.ts'
+import type { Device } from './frame.ts'
 import type { ModelId } from './models.ts'
 
 export interface Candidate {
@@ -16,6 +19,10 @@ export interface Candidate {
   firstChunkMs: number | null
   totalMs: number
   finishReason: string | null
+  /** The device the screen was designed for; absent on screens made before devices existed. */
+  device?: Device
+  /** What the user asked to change when they regenerated, if anything. */
+  feedback?: string
 }
 
 export interface CacheEntry {
@@ -27,35 +34,13 @@ export interface CacheEntry {
   candidates: Candidate[]
 }
 
-/** One click that led from one screen to another: the arrows on the canvas. */
+/** One click that led from one screen to another. */
 export interface Link {
   from: string
   to: string
   /** The text of the control that was clicked, e.g. "Checkout". */
   label: string
   createdAt: string
-}
-
-/** Lowercase, Unicode-normalized, single-spaced, without trailing punctuation. » becomes >, as it separates key parts. */
-export function normalizePrompt(s: string): string {
-  return s.normalize('NFKC').toLowerCase().replace(/»/g, '>').replace(/\s+/g, ' ').trim().replace(/[\s.!?;:,]+$/, '')
-}
-
-/** The action prompt that means "the first screen"; the model writes it on back-to-start links. */
-export const HOME_ACTION = 'home'
-
-/** The action as stored: null for the first screen, whether asked for as no action, "home", or the product prompt. */
-export function canonicalAction(app: string, action: string | null): string | null {
-  if (!action) return null
-  const a = normalizePrompt(action)
-  return a === '' || a === HOME_ACTION || a === normalizePrompt(app) ? null : action
-}
-
-/** The cache key: the normalized product prompt, plus the normalized action prompt for later screens. */
-export function screenKey(app: string, action: string | null): string {
-  const root = normalizePrompt(app)
-  const a = canonicalAction(app, action)
-  return a ? `${root} » ${normalizePrompt(a)}` : root
 }
 
 export class ScreenCache {
@@ -84,8 +69,11 @@ export class ScreenCache {
     return this.entries.get(key)
   }
 
-  /** Store a new candidate. The first candidate of a key becomes the chosen one; later ones do not. */
-  add(app: string, action: string | null, candidate: Candidate): { entry: CacheEntry; index: number } {
+  /**
+   * Store new candidates, in order. The first candidate of a key becomes the chosen one; later ones
+   * do not. Returns the index of the first one added.
+   */
+  add(app: string, action: string | null, ...candidates: Candidate[]): { entry: CacheEntry; index: number } {
     action = canonicalAction(app, action)
     const key = screenKey(app, action)
     let entry = this.entries.get(key)
@@ -93,9 +81,10 @@ export class ScreenCache {
       entry = { key, app, action, chosen: 0, candidates: [] }
       this.entries.set(key, entry)
     }
-    entry.candidates.push(candidate)
+    const index = entry.candidates.length
+    entry.candidates.push(...candidates)
     this.save()
-    return { entry, index: entry.candidates.length - 1 }
+    return { entry, index }
   }
 
   /** The action prompts of this mockup's later screens, newest first. */
@@ -120,7 +109,7 @@ export class ScreenCache {
     return l
   }
 
-  /** Everything the canvas needs for one mockup: its screens (oldest first) and the clicks between them. */
+  /** One mockup: its screens (oldest first) and the clicks between them. */
   map(app: string): { root: string; entries: CacheEntry[]; links: Link[] } {
     const root = normalizePrompt(app)
     const entries = [...this.entries.values()].filter((e) => normalizePrompt(e.app) === root)

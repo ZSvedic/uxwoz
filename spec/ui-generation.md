@@ -32,6 +32,9 @@ iframe. Pico styles the bare elements, so the model writes no CSS.
 - **Rendering:** `<iframe sandbox="allow-scripts allow-forms" srcdoc=...>`. The sandbox keeps
   generated code away from the app; `allow-forms` matters because models often build todo-style
   screens as `<form>`, and both OpenUI and CopilotKit failed the todo task by blocking submit.
+- **Size:** the frame is as wide as the device the screen was made for (390 px phone, 1280 px
+  desktop) and as tall as its content. Text is a fixed 16 px: Pico grows it with the window (up to
+  21 px), which made screens look larger than the app around them.
 - **Inline the theme CSS** into the srcdoc. A null-origin frame cannot be relied on to fetch a
   stylesheet (one browser skipped it), and web fonts in it need CORS headers or `data:` URLs.
 - **Streaming:** rebuild the srcdoc at most every 300 ms while chunks arrive (each rebuild reloads

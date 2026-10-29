@@ -11,8 +11,8 @@ default) and `OPENAI_API_KEY` (the two GPT models). All `bun` commands run from 
 cd src && bun install && bun run dev
 ```
 
-Open http://127.0.0.1:3000, type a product idea (or pick an example), and click around: each new
-screen appears on the canvas with an arrow from the button that made it. `PORT=3001 bun run dev`
+Open http://127.0.0.1:3000, type a product idea (or pick an example), and click around: each screen
+comes in two variants side by side, and a click inside one picks it and adds the next screen below. `PORT=3001 bun run dev`
 picks another port.
 
 Generated screens are cached in `temp/screen-cache.json`. To start fresh, stop the server, move the

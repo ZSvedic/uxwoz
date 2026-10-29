@@ -2,6 +2,7 @@
 
 import type { Candidate } from './cache.ts'
 import { extractFragment } from './frame.ts'
+import { DEVICES, type Device } from './frame.ts'
 import { MODELS, type ModelId } from './models.ts'
 import { SYSTEM_PROMPT, WARMUP_REQUEST, screenRequest } from './prompt.ts'
 import { ProviderError, streamModel, type Fetch } from './providers.ts'
@@ -15,6 +16,12 @@ export interface GenerateOptions {
   /** Action prompts of screens the mockup already has; the model links to them by exact prompt. */
   existing?: string[]
   model: ModelId
+  /** The device to design for; left out of the request when absent. */
+  device?: Device
+  /** True for the second variant of a pair: ask for a clearly different design. */
+  alternative?: boolean
+  /** What the user wants changed, from a regenerate. */
+  feedback?: string
   signal?: AbortSignal
   fetch?: Fetch
   env?: Record<string, string | undefined>
@@ -33,7 +40,8 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
   let firstChunkMs: number | null = null
   try {
     for await (const ev of streamModel({
-      model: o.model, system: SYSTEM_PROMPT, user: screenRequest(o.app, o.action, o.existing),
+      model: o.model, system: SYSTEM_PROMPT,
+      user: screenRequest(o.app, o.action, o.existing, { device: o.device && DEVICES[o.device].request, alternative: o.alternative, feedback: o.feedback }),
       signal, fetch: o.fetch, env: o.env,
     })) {
       if (ev.type === 'text') {
@@ -64,6 +72,8 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
           firstChunkMs: firstChunkMs == null ? null : Math.round(firstChunkMs),
           totalMs: Math.round(performance.now() - t0),
           finishReason: ev.finishReason,
+          ...(o.device && { device: o.device }),
+          ...(o.feedback && { feedback: o.feedback }),
         },
       }
       return

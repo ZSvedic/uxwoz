@@ -26,6 +26,20 @@ Screens that already exist in this mockup:
 The list holds the action prompts of the screens this mockup already has, newest first, at most 30.
 It lets a new screen link to an old one with the exact same prompt, so the click hits the cache.
 
+Three lines may follow, each after a blank line: the device, the user's feedback from **Make 2
+more**, and, for the second variant of a pair only, a request for a different design:
+
+```
+Design it for a phone screen, about 390 px wide.
+
+The user saw earlier versions of this screen and asks: one big pay button
+
+Design this as a clearly different alternative to the obvious layout: change the structure, grouping or navigation, not just the wording.
+```
+
+They live in the user message, so the system prompt stays the same for every request and the
+provider's prompt cache keeps working.
+
 ## System prompt
 
 The first five bullets are the benchmark prompt (`benchmarks/bench/prompts/system.txt`) unchanged. The

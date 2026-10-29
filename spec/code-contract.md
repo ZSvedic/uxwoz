@@ -7,20 +7,22 @@ and model settings ([ui-generation.md](ui-generation.md)).
 ## Example
 
 ```
-POST /api/screen  {"app": "A coffee shop ordering app", "action": null, "model": "claude-haiku-5.5"}
+POST /api/screen  {"app": "A coffee shop ordering app", "action": null, "model": "claude-haiku-5.5", "device": "phone"}
 
-{"type":"meta","key":"a coffee shop ordering app","cached":false}
-{"type":"chunk","text":"<h1>Brew"}
+{"type":"meta","key":"a coffee shop ordering app","cached":false,"variants":2}
+{"type":"chunk","variant":0,"text":"<h1>Brew"}
+{"type":"chunk","variant":1,"text":"<h1>Coffee"}
 ...
-{"type":"done","entry":{...CacheEntry},"index":0,"link":null}
+{"type":"done","entry":{...CacheEntry},"variants":[0,1],"failed":[],"link":null}
 ```
 
 ## Packages
 
-- `@uxwoz/core` (`src/packages/core`): models, prompt, provider streaming, screen cache, frame page,
-  canvas layout. `frame.ts` and `layout.ts` run in the browser too, so they use no Node or Bun APIs.
+- `@uxwoz/core` (`src/packages/core`): models, prompt, provider streaming, screen cache, cache keys,
+  frame page and devices. `frame.ts` and `keys.ts` run in the browser too, so they use no Node or
+  Bun APIs.
 - `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`,
-  `canvas.ts`, bundled by Bun's HTML import), and the themes in `themes/`.
+  `feed.ts`, bundled by Bun's HTML import), and the themes in `themes/`.
 
 There are no runtime dependencies; `@types/bun` and `typescript` are dev-only.
 
@@ -30,16 +32,20 @@ The server listens on 127.0.0.1 by default (`UXWOZ_HOST`). Every POST must be `a
 come from another origin (`Origin` or `Sec-Fetch-Site: cross-site`, else 403), so no other web page
 can spend model credits.
 
-- `GET /api/config`: models (id, label, costEstimated), themes (`mockup`, `clean`), default model
-  and theme.
-- `POST /api/screen {app, action?, model?, regenerate?, from?, label?}`: NDJSON stream of `meta`,
-  `chunk`*, then `done` or `error`. A cache hit sends `meta` (cached true) and `done` only. With
-  `from` (the key of the screen clicked in) and `label` (the control's text), `done` carries the
-  `Link` it recorded, or null. 400 on an empty
-  or too long `app` (2,000), `action` (500), or an unknown model. A closed browser connection aborts
-  the model call.
+- `GET /api/config`: models (id, label, costEstimated), themes (`mockup`, `clean`), devices (id,
+  label, width), and the default model, theme and device.
+- `POST /api/screen {app, action?, model?, device?, regenerate?, feedback?, from?, label?}`: NDJSON
+  stream of `meta`, `chunk`*, then `done` or `error`. A new screen, or `regenerate`, makes two
+  variants at once: `meta.variants` is 2 and each chunk names its `variant` (0 or 1). `done.variants`
+  maps each variant to its candidate index, or null if it failed (its message in `failed`); `error`
+  comes only when both fail. A cache hit sends `meta` (cached true, variants 0) and `done` only.
+  `feedback` (up to 500 characters) goes to the model and onto the new candidates. With `from` (the
+  key of the screen clicked in) and `label` (the control's text), `done` carries the `Link` it
+  recorded, or null. 400 on an empty or too long `app` (2,000), `action` (500), `feedback` (500), or
+  an unknown model or device. A closed browser connection aborts the model calls; a variant that
+  already finished is still cached.
 - `GET /api/map?app=…`: `{root, entries: CacheEntry[], links: Link[]}` for one mockup, oldest first.
-- `POST /api/choose {key, index}`: set the version revisits show; 404 if either is unknown.
+- `POST /api/choose {key, index}`: set the picked variant; 404 if either is unknown.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
   `pico.css` followed by `mockup.css`.
@@ -47,12 +53,13 @@ can spend model credits.
 ## Frame messages
 
 The script we add to every screen talks to the app with `postMessage`; the app accepts a message
-only from a card's own frame, and `action` only from the current card.
+only from a variant's own frame.
 
 ```ts
 { uxwoz: 'action', prompt, label }   // a click on a control with an action prompt
-{ uxwoz: 'size', height }            // the screen's height, so the card fits it (160-8000 px)
-{ uxwoz: 'wheel', dx, dy, zoom, x, y } // scroll or pinch over the screen, applied to the canvas
+{ uxwoz: 'size', height }            // the screen's height, so the frame fits it (160-8000 px)
+{ uxwoz: 'wheel', dx, dy }          // scroll over the screen: dy scrolls the page, dx the row;
+                                     // Ctrl/Cmd + scroll stays in the browser, to zoom
 ```
 
 ## Types
@@ -60,9 +67,11 @@ only from a card's own frame, and `action` only from the current card.
 ```ts
 CacheEntry { key; app; action: string | null; chosen: number; candidates: Candidate[] }
 Candidate  { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
-             costEstimated; firstChunkMs; totalMs; finishReason }
+             costEstimated; firstChunkMs; totalMs; finishReason; device?: Device; feedback? }
+             // one variant; entry.chosen is the picked one
 Link       { from: key; to: key; label; createdAt }  // first click between two screens wins
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast'
+Device     'phone' (390 px wide) | 'desktop' (1280 px)
 key        normalize(app) or normalize(app) + ' » ' + normalize(action); normalize turns » into >; action
            "home" or the product prompt itself means the first screen (action null)
 ```

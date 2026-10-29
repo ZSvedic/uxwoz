@@ -38,7 +38,7 @@ test('the frame script reports the clicked control by its own words', () => {
   expect(labelOf(el)).toBe('View past orders')
 })
 
-test('vh units become pixels of a fixed window, so a card cannot grow without end', () => {
+test('vh units become pixels of a fixed window, so a frame cannot grow without end', () => {
   const script = framePage('', '', true).match(/<script>([\s\S]*?)<\/script>/)![1]!
   const helper = script.match(/const vhToPx = (\(css\) => [^\n]*)/)![1]!
   const vhToPx = new Function(`return ${helper}`)() as (css: string) => string

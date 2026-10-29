@@ -31,19 +31,20 @@ When you answer the user in chat (status updates, failure reports, "why did X ha
 ## Code map
 
 ```
-src/packages/core/src/       engine; frame.ts and layout.ts also run in the browser
+src/packages/core/src/       engine; frame.ts and keys.ts also run in the browser
   models.ts      the 3 models, call settings, prices
-  prompt.ts      system prompt + user message (copy of spec/prompt-screen.md; a test keeps them equal)
+  prompt.ts      system prompt + user message: device, feedback, ask for a different 2nd variant
+                 (system prompt is a copy of spec/prompt-screen.md; a test keeps them equal)
   providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol)
   generate.ts    one screen: stream, 20 s deadline, cost, refuse cut-off replies
-  cache.ts       screen cache: keys, versions, links between screens, JSON file
-  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix)
-  layout.ts      card positions on the canvas
+  keys.ts        cache keys: normalize a prompt, "home" means the first screen
+  cache.ts       screen cache: variants (candidates) and the pick, links between screens, JSON file
+  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices
 src/packages/web/src/
-  server.ts      Bun.serve: /api/config, /api/screen (NDJSON), /api/map, /api/choose, /api/warmup, themes
-  app.ts         browser: prompt box, open() a screen, streaming, versions, pickers, metrics
-  canvas.ts      browser: cards, arrows, pan/zoom, focus, Fit all
-  index.html, shell.css   the page around the canvas
+  server.ts      Bun.serve: /api/config, /api/screen (NDJSON, two variants at once), /api/map, /api/choose, /api/warmup, themes
+  app.ts         browser: prompt box, rows of the flow, load() a row, streaming, picking, pickers, metrics
+  feed.ts        browser: rows of variants, frames, heights, zoom for wide screens, Neither tile
+  index.html, shell.css   the page around the feed
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
 ```

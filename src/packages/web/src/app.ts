@@ -1,9 +1,10 @@
-// The browser side: prompt box, canvas of screens, streaming renderer, click-to-navigate,
-// versions, pickers, metrics.
+// The browser side: prompt box, the feed of screens (one row per step, variants side by side),
+// streaming two variants at once, click-to-navigate, picking, pickers, metrics.
 
-import { REBUILD_MS, extractFragment, hasVisibleText } from '@uxwoz/core/frame'
-import type { CacheEntry, Candidate, Link } from '@uxwoz/core'
-import { Canvas, type CanvasScreen } from './canvas.ts'
+import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
+import { normalizePrompt, screenKey } from '@uxwoz/core/keys'
+import type { CacheEntry, Candidate } from '@uxwoz/core'
+import { Feed, type FeedRow, type FeedVariant } from './feed.ts'
 import type { ScreenEvent } from './server.ts'
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -11,27 +12,28 @@ const promptForm = $<HTMLFormElement>('promptForm')
 const promptInput = $<HTMLInputElement>('prompt')
 const modelSelect = $<HTMLSelectElement>('model')
 const themeSelect = $<HTMLSelectElement>('theme')
-const stage = $('stage')
+const deviceSelect = $<HTMLSelectElement>('device')
 const metrics = $('metrics')
 const errorBox = $('error')
 
-interface Nav { app: string; action: string | null }
-interface MapData { root: string; entries: CacheEntry[]; links: Link[] }
+/** One step of the flow: a screen and its variants. */
+interface Row {
+  key: string
+  action: string | null
+  /** The control clicked in the row above to get here; null for the first row. */
+  via: string | null
+  /** Null until the screen arrives the first time. */
+  entry: CacheEntry | null
+  /** The variants streaming into this row now, one renderer each. */
+  streaming: StreamRenderer[]
+}
 
 const state = {
-  nav: null as Nav | null,
-  history: [] as Nav[],
-  /** Every screen of this mockup and the clicks between them, as drawn on the canvas. */
-  map: null as MapData | null,
-  /** The current screen's key, and the one streaming now (a new screen, or a new version). */
-  key: null as string | null,
-  streaming: null as string | null,
-  /** While a new screen streams, the click that led to it, drawn as a provisional arrow. */
-  pendingLink: null as Link | null,
-  entry: null as CacheEntry | null,
-  /** The candidate on screen; may differ from entry.chosen while comparing versions. */
-  index: 0,
+  app: null as string | null,
+  rows: [] as Row[],
   busy: null as AbortController | null,
+  /** Counts prompts started, so a slower earlier start gives way to a newer one. */
+  starts: 0,
   spent: 0,
   css: {} as Record<string, string>,
 }
@@ -41,42 +43,61 @@ const store = {
   set: (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* private mode */ } },
 }
 
+const feed = new Feed($('stage'), {
+  pick: (rowKey, id) => { const r = rowOf(rowKey); if (r) choose(r, indexOf(id)) },
+  regenerate: (rowKey, feedback) => { const r = rowOf(rowKey); if (r && !state.busy) load(r, { regenerate: true, feedback }) },
+  action: onAction,
+})
+
+const rowOf = (key: string) => state.rows.find((r) => r.key === key)
+/** The candidate index in a variant id `key#3`; NaN for a variant still streaming (`key#s0`). */
+const indexOf = (id: string) => Number(id.slice(id.lastIndexOf('#') + 1))
+const streamId = (key: string, slot: number) => `${key}#s${slot}`
+const candidateId = (key: string, index: number) => `${key}#${index}`
+
 // ---- Rendering --------------------------------------------------------------------------------
 
-let canvas: Canvas | null = null
-
-function getCanvas(): Canvas {
-  canvas ??= new Canvas(stage, (key) => pick(key))
-  return canvas
+/** A row's title: the picked screen's first heading, else its prompt. */
+function titleOf(r: Row): string {
+  const html = r.entry?.candidates[r.entry.chosen]?.html
+  const h = html?.match(/<h[12][^>]*>([\s\S]*?)<\/h[12]>/i)?.[1]
+  // Parsed, not just stripped of tags, so entities like &amp; read as text.
+  const text = h && new DOMParser().parseFromString(h, 'text/html').body.textContent?.trim()
+  return (text || r.action || state.app || '').slice(0, 80)
 }
 
-/** A card's title: the screen's first heading, else its prompt. */
-function titleOf(e: CacheEntry, html: string | null): string {
-  const h = html?.match(/<h[12][^>]*>([\s\S]*?)<\/h[12]>/i)?.[1]?.replace(/<[^>]*>/g, '').trim()
-  return (h || e.action || e.app).slice(0, 80)
+const widthOf = (c: Candidate) => (c.device ? DEVICES[c.device].width : LEGACY_WIDTH)
+
+function feedRow(r: Row): FeedRow {
+  const cands = r.entry?.candidates ?? []
+  const variants: FeedVariant[] = cands.map((c, i) => ({
+    id: candidateId(r.key, i),
+    width: widthOf(c),
+    caption: `Variant ${i + 1} · ${modelLabel(c.model)} · ${fmtCost(c)}`,
+    tooltip: c.feedback ? `Asked for: ${c.feedback}` : '',
+    chosen: r.entry!.chosen === i,
+    streaming: false,
+  }))
+  const device = deviceSelect.value as Device
+  r.streaming.forEach((_, slot) => variants.push({
+    id: streamId(r.key, slot),
+    width: DEVICES[device]?.width ?? LEGACY_WIDTH,
+    caption: `Variant ${cands.length + slot + 1} · making…`,
+    tooltip: '',
+    chosen: false,
+    streaming: true,
+  }))
+  const note = r.streaming.length ? `making ${r.streaming.length} variants…` : `${cands.length} variant${cands.length === 1 ? '' : 's'}`
+  return { key: r.key, title: r.entry ? titleOf(r) : 'Making this screen…', via: r.via, note, variants }
 }
 
-/** Redraw the canvas from state. The streaming card's frame is left to the stream. */
-async function redraw() {
-  const m = state.map
-  if (!m) return
-  const css = await themeCss(themeSelect.value)
-  const screens: CanvasScreen[] = m.entries.map((e) => {
-    const c = e.candidates[e.key === state.key ? state.index : e.chosen]
-    const n = e.candidates.length
-    const html = e.key === state.streaming ? null : c?.html ?? null
-    return {
-      key: e.key,
-      title: titleOf(e, c?.html ?? null) + (n > 1 ? `  (v${(e.key === state.key ? state.index : e.chosen) + 1}/${n})` : ''),
-      tooltip: e.action ?? e.app,
-      html,
-    }
-  })
-  // A screen still streaming for the first time has no entry yet: show its card already.
-  if (state.streaming && !m.entries.some((e) => e.key === state.streaming))
-    screens.push({ key: state.streaming, title: 'Making this screen…', tooltip: state.nav?.action ?? '', html: null })
-  const links = state.pendingLink ? [...m.links, state.pendingLink] : m.links
-  getCanvas().update(screens, links, css, state.key)
+/** Draw every row and put each stored variant in its frame. Streaming frames are left to their streams. */
+async function draw() {
+  feed.render(state.rows.map(feedRow), !!state.busy)
+  const theme = themeSelect.value
+  const css = await themeCss(theme)
+  if (theme !== themeSelect.value) return // a newer draw shows the newer theme
+  for (const r of state.rows) r.entry?.candidates.forEach((c, i) => feed.show(candidateId(r.key, i), c.html, true, css))
 }
 
 async function fetchText(url: string): Promise<string> {
@@ -94,32 +115,18 @@ async function themeCss(theme: string): Promise<string> {
   return state.css[theme]!
 }
 
-/** Rebuilds the frame at most every REBUILD_MS while streaming, then once more when final. */
+/** Rebuilds one variant's frame at most every REBUILD_MS while it streams. */
 class StreamRenderer {
   private raw = ''
   private shown: string | null = null
   private lastBuild = 0
   private timer: ReturnType<typeof setTimeout> | null = null
   private visible = false
-  /** The card being streamed into; set when the server names the screen. */
-  key: string | null = null
-  constructor(private css: string, private onVisible: () => void) {}
+  constructor(private id: string, private css: string, private onVisible: () => void) {}
 
   push(text: string) {
     this.raw += text
     this.build(false)
-  }
-
-  /** Show the final screen in the theme picked now; `onLoaded` runs once the frame has loaded it. */
-  finish(key: string, html: string, css: string, onLoaded: () => void) {
-    this.cancel()
-    getCanvas().show(key, html, true, css, () => { this.notify(); onLoaded() })
-  }
-
-  private notify() {
-    if (this.visible) return
-    this.visible = true
-    this.onVisible()
   }
 
   cancel() {
@@ -134,20 +141,20 @@ class StreamRenderer {
       return
     }
     const fragment = extractFragment(this.raw)
-    if (!this.key || fragment === this.shown || !hasVisibleText(fragment)) return
+    if (fragment === this.shown || !hasVisibleText(fragment)) return
     this.lastBuild = now
     this.shown = fragment
-    getCanvas().show(this.key, fragment, false, this.css, this.visible ? undefined : () => this.notify())
+    feed.show(this.id, fragment, false, this.css, this.visible ? undefined : () => { this.visible = true; this.onVisible() })
   }
 }
 
 // ---- Screens ----------------------------------------------------------------------------------
 
 const fmtS = (ms: number) => `${(ms / 1000).toFixed(ms < 1000 ? 2 : 1)} s`
+const fmtUsd = (v: number) => `$${v < 0.01 ? v.toFixed(4) : v.toFixed(3)}`
 function fmtCost(c: Candidate) {
   if (c.costUsd == null) return 'cost unknown'
-  const v = c.costUsd < 0.01 ? c.costUsd.toFixed(4) : c.costUsd.toFixed(3)
-  return `${c.costEstimated ? '~' : ''}$${v}${c.costEstimated ? ' (est.)' : ''}`
+  return `${c.costEstimated ? '~' : ''}${fmtUsd(c.costUsd)}${c.costEstimated ? ' (est.)' : ''}`
 }
 const modelLabel = (id: string) => [...modelSelect.options].find((o) => o.value === id)?.text ?? id
 
@@ -158,23 +165,6 @@ function showError(msg: string | null) {
 
 function setMetrics(html: string) {
   metrics.innerHTML = html
-}
-
-function updateToolbar() {
-  const e = state.entry
-  $('toolbar').hidden = !state.nav
-  $<HTMLButtonElement>('back').disabled = state.history.length === 0 || !!state.busy
-  $<HTMLButtonElement>('home').disabled = !state.nav?.action || !!state.busy
-  $<HTMLButtonElement>('regen').disabled = !!state.busy || !e
-  $('where').textContent = state.nav ? (state.nav.action ?? state.nav.app) : ''
-  $('where').title = $('where').textContent ?? ''
-  const n = e?.candidates.length ?? 0
-  $('versions').hidden = n < 2
-  $<HTMLButtonElement>('prev').disabled = !!state.busy || state.index <= 0
-  $<HTMLButtonElement>('next').disabled = !!state.busy || state.index >= n - 1
-  const isChosen = e ? state.index === e.chosen : true
-  $('versionLabel').textContent = `Version ${state.index + 1} of ${n}${isChosen ? ' (shown on revisit)' : ''}`
-  $('choose').hidden = isChosen || !!state.busy
 }
 
 async function* readEvents(res: Response): AsyncGenerator<ScreenEvent> {
@@ -195,135 +185,172 @@ async function* readEvents(res: Response): AsyncGenerator<ScreenEvent> {
   }
 }
 
-/** Open a screen: from the cache when it is there, else streamed from the model. */
-async function open(nav: Nav, { push = true, regenerate = false, label = null as string | null } = {}) {
+/**
+ * Fill a row: from the cache when its screen is there, else two variants streamed side by side.
+ * With `regenerate`, two more variants join the row, shaped by the user's feedback if any.
+ */
+async function load(row: Row, { regenerate = false, feedback = '', from = null as Row | null } = {}) {
   state.busy?.abort()
   const ctrl = new AbortController()
   state.busy = ctrl
+  const app = state.app!
   const t0 = performance.now()
-  // What to go back to if this screen fails.
-  const before = { nav: state.nav, key: state.key, entry: state.entry, index: state.index, historyLength: state.history.length }
-  // A click inside a screen (label set) draws an arrow from that screen.
-  const from = label != null ? state.key : null
-  if (push && state.nav && !regenerate) state.history.push(state.nav)
-  state.nav = nav
-  showError(null)
-  updateToolbar()
   const model = modelSelect.value
   let firstVisible: number | null = null
   let cached = false
-  let renderer: StreamRenderer | null = null
-  setMetrics(regenerate ? `Making a new version with ${modelLabel(model)}…` : 'Asking for the screen…')
+  showError(null)
+  setMetrics(regenerate ? `Making 2 more variants with ${modelLabel(model)}…` : 'Asking for the screen…')
+  draw()
   try {
     const css = await themeCss(themeSelect.value)
-    renderer = new StreamRenderer(css, () => {
-      firstVisible ??= performance.now() - t0
-      if (!cached && state.busy === ctrl) setMetrics(`First visible screen <b>${fmtS(firstVisible)}</b> · streaming from ${modelLabel(model)}…`)
-    })
     const res = await fetch('/api/screen', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...nav, model, regenerate, from, label }),
+      body: JSON.stringify({
+        app, action: row.action, model, device: deviceSelect.value, regenerate, feedback,
+        from: from?.key ?? null, label: from ? row.via : null,
+      }),
       signal: ctrl.signal,
     })
+    let finished = false
     for await (const ev of readEvents(res)) {
       if (ev.type === 'meta') {
         cached = ev.cached
-        renderer.key = ev.key
+        row.key = ev.key // the server's key is the truth (it was computed the same way)
+        row.streaming = Array.from({ length: ev.variants }, (_, slot) => new StreamRenderer(streamId(row.key, slot), css, () => {
+          firstVisible ??= performance.now() - t0
+          setMetrics(`First visible screen <b>${fmtS(firstVisible)}</b> · streaming ${ev.variants} variants from ${modelLabel(model)}…`)
+        }))
         if (!cached) {
-          // Show the new card (or the new version) at once, and stream into it.
-          state.streaming = ev.key
-          state.pendingLink = from && from !== ev.key && !state.map?.entries.some((e) => e.key === ev.key)
-            ? { from, to: ev.key, label: label || '…', createdAt: new Date().toISOString() }
-            : null
-          state.key = ev.key
-          await redraw()
-          getCanvas().focus()
+          await draw()
+          if (regenerate) feed.scrollToVariant(streamId(row.key, 0))
+          else feed.scrollToRow(row.key)
         }
-      } else if (ev.type === 'chunk') renderer.push(ev.text)
+      } else if (ev.type === 'chunk') row.streaming[ev.variant]?.push(ev.text)
       else if (ev.type === 'error') throw new Error(ev.message)
       else if (ev.type === 'done') {
-        state.entry = ev.entry
-        state.nav = { app: nav.app, action: ev.entry.action } // "home" arrives as the first screen
-        state.index = ev.index
-        state.key = ev.entry.key
-        state.streaming = null
-        state.pendingLink = null
-        upsert(ev.entry, ev.link)
-        const c = ev.entry.candidates[ev.index]!
-        if (!cached) state.spent += c.costUsd ?? 0
-        renderer.finish(ev.entry.key, c.html, await themeCss(themeSelect.value), () => {
-          if (state.busy && state.busy !== ctrl) return // a newer screen is on its way
+        finished = true
+        for (const s of row.streaming) s.cancel()
+        row.streaming = []
+        row.entry = ev.entry
+        const added = ev.variants.filter((i): i is number => i != null)
+        ev.variants.forEach((i, slot) => { if (i != null) feed.rename(streamId(row.key, slot), candidateId(row.key, i)) })
+        const cost = added.reduce((s, i) => s + (ev.entry.candidates[i]!.costUsd ?? 0), 0)
+        state.spent += cost
+        savePath(app)
+        if (regenerate && added.length) feed.clearFeedback(row.key)
+        if (ev.failed.length) showError(`${ev.failed.length} of ${ev.variants.length} variants failed: ${ev.failed[0]}`)
+        // The metrics line is final once every new variant has loaded with its script.
+        let waiting = added.length
+        const css = await themeCss(themeSelect.value)
+        for (const i of added) feed.show(candidateId(row.key, i), ev.entry.candidates[i]!.html, true, css, () => {
+          if (--waiting > 0) return
           const total = performance.now() - t0
-          if (cached) {
-            setMetrics(`<b>Cached</b> · shown in <b>${fmtS(total)}</b> · $0 now (made by ${modelLabel(c.model)} for ${fmtCost(c)})`)
-            return
-          }
-          setMetrics(`First visible screen <b>${fmtS(firstVisible ?? total)}</b> · interactive <b>${fmtS(total)}</b>`
-            + ` · <b>${fmtCost(c)}</b> · ${modelLabel(c.model)} · this session $${state.spent.toFixed(4)}`)
+          const est = added.some((i) => ev.entry.candidates[i]!.costEstimated)
+          setMetrics(`First visible screen <b>${fmtS(firstVisible ?? total)}</b> · ${added.length === 1 ? 'interactive' : 'all variants interactive'} <b>${fmtS(total)}</b>`
+            + ` · <b>${est ? '~' : ''}${fmtUsd(cost)}${est ? ' (est.)' : ''}</b> for ${added.length} · ${modelLabel(model)} · this session $${state.spent.toFixed(4)}`)
         })
-        await redraw()
-        getCanvas().focus()
+        await draw()
+        if (cached) {
+          const c = ev.entry.candidates[ev.entry.chosen]!
+          setMetrics(`<b>Cached</b> · shown in <b>${fmtS(performance.now() - t0)}</b> · $0 now (made by ${modelLabel(c.model)} for ${fmtCost(c)})`)
+          if (from) feed.scrollToRow(row.key)
+        }
       }
     }
+    if (!finished && !ctrl.signal.aborted) throw new Error('the stream ended early')
   } catch (err) {
-    renderer?.cancel()
-    if (ctrl.signal.aborted) return
-    showError(`Could not make this screen: ${err instanceof Error ? err.message : err}`)
-    setMetrics('')
-    // Put the previous screen back, working, so the toolbar and the frame agree again.
-    state.nav = before.nav
-    state.key = before.key
-    state.entry = before.entry
-    state.index = before.index
-    state.history.length = before.historyLength
-    state.streaming = null
-    state.pendingLink = null
-    // Redrawing drops a half-built new card and puts a regenerated card's old version back.
-    const c = state.entry?.candidates[state.index]
-    if (c && state.key) themeCss(themeSelect.value).then((css) => getCanvas().show(state.key!, c.html, true, css)).catch(() => {})
-    redraw().then(() => getCanvas().focus()).catch(() => {})
+    if (!ctrl.signal.aborted) {
+      showError(`Could not make this screen: ${err instanceof Error ? err.message : err}`)
+      setMetrics('')
+    }
+    for (const s of row.streaming) s.cancel()
+    row.streaming = []
+    // A new row whose screen never arrived goes away; a regenerated row keeps the variants it had.
+    // After an abort the rows may already belong to another prompt, so they are left alone.
+    if (!row.entry && !ctrl.signal.aborted) { state.rows = state.rows.filter((r) => r !== row); savePath(app) }
   } finally {
     if (state.busy === ctrl) state.busy = null
-    updateToolbar()
+    draw().catch((e) => showError(String(e)))
   }
 }
 
-/** Put a screen and the click that reached it into the local map. */
-function upsert(entry: CacheEntry, link: Link | null) {
-  const m = state.map
-  if (!m) return
-  const i = m.entries.findIndex((e) => e.key === entry.key)
-  if (i >= 0) m.entries[i] = entry
-  else m.entries.push(entry)
-  if (link && !m.links.some((l) => l.from === link.from && l.to === link.to)) m.links.push(link)
+/** A click inside a variant picks it and opens the next row; a link to a screen already in the flow scrolls to it. */
+function onAction(rowKey: string, id: string, prompt: string, label: string) {
+  const app = state.app
+  const r = state.rows.findIndex((x) => x.key === rowKey)
+  const index = indexOf(id)
+  if (!app || r < 0 || !Number.isInteger(index)) return
+  const row = state.rows[r]!
+  const key = screenKey(app, prompt)
+  const known = !!rowOf(key)
+  if (state.busy && !known) return
+  if (row.entry && row.entry.chosen !== index) choose(row, index)
+  if (known) { feed.scrollToRow(key); return }
+  // A new screen from an earlier row replaces the rows below it.
+  const next: Row = { key, action: prompt, via: label, entry: null, streaming: [] }
+  state.rows = [...state.rows.slice(0, r + 1), next]
+  savePath(app)
+  load(next, { from: row })
 }
 
-/** Clicking a preview card on the canvas opens that screen (from the cache). */
-function pick(key: string) {
-  const e = state.map?.entries.find((x) => x.key === key)
-  if (!e || state.busy || key === state.key) return
-  open({ app: e.app, action: e.action })
+/** Make a variant the one revisits show. */
+async function choose(row: Row, index: number) {
+  const entry = row.entry
+  if (!entry || !Number.isInteger(index) || entry.chosen === index) return
+  const before = entry.chosen
+  entry.chosen = index // at once, so the row shows it; undone below if the server says no
+  draw()
+  const res = await fetch('/api/choose', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: entry.key, index }),
+  }).catch(() => null)
+  if (!res?.ok) {
+    if (entry.chosen === index) entry.chosen = before
+    showError('Could not save the pick')
+  }
+  draw()
 }
 
-/** Load a mockup's existing screens, so typing a known prompt shows everything made so far. */
-async function loadMap(app: string) {
+// ---- The flow, remembered per mockup in this browser --------------------------------------------
+
+const pathKey = (app: string) => `uxwoz:path:${normalizePrompt(app)}`
+interface SavedRow { key: string; action: string | null; via: string | null }
+
+/** Save the rows shown now, if they still belong to `app` (a newer prompt may have replaced them). */
+function savePath(app: string) {
+  if (state.app !== app) return
+  const rows: SavedRow[] = state.rows.filter((r) => r.entry).map(({ key, action, via }) => ({ key, action, via }))
+  store.set(pathKey(app), JSON.stringify(rows))
+}
+
+/** Start a mockup: the rows saved for it last time (those still in the cache), else its first screen. */
+async function start(app: string) {
+  state.busy?.abort()
+  state.busy = null
+  state.app = app
+  const n = ++state.starts
+  showError(null)
   const res = await fetch(`/api/map?app=${encodeURIComponent(app)}`)
-  if (!res.ok) throw new Error(`could not load the map: HTTP ${res.status}`)
-  state.map = await res.json()
-  state.map!.entries.sort((a, b) => Number(b.key === state.map!.root) - Number(a.key === state.map!.root))
-}
-
-function showVersion(i: number) {
-  const e = state.entry
-  if (!e || i < 0 || i >= e.candidates.length) return
-  state.index = i
-  const c = e.candidates[i]!
-  themeCss(themeSelect.value)
-    .then((css) => { getCanvas().show(e.key, c.html, true, css); return redraw() })
-    .catch((err) => showError(String(err)))
-  setMetrics(`Version ${i + 1} · made by ${modelLabel(c.model)} in ${fmtS(c.totalMs)} for ${fmtCost(c)}`)
-  updateToolbar()
+  if (!res.ok) throw new Error(`could not load the mockup: HTTP ${res.status}`)
+  const entries = new Map((await res.json() as { entries: CacheEntry[] }).entries.map((e) => [e.key, e]))
+  if (n !== state.starts) return // a newer prompt was submitted meanwhile
+  let saved: SavedRow[] = []
+  try { saved = JSON.parse(store.get(pathKey(app)) ?? '[]') } catch { /* start fresh */ }
+  const root = screenKey(app, null)
+  const rows: Row[] = []
+  for (const s of saved) {
+    const entry = entries.get(s.key)
+    if (!entry || (rows.length === 0 && s.key !== root)) break
+    rows.push({ ...s, entry, streaming: [] })
+  }
+  state.rows = rows.length ? rows : [{ key: root, action: null, via: null, entry: null, streaming: [] }]
+  const first = state.rows[0]!
+  if (first.entry) {
+    await draw()
+    feed.scrollToRow(first.key, false)
+    setMetrics(`<b>Cached</b> · ${state.rows.length} screen${state.rows.length === 1 ? '' : 's'} in this flow · $0 now`)
+  } else await load(first)
 }
 
 // ---- Wiring -----------------------------------------------------------------------------------
@@ -331,13 +358,7 @@ function showVersion(i: number) {
 promptForm.addEventListener('submit', (e) => {
   e.preventDefault()
   const app = promptInput.value.trim()
-  if (!app) return
-  state.history = []
-  state.entry = null
-  state.key = null
-  loadMap(app)
-    .then(() => open({ app, action: null }, { push: false }))
-    .catch((err) => showError(String(err)))
+  if (app) start(app).catch((err) => showError(String(err)))
 })
 
 // An example with a long prompt shows a short name and keeps the full prompt in data-prompt.
@@ -345,52 +366,18 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('.example')) {
   b.addEventListener('click', () => { promptInput.value = b.dataset.prompt ?? b.textContent ?? ''; promptForm.requestSubmit() })
 }
 
-// Clicks inside the screen arrive as postMessage from our bootstrap script in the frame.
-// Only the current screen's card is live, so only its messages count.
-addEventListener('message', (e) => {
-  if (!canvas || e.source !== canvas.frameWindow(state.key)) return
-  const d = e.data
-  if (d?.uxwoz !== 'action' || typeof d.prompt !== 'string' || !state.nav || state.busy) return
-  open({ app: state.nav.app, action: d.prompt.slice(0, 500) }, { label: typeof d.label === 'string' ? d.label.slice(0, 80) : '' })
-})
-
-$('back').addEventListener('click', () => {
-  const prev = state.history.pop()
-  if (prev) open(prev, { push: false })
-})
-$('home').addEventListener('click', () => {
-  if (state.nav) open({ app: state.nav.app, action: null })
-})
-$('regen').addEventListener('click', () => { if (state.nav) open(state.nav, { push: false, regenerate: true }) })
-$('fit').addEventListener('click', () => canvas?.fitAll())
-$('focus').addEventListener('click', () => canvas?.focus())
-$('prev').addEventListener('click', () => showVersion(state.index - 1))
-$('next').addEventListener('click', () => showVersion(state.index + 1))
-$('choose').addEventListener('click', async () => {
-  const e = state.entry
-  if (!e) return
-  const res = await fetch('/api/choose', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key: e.key, index: state.index }),
-  })
-  if (res.ok) {
-    state.entry = (await res.json()).entry
-    upsert(state.entry!, null)
-    redraw()
-  } else showError('Could not save the version choice')
-  updateToolbar()
-})
-
 // While a screen streams, the new theme applies when it finishes.
 themeSelect.addEventListener('change', async () => {
   store.set('uxwoz:theme', themeSelect.value)
   try {
     await themeCss(themeSelect.value)
-    if (!state.busy) await redraw()
+    await draw()
   } catch (e) {
     showError(`Could not load the theme: ${e instanceof Error ? e.message : e}`)
   }
 })
+
+deviceSelect.addEventListener('change', () => store.set('uxwoz:device', deviceSelect.value))
 
 const warmUp = (model: string) =>
   fetch('/api/warmup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model }) }).catch(() => {})
@@ -404,13 +391,15 @@ async function init() {
   const cfg = await (await fetch('/api/config')).json()
   for (const m of cfg.models) modelSelect.add(new Option(m.label + (m.costEstimated ? ' (cost est.)' : ''), m.id))
   for (const t of cfg.themes) themeSelect.add(new Option(t.label, t.id))
+  for (const d of cfg.devices) deviceSelect.add(new Option(d.label, d.id))
   const savedModel = store.get('uxwoz:model')
   modelSelect.value = cfg.models.some((m: { id: string }) => m.id === savedModel) ? savedModel! : cfg.defaultModel
   const savedTheme = store.get('uxwoz:theme')
   themeSelect.value = cfg.themes.some((t: { id: string }) => t.id === savedTheme) ? savedTheme! : cfg.defaultTheme
+  const savedDevice = store.get('uxwoz:device')
+  deviceSelect.value = isDevice(savedDevice) ? savedDevice : cfg.defaultDevice
   warmUp(modelSelect.value)
   await themeCss(themeSelect.value)
-  updateToolbar()
 }
 
 init().catch((e) => showError(`Could not load the app config: ${e.message}`))

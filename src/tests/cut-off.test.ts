@@ -1,6 +1,6 @@
 // A stream that stops early must fail and never reach the cache (no cassette: a fake provider).
 import { expect, test } from 'bun:test'
-import { ScreenCache, generateScreen, screenKey, type Fetch } from '@uxwoz/core'
+import { ALTERNATIVE_REQUEST, ScreenCache, generateScreen, screenKey, type Fetch } from '@uxwoz/core'
 import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
 
 const sse = (...events: object[]) => events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('')
@@ -33,6 +33,27 @@ test('the server reports a cut-off screen and caches nothing', async () => {
     const evs: ScreenEvent[] = (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
     expect(evs.at(-1)?.type).toBe('error')
     expect(cache.get(screenKey('Shop', null))).toBeUndefined()
+  } finally {
+    server.stop(true)
+  }
+})
+
+test('when one of the two variants fails, the other is still cached and shown', async () => {
+  const whole = sse({ model: 'anthropic/claude-haiku-5.5', choices: [{ delta: { content: '<h1>Whole</h1>' }, finish_reason: 'stop' }], usage: { cost: 0.001 } })
+  // The second variant (asked for a different design) stops early; the first finishes.
+  const fetch: Fetch = async (_url, init) => new Response(String(init?.body).includes(ALTERNATIVE_REQUEST) ? halfScreen : whole)
+  const cache = new ScreenCache()
+  const server = createServer({ port: 0, cache, fetch, env, log: () => {} })
+  try {
+    const res = await globalThis.fetch(new URL('/api/screen', server.url), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app: 'Shop' }),
+    })
+    const evs: ScreenEvent[] = (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
+    const done = evs.at(-1) as Extract<ScreenEvent, { type: 'done' }>
+    expect(done.type).toBe('done')
+    expect(done.variants).toEqual([0, null])
+    expect(done.failed[0]).toContain('ended before the screen was complete')
+    expect(cache.get(screenKey('Shop', null))?.candidates.map((c) => c.html)).toEqual(['<h1>Whole</h1>'])
   } finally {
     server.stop(true)
   }
