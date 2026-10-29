@@ -33,17 +33,18 @@ When you answer the user in chat (status updates, failure reports, "why did X ha
 ```
 src/packages/core/src/       engine; frame.ts and keys.ts also run in the browser
   models.ts      the 3 models, call settings, prices
-  prompt.ts      system prompt + user message: device, feedback, ask for a different 2nd variant
+  prompt.ts      system prompt + user message: device, ask for a different 2nd variant
                  (system prompt is a copy of spec/prompt-screen.md; a test keeps them equal)
   providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol)
   generate.ts    one screen: stream, 20 s deadline, cost, refuse cut-off replies
-  keys.ts        cache keys: normalize a prompt, "home" means the first screen
-  cache.ts       screen cache: variants (candidates) and the pick, links between screens, JSON file
+  keys.ts        cache keys: normalize a prompt, "home" means the first screen; variant names (L2-B)
+  cache.ts       screen cache: variants (candidates) and the pick, levels, letters, parents, links, delete, JSON file
   frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices
 src/packages/web/src/
-  server.ts      Bun.serve: /api/config, /api/screen (NDJSON, two variants at once), /api/map, /api/apps, /api/link, /api/choose, /api/warmup, themes
-  app.ts         browser: prompt box, History, rows of the flow, load() a row, streaming, picking, pickers, metrics
-  feed.ts        browser: rows of variants, frames, heights, lineage lines, Neither tile
+  server.ts      Bun.serve: /api/config, /api/screen (NDJSON, two variants at once), /api/map, /api/apps, /api/link, /api/choose, /api/delete, /api/delete-app, /api/warmup, themes
+  app.ts         browser: prompt box, History, rows of the flow (they follow the pick), load() a row, streaming, picking, delete, pickers, metrics
+  feed.ts        browser: rows of variants, frames, heights, lineage lines, variant tools, zoom
+  tree.ts        browser: the tree of every screen beside the feed
   index.html, shell.css   the page around the feed
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest

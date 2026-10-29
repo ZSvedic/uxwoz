@@ -15,8 +15,13 @@ Open http://127.0.0.1:3000, type a product idea (or pick an example), and click 
 comes in two variants side by side, and a click inside one picks it and adds the next screen below. `PORT=3001 bun run dev`
 picks another port.
 
-Generated screens are cached in `temp/screen-cache.json`. To start fresh, stop the server, move the
-file aside, and start it again: a running server keeps its cache in memory and writes it back.
+Generated screens are cached in `temp/screen-cache.json`. To make a mockup again from scratch,
+open it and click **Start over**; **Delete** removes it. To clear the whole cache, stop the server,
+move the file aside, and start it again: a running server keeps its cache in memory and writes it
+back.
+
+If an edit to `feed.ts` does not show up after a reload, restart `bun run dev`: the live reload
+sometimes keeps an old copy of it.
 
 If the page shows "Failed to load bundled module" after new code arrives, restart `bun run dev`:
 the live reload cannot add a new frontend file.

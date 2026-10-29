@@ -50,7 +50,9 @@ The model never sees the theme, so a theme changes looks and nothing else. A the
 stylesheet loaded instead of, or after, Pico: override the `--pico-*` variables (font, colours,
 radius, borders). A hand-drawn wireframe look needs a handwriting font, thick dark borders and
 irregular corners (`border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px`). Clean keeps the
-model's colours; Mockup turns them grey with a filter on `main`. Re-check BMI screenshots after a theme change: the deterministic tests
+model's colours; Mockup turns them grey with a filter on each topmost part of the screen that holds
+no control opening another screen. Those controls are blue in both themes (our frame CSS), and
+Pico's own blue becomes a neutral ink, so blue always means "opens a screen". Re-check BMI screenshots after a theme change: the deterministic tests
 read text and positions, so a theme that moves elements can change the scale check.
 
 ## Models

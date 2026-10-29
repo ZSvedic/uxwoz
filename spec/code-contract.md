@@ -22,7 +22,7 @@ POST /api/screen  {"app": "A coffee shop ordering app", "action": null, "model":
   frame page and devices. `frame.ts` and `keys.ts` run in the browser too, so they use no Node or
   Bun APIs.
 - `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`,
-  `feed.ts`, bundled by Bun's HTML import), and the themes in `themes/`.
+  `feed.ts`, `tree.ts`, bundled by Bun's HTML import), and the themes in `themes/`.
 
 There are no runtime dependencies; `@types/bun` and `typescript` are dev-only.
 
@@ -34,23 +34,31 @@ can spend model credits.
 
 - `GET /api/config`: models (id, label, costEstimated), themes (`mockup`, `clean`), devices (id,
   label, width), and the default model, theme and device.
-- `POST /api/screen {app, action?, model?, device?, regenerate?, feedback?, from?, label?}`: NDJSON
-  stream of `meta`, `chunk`*, then `done` or `error`. A new screen, or `regenerate`, makes two
-  variants at once: `meta.variants` is 2 and each chunk names its `variant` (0 or 1). `done.variants`
-  maps each variant to its candidate index, or null if it failed (its message in `failed`); `error`
-  comes only when both fail. A cache hit sends `meta` (cached true, variants 0) and `done` only.
-  `feedback` (up to 500 characters) goes to the model and onto the new candidates. With `from` (the
-  key of the screen clicked in) and `label` (the control's text), `done` carries the `Link` it
-  recorded, or null. 400 on an empty or too long `app` (2,000), `action` (500), `feedback` (500), or
-  an unknown model or device. A closed browser connection aborts the model calls; a variant that
+- `POST /api/screen {app, action?, model?, device?, regenerate?, prompt?, from?, variant?, label?}`:
+  NDJSON stream of `meta`, `chunk`*, then `done` or `error`. A new screen makes two variants at
+  once: `meta.variants` is 2 and each chunk names its `variant` (0 or 1). `regenerate` makes one
+  more variant of the screen, cached or not. `prompt` (up to 2,000 characters) is asked for in place
+  of the screen's own action prompt and stored on the new candidates; the key stays the screen's.
+  `done.variants` maps each variant to its candidate index, or null if it failed (its message in
+  `failed`); `error` comes only when all fail. A cache hit sends `meta` (cached true, variants 0)
+  and `done` only. With `from` (the key of the screen clicked in), `variant` (the candidate it was
+  clicked in) and `label` (the control's text), a new screen takes that click as its parent, and
+  `done` carries the `Link` it recorded, or null. 400 on an empty or too long `app` (2,000),
+  `action` (500), `prompt` (2,000), or an unknown model or device. A closed browser connection aborts the model calls; a variant that
   already finished is still cached.
 - `GET /api/map?app=…`: `{root, entries: CacheEntry[], links: Link[]}` for one mockup, oldest first.
-- `POST /api/link {from, to, label}`: record a click from one screen to another one already in the
-  flow (no screen is made); `{link}`, or 404 if a key is unknown or the two belong to different
-  mockups. The first click between two screens keeps its label.
+- `POST /api/link {from, variant, to, label}`: record a click in variant `variant` of one screen to
+  another one already in the flow (no screen is made); `{link}`, or 404 if a key or the variant is
+  unknown or the two belong to different mockups. The first click from a variant to a screen keeps
+  its label.
 - `GET /api/apps`: `{apps: {app, screens, updatedAt}[]}`, every mockup once as first typed,
   most recently changed first. The History list.
-- `POST /api/choose {key, index}`: set the picked variant; 404 if either is unknown.
+- `POST /api/choose {key, index}`: set the picked variant; 404 if either is unknown or deleted.
+- `POST /api/delete {key, index}`: delete a variant; screens the first screen no longer reaches
+  through live variants go too, and a screen still reached by another click takes it as its new
+  parent. `{entry, removed}`: the screen (null once it is gone) and the keys removed; 404 if
+  unknown.
+- `POST /api/delete-app {app}`: delete every screen and link of a mockup; `{removed}`.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
   `pico.css` followed by `mockup.css`.
@@ -65,18 +73,25 @@ only from a variant's own frame.
 { uxwoz: 'touch' }                   // any press in the screen: picks this variant
 { uxwoz: 'size', height, width }     // the screen's size, so the frame fits it (160-8000 px tall;
                                      // the card shows only `width`, at least 280 px)
-{ uxwoz: 'wheel', dx, dy }          // scroll over the screen: dy scrolls the page, dx the row;
-                                     // Ctrl/Cmd + scroll stays in the browser, to zoom
+{ uxwoz: 'wheel', dx, dy }           // scroll over the screen: dy scrolls the page, dx the row
+{ uxwoz: 'zoom', dy, x, y }          // Ctrl/Cmd + scroll or a pinch over the screen, at (x, y) in
+                                     // the frame: zooms the feed around that point
 ```
 
 ## Types
 
 ```ts
-CacheEntry { key; app; action: string | null; chosen: number; candidates: Candidate[] }
+CacheEntry { key; app; action: string | null; chosen: number; candidates: Candidate[];
+             level: number; parent: { key; variant: number; label } | null }
+             // level 1 is the first screen; parent is the click that first made the screen
 Candidate  { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
-             costEstimated; firstChunkMs; totalMs; finishReason; device?: Device; feedback? }
-             // one variant; entry.chosen is the picked one
-Link       { from: key; to: key; label; createdAt }  // first click between two screens wins
+             costEstimated; firstChunkMs; totalMs; finishReason; device?: Device;
+             name?; letter?; prompt?; feedback?; deleted? }
+             // one variant; entry.chosen is the picked one. name comes from the model's <title>,
+             // letter from the cache ("B" in L2-B), prompt from a Change; feedback is from before
+             // Change existed; a deleted one has html ''
+Link       { from: key; variant: number; to: key; label; createdAt }
+             // first click from a variant to a screen wins
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast'
 Device     'phone' (390 px wide) | 'desktop' (1024 px)
 key        normalize(app) or normalize(app) + ' » ' + normalize(action); normalize turns » into >; action
