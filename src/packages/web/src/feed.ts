@@ -24,6 +24,8 @@ const GAP = 16
 const LINE_INSET = 24
 /** The gutter left of the rows that holds the arcs (matches .feed's padding-left). */
 const GUTTER = 32
+/** How far right of a variant's left edge the flow line meets it: picks come first, so the line is straight. */
+const FLOW_X = 48
 /** The radius of a stepped line's corners. */
 const BEND = 8
 const SVG_NS = 'http://www.w3.org/2000/svg'
@@ -52,7 +54,8 @@ export interface FeedRow {
 export interface FeedLink { from: string; to: string; label: string }
 
 export interface FeedHandlers {
-  pick: (rowKey: string, id: string) => void
+  /** `bar` is true for a click on the variant's bar, false for a press inside its screen. */
+  pick: (rowKey: string, id: string, bar: boolean) => void
   regenerate: (rowKey: string, feedback: string) => void
   action: (rowKey: string, id: string, prompt: string, label: string) => void
 }
@@ -74,6 +77,8 @@ interface Frame {
 interface RowEl {
   el: HTMLElement; head: HTMLElement; strip: HTMLElement; neither: HTMLElement
   feedback: HTMLTextAreaElement; more: HTMLButtonElement
+  /** The variant shown first, so a new one there scrolls the row back to its start. */
+  front: string | null
 }
 
 export class Feed {
@@ -104,17 +109,21 @@ export class Feed {
       const row = this.row(r.key)
       placeAt(this.list, row.el, i + 1) // after the lines
       row.head.replaceChildren(el('b', 'row-title', r.title), el('span', 'row-note', r.note))
+      // Variants are placed with CSS order, not moved: moving an iframe reloads it.
       r.variants.forEach((v, j) => {
         const f = this.frame(v.id, r.key)
-        placeAt(row.strip, f.el, j)
+        if (f.el.parentElement !== row.strip) row.strip.insertBefore(f.el, row.neither)
+        f.el.style.order = String(j)
         f.el.classList.toggle('chosen', v.chosen)
         f.el.classList.toggle('streaming', v.streaming)
         f.el.title = v.tooltip
         f.caption.textContent = v.caption
         if (f.width !== v.width) { f.width = v.width; f.frame.style.width = f.screen.style.width = `${v.width}px` }
       })
-      placeAt(row.strip, row.neither, r.variants.length)
+      row.neither.style.order = String(r.variants.length)
       row.more.disabled = busy
+      const front = r.variants[0]?.id ?? null
+      if (front !== row.front) { row.front = front; row.strip.scrollTo({ left: 0 }) }
     })
     this.drawn = { rows, links }
     this.queueLines()
@@ -189,11 +198,11 @@ export class Feed {
     const defs = svgEl('defs', {})
     defs.append(marker)
     const parts: SVGElement[] = [defs]
-    /** Where a line meets a variant: its middle, kept inside the visible part of the row. */
+    /** Where a line meets a variant: near its left edge, kept inside the visible part of the row. */
     const at = (f: Frame, edge: 'top' | 'bottom') => {
       const s = f.el.parentElement!.getBoundingClientRect(), v = f.el.getBoundingClientRect()
       return {
-        x: Math.min(Math.max(v.left + v.width / 2, s.left + LINE_INSET), s.right - LINE_INSET) - base.left,
+        x: Math.min(Math.max(v.left + FLOW_X, s.left + LINE_INSET), s.right - LINE_INSET) - base.left,
         y: v[edge] - base.top,
       }
     }
@@ -247,7 +256,7 @@ export class Feed {
     neither.append(el('b', '', 'Neither?'), el('p', '', 'Click anything in the variant you like to pick it, or ask for two more.'), feedback, more)
     strip.append(neither)
     r.append(head, strip)
-    const row = { el: r, head, strip, neither, feedback, more }
+    const row = { el: r, head, strip, neither, feedback, more, front: null }
     this.rows.set(key, row)
     return row
   }
@@ -269,7 +278,7 @@ export class Feed {
     screen.append(frame)
     v.append(bar, screen)
     const f: Frame = { el: v, caption, screen, frame, rowKey, width: 0, shown: null, onLoad: null, growth: { count: 0, at: 0 }, frozen: false }
-    bar.addEventListener('click', () => this.on.pick(f.rowKey, v.dataset.id!))
+    bar.addEventListener('click', () => this.on.pick(f.rowKey, v.dataset.id!, true))
     frame.addEventListener('load', () => this.loaded(f))
     this.frames.set(id, f)
     return f
@@ -308,7 +317,7 @@ export class Feed {
       f.frame.style.height = `${h}px`
       this.queueLines()
     } else if (d.uxwoz === 'touch') {
-      this.on.pick(f.rowKey, id)
+      this.on.pick(f.rowKey, id, false)
     } else if (d.uxwoz === 'wheel') {
       // The frame never scrolls itself: its gestures scroll the page and the row.
       this.stage.scrollBy(0, Number(d.dy) || 0)

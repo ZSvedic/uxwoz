@@ -25,6 +25,11 @@ interface Row {
   via: string | null
   /** The variant of the row above that the click was made in; null for the first row. */
   parent: number | null
+  /**
+   * The variant shown first: the pick, as it was when the row was last left or opened. Picking by
+   * playing with a variant does not move it, so a screen never jumps away under the pointer.
+   */
+  front?: number
   /** Null until the screen arrives the first time. */
   entry: CacheEntry | null
   /** The variants streaming into this row now, one renderer each. */
@@ -51,7 +56,12 @@ const store = {
 }
 
 const feed = new Feed($('stage'), {
-  pick: (rowKey, id) => { const r = rowOf(rowKey); if (r) choose(r, indexOf(id)) },
+  pick: (rowKey, id, bar) => {
+    const r = rowOf(rowKey)
+    if (!r) return
+    choose(r, indexOf(id))
+    if (bar && Number.isInteger(indexOf(id))) { r.front = indexOf(id); draw() }
+  },
   regenerate: (rowKey, feedback) => { const r = rowOf(rowKey); if (r && !state.busy) load(r, { regenerate: true, feedback }) },
   action: onAction,
 })
@@ -80,6 +90,8 @@ const widthOf = (c: Candidate) => (c.device ? DEVICES[c.device].width : LEGACY_W
 
 function feedRow(r: Row, i: number): FeedRow {
   const e = r.entry
+  const fc = e && r.front != null ? e.candidates[r.front] : undefined
+  if (e && (!fc || fc.deleted)) r.front = e.chosen
   const variants: FeedVariant[] = []
   e?.candidates.forEach((c, j) => {
     if (c.deleted) return
@@ -92,6 +104,8 @@ function feedRow(r: Row, i: number): FeedRow {
       streaming: false,
     })
   })
+  const first = variants.findIndex((v) => v.id === candidateId(r.key, r.front!))
+  if (first > 0) variants.unshift(...variants.splice(first, 1))
   const device = deviceSelect.value as Device
   r.streaming.forEach((_, slot) => variants.push({
     id: streamId(r.key, slot),
@@ -305,6 +319,7 @@ function onAction(rowKey: string, id: string, prompt: string, label: string) {
   const known = !!rowOf(key)
   if (state.busy && !known) return
   if (row.entry && row.entry.chosen !== index) choose(row, index)
+  row.front = index
   if (rowOf(key)) {
     feed.scrollToRow(key)
     recordLink(row.key, index, key, label)
