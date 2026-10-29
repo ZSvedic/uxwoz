@@ -15,6 +15,8 @@ const modelSelect = $<HTMLSelectElement>('model')
 const themeSelect = $<HTMLSelectElement>('theme')
 const deviceSelect = $<HTMLSelectElement>('device')
 const historySelect = $<HTMLSelectElement>('history')
+const startOverButton = $<HTMLButtonElement>('startOver')
+const deleteAppButton = $<HTMLButtonElement>('deleteApp')
 const zoomRange = $<HTMLInputElement>('zoomRange')
 const zoom100 = $<HTMLButtonElement>('zoom100')
 const metrics = $('metrics')
@@ -162,6 +164,7 @@ function feedRow(r: Row, i: number): FeedRow {
 /** Draw every row and put each stored variant in its frame. Streaming frames are left to their streams. */
 async function draw() {
   feed.render(state.rows.map(feedRow), !!state.busy, state.links.map(({ from, to, label }): FeedLink => ({ from, to, label })))
+  startOverButton.hidden = deleteAppButton.hidden = !state.app
   tree.render(state.app ? {
     root: screenKey(state.app, null),
     entries: state.entries,
@@ -538,7 +541,33 @@ async function start(app: string) {
   } else await load(first)
 }
 
+/** Delete every screen of the open mockup, after asking; then make its first screen again, or close it. */
+async function deleteApp(again: boolean) {
+  const app = state.app
+  if (!app) return
+  const n = state.entries.size
+  const what = n === 1 ? 'the only screen of this mockup' : `all ${n} screens of this mockup`
+  if (!confirm(again ? `Start over? This deletes ${what} and makes its first screen again.` : `Delete ${what}?`)) return
+  state.busy?.abort()
+  const res = await fetch('/api/delete-app', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app }),
+  }).catch(() => null)
+  if (!res?.ok) return showError('Could not delete the mockup')
+  store.set(pathKey(app), '[]')
+  loadHistory()
+  if (again) return start(app)
+  state.app = null
+  state.rows = []
+  state.entries = new Map()
+  state.links = []
+  setMetrics(`Deleted ${what}.`)
+  draw()
+}
+
 // ---- Wiring -----------------------------------------------------------------------------------
+
+startOverButton.addEventListener('click', () => deleteApp(true).catch((e) => showError(String(e))))
+deleteAppButton.addEventListener('click', () => deleteApp(false).catch((e) => showError(String(e))))
 
 promptForm.addEventListener('submit', (e) => {
   e.preventDefault()

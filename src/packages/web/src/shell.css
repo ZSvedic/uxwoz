@@ -25,6 +25,8 @@ button:disabled { opacity: .45; cursor: default; }
 .zoom input { width: 110px; accent-color: var(--accent); }
 .examples { flex-basis: 100%; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .example { padding: 2px 8px; font-size: 13px; }
+.app-tool { padding: 2px 8px; font-size: 13px; }
+#deleteApp:hover { color: var(--err); border-color: var(--err); }
 #history { margin-left: auto; padding: 2px 8px; font-size: 13px; max-width: 22em; }
 .metrics { flex: none; padding: 6px 16px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.4em; }
 .metrics b { color: var(--fg); font-weight: 600; }
