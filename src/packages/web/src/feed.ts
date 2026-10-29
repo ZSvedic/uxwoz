@@ -103,7 +103,7 @@ export class Feed {
     rows.forEach((r, i) => {
       const row = this.row(r.key)
       placeAt(this.list, row.el, i + 1) // after the lines
-      row.head.replaceChildren(el('b', 'row-title', `${i + 1} · ${r.title}`), el('span', 'row-note', r.note))
+      row.head.replaceChildren(el('b', 'row-title', r.title), el('span', 'row-note', r.note))
       r.variants.forEach((v, j) => {
         const f = this.frame(v.id, r.key)
         placeAt(row.strip, f.el, j)
@@ -260,7 +260,7 @@ export class Feed {
     const bar = el('div', 'variant-bar')
     const caption = el('span', 'caption')
     bar.title = 'Click anything in a variant to pick it'
-    bar.append(caption, el('span', 'picked', '✓ Picked'))
+    bar.append(caption, el('span', 'picked', '✓'))
     const screen = el('div', 'screen')
     const frame = document.createElement('iframe')
     frame.setAttribute('sandbox', FRAME_SANDBOX)

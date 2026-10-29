@@ -2,7 +2,7 @@
 // streaming two variants at once, click-to-navigate, picking, pickers, history, metrics.
 
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
-import { normalizePrompt, screenKey } from '@uxwoz/core/keys'
+import { normalizePrompt, screenKey, variantId } from '@uxwoz/core/keys'
 import type { CacheEntry, Candidate, Link } from '@uxwoz/core'
 import { Feed, type FeedLink, type FeedRow, type FeedVariant } from './feed.ts'
 import type { ScreenEvent } from './server.ts'
@@ -64,38 +64,46 @@ const candidateId = (key: string, index: number) => `${key}#${index}`
 
 // ---- Rendering --------------------------------------------------------------------------------
 
-/** A row's title: the picked screen's first heading, else its prompt. */
-function titleOf(r: Row): string {
-  const html = r.entry?.candidates[r.entry.chosen]?.html
-  const h = html?.match(/<h[12][^>]*>([\s\S]*?)<\/h[12]>/i)?.[1]
+/** A variant's short name: the one the model gave it, else its first heading, else its prompt. */
+function nameOf(e: CacheEntry, c: Candidate): string {
+  if (c.name) return c.name
+  const h = c.html.match(/<h[12][^>]*>([\s\S]*?)<\/h[12]>/i)?.[1]
   // Parsed, not just stripped of tags, so entities like &amp; read as text.
   const text = h && new DOMParser().parseFromString(h, 'text/html').body.textContent?.trim()
-  return (text || r.action || state.app || '').slice(0, 80)
+  return (text || e.action || e.app).slice(0, 60)
 }
+
+/** A variant's canonical label, e.g. "L2-B Planning sync". */
+const labelOf = (e: CacheEntry, c: Candidate) => `${variantId(e.level, c.letter ?? '?')} ${nameOf(e, c)}`
 
 const widthOf = (c: Candidate) => (c.device ? DEVICES[c.device].width : LEGACY_WIDTH)
 
-function feedRow(r: Row): FeedRow {
-  const cands = r.entry?.candidates ?? []
-  const variants: FeedVariant[] = cands.map((c, i) => ({
-    id: candidateId(r.key, i),
-    width: widthOf(c),
-    caption: `Variant ${i + 1} · ${modelLabel(c.model)} · ${fmtCost(c)}`,
-    tooltip: c.feedback ? `Asked for: ${c.feedback}` : '',
-    chosen: r.entry!.chosen === i,
-    streaming: false,
-  }))
+function feedRow(r: Row, i: number): FeedRow {
+  const e = r.entry
+  const variants: FeedVariant[] = []
+  e?.candidates.forEach((c, j) => {
+    if (c.deleted) return
+    variants.push({
+      id: candidateId(r.key, j),
+      width: widthOf(c),
+      caption: labelOf(e, c),
+      tooltip: `${modelLabel(c.model)} · ${fmtCost(c)} · ${fmtS(c.totalMs)}`,
+      chosen: e.chosen === j,
+      streaming: false,
+    })
+  })
   const device = deviceSelect.value as Device
   r.streaming.forEach((_, slot) => variants.push({
     id: streamId(r.key, slot),
     width: DEVICES[device]?.width ?? LEGACY_WIDTH,
-    caption: `Variant ${cands.length + slot + 1} · making…`,
+    caption: 'New variant · making…',
     tooltip: '',
     chosen: false,
     streaming: true,
   }))
-  const note = r.streaming.length ? `making ${r.streaming.length} variants…` : `${cands.length} variant${cands.length === 1 ? '' : 's'}`
-  return { key: r.key, title: r.entry ? titleOf(r) : 'Making this screen…', via: r.via, note, variants }
+  const live = variants.length - r.streaming.length
+  const note = r.streaming.length ? `making ${r.streaming.length === 1 ? 'a variant' : `${r.streaming.length} variants`}…` : `${live} variant${live === 1 ? '' : 's'}`
+  return { key: r.key, title: `Step ${i + 1}`, via: r.via, note, variants }
 }
 
 /** Draw every row and put each stored variant in its frame. Streaming frames are left to their streams. */
