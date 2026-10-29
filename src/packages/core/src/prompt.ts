@@ -9,7 +9,8 @@ export const SYSTEM_PROMPT = `You build interactive UIs as one HTML fragment wit
 - Show values formatted for humans (e.g. toLocaleString / toFixed).
 - Be brief: keep the whole reply under about 2,500 characters: no comments, no input validation beyond what is needed, minimal markup.
 - The screen is one page of a clickable mockup. Every button or link that would open another screen gets a data-action attribute with a short prompt for that screen, e.g. <button data-action="Checkout screen of a coffee shop app with 2 lattes in the cart">Checkout</button>. The prompt must make sense without seeing this screen. Controls that only change this screen need no data-action. Use realistic sample data.
-- A control that goes back to the app's first screen gets data-action="home". When the request lists screens that already exist, link to one of them by copying its prompt exactly into data-action.`
+- A control that goes back to the app's first screen gets data-action="home". When the request lists screens that already exist, link to one of them by copying its prompt exactly into data-action.
+- Start small: this is an early sketch, so show only what this step needs, with 2-4 sample items per list. The device width is a maximum, not a canvas to fill: the screen is only as wide and tall as its content.`
 
 /** The most existing screens one request lists, newest first, so a long session keeps requests short. */
 export const MAX_EXISTING_SCREENS = 30
@@ -18,7 +19,7 @@ export const MAX_EXISTING_SCREENS = 30
 export const ALTERNATIVE_REQUEST = 'Design this as a clearly different alternative to the obvious layout: change the structure, grouping or navigation, not just the wording.'
 
 export interface RequestExtras {
-  /** What the screen is for, e.g. "a phone screen, about 390 px wide". */
+  /** What the screen is for, e.g. "a phone screen, at most 390 px wide". */
   device?: string
   /** True for the second variant of a pair: ask for a different design. */
   alternative?: boolean

@@ -1,7 +1,9 @@
 // The feed: the mockup as rows, one per step of the flow, top to bottom. A row holds the variants
 // of one screen side by side, then a "Neither" tile to ask for more. Every variant is live: a click
 // inside one picks it and opens the next row. The page scrolls normally, also over a screen.
-// Screens always show at 100%: a row that is too wide scrolls sideways. A line drops from the
+// Screens always show at 100% and only as wide as their content: the frame keeps the device's
+// width, so the screen's layout never changes, and the part it does not use is cut off. A row
+// that is too wide scrolls sideways. A line drops from the
 // picked variant of each row into the next row, labelled with the control that was clicked.
 
 import { FRAME_SANDBOX, framePage } from '@uxwoz/core/frame'
@@ -9,6 +11,8 @@ import { FRAME_SANDBOX, framePage } from '@uxwoz/core/frame'
 /** Limits on the height a screen may report, so a broken screen cannot make a huge frame. */
 const MIN_SCREEN_H = 160
 const MAX_SCREEN_H = 8000
+/** The narrowest a variant gets, so its bar stays readable. */
+const MIN_SCREEN_W = 280
 /** The height of a frame whose screen has not reported its size yet. */
 const START_H = 600
 /** A frame that grows this many times in a row, each within GROWTH_MS of the last, stops growing. */
@@ -21,7 +25,7 @@ const LINE_INSET = 24
 export interface FeedVariant {
   /** Unique in the feed: `key#index` for a stored candidate, `key#sN` for a variant still streaming. */
   id: string
-  /** Width of the window the screen is designed for. */
+  /** Width of the window the screen is designed for: the most it shows. */
   width: number
   caption: string
   tooltip: string
@@ -48,6 +52,8 @@ interface Frame {
   el: HTMLElement
   caption: HTMLElement
   pick: HTMLButtonElement
+  /** Cuts the frame to the width the screen uses. */
+  screen: HTMLElement
   frame: HTMLIFrameElement
   rowKey: string
   width: number
@@ -98,7 +104,7 @@ export class Feed {
         f.el.title = v.tooltip
         f.caption.textContent = v.caption
         f.pick.hidden = v.chosen || v.streaming
-        if (f.width !== v.width) { f.width = v.width; f.frame.style.width = `${v.width}px` }
+        if (f.width !== v.width) { f.width = v.width; f.frame.style.width = f.screen.style.width = `${v.width}px` }
       })
       placeAt(row.strip, row.neither, r.variants.length)
       row.more.disabled = busy
@@ -119,6 +125,8 @@ export class Feed {
       return
     }
     if (s?.html !== html) { f.frozen = false; f.growth = { count: 0, at: 0 } }
+    // While a screen streams it keeps the full width, so the row does not jump with every chunk.
+    if (!final) f.screen.style.width = `${f.width}px`
     f.shown = { html, final, css }
     f.frame.srcdoc = framePage(html, css, final)
   }
@@ -224,7 +232,7 @@ export class Feed {
     frame.style.height = `${START_H}px`
     screen.append(frame)
     v.append(bar, screen)
-    const f: Frame = { el: v, caption, pick, frame, rowKey, width: 0, shown: null, onLoad: null, growth: { count: 0, at: 0 }, frozen: false }
+    const f: Frame = { el: v, caption, pick, screen, frame, rowKey, width: 0, shown: null, onLoad: null, growth: { count: 0, at: 0 }, frozen: false }
     pick.addEventListener('click', () => this.on.pick(f.rowKey, v.dataset.id!))
     frame.addEventListener('load', () => this.loaded(f))
     this.frames.set(id, f)
@@ -246,6 +254,10 @@ export class Feed {
     if (!id) return
     const f = this.frames.get(id)!
     if (d.uxwoz === 'size' && Number.isFinite(d.height)) {
+      if (f.shown?.final && Number.isFinite(d.width)) {
+        f.screen.style.width = `${Math.min(f.width, Math.max(MIN_SCREEN_W, Math.round(d.width)))}px`
+        this.queueLines()
+      }
       const h = Math.min(MAX_SCREEN_H, Math.max(MIN_SCREEN_H, Math.round(d.height)))
       const old = parseFloat(f.frame.style.height)
       if (old === h) return

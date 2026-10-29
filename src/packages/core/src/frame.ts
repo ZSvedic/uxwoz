@@ -23,10 +23,10 @@ export const hasVisibleText = (html: string): boolean =>
  */
 export const VIEWPORT_H = 800
 
-/** The devices a screen can be designed for, and the width of the window it gets. */
+/** The devices a screen can be designed for, and the width of the window it gets: its widest. */
 export const DEVICES = {
-  phone: { label: 'Phone', width: 390, request: 'a phone screen, about 390 px wide' },
-  desktop: { label: 'Desktop', width: 1024, request: 'a desktop browser window, about 1024 px wide' },
+  phone: { label: 'Phone', width: 390, request: 'a phone screen, at most 390 px wide' },
+  desktop: { label: 'Desktop', width: 1024, request: 'a desktop browser window, at most 1024 px wide' },
 } as const
 export type Device = keyof typeof DEVICES
 export const DEFAULT_DEVICE: Device = 'phone'
@@ -90,14 +90,16 @@ const bootstrap = (final: boolean) => `(() => {
     }
   }
   addEventListener('DOMContentLoaded', fixVh)
-  // The frame grows to fit the whole screen, so it never scrolls: it reports its height, and hands
-  // scroll gestures to the page around it.
-  let lastHeight = 0
+  // The frame fits the whole screen, so it never scrolls: it reports the screen's height and width
+  // (main is only as wide as its content), and hands scroll gestures to the page around it.
+  let last = ''
   const report = () => {
     fixVh()
     const main = document.querySelector('main')
-    const h = Math.ceil(main ? main.getBoundingClientRect().bottom + 16 : document.body.scrollHeight)
-    if (h !== lastHeight) { lastHeight = h; parent.postMessage({ uxwoz: 'size', height: h }, '*') }
+    const r = main ? main.getBoundingClientRect() : null
+    const h = Math.ceil(r ? r.bottom + 16 : document.body.scrollHeight)
+    const w = Math.ceil(r ? r.right : document.body.scrollWidth)
+    if (h + 'x' + w !== last) { last = h + 'x' + w; parent.postMessage({ uxwoz: 'size', height: h, width: w }, '*') }
   }
   addEventListener('load', () => { report(); new ResizeObserver(report).observe(document.body) })
   // Ctrl/Cmd + scroll (and pinch) is left to the browser, to zoom the page.
@@ -108,14 +110,14 @@ const bootstrap = (final: boolean) => `(() => {
   }, { passive: false })
 })()`
 
-// Our layout rules, after the theme: the screen fills the frame's width with less padding, and
-// the page never scrolls (the frame is as tall as the screen). Pico grows its text with the window
+// Our layout rules, after the theme: the screen is only as wide as its content (the window is the
+// most it may take), with less padding, and the page never scrolls (the frame is as tall as the screen). Pico grows its text with the window
 // (20 px at 1280 px); a fixed 16 px keeps screens in scale with the app around them.
 // Pico turns a <small> right after an input into help text on its own line; after a checkbox or
 // radio in its label it is a count or note, like "All <small>(6)</small>", so it stays inline.
 const FRAME_CSS = `html, body { overflow: hidden; }
 label > :is([type="checkbox"], [type="radio"]) + small { display: inline; margin: 0 0 0 .25em; }
-body > main { max-width: none; padding: 20px 24px; }
+body > main { width: fit-content; min-width: 280px; max-width: none; margin: 0; padding: 20px 24px; }
 @media (max-width: 600px) { body > main { padding: 16px; } }
 :root { --pico-font-size: 100%; --pico-spacing: .75rem; --pico-typography-spacing-vertical: .75rem;
   --pico-block-spacing-vertical: .75rem; --pico-block-spacing-horizontal: 1rem;

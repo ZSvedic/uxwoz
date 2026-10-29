@@ -54,7 +54,8 @@ to one variant at a time, so the next variant is one swipe away.
   "full-screen" screens keep a normal size; a screen that still keeps growing with its window
   stops after four steps.
 - **Size**: every screen shows at 100%, never shrunk, so its text stays readable and its sketch
-  lines stay whole. A row too wide for the window scrolls sideways. For an overview, use the
+  lines stay whole. A screen is only as wide as its content; the device width is the most it
+  takes. The model is told to start small: only what this step needs. A row too wide for the window scrolls sideways. For an overview, use the
   browser's zoom: it shrinks the whole page evenly.
 - Each variant's bar names its model and cost. The picked variant has a blue outline and
   *✓ Picked*; the others have a **Pick** button.
@@ -116,7 +117,7 @@ per browser.
 
 - **Model**: Claude Haiku 5.5 (default), GPT-6 Luna (fast), GPT-6.1 Sol Ultrafast. It applies to the
   next generated screen; cached screens stay as they are, with their maker named on each variant.
-- **Device**: Phone (default, 390 px wide) or Desktop (1024 px). The model is told which one, and
+- **Device**: Phone (default, at most 390 px wide) or Desktop (at most 1024 px). The model is told which one, and
   the screen gets a window that wide. Like the model, it applies to the next generated screen.
   Screens made before devices existed show at 800 px.
   Loading the page and picking a model each send a short warm-up request to warm the prompt cache.

@@ -22,7 +22,8 @@ describe('generate a screen', () => {
       expect(chunks.length).toBeGreaterThan(5)
       expect(c.html).toContain('<script>')
       expect(c.html).not.toContain('```')
-      expect(c.html).toMatch(/data-action="[^"]{10,}"/)
+      // An action prompt in the markup, or set by the screen's script (clicks read it when they happen).
+      expect(c.html).toMatch(/data-action="[^"]{10,}"|dataset\.action\s*=/)
       expect(c.costUsd).toBeGreaterThan(0)
       expect(c.costEstimated).toBe(MODELS[model].costEstimated)
       expect(c.servedModel?.startsWith(MODELS[model].model)).toBe(true)

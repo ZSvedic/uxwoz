@@ -32,8 +32,9 @@ iframe. Pico styles the bare elements, so the model writes no CSS.
 - **Rendering:** `<iframe sandbox="allow-scripts allow-forms" srcdoc=...>`. The sandbox keeps
   generated code away from the app; `allow-forms` matters because models often build todo-style
   screens as `<form>`, and both OpenUI and CopilotKit failed the todo task by blocking submit.
-- **Size:** the frame is as wide as the device the screen was made for (390 px phone, 1024 px
-  desktop) and as tall as its content, and it is never scaled. Shrinking a 1280 px screen to fit
+- **Size:** the screen gets a window as wide as its device (390 px phone, 1024 px desktop), but
+  `main` is only as wide as its content and the card shows only that part. The frame is as tall as
+  its content and never scaled. Shrinking a 1280 px screen to fit
   made 5 px text and broke the sketch theme's thin curved borders into gaps. Text is a fixed 16 px: Pico grows it with the window (up to
   21 px), which made screens look larger than the app around them.
 - **Inline the theme CSS** into the srcdoc. A null-origin frame cannot be relied on to fetch a
