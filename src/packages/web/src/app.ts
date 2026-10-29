@@ -436,16 +436,17 @@ async function removeVariant(row: Row, index: number) {
     body: JSON.stringify({ key: e.key, index }),
   }).catch(() => null)
   if (!res?.ok) return showError('Could not delete the variant')
-  const { entry, removed } = await res.json() as { entry: CacheEntry | null; removed: string[] }
-  const gone = new Set(removed)
-  for (const k of gone) state.entries.delete(k)
-  state.links = state.links.filter((l) => !gone.has(l.from) && !gone.has(l.to) && !(l.from === e.key && l.variant === index))
-  if (entry) { state.entries.set(entry.key, entry); row.entry = entry }
-  const cut = state.rows.findIndex((r) => gone.has(r.key))
-  if (cut >= 0) state.rows = state.rows.slice(0, cut)
-  if (entry) followPick(row)
-  if (state.app) savePath(state.app)
+  // The server sends the whole mockup back: a delete can also give other screens new parents.
+  const map = await res.json() as { entries: CacheEntry[]; links: Link[] }
   loadHistory()
+  if (normalizePrompt(state.app ?? '') !== normalizePrompt(e.app)) return // another mockup opened meanwhile
+  state.entries = new Map(map.entries.map((x) => [x.key, x]))
+  state.links = map.links
+  const cut = state.rows.findIndex((r) => !state.entries.has(r.key))
+  if (cut >= 0) state.rows = state.rows.slice(0, cut)
+  for (const r of state.rows) r.entry = state.entries.get(r.key)!
+  if (state.rows.includes(row)) followPick(row)
+  if (state.app) savePath(state.app)
   if (!state.rows.length) setMetrics('This mockup is empty now. Press <b>Generate</b> to start it again.')
   draw()
 }
@@ -511,7 +512,6 @@ function savePath(app: string) {
 async function start(app: string) {
   state.busy?.abort()
   state.busy = null
-  state.app = app
   const n = ++state.starts
   showError(null)
   const res = await fetch(`/api/map?app=${encodeURIComponent(app)}`)
@@ -519,6 +519,9 @@ async function start(app: string) {
   const map = await res.json() as { entries: CacheEntry[]; links: Link[] }
   const entries = new Map(map.entries.map((e) => [e.key, e]))
   if (n !== state.starts) return // a newer prompt was submitted meanwhile
+  // Only now: until the new mockup is here, the rows on screen still belong to the old one, and
+  // a click in them must name the old mockup.
+  state.app = app
   state.entries = entries
   state.links = map.links
   let saved: SavedRow[] = []

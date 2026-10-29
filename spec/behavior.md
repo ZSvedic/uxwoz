@@ -36,7 +36,8 @@ Every variant has a fixed name: the level its screen was made at, a letter, and 
 model gives the screen in the same reply, as in *L2-B Planning sync*. Letters count all variants
 made at a level of a mockup, so the level-2 screens made from L1-A and from L1-B share one run of
 letters (L2-A, L2-B, then L2-C, L2-D). A letter is never reused, even after its variant is deleted,
-and a screen keeps its level when another path reaches it. So *L2-B* always means the same variant.
+and a screen keeps its level when another path reaches it. Each mockup keeps a letter count
+per level, so letters stay taken after their screens are gone; Start over begins again at A. So *L2-B* always means the same variant.
 
 ## Feed
 

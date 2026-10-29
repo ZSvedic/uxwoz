@@ -5,7 +5,7 @@
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { canonicalAction, letterAt, normalizePrompt, screenKey } from './keys.ts'
+import { canonicalAction, letterAt, letterIndex, normalizePrompt, screenKey } from './keys.ts'
 import type { Device } from './frame.ts'
 import type { ModelId } from './models.ts'
 
@@ -71,16 +71,22 @@ export class ScreenCache {
   private entries = new Map<string, CacheEntry>()
   /** Keyed by "from#variant\nto": the first click between two screens names the arrow. */
   private links = new Map<string, Link>()
+  /**
+   * The next letter at each level of each mockup, keyed by "root\nlevel". Kept apart from the
+   * screens, so a letter stays taken after its screen is deleted.
+   */
+  private letters = new Map<string, number>()
 
   /** With a file, the cache loads it now and rewrites it after every change. */
   constructor(private file: string | null = null) {
     if (file && existsSync(file)) {
       try {
         // The first file format was a bare list of entries.
-        const data = JSON.parse(readFileSync(file, 'utf8')) as CacheEntry[] | { entries: CacheEntry[]; links: Link[] }
-        const { entries, links } = Array.isArray(data) ? { entries: data, links: [] } : data
+        const data = JSON.parse(readFileSync(file, 'utf8')) as CacheEntry[] | { entries: CacheEntry[]; links: Link[]; letters?: Record<string, number> }
+        const { entries, links, letters = {} } = Array.isArray(data) ? { entries: data, links: [] } : data
         for (const e of entries) this.entries.set(e.key, e)
         for (const l of links) this.links.set(linkId(l), l)
+        for (const [k, n] of Object.entries(letters)) this.letters.set(k, n)
       } catch (err) {
         const aside = `${file}.corrupt-${Date.now()}`
         renameSync(file, aside)
@@ -103,15 +109,20 @@ export class ScreenCache {
     action = canonicalAction(app, action)
     const key = screenKey(app, action)
     let entry = this.entries.get(key)
+    const root = normalizePrompt(app)
     if (!entry) {
-      const parent = action && opts.parent && this.entries.has(opts.parent.key) ? opts.parent : null
+      // A parent must be a live variant of this mockup; a click that raced a delete makes no parent.
+      const p = opts.parent, from = p && this.entries.get(p.key)
+      const parent = action && p && from && normalizePrompt(from.app) === root && isLive(from, p.variant) ? p : null
       const level = action ? (parent ? this.entries.get(parent.key)!.level + 1 : 2) : 1
       entry = { key, app, action, chosen: 0, candidates: [], level, parent }
       this.entries.set(key, entry)
     }
     const index = entry.candidates.length
-    let n = this.lettersAt(app, entry.level)
+    const at = `${root}\n${entry.level}`
+    let n = this.letters.get(at) ?? 0
     entry.candidates.push(...candidates.map((c) => ({ ...c, letter: letterAt(n++) })))
+    this.letters.set(at, n)
     this.save()
     return { entry, index }
   }
@@ -176,6 +187,8 @@ export class ScreenCache {
   deleteVariant(key: string, index: number): { entry: CacheEntry | undefined; removed: string[] } | undefined {
     const entry = this.entries.get(key)
     if (!entry || !Number.isInteger(index) || !isLive(entry, index)) return undefined
+    const root = normalizePrompt(entry.app)
+    const before = this.reach(root)
     const c = entry.candidates[index]!
     entry.candidates[index] = { ...c, html: '', deleted: true }
     for (const [id, l] of this.links) if (l.from === key && l.variant === index) this.links.delete(id)
@@ -183,7 +196,7 @@ export class ScreenCache {
       const live = entry.candidates.findIndex((x) => !x.deleted)
       if (live >= 0) entry.chosen = live
     }
-    const removed = this.prune(normalizePrompt(entry.app))
+    const removed = this.prune(root, before)
     this.save()
     return { entry: this.entries.get(key), removed }
   }
@@ -193,6 +206,8 @@ export class ScreenCache {
     const root = normalizePrompt(app)
     const gone = this.mockup(root)
     for (const e of gone) this.entries.delete(e.key)
+    // A mockup made again from its prompt starts over at L1-A.
+    for (const k of this.letters.keys()) if (k.startsWith(`${root}\n`)) this.letters.delete(k)
     this.dropLinks()
     if (gone.length) this.save()
     return gone.length
@@ -206,21 +221,16 @@ export class ScreenCache {
     return [...this.entries.values()].filter((e) => normalizePrompt(e.app) === root)
   }
 
-  /** How many letters are taken at a level of a mockup, deleted variants included. */
-  private lettersAt(app: string, level: number): number {
-    return this.mockup(normalizePrompt(app)).filter((e) => e.level === level).reduce((n, e) => n + e.candidates.length, 0)
-  }
 
   private dropLinks() {
     for (const [id, l] of this.links) if (!this.entries.has(l.from) || !this.entries.has(l.to)) this.links.delete(id)
   }
 
   /**
-   * Remove the screens of a mockup that the first screen no longer reaches through live variants,
-   * following both parents and other clicks. A screen still reached by another click takes that
-   * click as its new parent. Returns the keys removed.
+   * The screens of a mockup the first screen reaches through live variants, following both parents
+   * and other clicks, each with the click that reached it first (null for the first screen).
    */
-  private prune(root: string): string[] {
+  private reach(root: string): Map<string, Parent | null> {
     const entries = this.mockup(root)
     const first = this.entries.get(root)
     const reached = new Map<string, Parent | null>()
@@ -238,11 +248,41 @@ export class ScreenCache {
         queue.push(key)
       }
     }
+    return reached
+  }
+
+  /**
+   * After a delete: remove the screens the first screen reached `before` and no longer reaches.
+   * Screens it never reached (from old files without links) are left alone. A screen still reached
+   * whose parent chain no longer leads to the first screen takes the click that reaches it now.
+   * Returns the keys removed.
+   */
+  private prune(root: string, before: Map<string, Parent | null>): string[] {
+    const reached = this.reach(root)
     const removed: string[] = []
-    for (const e of entries) {
-      if (!reached.has(e.key)) { this.entries.delete(e.key); removed.push(e.key); continue }
-      const p = e.parent
-      if (p && !(reached.has(p.key) && isLive(this.entries.get(p.key), p.variant))) e.parent = reached.get(e.key) ?? null
+    for (const key of before.keys()) {
+      if (reached.has(key) || !this.entries.has(key)) continue
+      this.entries.delete(key)
+      removed.push(key)
+    }
+    // Repeat until stable: each fix points a screen at one the search found earlier, so it ends.
+    const leadsHome = (e: CacheEntry) => {
+      const seen = new Set<string>()
+      for (let x: CacheEntry | undefined = e; x; x = x.parent ? this.entries.get(x.parent.key) : undefined) {
+        if (x.key === root) return true
+        if (seen.has(x.key) || (x.parent && !isLive(this.entries.get(x.parent.key), x.parent.variant))) return false
+        seen.add(x.key)
+      }
+      return false
+    }
+    for (let changed = true; changed;) {
+      changed = false
+      for (const [key, via] of reached) {
+        const e = this.entries.get(key)!
+        if (key === root || leadsHome(e)) continue
+        e.parent = via
+        changed = true
+      }
     }
     this.dropLinks()
     return removed
@@ -295,6 +335,14 @@ export class ScreenCache {
         for (const t of [...list].sort((a, b) => a.at.localeCompare(b.at))) t.c.letter ??= letterAt(n++)
       }
     }
+    // Letter counters start after the highest letter in use at each level.
+    for (const e of this.entries.values()) {
+      const at = `${normalizePrompt(e.app)}\n${e.level}`
+      for (const c of e.candidates) {
+        const next = letterIndex(c.letter ?? '') + 1
+        if (next > (this.letters.get(at) ?? 0)) { this.letters.set(at, next); changed = true }
+      }
+    }
     return changed
   }
 
@@ -303,7 +351,7 @@ export class ScreenCache {
     mkdirSync(dirname(this.file), { recursive: true })
     // Write a temp file, then rename, so a crash never leaves half a cache file.
     const tmp = `${this.file}.tmp`
-    writeFileSync(tmp, JSON.stringify({ entries: [...this.entries.values()], links: [...this.links.values()] }, null, 1))
+    writeFileSync(tmp, JSON.stringify({ entries: [...this.entries.values()], links: [...this.links.values()], letters: Object.fromEntries(this.letters) }, null, 1))
     renameSync(tmp, this.file)
   }
 }

@@ -44,7 +44,9 @@ can spend model credits.
   and `done` only. With `from` (the key of the screen clicked in), `variant` (the candidate it was
   clicked in) and `label` (the control's text), a new screen takes that click as its parent, and
   `done` carries the `Link` it recorded, or null. 400 on an empty or too long `app` (2,000),
-  `action` (500), `prompt` (2,000), or an unknown model or device. A closed browser connection aborts the model calls; a variant that
+  `action` (500), `prompt` (2,000), an unknown model or device, or a `variant` that is not a whole
+  number. A later screen of a mockup without a first screen gets `error` before any model call,
+  and a reply that finishes after its mockup was deleted is not kept. A closed browser connection aborts the model calls; a variant that
   already finished is still cached.
 - `GET /api/map?app=…`: `{root, entries: CacheEntry[], links: Link[]}` for one mockup, oldest first.
 - `POST /api/link {from, variant, to, label}`: record a click in variant `variant` of one screen to
@@ -54,10 +56,11 @@ can spend model credits.
 - `GET /api/apps`: `{apps: {app, screens, updatedAt}[]}`, every mockup once as first typed,
   most recently changed first. The History list.
 - `POST /api/choose {key, index}`: set the picked variant; 404 if either is unknown or deleted.
-- `POST /api/delete {key, index}`: delete a variant; screens the first screen no longer reaches
-  through live variants go too, and a screen still reached by another click takes it as its new
-  parent. `{entry, removed}`: the screen (null once it is gone) and the keys removed; 404 if
-  unknown.
+- `POST /api/delete {key, index}`: delete a variant. Screens the first screen reached before and
+  no longer reaches through live variants go too; a screen still reached by another click takes
+  it as its new parent, so every parent chain leads to the first screen. `{entry, removed, root,
+  entries, links}`: the screen (null once it is gone), the keys removed, and the whole mockup as
+  `/api/map` sends it; 404 if unknown.
 - `POST /api/delete-app {app}`: delete every screen and link of a mockup; `{removed}`.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is

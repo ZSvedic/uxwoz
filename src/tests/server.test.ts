@@ -105,6 +105,8 @@ describe('web server', () => {
     expect((await post('/api/screen', { app: 'x', device: 'watch' })).status).toBe(400)
     expect((await post('/api/screen', { app: 'x', prompt: 'x'.repeat(2001) })).status).toBe(400)
     expect((await post('/api/delete', { key: 'no such screen', index: 0 })).status).toBe(404)
+    expect((await post('/api/screen', { app: 'x', from: 'y', variant: -1 })).status).toBe(400)
+    expect((await post('/api/screen', { app: 'x', from: 'y', variant: 1.5 })).status).toBe(400)
   })
 
   test('the mockup theme and the phone are the defaults, and the stylesheet is served', async () => {
@@ -131,7 +133,11 @@ describe('web server', () => {
     const del = await (await post('/api/delete', { key: first.key, index: 3 })).json()
     expect(del.entry.candidates[3]).toMatchObject({ deleted: true, html: '' })
     expect(del.entry.chosen).toBe(0)
+    expect(del.entries.map((e: { key: string }) => e.key)).toContain(first.key) // the whole mockup, as /api/map sends it
     expect((await (await post('/api/delete-app', { app: APP })).json()).removed).toBeGreaterThan(1)
     expect((await (await fetch(new URL('/api/apps', server.url))).json()).apps).toEqual([])
+    // A later screen of the deleted mockup is refused before any model call.
+    const late = await screen({ app: APP, action: 'Our breads' })
+    expect(late.map((e) => e.type)).toEqual(['error'])
   })
 })

@@ -150,8 +150,11 @@ export class Feed {
 
   /** The zoom at which the whole flow fits the page, at most 100%. */
   fitZoom(): number {
+    // The width the variants take, not the strip's: a strip is as wide as the page at this zoom.
     let w = 0
-    for (const r of this.rows.values()) w = Math.max(w, r.strip.scrollWidth)
+    for (const r of this.rows.values()) {
+      for (const v of r.strip.children) w = Math.max(w, (v as HTMLElement).offsetLeft + (v as HTMLElement).offsetWidth - r.strip.offsetLeft)
+    }
     const h = this.list.scrollHeight
     if (!w || !h) return 1
     return Math.min(1, (this.stage.clientWidth - 32) / (w + GUTTER), (this.stage.clientHeight - 16) / h)

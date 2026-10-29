@@ -117,6 +117,10 @@ export function createServer(opts: ServerOptions = {}) {
       yield { type: 'done', entry: hit, variants: [], failed: [], link: linkFrom() }
       return
     }
+    if (action && !cache.get(screenKey(app, null))) {
+      yield { type: 'error', message: 'this mockup has no first screen: it was deleted, or never made' }
+      return
+    }
     const count = r.regenerate ? 1 : VARIANTS
     yield { type: 'meta', key, cached: false, variants: count }
     const existing = cache.existingScreens(app).filter((a) => a !== action)
@@ -137,9 +141,16 @@ export function createServer(opts: ServerOptions = {}) {
     }
     const ok = made.filter((c): c is Candidate => c != null)
     const parent = click && { key: click.from, variant: click.variant, label: click.label }
+    // A later screen of a mockup deleted meanwhile (Delete, Start over) is not kept: it would bring
+    // the mockup back without its first screen.
+    const gone = action != null && !cache.get(screenKey(app, null))
     // A variant that finished is paid for: keep it, even if the browser left before the other one.
     if (signal.aborted) {
-      if (ok.length) cache.add(app, action, ok, { parent })
+      if (ok.length && !gone) cache.add(app, action, ok, { parent })
+      return
+    }
+    if (gone) {
+      yield { type: 'error', message: 'this mockup was deleted while the screen was being made' }
       return
     }
     if (!ok.length) {
@@ -189,8 +200,10 @@ export function createServer(opts: ServerOptions = {}) {
           if (prompt && prompt.length > 2000) return json({ error: 'prompt must be at most 2000 characters' }, 400)
           if (!isModelId(model)) return json({ error: `unknown model ${model}` }, 400)
           if (!isDevice(device)) return json({ error: `unknown device ${device}` }, 400)
+          const variant = b?.variant ?? 0
+          if (!Number.isInteger(variant) || variant < 0) return json({ error: 'variant must be a whole number' }, 400)
           const click = typeof b?.from === 'string' && b.from
-            ? { from: b.from.slice(0, 3000), variant: Number(b?.variant ?? 0), label: String(b?.label ?? '').slice(0, 200) }
+            ? { from: b.from.slice(0, 3000), variant, label: String(b?.label ?? '').slice(0, 200) }
             : null
           return ndjson(screenEvents({ app, action, model, device, regenerate: b?.regenerate === true, prompt, click }, req.signal))
         },
@@ -220,14 +233,18 @@ export function createServer(opts: ServerOptions = {}) {
           return entry ? json({ entry }) : json({ error: 'no such screen or variant' }, 404)
         },
       },
-      // Delete one variant; screens only it reached go too.
+      // Delete one variant; screens only it reached go too. Returns the mockup as /api/map does.
       '/api/delete': {
         POST: async (req) => {
           const refused = refuseForeign(req)
           if (refused) return refused
           const b = await req.json().catch(() => null)
-          const done = cache.deleteVariant(String(b?.key ?? ''), Number(b?.index))
-          return done ? json({ entry: done.entry ?? null, removed: done.removed }) : json({ error: 'no such screen or variant' }, 404)
+          const key = String(b?.key ?? ''), app = cache.get(key)?.app
+          const done = cache.deleteVariant(key, Number(b?.index))
+          // The whole mockup comes back too: a delete can give other screens new parents.
+          return done && app
+            ? json({ entry: done.entry ?? null, removed: done.removed, ...cache.map(app) })
+            : json({ error: 'no such screen or variant' }, 404)
         },
       },
       // Delete a whole mockup, so its prompt starts over.

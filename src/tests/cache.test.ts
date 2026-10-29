@@ -120,6 +120,49 @@ describe('screen cache', () => {
     expect(cache.map('Cafe').entries.map((e) => e.key)).toEqual([menu])
   })
 
+  test('a letter stays taken after its screen is deleted, and a mockup made again starts at A', () => {
+    const cache = new ScreenCache()
+    const root = cache.add('Cafe', null, [cand('<h1>A</h1>'), cand('<h1>B</h1>')]).entry.key
+    const at = (action: string, variant: number) => cache.add('Cafe', action, [cand('<h1>x</h1>'), cand('<h1>y</h1>')], { parent: { key: root, variant, label: action } }).entry
+    at('X', 0); at('Y', 1); at('Z', 1)
+    cache.deleteVariant(root, 0) // takes X (L2-A, L2-B)
+    expect(at('W', 1).candidates.map((c) => c.letter)).toEqual(['G', 'H'])
+    cache.deleteApp('Cafe')
+    expect(cache.add('Cafe', null, [cand('<h1>A</h1>')]).entry.candidates[0]!.letter).toBe('A')
+  })
+
+  test('a delete removes only what it cut off, never screens the first screen did not reach before', () => {
+    const cache = new ScreenCache()
+    const root = cache.add('Cafe', null, [cand('<h1>A</h1>'), cand('<h1>B</h1>')]).entry.key
+    const old = cache.add('Cafe', 'Old screen', [cand('<h1>old</h1>')]).entry.key // no parent, as in old files
+    const help = cache.add('Cafe', 'Help', [cand('<h1>h</h1>'), cand('<h1>h2</h1>')], { parent: { key: root, variant: 0, label: 'Help' } }).entry.key
+    expect(cache.deleteVariant(help, 1)!.removed).toEqual([])
+    expect(cache.get(old)).toBeDefined()
+    expect(cache.deleteVariant(root, 0)!.removed).toEqual([help])
+    expect(cache.get(old)).toBeDefined()
+  })
+
+  test('new parents after a delete always lead back to the first screen', () => {
+    const cache = new ScreenCache()
+    const root = cache.add('Cafe', null, [cand('<h1>A</h1>'), cand('<h1>B</h1>')]).entry.key
+    const y = cache.add('Cafe', 'Y', [cand('<h1>y</h1>')], { parent: { key: root, variant: 0, label: 'Y' } }).entry.key
+    const x = cache.add('Cafe', 'X', [cand('<h1>x</h1>')], { parent: { key: y, variant: 0, label: 'X' } }).entry.key
+    cache.link(root, 1, x, 'X')
+    cache.link(x, 0, y, 'Y')
+    cache.deleteVariant(root, 0)
+    expect(cache.get(x)!.parent).toMatchObject({ key: root, variant: 1 })
+    expect(cache.get(y)!.parent).toMatchObject({ key: x, variant: 0 })
+  })
+
+  test('a new screen takes a parent only from a live variant of the same mockup', () => {
+    const cache = new ScreenCache()
+    const root = cache.add('Cafe', null, [cand('<h1>A</h1>')]).entry.key
+    const tea = cache.add('Tea', null, [cand('<h1>T</h1>')]).entry.key
+    expect(cache.add('Cafe', 'X', [cand('<h1>x</h1>')], { parent: { key: tea, variant: 0, label: 'x' } }).entry.parent).toBeNull()
+    expect(cache.add('Cafe', 'Y', [cand('<h1>y</h1>')], { parent: { key: root, variant: Number.NaN, label: 'y' } }).entry.parent).toBeNull()
+    expect(cache.add('Cafe', 'Z', [cand('<h1>z</h1>')], { parent: { key: root, variant: 3, label: 'z' } }).entry.parent).toBeNull()
+  })
+
   test('deleting a mockup removes all its screens and links, and no other', () => {
     const cache = new ScreenCache()
     const menu = cache.add('Cafe', null, [cand('<h1>Menu</h1>')]).entry.key
