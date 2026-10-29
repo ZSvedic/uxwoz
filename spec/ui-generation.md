@@ -52,7 +52,9 @@ radius, borders). A hand-drawn wireframe look needs a handwriting font, thick da
 irregular corners (`border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px`). Clean keeps the
 model's colours; Mockup turns them grey with a filter on each topmost part of the screen that holds
 no control opening another screen. Those controls are blue in both themes (our frame CSS), and
-Pico's own blue becomes a neutral ink, so blue always means "opens a screen". Re-check BMI screenshots after a theme change: the deterministic tests
+Pico's own blue becomes a neutral ink, so blue always means "opens a screen". Blue links have no
+underline until hovered: Pico drops it inside `<nav>` and Mockup makes it wavy elsewhere, so the
+same tab bar would look different depending on the markup. Re-check BMI screenshots after a theme change: the deterministic tests
 read text and positions, so a theme that moves elements can change the scale check.
 
 ## Models

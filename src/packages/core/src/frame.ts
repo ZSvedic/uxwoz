@@ -119,7 +119,9 @@ const bootstrap = (final: boolean) => `(() => {
 })()`
 
 // Controls that open another screen are blue, in every theme; everything else keeps a neutral ink,
-// so Pico's own blue (links, buttons) cannot be mistaken for them. A form with an action prompt
+// so Pico's own blue (links, buttons) cannot be mistaken for them. Blue links lose their underline
+// until hovered: Pico drops it inside <nav> and the mockup theme makes it wavy elsewhere, so the
+// same tab bar looked different depending on the markup the model chose. A form with an action prompt
 // opens a screen on submit, so its submit button is blue, not the whole form.
 const GO = `[data-action]:not(form), form[data-action] :is(button:not([type="button"]), [type="submit"]), a[href]:not([href^="#"], [href^="javascript:"])`
 const NAV_CSS = `main { --pico-primary: #373c44; --pico-primary-background: #525f7a; --pico-primary-border: #525f7a;
@@ -127,7 +129,9 @@ const NAV_CSS = `main { --pico-primary: #373c44; --pico-primary-background: #525
   --pico-primary-hover-border: #48536b; --pico-primary-hover-underline: #1f2329; --pico-primary-focus: rgba(82, 95, 122, .25);
   --pico-primary-inverse: #fff; }
 main :is(${GO}) { color: #2a5bd7 !important; border-color: #2a5bd7 !important; text-decoration-color: #2a5bd7 !important; }
-main :is(button, [role="button"], input, select):is(${GO}) { background-color: #e9effc !important; }`
+main :is(button, [role="button"], input, select):is(${GO}) { background-color: #e9effc !important; }
+main a:is(${GO}) { text-decoration-line: none !important; }
+main a:is(${GO}):hover { text-decoration-line: underline !important; }`
 
 // Our layout rules, after the theme: the screen is only as wide as its content (the window is the
 // most it may take), with less padding, and the page never scrolls (the frame is as tall as the screen). Pico grows its text with the window
