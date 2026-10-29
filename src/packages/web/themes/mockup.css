@@ -44,8 +44,10 @@
   --pico-card-box-shadow: none;
 }
 body { background: var(--sk-paper); letter-spacing: .01em; }
-/* The model's own colours (inline styles, SVG charts) turn grey too. */
-main { filter: grayscale(1); }
+/* The model's own colours (inline styles, SVG charts) turn grey too, except on controls that open
+   another screen: the app colours those blue. So the filter sits on each topmost part that holds
+   no such control, not on the whole screen. */
+:is(main, main :has([data-action], a[href])) > :not([data-action], a[href], :has([data-action], a[href])) { filter: grayscale(1); }
 button, input, select, textarea, article, fieldset, [role="button"] {
   border: 2px solid var(--sk-ink) !important;
   border-radius: var(--sk-wobble) !important;

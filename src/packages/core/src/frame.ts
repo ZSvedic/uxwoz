@@ -118,6 +118,17 @@ const bootstrap = (final: boolean) => `(() => {
   }, { passive: false })
 })()`
 
+// Controls that open another screen are blue, in every theme; everything else keeps a neutral ink,
+// so Pico's own blue (links, buttons) cannot be mistaken for them. A form with an action prompt
+// opens a screen on submit, so its submit button is blue, not the whole form.
+const GO = `[data-action]:not(form), form[data-action] :is(button:not([type="button"]), [type="submit"]), a[href]:not([href^="#"], [href^="javascript:"])`
+const NAV_CSS = `main { --pico-primary: #373c44; --pico-primary-background: #525f7a; --pico-primary-border: #525f7a;
+  --pico-primary-underline: rgba(55, 60, 68, .5); --pico-primary-hover: #1f2329; --pico-primary-hover-background: #48536b;
+  --pico-primary-hover-border: #48536b; --pico-primary-hover-underline: #1f2329; --pico-primary-focus: rgba(82, 95, 122, .25);
+  --pico-primary-inverse: #fff; }
+main :is(${GO}) { color: #2a5bd7 !important; border-color: #2a5bd7 !important; text-decoration-color: #2a5bd7 !important; }
+main :is(button, [role="button"], input, select):is(${GO}) { background-color: #e9effc !important; }`
+
 // Our layout rules, after the theme: the screen is only as wide as its content (the window is the
 // most it may take), with less padding, and the page never scrolls (the frame is as tall as the screen). Pico grows its text with the window
 // (20 px at 1280 px); a fixed 16 px keeps screens in scale with the app around them.
@@ -136,7 +147,7 @@ export function framePage(fragment: string, css: string, final: boolean): string
   const style = css.replace(/<\/style/gi, '<\\/style')
   return `<!doctype html><html data-theme="light"><head><meta charset="utf-8">`
     + `<meta name="viewport" content="width=device-width, initial-scale=1">`
-    + `<style>${style}</style><style>${FRAME_CSS}</style><script>${bootstrap(final)}</script></head>`
+    + `<style>${style}</style><style>${FRAME_CSS}\n${NAV_CSS}</style><script>${bootstrap(final)}</script></head>`
     + `<body${final ? '' : ' style="cursor:progress"'}><main>${fragment}</main></body></html>`
 }
 
