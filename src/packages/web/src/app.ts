@@ -5,6 +5,7 @@ import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isD
 import { normalizePrompt, screenKey, variantId } from '@uxwoz/core/keys'
 import type { CacheEntry, Candidate, Link } from '@uxwoz/core'
 import { Feed, type FeedLink, type FeedRow, type FeedVariant } from './feed.ts'
+import { Tree } from './tree.ts'
 import type { ScreenEvent } from './server.ts'
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -73,6 +74,8 @@ const feed = new Feed($('stage'), {
   remove: (rowKey, id) => { const r = rowOf(rowKey); if (r) removeVariant(r, indexOf(id)) },
   action: onAction,
 })
+
+const tree = new Tree($('tree'), { open: openVariant })
 
 const rowOf = (key: string) => state.rows.find((r) => r.key === key)
 /** The candidate index in a variant id `key#3`; NaN for a variant still streaming (`key#s0`). */
@@ -152,6 +155,12 @@ function feedRow(r: Row, i: number): FeedRow {
 /** Draw every row and put each stored variant in its frame. Streaming frames are left to their streams. */
 async function draw() {
   feed.render(state.rows.map(feedRow), !!state.busy, state.links.map(({ from, to, label }): FeedLink => ({ from, to, label })))
+  tree.render(state.app ? {
+    root: screenKey(state.app, null),
+    entries: state.entries,
+    flow: new Set(state.rows.filter((r) => r.entry).map((r) => candidateId(r.key, r.entry!.chosen))),
+    name: (e, i) => nameOf(e, e.candidates[i]!),
+  } : null)
   const theme = themeSelect.value
   const css = await themeCss(theme)
   if (theme !== themeSelect.value) return // a newer draw shows the newer theme
@@ -439,15 +448,41 @@ async function choose(row: Row, index: number) {
   entry.chosen = index // at once, so the row shows it; undone below if the server says no
   followPick(row)
   draw()
-  const res = await fetch('/api/choose', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key: entry.key, index }),
-  }).catch(() => null)
-  if (!res?.ok) {
+  if (!await saveChoice(entry.key, index)) {
     if (entry.chosen === index) entry.chosen = before
     showError('Could not save the pick')
   }
   draw()
+}
+
+async function saveChoice(key: string, index: number): Promise<boolean> {
+  const res = await fetch('/api/choose', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, index }),
+  }).catch(() => null)
+  return !!res?.ok
+}
+
+/**
+ * Show a variant from the tree: the flow becomes the path of first clicks that made its screen, each
+ * screen on the way picks the variant the path goes through, and the flow goes on below it.
+ */
+function openVariant(key: string, index: number) {
+  const chain: CacheEntry[] = []
+  for (let e = state.entries.get(key); e && !chain.includes(e); e = e.parent ? state.entries.get(e.parent.key) : undefined) chain.unshift(e)
+  const app = state.app
+  if (!app || !chain.length || chain[0]!.key !== screenKey(app, null)) return
+  state.busy?.abort()
+  const picks = [...chain.slice(1).map((e) => e.parent!.variant), index]
+  chain.forEach((e, i) => {
+    if (e.chosen === picks[i]) return
+    e.chosen = picks[i]!
+    saveChoice(e.key, e.chosen).then((ok) => ok || showError('Could not save the pick'))
+  })
+  state.rows = chain.map((e) => ({ key: e.key, action: e.action, via: e.parent?.label ?? null, parent: e.parent?.variant ?? null, entry: e, streaming: [] }))
+  extendPath()
+  savePath(app)
+  draw().then(() => { feed.scrollToRow(key); feed.scrollToVariant(candidateId(key, index)) })
 }
 
 // ---- The flow, remembered per mockup in this browser --------------------------------------------

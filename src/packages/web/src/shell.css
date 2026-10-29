@@ -27,8 +27,24 @@ button:disabled { opacity: .45; cursor: default; }
 .metrics b { color: var(--fg); font-weight: 600; }
 .error { margin: 0 16px; padding: 8px 12px; border: 1px solid var(--err); color: var(--err); border-radius: 6px; }
 .error[hidden] { display: none; }
+/* The tree of all screens on the left, the feed of the main flow beside it. */
+.workspace { flex: 1; min-height: 0; display: flex; }
+.tree { flex: none; width: 270px; overflow: auto; padding: 8px 8px 40px 12px; border-right: 1px solid var(--line); font-size: 13px; }
+.tree:empty { display: none; }
+.tree-head { color: var(--muted); margin: 2px 0 6px 4px; }
+.tree ul { list-style: none; margin: 0; padding: 0; }
+.tree .branch { margin-left: 10px; padding-left: 8px; border-left: 1px solid var(--line); }
+.tree .via { color: var(--muted); margin: 2px 0 0 4px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tree .line { display: flex; gap: 6px; width: 100%; padding: 2px 4px; border: 0; border-radius: 4px; background: none; text-align: left;
+  color: var(--muted); }
+.tree .line:hover { background: var(--card); color: var(--fg); }
+.tree .line .id { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tree .line .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree .line.flow { color: var(--accent); }
+.tree .line.flow .name { color: var(--fg); font-weight: 600; }
+@media (max-width: 700px) { .tree { display: none; } }
 /* The feed: one row per step of the flow, top to bottom; a row's variants sit side by side. */
-.stage { flex: 1; min-height: 0; position: relative; overflow: auto; padding: 8px 16px 40vh; }
+.stage { flex: 1; min-width: 0; min-height: 0; position: relative; overflow: auto; padding: 8px 16px 40vh; }
 .empty .go { color: #2a5bd7; font-weight: 600; }
 .empty { color: var(--muted); text-align: center; margin: 15vh auto 0; max-width: 52ch; padding: 0 16px; }
 .feed { position: relative; overflow-x: clip; padding-left: 32px; }
