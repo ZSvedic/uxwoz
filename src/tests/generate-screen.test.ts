@@ -28,6 +28,8 @@ describe('generate a screen', () => {
       expect(c.costEstimated).toBe(MODELS[model].costEstimated)
       expect(c.servedModel?.startsWith(MODELS[model].model)).toBe(true)
       expect(c.finishReason).toBe('stop')
+      expect(c.name?.length).toBeGreaterThan(2)
+      expect(c.html).toMatch(/^\s*<title>/)
     }, 30_000)
   }
 
