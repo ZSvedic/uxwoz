@@ -192,6 +192,7 @@ export function createServer(opts: ServerOptions = {}) {
         if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
         return json(cache.map(app))
       },
+      '/api/apps': () => json({ apps: cache.apps() }),
       '/api/choose': {
         POST: async (req) => {
           const refused = refuseForeign(req)

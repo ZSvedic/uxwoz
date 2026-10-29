@@ -118,6 +118,19 @@ export class ScreenCache {
     return { root, entries, links }
   }
 
+  /** Every mockup once, as first typed, with its number of screens; most recently changed first. */
+  apps(): { app: string; screens: number; updatedAt: string }[] {
+    const byRoot = new Map<string, { app: string; screens: number; updatedAt: string }>()
+    for (const e of this.entries.values()) {
+      const root = normalizePrompt(e.app)
+      const a = byRoot.get(root) ?? { app: e.app, screens: 0, updatedAt: '' }
+      a.screens++
+      for (const c of e.candidates) if (c.createdAt > a.updatedAt) a.updatedAt = c.createdAt
+      byRoot.set(root, a)
+    }
+    return [...byRoot.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  }
+
   choose(key: string, index: number): CacheEntry | undefined {
     const entry = this.entries.get(key)
     if (!entry || !Number.isInteger(index) || index < 0 || index >= entry.candidates.length) return undefined

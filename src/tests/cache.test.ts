@@ -75,6 +75,17 @@ describe('screen cache', () => {
     expect(map.links).toHaveLength(1)
   })
 
+  test('the history lists each mockup once, as first typed, most recently changed first', () => {
+    const cache = new ScreenCache()
+    cache.add('Coffee app', null, { ...cand('<h1>Menu</h1>'), createdAt: '2026-10-20T00:00:00Z' })
+    cache.add('Tea app', null, { ...cand('<h1>Tea</h1>'), createdAt: '2026-10-21T00:00:00Z' })
+    cache.add('coffee APP', 'Cart', { ...cand('<h1>Cart</h1>'), createdAt: '2026-10-22T00:00:00Z' })
+    expect(cache.apps()).toEqual([
+      { app: 'Coffee app', screens: 2, updatedAt: '2026-10-22T00:00:00Z' },
+      { app: 'Tea app', screens: 1, updatedAt: '2026-10-21T00:00:00Z' },
+    ])
+  })
+
   test('a cache file from before links existed still loads', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
     writeFileSync(file, JSON.stringify([{ key: 'cafe', app: 'Cafe', action: null, chosen: 0, candidates: [cand('<h1>Menu</h1>')] }]))

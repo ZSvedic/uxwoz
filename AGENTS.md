@@ -41,9 +41,9 @@ src/packages/core/src/       engine; frame.ts and keys.ts also run in the browse
   cache.ts       screen cache: variants (candidates) and the pick, links between screens, JSON file
   frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices
 src/packages/web/src/
-  server.ts      Bun.serve: /api/config, /api/screen (NDJSON, two variants at once), /api/map, /api/choose, /api/warmup, themes
-  app.ts         browser: prompt box, rows of the flow, load() a row, streaming, picking, pickers, metrics
-  feed.ts        browser: rows of variants, frames, heights, zoom for wide screens, Neither tile
+  server.ts      Bun.serve: /api/config, /api/screen (NDJSON, two variants at once), /api/map, /api/apps, /api/choose, /api/warmup, themes
+  app.ts         browser: prompt box, History, rows of the flow, load() a row, streaming, picking, pickers, metrics
+  feed.ts        browser: rows of variants, frames, heights, lineage lines, Neither tile
   index.html, shell.css   the page around the feed
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest

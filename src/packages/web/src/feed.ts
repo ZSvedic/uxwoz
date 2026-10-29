@@ -1,8 +1,10 @@
 // The feed: the mockup as rows, one per step of the flow, top to bottom. A row holds the variants
 // of one screen side by side, then a "Neither" tile to ask for more. Every variant is live: a click
 // inside one picks it and opens the next row. The page scrolls normally, also over a screen.
+// Screens always show at 100%: a row that is too wide scrolls sideways. A line drops from the
+// picked variant of each row into the next row, labelled with the control that was clicked.
 
-import { DEVICES, FRAME_SANDBOX, framePage } from '@uxwoz/core/frame'
+import { FRAME_SANDBOX, framePage } from '@uxwoz/core/frame'
 
 /** Limits on the height a screen may report, so a broken screen cannot make a huge frame. */
 const MIN_SCREEN_H = 160
@@ -12,9 +14,9 @@ const START_H = 600
 /** A frame that grows this many times in a row, each within GROWTH_MS of the last, stops growing. */
 const GROWTH_LIMIT = 4
 const GROWTH_MS = 1500
-/** Room for the Neither tile and gaps when fitting two wide screens next to each other. */
-const NEITHER_W = 240
 const GAP = 16
+/** How far a lineage line keeps from the ends of a row, when its variant is scrolled out of view. */
+const LINE_INSET = 24
 
 export interface FeedVariant {
   /** Unique in the feed: `key#index` for a stored candidate, `key#sN` for a variant still streaming. */
@@ -46,7 +48,6 @@ interface Frame {
   el: HTMLElement
   caption: HTMLElement
   pick: HTMLButtonElement
-  screen: HTMLElement
   frame: HTMLIFrameElement
   rowKey: string
   width: number
@@ -56,17 +57,25 @@ interface Frame {
   frozen: boolean
 }
 
-interface RowEl { el: HTMLElement; head: HTMLElement; strip: HTMLElement; neither: HTMLElement; feedback: HTMLTextAreaElement; more: HTMLButtonElement }
+interface RowEl {
+  el: HTMLElement; head: HTMLElement; strip: HTMLElement; neither: HTMLElement
+  feedback: HTMLTextAreaElement; more: HTMLButtonElement
+  /** The line from the row above into this one, and the click it shows. */
+  line: HTMLElement; label: HTMLElement
+}
 
 export class Feed {
   private list = el('div', 'feed')
   private rows = new Map<string, RowEl>()
   private frames = new Map<string, Frame>()
+  /** Each row in order, with the variant id its line starts from (the pick in the row above). */
+  private lineage: { key: string; from: string | null }[] = []
+  private linesQueued = false
 
   /** `stage` is the scrolling page area; the feed replaces what it holds on the first render. */
   constructor(private stage: HTMLElement, private on: FeedHandlers) {
     addEventListener('message', (e) => this.onFrameMessage(e))
-    new ResizeObserver(() => { for (const f of this.frames.values()) this.fit(f) }).observe(stage)
+    new ResizeObserver(() => this.queueLines()).observe(stage)
   }
 
   /** Draw the rows. Frames are kept and moved as little as possible, so unchanged screens do not reload. */
@@ -79,11 +88,8 @@ export class Feed {
     rows.forEach((r, i) => {
       const row = this.row(r.key)
       placeAt(this.list, row.el, i)
-      row.head.replaceChildren(
-        ...(r.via != null ? [el('span', 'via', `↓ ${r.via || 'next'}`)] : []),
-        el('b', 'row-title', `${i + 1} · ${r.title}`),
-        el('span', 'row-note', r.note),
-      )
+      row.head.replaceChildren(el('b', 'row-title', `${i + 1} · ${r.title}`), el('span', 'row-note', r.note))
+      row.label.textContent = r.via || 'next'
       r.variants.forEach((v, j) => {
         const f = this.frame(v.id, r.key)
         placeAt(row.strip, f.el, j)
@@ -92,11 +98,13 @@ export class Feed {
         f.el.title = v.tooltip
         f.caption.textContent = v.caption
         f.pick.hidden = v.chosen || v.streaming
-        if (f.width !== v.width) { f.width = v.width; this.fit(f) }
+        if (f.width !== v.width) { f.width = v.width; f.frame.style.width = `${v.width}px` }
       })
       placeAt(row.strip, row.neither, r.variants.length)
       row.more.disabled = busy
     })
+    this.lineage = rows.map((r, i) => ({ key: r.key, from: i ? rows[i - 1]!.variants.find((v) => v.chosen)?.id ?? null : null }))
+    this.queueLines()
   }
 
   /** Put a screen into a variant's frame; `onLoad` runs once the frame has loaded it. */
@@ -143,21 +151,45 @@ export class Feed {
     if (f && strip) strip.scrollTo({ left: Math.max(0, f.el.offsetLeft - strip.offsetLeft - GAP), behavior: smooth ? 'smooth' : 'auto' })
   }
 
-  /** A wide screen shrinks so two of them and the Neither tile fit; a phone screen stays at 100%. */
-  private fit(f: Frame) {
-    const room = Math.max(280, (this.stage.clientWidth - 2 * GAP - NEITHER_W - 3 * GAP) / 2)
-    const zoom = f.width <= DEVICES.phone.width ? 1 : Math.min(1, room / f.width)
-    f.frame.style.width = `${f.width}px`
-    f.screen.style.zoom = String(zoom)
-    f.el.style.width = `${Math.round(f.width * zoom)}px`
+  /** Redraw the lineage lines once, before the next paint. */
+  private queueLines() {
+    if (this.linesQueued) return
+    this.linesQueued = true
+    requestAnimationFrame(() => { this.linesQueued = false; this.drawLines() })
+  }
+
+  /** Each line runs from the bottom of the picked variant above down to the top of its row. */
+  private drawLines() {
+    const base = this.list.getBoundingClientRect()
+    for (const { key, from } of this.lineage) {
+      const row = this.rows.get(key)
+      if (!row) continue
+      const f = from ? this.frames.get(from) : undefined
+      const strip = f?.el.parentElement
+      row.line.hidden = !f || !strip
+      if (!f || !strip) continue
+      const s = strip.getBoundingClientRect(), v = f.el.getBoundingClientRect()
+      const x = Math.min(Math.max(v.left + v.width / 2, s.left + LINE_INSET), s.right - LINE_INSET)
+      const top = v.bottom - base.top
+      row.line.style.left = `${x - base.left}px`
+      row.line.style.top = `${top}px`
+      row.line.style.height = `${Math.max(0, row.el.getBoundingClientRect().top - base.top - top)}px`
+      // Near the right edge the label goes on the line's left, so it stays in view.
+      row.line.classList.toggle('flip', x > s.left + s.width / 2)
+    }
   }
 
   private row(key: string): RowEl {
     const have = this.rows.get(key)
     if (have) return have
     const r = el('section', 'row')
+    const line = el('div', 'lineage')
+    line.hidden = true // until drawLines places it
+    const label = el('span', 'via')
+    line.append(label)
     const head = el('div', 'row-head')
     const strip = el('div', 'strip')
+    strip.addEventListener('scroll', () => this.queueLines(), { passive: true })
     const neither = el('aside', 'neither')
     const feedback = document.createElement('textarea')
     feedback.maxLength = 500
@@ -168,8 +200,8 @@ export class Feed {
     more.addEventListener('click', () => this.on.regenerate(key, feedback.value.trim()))
     neither.append(el('b', '', 'Neither?'), el('p', '', 'Click a button inside the variant you like, or ask for two more.'), feedback, more)
     strip.append(neither)
-    r.append(head, strip)
-    const row = { el: r, head, strip, neither, feedback, more }
+    r.append(line, head, strip)
+    const row = { el: r, head, strip, neither, feedback, more, line, label }
     this.rows.set(key, row)
     return row
   }
@@ -192,7 +224,7 @@ export class Feed {
     frame.style.height = `${START_H}px`
     screen.append(frame)
     v.append(bar, screen)
-    const f: Frame = { el: v, caption, pick, screen, frame, rowKey, width: 0, shown: null, onLoad: null, growth: { count: 0, at: 0 }, frozen: false }
+    const f: Frame = { el: v, caption, pick, frame, rowKey, width: 0, shown: null, onLoad: null, growth: { count: 0, at: 0 }, frozen: false }
     pick.addEventListener('click', () => this.on.pick(f.rowKey, v.dataset.id!))
     frame.addEventListener('load', () => this.loaded(f))
     this.frames.set(id, f)
@@ -226,6 +258,7 @@ export class Feed {
         if (f.growth.count >= GROWTH_LIMIT) { f.frozen = true; return }
       }
       f.frame.style.height = `${h}px`
+      this.queueLines()
     } else if (d.uxwoz === 'wheel') {
       // The frame never scrolls itself: its gestures scroll the page and the row.
       this.stage.scrollBy(0, Number(d.dy) || 0)

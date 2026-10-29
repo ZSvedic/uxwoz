@@ -45,6 +45,8 @@ can spend model credits.
   an unknown model or device. A closed browser connection aborts the model calls; a variant that
   already finished is still cached.
 - `GET /api/map?app=…`: `{root, entries: CacheEntry[], links: Link[]}` for one mockup, oldest first.
+- `GET /api/apps`: `{apps: {app, screens, updatedAt}[]}`, every mockup once as first typed,
+  most recently changed first. The History list.
 - `POST /api/choose {key, index}`: set the picked variant; 404 if either is unknown.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
@@ -71,7 +73,7 @@ Candidate  { html; model: ModelId; servedModel; createdAt; costUsd: number | nul
              // one variant; entry.chosen is the picked one
 Link       { from: key; to: key; label; createdAt }  // first click between two screens wins
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast'
-Device     'phone' (390 px wide) | 'desktop' (1280 px)
+Device     'phone' (390 px wide) | 'desktop' (1024 px)
 key        normalize(app) or normalize(app) + ' » ' + normalize(action); normalize turns » into >; action
            "home" or the product prompt itself means the first screen (action null)
 ```

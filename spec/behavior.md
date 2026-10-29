@@ -11,7 +11,8 @@ vars (see [code-contract.md](code-contract.md)).
 2. Two variants of the first screen stream in side by side. After about 1 s the metrics line reads
    *First visible screen 0.9 s*; at the end it reads *all variants interactive 6.0 s · $0.0016 for 2*.
 3. Zel likes variant 2 and clicks **Checkout** inside it. That picks variant 2, and a second row
-   appears below with two variants of the checkout, headed *↓ Checkout*. The page scrolls to it.
+   appears below with two variants of the checkout. A line runs from variant 2 down into it,
+   labelled *Checkout*. The page scrolls to it.
 4. Neither checkout is right. Zel types *one big pay button* in the **Neither?** tile and clicks
    **Make 2 more**: variants 3 and 4 join the row, and variants 1 and 2 stay.
 5. Zel clicks **Back to menu** inside variant 4. The page scrolls up to the first row; no new row.
@@ -22,6 +23,10 @@ The prompt box takes a product description (up to 2,000 characters); the example
 it in and submit. A new prompt starts a new mockup. A prompt this browser has seen before shows
 the rows it had last time, from the cache, at no cost.
 
+**History** lists every mockup in the cache, most recently changed first, with its number of
+screens. Choosing one opens it like typing its prompt again. The list comes from the server, so
+it is the same in every browser.
+
 ## Feed
 
 The mockup is a feed: one row per step of the flow, from the first screen at the top down to the
@@ -30,18 +35,27 @@ down walks through the flow; scrolling sideways compares variants. On a narrow w
 to one variant at a time, so the next variant is one swipe away.
 
 ```
- 1 · Menu        [ Variant 1 ✓ ] [ Variant 2 ] [ Neither? ]
- ↓ Checkout
- 2 · Checkout    [ Variant 1 ] [ Variant 2 ✓ ] [ Variant 3 ] [ Variant 4 ] [ Neither? ]
+ 1 · Menu
+ [ Variant 1 ✓ ]  [ Variant 2 ]  [ Neither? ]
+        │
+        │ Checkout
+        ↓
+ 2 · Checkout
+ [ Variant 1 ]  [ Variant 2 ✓ ]  [ Variant 3 ]  [ Variant 4 ]  [ Neither? ]
 ```
+
+- **Lineage**: a line drops from the bottom of the picked variant in each row into the next row,
+  labelled with the control that was clicked. Pick another variant and the line moves to it. When
+  the picked variant is scrolled out of the row, the line stays at the row's edge.
 
 - **Every variant is live**: its controls work, in any row.
 - **A screen is as tall as its content**, so nothing scrolls inside it: scrolling over a screen
   moves the page and the row. A screen sees an 800 px tall window (`100vh` is 800 px), so
   "full-screen" screens keep a normal size; a screen that still keeps growing with its window
   stops after four steps.
-- **Size**: a phone screen shows at 100%. Wider screens shrink until two of them and the
-  Neither tile fit the window.
+- **Size**: every screen shows at 100%, never shrunk, so its text stays readable and its sketch
+  lines stay whole. A row too wide for the window scrolls sideways. For an overview, use the
+  browser's zoom: it shrinks the whole page evenly.
 - Each variant's bar names its model and cost. The picked variant has a blue outline and
   *✓ Picked*; the others have a **Pick** button.
 
@@ -102,7 +116,7 @@ per browser.
 
 - **Model**: Claude Haiku 5.5 (default), GPT-6 Luna (fast), GPT-6.1 Sol Ultrafast. It applies to the
   next generated screen; cached screens stay as they are, with their maker named on each variant.
-- **Device**: Phone (default, 390 px wide) or Desktop (1280 px). The model is told which one, and
+- **Device**: Phone (default, 390 px wide) or Desktop (1024 px). The model is told which one, and
   the screen gets a window that wide. Like the model, it applies to the next generated screen.
   Screens made before devices existed show at 800 px.
   Loading the page and picking a model each send a short warm-up request to warm the prompt cache.

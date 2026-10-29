@@ -1,5 +1,5 @@
 // The browser side: prompt box, the feed of screens (one row per step, variants side by side),
-// streaming two variants at once, click-to-navigate, picking, pickers, metrics.
+// streaming two variants at once, click-to-navigate, picking, pickers, history, metrics.
 
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
 import { normalizePrompt, screenKey } from '@uxwoz/core/keys'
@@ -13,6 +13,7 @@ const promptInput = $<HTMLInputElement>('prompt')
 const modelSelect = $<HTMLSelectElement>('model')
 const themeSelect = $<HTMLSelectElement>('theme')
 const deviceSelect = $<HTMLSelectElement>('device')
+const historySelect = $<HTMLSelectElement>('history')
 const metrics = $('metrics')
 const errorBox = $('error')
 
@@ -234,6 +235,7 @@ async function load(row: Row, { regenerate = false, feedback = '', from = null a
         row.streaming = []
         row.entry = ev.entry
         const added = ev.variants.filter((i): i is number => i != null)
+        if (added.length) loadHistory()
         ev.variants.forEach((i, slot) => { if (i != null) feed.rename(streamId(row.key, slot), candidateId(row.key, i)) })
         const cost = added.reduce((s, i) => s + (ev.entry.candidates[i]!.costUsd ?? 0), 0)
         state.spent += cost
@@ -379,6 +381,27 @@ themeSelect.addEventListener('change', async () => {
 
 deviceSelect.addEventListener('change', () => store.set('uxwoz:device', deviceSelect.value))
 
+/** Fill the History list with every mockup in the cache, newest first. */
+async function loadHistory() {
+  const res = await fetch('/api/apps').catch(() => null)
+  if (!res?.ok) return
+  const { apps } = await res.json() as { apps: { app: string; screens: number }[] }
+  historySelect.replaceChildren(new Option(`History (${apps.length})`, ''))
+  for (const a of apps) {
+    const o = new Option(`${a.app.length > 60 ? a.app.slice(0, 59) + '…' : a.app} · ${a.screens} screen${a.screens === 1 ? '' : 's'}`, a.app)
+    o.title = a.app
+    historySelect.add(o)
+  }
+  historySelect.hidden = apps.length === 0
+}
+
+historySelect.addEventListener('change', () => {
+  if (!historySelect.value) return
+  promptInput.value = historySelect.value
+  historySelect.value = ''
+  promptForm.requestSubmit()
+})
+
 const warmUp = (model: string) =>
   fetch('/api/warmup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model }) }).catch(() => {})
 
@@ -399,6 +422,7 @@ async function init() {
   const savedDevice = store.get('uxwoz:device')
   deviceSelect.value = isDevice(savedDevice) ? savedDevice : cfg.defaultDevice
   warmUp(modelSelect.value)
+  loadHistory()
   await themeCss(themeSelect.value)
 }
 

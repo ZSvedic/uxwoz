@@ -26,7 +26,7 @@ export const VIEWPORT_H = 800
 /** The devices a screen can be designed for, and the width of the window it gets. */
 export const DEVICES = {
   phone: { label: 'Phone', width: 390, request: 'a phone screen, about 390 px wide' },
-  desktop: { label: 'Desktop', width: 1280, request: 'a desktop browser window, about 1280 px wide' },
+  desktop: { label: 'Desktop', width: 1024, request: 'a desktop browser window, about 1024 px wide' },
 } as const
 export type Device = keyof typeof DEVICES
 export const DEFAULT_DEVICE: Device = 'phone'

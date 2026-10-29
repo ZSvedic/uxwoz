@@ -76,6 +76,8 @@ describe('web server', () => {
     const map = await (await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}`, server.url))).json()
     expect(map.root).toBe('a tiny bakery website')
     expect(map.links.some((l: { label: string }) => l.label === 'Our breads')).toBe(true)
+    const { apps } = await (await fetch(new URL('/api/apps', server.url))).json()
+    expect(apps.map((a: { app: string }) => a.app)).toEqual([APP])
   })
 
   test('regenerate adds two more variants with the feedback; revisits keep the pick until the user picks again', async () => {

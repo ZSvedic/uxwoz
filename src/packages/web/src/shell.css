@@ -22,6 +22,7 @@ button:disabled { opacity: .45; cursor: default; }
 .pickers label { display: flex; gap: 6px; align-items: center; color: var(--muted); }
 .examples { flex-basis: 100%; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .example { padding: 2px 8px; font-size: 13px; }
+#history { margin-left: auto; padding: 2px 8px; font-size: 13px; max-width: 22em; }
 .metrics { flex: none; padding: 6px 16px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.4em; }
 .metrics b { color: var(--fg); font-weight: 600; }
 .error { margin: 0 16px; padding: 8px 12px; border: 1px solid var(--err); color: var(--err); border-radius: 6px; }
@@ -29,11 +30,17 @@ button:disabled { opacity: .45; cursor: default; }
 /* The feed: one row per step of the flow, top to bottom; a row's variants sit side by side. */
 .stage { flex: 1; min-height: 0; position: relative; overflow: auto; padding: 8px 16px 40vh; }
 .empty { color: var(--muted); text-align: center; margin: 15vh auto 0; max-width: 52ch; padding: 0 16px; }
-.row { margin-bottom: 28px; }
+.feed { position: relative; overflow-x: clip; }
+.row { margin-bottom: 40px; }
 .row-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; margin: 0 0 10px; }
 .row-title { font-size: 15px; }
 .row-note { color: var(--muted); }
-.via { flex-basis: 100%; color: var(--accent); font-weight: 600; }
+/* Lineage: a line from the picked variant above down into this row, with the click beside it. */
+.lineage { position: absolute; width: 0; border-left: 2px solid var(--accent); pointer-events: none; }
+.lineage::after { content: ''; position: absolute; left: -7px; bottom: -2px; border: 6px solid transparent;
+  border-top: 8px solid var(--accent); border-bottom: 0; }
+.via { position: absolute; left: 10px; bottom: 6px; white-space: nowrap; color: var(--accent); font-weight: 600; }
+.lineage.flip .via { left: auto; right: 12px; }
 .strip { display: flex; gap: 16px; align-items: flex-start; overflow-x: auto; padding: 4px 4px 12px; }
 .variant { flex: none; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
   box-shadow: 0 2px 10px rgba(0, 0, 0, .12); }
