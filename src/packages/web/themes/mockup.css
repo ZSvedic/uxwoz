@@ -57,8 +57,15 @@ button, [role="button"], input[type="submit"], input[type="button"] {
 }
 button:hover, [role="button"]:hover { background: #eee !important; }
 input[type="checkbox"], input[type="radio"] { box-shadow: none !important; }
+/* Small controls keep their shape: a wobble this size turns a round radio into a square. */
+input[type="checkbox"] { border-radius: 4px !important; }
+input[type="radio"] { border-radius: 50% !important; }
+/* See-through card headers and footers: a filled, square strip would paint over the wobbly corners. */
+article > header, article > footer { background: transparent; }
 input[type="checkbox"]:checked, input[type="radio"]:checked { background-color: var(--sk-ink) !important; }
 article { padding: 1rem 1.25rem; }
+/* Pico draws no fieldset border, so it gives none room either; this theme draws one. */
+fieldset { padding: .5rem 1rem; }
 table { border: 2px solid var(--sk-ink); }
 th, td { border-bottom: 1px dashed var(--sk-ink); }
 progress { border-radius: var(--sk-wobble); }

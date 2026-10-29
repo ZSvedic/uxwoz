@@ -111,7 +111,10 @@ const bootstrap = (final: boolean) => `(() => {
 // Our layout rules, after the theme: the screen fills the frame's width with less padding, and
 // the page never scrolls (the frame is as tall as the screen). Pico grows its text with the window
 // (20 px at 1280 px); a fixed 16 px keeps screens in scale with the app around them.
+// Pico turns a <small> right after an input into help text on its own line; after a checkbox or
+// radio in its label it is a count or note, like "All <small>(6)</small>", so it stays inline.
 const FRAME_CSS = `html, body { overflow: hidden; }
+label > :is([type="checkbox"], [type="radio"]) + small { display: inline; margin: 0 0 0 .25em; }
 body > main { max-width: none; padding: 20px 24px; }
 @media (max-width: 600px) { body > main { padding: 16px; } }
 :root { --pico-font-size: 100%; --pico-spacing: .75rem; --pico-typography-spacing-vertical: .75rem;
