@@ -193,6 +193,16 @@ export function createServer(opts: ServerOptions = {}) {
         return json(cache.map(app))
       },
       '/api/apps': () => json({ apps: cache.apps() }),
+      // A click to a screen already in the flow opens no new screen; this records it as a link.
+      '/api/link': {
+        POST: async (req) => {
+          const refused = refuseForeign(req)
+          if (refused) return refused
+          const b = await req.json().catch(() => null)
+          const link = cache.link(String(b?.from ?? ''), String(b?.to ?? ''), String(b?.label ?? '').slice(0, 200))
+          return link ? json({ link }) : json({ error: 'no such screens, or not in the same mockup' }, 404)
+        },
+      },
       '/api/choose': {
         POST: async (req) => {
           const refused = refuseForeign(req)

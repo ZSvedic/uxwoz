@@ -45,6 +45,9 @@ can spend model credits.
   an unknown model or device. A closed browser connection aborts the model calls; a variant that
   already finished is still cached.
 - `GET /api/map?app=…`: `{root, entries: CacheEntry[], links: Link[]}` for one mockup, oldest first.
+- `POST /api/link {from, to, label}`: record a click from one screen to another one already in the
+  flow (no screen is made); `{link}`, or 404 if a key is unknown or the two belong to different
+  mockups. The first click between two screens keeps its label.
 - `GET /api/apps`: `{apps: {app, screens, updatedAt}[]}`, every mockup once as first typed,
   most recently changed first. The History list.
 - `POST /api/choose {key, index}`: set the picked variant; 404 if either is unknown.

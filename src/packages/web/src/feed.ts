@@ -3,8 +3,9 @@
 // inside one picks it and opens the next row. The page scrolls normally, also over a screen.
 // Screens always show at 100% and only as wide as their content: the frame keeps the device's
 // width, so the screen's layout never changes, and the part it does not use is cut off. A row
-// that is too wide scrolls sideways. A line drops from the
-// picked variant of each row into the next row, labelled with the control that was clicked.
+// that is too wide scrolls sideways. A stepped line joins the picked variant of each row to the
+// picked variant of the next, labelled with the control that was clicked; other clicks between rows
+// (back links, skips ahead) are arcs in a gutter on the left.
 
 import { FRAME_SANDBOX, framePage } from '@uxwoz/core/frame'
 
@@ -19,8 +20,13 @@ const START_H = 600
 const GROWTH_LIMIT = 4
 const GROWTH_MS = 1500
 const GAP = 16
-/** How far a lineage line keeps from the ends of a row, when its variant is scrolled out of view. */
+/** How far a line keeps from the ends of a row, when its variant is scrolled out of view. */
 const LINE_INSET = 24
+/** The gutter left of the rows that holds the arcs (matches .feed's padding-left). */
+const GUTTER = 32
+/** The radius of a stepped line's corners. */
+const BEND = 8
+const SVG_NS = 'http://www.w3.org/2000/svg'
 
 export interface FeedVariant {
   /** Unique in the feed: `key#index` for a stored candidate, `key#sN` for a variant still streaming. */
@@ -41,6 +47,9 @@ export interface FeedRow {
   note: string
   variants: FeedVariant[]
 }
+
+/** A click in one row's screen that opens another row's screen. */
+export interface FeedLink { from: string; to: string; label: string }
 
 export interface FeedHandlers {
   pick: (rowKey: string, id: string) => void
@@ -66,26 +75,27 @@ interface Frame {
 interface RowEl {
   el: HTMLElement; head: HTMLElement; strip: HTMLElement; neither: HTMLElement
   feedback: HTMLTextAreaElement; more: HTMLButtonElement
-  /** The line from the row above into this one, and the click it shows. */
-  line: HTMLElement; label: HTMLElement
 }
 
 export class Feed {
   private list = el('div', 'feed')
   private rows = new Map<string, RowEl>()
   private frames = new Map<string, Frame>()
-  /** Each row in order, with the variant id its line starts from (the pick in the row above). */
-  private lineage: { key: string; from: string | null }[] = []
+  /** The rows and clicks the lines are drawn from. */
+  private drawn: { rows: FeedRow[]; links: FeedLink[] } = { rows: [], links: [] }
+  private lines = document.createElementNS(SVG_NS, 'svg')
   private linesQueued = false
 
   /** `stage` is the scrolling page area; the feed replaces what it holds on the first render. */
   constructor(private stage: HTMLElement, private on: FeedHandlers) {
+    this.lines.classList.add('lines')
+    this.list.append(this.lines)
     addEventListener('message', (e) => this.onFrameMessage(e))
     new ResizeObserver(() => this.queueLines()).observe(stage)
   }
 
   /** Draw the rows. Frames are kept and moved as little as possible, so unchanged screens do not reload. */
-  render(rows: FeedRow[], busy: boolean) {
+  render(rows: FeedRow[], busy: boolean, links: FeedLink[] = []) {
     if (this.list.parentElement !== this.stage) this.stage.replaceChildren(this.list)
     const keep = new Set(rows.map((r) => r.key))
     for (const [k, r] of this.rows) if (!keep.has(k)) { r.el.remove(); this.rows.delete(k) }
@@ -93,9 +103,8 @@ export class Feed {
     for (const [id, f] of this.frames) if (!ids.has(id)) { f.el.remove(); this.frames.delete(id) }
     rows.forEach((r, i) => {
       const row = this.row(r.key)
-      placeAt(this.list, row.el, i)
+      placeAt(this.list, row.el, i + 1) // after the lines
       row.head.replaceChildren(el('b', 'row-title', `${i + 1} · ${r.title}`), el('span', 'row-note', r.note))
-      row.label.textContent = r.via || 'next'
       r.variants.forEach((v, j) => {
         const f = this.frame(v.id, r.key)
         placeAt(row.strip, f.el, j)
@@ -109,7 +118,7 @@ export class Feed {
       placeAt(row.strip, row.neither, r.variants.length)
       row.more.disabled = busy
     })
-    this.lineage = rows.map((r, i) => ({ key: r.key, from: i ? rows[i - 1]!.variants.find((v) => v.chosen)?.id ?? null : null }))
+    this.drawn = { rows, links }
     this.queueLines()
   }
 
@@ -166,35 +175,66 @@ export class Feed {
     requestAnimationFrame(() => { this.linesQueued = false; this.drawLines() })
   }
 
-  /** Each line runs from the bottom of the picked variant above down to the top of its row. */
+  /**
+   * The flow's lines, in the feed's own coordinates. Between neighbouring rows: down from the pick,
+   * across, and down into the next row's pick. Any other click between two rows: an arc in the
+   * gutter from the row it was made in to the row it opened, wider the more rows it spans.
+   */
   private drawLines() {
+    const { rows, links } = this.drawn
     const base = this.list.getBoundingClientRect()
-    for (const { key, from } of this.lineage) {
-      const row = this.rows.get(key)
-      if (!row) continue
-      const f = from ? this.frames.get(from) : undefined
-      const strip = f?.el.parentElement
-      row.line.hidden = !f || !strip
-      if (!f || !strip) continue
-      const s = strip.getBoundingClientRect(), v = f.el.getBoundingClientRect()
-      const x = Math.min(Math.max(v.left + v.width / 2, s.left + LINE_INSET), s.right - LINE_INSET)
-      const top = v.bottom - base.top
-      row.line.style.left = `${x - base.left}px`
-      row.line.style.top = `${top}px`
-      row.line.style.height = `${Math.max(0, row.el.getBoundingClientRect().top - base.top - top)}px`
-      // Near the right edge the label goes on the line's left, so it stays in view.
-      row.line.classList.toggle('flip', x > s.left + s.width / 2)
+    const svg = this.lines
+    svg.setAttribute('width', String(this.list.scrollWidth))
+    svg.setAttribute('height', String(this.list.scrollHeight))
+    const marker = svgEl('marker', { id: 'uxwoz-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' })
+    marker.append(svgEl('path', { d: 'M0 0 L10 5 L0 10 z', class: 'arrow' }))
+    const defs = svgEl('defs', {})
+    defs.append(marker)
+    const parts: SVGElement[] = [defs]
+    /** Where a line meets a variant: its middle, kept inside the visible part of the row. */
+    const at = (f: Frame, edge: 'top' | 'bottom') => {
+      const s = f.el.parentElement!.getBoundingClientRect(), v = f.el.getBoundingClientRect()
+      return {
+        x: Math.min(Math.max(v.left + v.width / 2, s.left + LINE_INSET), s.right - LINE_INSET) - base.left,
+        y: v[edge] - base.top,
+      }
     }
+    const pick = (r: FeedRow) => {
+      const v = r.variants.find((x) => x.chosen) ?? r.variants[0]
+      return v ? this.frames.get(v.id) : undefined
+    }
+    for (let i = 1; i < rows.length; i++) {
+      const a = pick(rows[i - 1]!), b = pick(rows[i]!), row = this.rows.get(rows[i]!.key)
+      if (!a || !b || !row) continue
+      const p = at(a, 'bottom'), q = at(b, 'top')
+      const mid = row.el.getBoundingClientRect().top - base.top - 20
+      parts.push(svgEl('path', { d: stepped(p.x, p.y, q.x, mid, q.y), class: 'step', 'marker-end': 'url(#uxwoz-arrow)' }))
+      const label = svgEl('text', { x: String(p.x + (q.x < p.x ? -8 : 8)), y: String(mid - 6), class: 'via', 'text-anchor': q.x < p.x ? 'end' : 'start' })
+      label.textContent = rows[i]!.via || 'next'
+      parts.push(label)
+    }
+    const index = new Map(rows.map((r, i) => [r.key, i]))
+    const headY = (i: number) => {
+      const h = this.rows.get(rows[i]!.key)!.head.getBoundingClientRect()
+      return h.top + h.height / 2 - base.top
+    }
+    for (const l of links) {
+      const i = index.get(l.from), j = index.get(l.to)
+      if (i == null || j == null || i === j || j === i + 1) continue
+      const ya = headY(i), yb = headY(j), w = Math.min(GUTTER - 4, 6 + 4 * Math.abs(i - j))
+      const arc = svgEl('path', { d: `M${GUTTER - 4} ${ya} C${GUTTER - 4 - w} ${ya} ${GUTTER - 4 - w} ${yb} ${GUTTER - 4} ${yb}`, class: 'back', 'marker-end': 'url(#uxwoz-arrow)' })
+      const title = svgEl('title', {})
+      title.textContent = `${l.label || 'link'}: row ${i + 1} → row ${j + 1}`
+      arc.append(title)
+      parts.push(arc)
+    }
+    svg.replaceChildren(...parts)
   }
 
   private row(key: string): RowEl {
     const have = this.rows.get(key)
     if (have) return have
     const r = el('section', 'row')
-    const line = el('div', 'lineage')
-    line.hidden = true // until drawLines places it
-    const label = el('span', 'via')
-    line.append(label)
     const head = el('div', 'row-head')
     const strip = el('div', 'strip')
     strip.addEventListener('scroll', () => this.queueLines(), { passive: true })
@@ -208,8 +248,8 @@ export class Feed {
     more.addEventListener('click', () => this.on.regenerate(key, feedback.value.trim()))
     neither.append(el('b', '', 'Neither?'), el('p', '', 'Click a button inside the variant you like, or ask for two more.'), feedback, more)
     strip.append(neither)
-    r.append(line, head, strip)
-    const row = { el: r, head, strip, neither, feedback, more, line, label }
+    r.append(head, strip)
+    const row = { el: r, head, strip, neither, feedback, more }
     this.rows.set(key, row)
     return row
   }
@@ -286,6 +326,20 @@ function el(tag: string, cls: string, text?: string): HTMLElement {
   if (cls) e.className = cls
   if (text != null) e.textContent = text
   return e
+}
+
+function svgEl(tag: string, attrs: Record<string, string>): SVGElement {
+  const e = document.createElementNS(SVG_NS, tag)
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v)
+  return e
+}
+
+/** Down from (x1, y1) to y, across to x2, down to y2, with rounded corners. */
+function stepped(x1: number, y1: number, x2: number, y: number, y2: number): string {
+  const dx = x2 - x1
+  if (Math.abs(dx) < 2 * BEND) return `M${x1} ${y1} V${y2}`
+  const s = Math.sign(dx)
+  return `M${x1} ${y1} V${y - BEND} Q${x1} ${y} ${x1 + s * BEND} ${y} H${x2 - s * BEND} Q${x2} ${y} ${x2} ${y + BEND} V${y2}`
 }
 
 /** Put a child at position i without moving the others (moving an iframe reloads it). */

@@ -44,9 +44,16 @@ to one variant at a time, so the next variant is one swipe away.
  [ Variant 1 ]  [ Variant 2 ✓ ]  [ Variant 3 ]  [ Variant 4 ]  [ Neither? ]
 ```
 
-- **Lineage**: a line drops from the bottom of the picked variant in each row into the next row,
-  labelled with the control that was clicked. Pick another variant and the line moves to it. When
-  the picked variant is scrolled out of the row, the line stays at the row's edge.
+- **Lineage**: a stepped line runs from the picked variant in each row down, across and into the
+  picked variant of the next row, labelled with the control that was clicked. Pick another variant
+  and the line moves to it. When a variant is scrolled out of its row, the line stays at the row's
+  edge.
+- **Other clicks**: a click that goes back to a row already in the flow (or ahead to a later one)
+  scrolls there and draws a dashed arc in the gutter left of the rows, from the row clicked in to
+  the row it opened, with an arrow. Hovering an arc names the control. Arcs are stored with the
+  mockup, so they come back next time. This is an arc diagram: the rows are a line, and every
+  link beside the line is an arc, so 50 screens stay readable. A map view of the whole mockup, as
+  an indented tree, can come later.
 
 - **Every variant is live**: its controls work, in any row.
 - **A screen is as tall as its content**, so nothing scrolls inside it: scrolling over a screen

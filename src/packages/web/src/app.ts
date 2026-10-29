@@ -3,8 +3,8 @@
 
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
 import { normalizePrompt, screenKey } from '@uxwoz/core/keys'
-import type { CacheEntry, Candidate } from '@uxwoz/core'
-import { Feed, type FeedRow, type FeedVariant } from './feed.ts'
+import type { CacheEntry, Candidate, Link } from '@uxwoz/core'
+import { Feed, type FeedLink, type FeedRow, type FeedVariant } from './feed.ts'
 import type { ScreenEvent } from './server.ts'
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -32,6 +32,8 @@ interface Row {
 const state = {
   app: null as string | null,
   rows: [] as Row[],
+  /** Clicks between this mockup's screens, for the lines between rows. */
+  links: [] as FeedLink[],
   busy: null as AbortController | null,
   /** Counts prompts started, so a slower earlier start gives way to a newer one. */
   starts: 0,
@@ -94,7 +96,7 @@ function feedRow(r: Row): FeedRow {
 
 /** Draw every row and put each stored variant in its frame. Streaming frames are left to their streams. */
 async function draw() {
-  feed.render(state.rows.map(feedRow), !!state.busy)
+  feed.render(state.rows.map(feedRow), !!state.busy, state.links)
   const theme = themeSelect.value
   const css = await themeCss(theme)
   if (theme !== themeSelect.value) return // a newer draw shows the newer theme
@@ -239,6 +241,7 @@ async function load(row: Row, { regenerate = false, feedback = '', from = null a
         ev.variants.forEach((i, slot) => { if (i != null) feed.rename(streamId(row.key, slot), candidateId(row.key, i)) })
         const cost = added.reduce((s, i) => s + (ev.entry.candidates[i]!.costUsd ?? 0), 0)
         state.spent += cost
+        if (ev.link) addLink(ev.link)
         savePath(app)
         if (regenerate && added.length) feed.clearFeedback(row.key)
         if (ev.failed.length) showError(`${ev.failed.length} of ${ev.variants.length} variants failed: ${ev.failed[0]}`)
@@ -288,12 +291,31 @@ function onAction(rowKey: string, id: string, prompt: string, label: string) {
   const known = !!rowOf(key)
   if (state.busy && !known) return
   if (row.entry && row.entry.chosen !== index) choose(row, index)
-  if (known) { feed.scrollToRow(key); return }
+  if (known) {
+    feed.scrollToRow(key)
+    recordLink(row.key, key, label)
+    return
+  }
   // A new screen from an earlier row replaces the rows below it.
   const next: Row = { key, action: prompt, via: label, entry: null, streaming: [] }
   state.rows = [...state.rows.slice(0, r + 1), next]
   savePath(app)
   load(next, { from: row })
+}
+
+function addLink(l: Link | FeedLink) {
+  if (!state.links.some((x) => x.from === l.from && x.to === l.to)) state.links.push({ from: l.from, to: l.to, label: l.label })
+}
+
+/** A click to a screen already in the flow: draw it now, and store it with the mockup. */
+async function recordLink(from: string, to: string, label: string) {
+  if (from === to) return
+  addLink({ from, to, label })
+  draw()
+  await fetch('/api/link', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to, label }),
+  }).catch(() => null)
 }
 
 /** Make a variant the one revisits show. */
@@ -335,8 +357,10 @@ async function start(app: string) {
   showError(null)
   const res = await fetch(`/api/map?app=${encodeURIComponent(app)}`)
   if (!res.ok) throw new Error(`could not load the mockup: HTTP ${res.status}`)
-  const entries = new Map((await res.json() as { entries: CacheEntry[] }).entries.map((e) => [e.key, e]))
+  const map = await res.json() as { entries: CacheEntry[]; links: Link[] }
+  const entries = new Map(map.entries.map((e) => [e.key, e]))
   if (n !== state.starts) return // a newer prompt was submitted meanwhile
+  state.links = map.links.map(({ from, to, label }) => ({ from, to, label }))
   let saved: SavedRow[] = []
   try { saved = JSON.parse(store.get(pathKey(app)) ?? '[]') } catch { /* start fresh */ }
   const root = screenKey(app, null)

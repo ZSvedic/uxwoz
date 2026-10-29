@@ -30,17 +30,19 @@ button:disabled { opacity: .45; cursor: default; }
 /* The feed: one row per step of the flow, top to bottom; a row's variants sit side by side. */
 .stage { flex: 1; min-height: 0; position: relative; overflow: auto; padding: 8px 16px 40vh; }
 .empty { color: var(--muted); text-align: center; margin: 15vh auto 0; max-width: 52ch; padding: 0 16px; }
-.feed { position: relative; overflow-x: clip; }
+.feed { position: relative; overflow-x: clip; padding-left: 32px; }
 .row { margin-bottom: 40px; }
 .row-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; margin: 0 0 10px; }
 .row-title { font-size: 15px; }
 .row-note { color: var(--muted); }
-/* Lineage: a line from the picked variant above down into this row, with the click beside it. */
-.lineage { position: absolute; width: 0; border-left: 2px solid var(--accent); pointer-events: none; }
-.lineage::after { content: ''; position: absolute; left: -7px; bottom: -2px; border: 6px solid transparent;
-  border-top: 8px solid var(--accent); border-bottom: 0; }
-.via { position: absolute; left: 10px; bottom: 6px; white-space: nowrap; color: var(--accent); font-weight: 600; }
-.lineage.flip .via { left: auto; right: 12px; }
+/* The flow's lines (drawn by feed.ts): stepped lines from pick to pick, dashed arcs in the left
+   gutter for other clicks. Row titles sit on a background, so a line passes behind them. */
+.lines { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.lines .step { fill: none; stroke: var(--accent); stroke-width: 2; }
+.lines .back { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: stroke; }
+.lines .arrow { fill: var(--accent); }
+.lines .via { fill: var(--accent); font: 600 13px system-ui, -apple-system, sans-serif; }
+.row-head > * { position: relative; background: var(--bg); padding: 0 4px; }
 .strip { display: flex; gap: 16px; align-items: flex-start; overflow-x: auto; padding: 4px 4px 12px; }
 .variant { flex: none; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
   box-shadow: 0 2px 10px rgba(0, 0, 0, .12); }
