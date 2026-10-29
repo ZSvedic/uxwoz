@@ -19,6 +19,7 @@ const startOverButton = $<HTMLButtonElement>('startOver')
 const deleteAppButton = $<HTMLButtonElement>('deleteApp')
 const zoomRange = $<HTMLInputElement>('zoomRange')
 const zoom100 = $<HTMLButtonElement>('zoom100')
+const zoomValue = $('zoomValue')
 const metrics = $('metrics')
 const errorBox = $('error')
 
@@ -39,6 +40,8 @@ interface Row {
   entry: CacheEntry | null
   /** The variants streaming into this row now, one renderer each. */
   streaming: StreamRenderer[]
+  /** The variant being refreshed in place, if any: it streams into its own frame. */
+  replacing?: number
 }
 
 const state = {
@@ -70,6 +73,8 @@ const feed = new Feed($('stage'), {
   regenerate: (rowKey, id, prompt) => {
     const r = rowOf(rowKey), c = r?.entry?.candidates[indexOf(id)]
     if (!r?.entry || !c || state.busy) return
+    // Refresh (no prompt) makes a new version of the variant in its place; Change adds a variant.
+    if (prompt == null) return refreshVariant(r, indexOf(id))
     // Regenerate keeps the variant's own prompt; a Change back to the screen's prompt is a plain regenerate.
     const own = r.entry.action ?? r.entry.app
     prompt ??= c.prompt ?? null
@@ -79,7 +84,8 @@ const feed = new Feed($('stage'), {
   action: onAction,
   zoomed: (z) => {
     zoomRange.value = String(Math.round(z * 100))
-    zoom100.textContent = `${Math.round(z * 100)}%`
+    zoomValue.textContent = `${Math.round(z * 100)}%`
+    zoom100.disabled = z === 1
     store.set('uxwoz:zoom', String(z))
   },
 })
@@ -135,18 +141,24 @@ function feedRow(r: Row, i: number): FeedRow {
     variants.push({
       id: candidateId(r.key, j),
       width: widthOf(c),
-      caption: labelOf(e, c),
+      caption: r.replacing === j ? `${labelOf(e, c)} · refreshing…` : labelOf(e, c),
       tooltip: `${modelLabel(c.model)} · ${fmtCost(c)} · ${fmtS(c.totalMs)}`,
       chosen: e.chosen === j,
-      streaming: false,
+      streaming: r.replacing === j,
       prompt: c.prompt ?? e.action ?? e.app,
       info: infoOf(e, c),
     })
   })
+  // A refreshed variant shows where the one it replaced was.
+  const slot = (j: number): number => { const c = e?.candidates[j]; return c?.replaces != null && c.replaces < j ? slot(c.replaces) : j }
+  variants.sort((a, b) => {
+    const x = indexOf(a.id), y = indexOf(b.id) // NaN for a variant still streaming: those stay last
+    return Number.isNaN(x) || Number.isNaN(y) ? Number(Number.isNaN(x)) - Number(Number.isNaN(y)) : slot(x) - slot(y)
+  })
   const first = variants.findIndex((v) => v.id === candidateId(r.key, r.front!))
   if (first > 0) variants.unshift(...variants.splice(first, 1))
   const device = deviceSelect.value as Device
-  r.streaming.forEach((_, slot) => variants.push({
+  if (r.replacing == null) r.streaming.forEach((_, slot) => variants.push({
     id: streamId(r.key, slot),
     width: DEVICES[device]?.width ?? LEGACY_WIDTH,
     caption: 'New variant · making…',
@@ -156,7 +168,7 @@ function feedRow(r: Row, i: number): FeedRow {
     prompt: '',
     info: [],
   }))
-  const live = variants.length - r.streaming.length
+  const live = r.replacing == null ? variants.length - r.streaming.length : variants.length
   const note = r.streaming.length ? `making ${r.streaming.length === 1 ? 'a variant' : `${r.streaming.length} variants`}…` : `${live} variant${live === 1 ? '' : 's'}`
   return { key: r.key, title: `Step ${i + 1}`, via: r.via, note, variants }
 }
@@ -174,7 +186,7 @@ async function draw() {
   const theme = themeSelect.value
   const css = await themeCss(theme)
   if (theme !== themeSelect.value) return // a newer draw shows the newer theme
-  for (const r of state.rows) r.entry?.candidates.forEach((c, i) => feed.show(candidateId(r.key, i), c.html, true, css))
+  for (const r of state.rows) r.entry?.candidates.forEach((c, i) => { if (r.replacing !== i) feed.show(candidateId(r.key, i), c.html, true, css) })
 }
 
 async function fetchText(url: string): Promise<string> {
@@ -264,9 +276,10 @@ async function* readEvents(res: Response): AsyncGenerator<ScreenEvent> {
 
 /**
  * Fill a row: from the cache when its screen is there, else two variants streamed side by side.
- * With `regenerate`, one more variant joins the row, made from `prompt` when given.
+ * With `regenerate`, one more variant joins the row, made from `prompt` when given. With `replace`,
+ * that variant gets a new version in its place, streamed into its own frame.
  */
-async function load(row: Row, { regenerate = false, prompt = null as string | null, from = null as Row | null } = {}) {
+async function load(row: Row, { regenerate = false, prompt = null as string | null, from = null as Row | null, replace = null as number | null } = {}) {
   const variant = row.parent
   state.busy?.abort()
   const ctrl = new AbortController()
@@ -277,7 +290,7 @@ async function load(row: Row, { regenerate = false, prompt = null as string | nu
   let firstVisible: number | null = null
   let cached = false
   showError(null)
-  setMetrics(regenerate ? `Making a new variant with ${modelLabel(model)}…` : 'Asking for the screen…')
+  setMetrics(replace != null ? `Refreshing the variant with ${modelLabel(model)}…` : regenerate ? `Making a new variant with ${modelLabel(model)}…` : 'Asking for the screen…')
   draw()
   try {
     const css = await themeCss(themeSelect.value)
@@ -285,7 +298,7 @@ async function load(row: Row, { regenerate = false, prompt = null as string | nu
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        app, action: row.action, model, device: deviceSelect.value, regenerate, prompt,
+        app, action: row.action, model, device: deviceSelect.value, regenerate, prompt, replace,
         from: from?.key ?? null, variant, label: from ? row.via : null,
       }),
       signal: ctrl.signal,
@@ -295,13 +308,15 @@ async function load(row: Row, { regenerate = false, prompt = null as string | nu
       if (ev.type === 'meta') {
         cached = ev.cached
         row.key = ev.key // the server's key is the truth (it was computed the same way)
-        row.streaming = Array.from({ length: ev.variants }, (_, slot) => new StreamRenderer(streamId(row.key, slot), css, () => {
+        if (replace != null) row.replacing = replace
+        const target = (slot: number) => (replace != null ? candidateId(row.key, replace) : streamId(row.key, slot))
+        row.streaming = Array.from({ length: ev.variants }, (_, slot) => new StreamRenderer(target(slot), css, () => {
           firstVisible ??= performance.now() - t0
           setMetrics(`First visible screen <b>${fmtS(firstVisible)}</b> · streaming ${ev.variants} variants from ${modelLabel(model)}…`)
         }))
         if (!cached) {
           await draw()
-          if (regenerate) feed.scrollToVariant(streamId(row.key, 0))
+          if (regenerate || replace != null) feed.scrollToVariant(target(0))
           else feed.scrollToRow(row.key)
         }
       } else if (ev.type === 'chunk') row.streaming[ev.variant]?.push(ev.text)
@@ -310,14 +325,22 @@ async function load(row: Row, { regenerate = false, prompt = null as string | nu
         finished = true
         for (const s of row.streaming) s.cancel()
         row.streaming = []
+        row.replacing = undefined
         row.entry = ev.entry
         state.entries.set(ev.entry.key, ev.entry)
         const added = ev.variants.filter((i): i is number => i != null)
         if (added.length) loadHistory()
-        ev.variants.forEach((i, slot) => { if (i != null) feed.rename(streamId(row.key, slot), candidateId(row.key, i)) })
+        // A refreshed variant streamed into the old version's frame, which now shows the new one.
+        ev.variants.forEach((i, slot) => { if (i != null) feed.rename(replace != null ? candidateId(row.key, replace) : streamId(row.key, slot), candidateId(row.key, i)) })
+        if (replace != null && row.front === replace) row.front = ev.variants[0] ?? undefined
         const cost = added.reduce((s, i) => s + (ev.entry.candidates[i]!.costUsd ?? 0), 0)
         state.spent += cost
         if (ev.link) addLink(ev.link)
+        // A refresh deletes the old version, and with it maybe screens and links: reload the mockup.
+        if (replace != null) {
+          const res = await fetch(`/api/map?app=${encodeURIComponent(app)}`).catch(() => null)
+          if (res?.ok) applyMap(app, await res.json(), row)
+        }
         savePath(app)
         if (ev.failed.length) showError(`${ev.failed.length} of ${ev.variants.length} variants failed: ${ev.failed[0]}`)
         // The metrics line is final once every new variant has loaded with its script.
@@ -346,6 +369,7 @@ async function load(row: Row, { regenerate = false, prompt = null as string | nu
     }
     for (const s of row.streaming) s.cancel()
     row.streaming = []
+    row.replacing = undefined // draw() puts the old version back into its frame
     // A new row whose screen never arrived goes away; a regenerated row keeps the variants it had.
     // After an abort the rows may already belong to another prompt, so they are left alone.
     if (!row.entry && !ctrl.signal.aborted) { state.rows = state.rows.filter((r) => r !== row); savePath(app) }
@@ -437,9 +461,18 @@ async function removeVariant(row: Row, index: number) {
   }).catch(() => null)
   if (!res?.ok) return showError('Could not delete the variant')
   // The server sends the whole mockup back: a delete can also give other screens new parents.
-  const map = await res.json() as { entries: CacheEntry[]; links: Link[] }
+  applyMap(e.app, await res.json() as { entries: CacheEntry[]; links: Link[] }, row)
   loadHistory()
-  if (normalizePrompt(state.app ?? '') !== normalizePrompt(e.app)) return // another mockup opened meanwhile
+  if (!state.rows.length) setMetrics('This mockup is empty now. Press <b>Generate</b> to start it again.')
+  draw()
+}
+
+/**
+ * Take the server's copy of the open mockup after screens were deleted: rows whose screen is gone
+ * go, with the rows below them, and the rows below `row` follow its pick again.
+ */
+function applyMap(app: string, map: { entries: CacheEntry[]; links: Link[] }, row: Row) {
+  if (normalizePrompt(state.app ?? '') !== normalizePrompt(app)) return // another mockup opened meanwhile
   state.entries = new Map(map.entries.map((x) => [x.key, x]))
   state.links = map.links
   const cut = state.rows.findIndex((r) => !state.entries.has(r.key))
@@ -447,8 +480,16 @@ async function removeVariant(row: Row, index: number) {
   for (const r of state.rows) r.entry = state.entries.get(r.key)!
   if (state.rows.includes(row)) followPick(row)
   if (state.app) savePath(state.app)
-  if (!state.rows.length) setMetrics('This mockup is empty now. Press <b>Generate</b> to start it again.')
-  draw()
+}
+
+/** Refresh a variant, after asking when screens were made from it: they go with the old version. */
+function refreshVariant(row: Row, index: number) {
+  const e = row.entry, c = e?.candidates[index]
+  if (!e || !c) return
+  const kids = [...state.entries.values()].filter((x) => x.parent?.key === e.key && x.parent.variant === index).length
+  const what = kids === 1 ? 'the screen made from it is' : `the ${kids} screens made from it are`
+  if (kids && !confirm(`Refresh ${labelOf(e, c)}? The new version gets a new name, and ${what} deleted.`)) return
+  load(row, { replace: index })
 }
 
 /** Make a variant the one revisits show. */

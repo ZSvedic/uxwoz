@@ -24,7 +24,7 @@ export const VARIANTS = 2
 export type ScreenEvent =
   | { type: 'meta'; key: string; cached: boolean; variants: number }
   | { type: 'chunk'; variant: number; text: string }
-  | { type: 'done'; entry: CacheEntry; variants: (number | null)[]; failed: string[]; link: Link | null }
+  | { type: 'done'; entry: CacheEntry; variants: (number | null)[]; failed: string[]; link: Link | null; removed: string[] }
   | { type: 'error'; message: string }
 
 export interface ServerOptions {
@@ -102,30 +102,41 @@ export function createServer(opts: ServerOptions = {}) {
   interface Click { from: string; variant: number; label: string }
   /**
    * `regenerate` adds one variant to a screen even when it is cached; `prompt`, when given, is what
-   * the model is asked for instead of the screen's own prompt (the user's Change).
+   * the model is asked for instead of the screen's own prompt (the user's Change). `replace` makes
+   * a new version of that variant from the prompt it was made with; it takes the old one's place.
    */
-  interface ScreenRequest { app: string; action: string | null; model: ModelId; device: Device; regenerate: boolean; prompt: string | null; click: Click | null }
+  interface ScreenRequest {
+    app: string; action: string | null; model: ModelId; device: Device; regenerate: boolean; prompt: string | null
+    replace: number | null; click: Click | null
+  }
 
   async function* screenEvents(r: ScreenRequest, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
-    const { app, model, device, click, prompt } = r
+    const { app, model, device, click, replace } = r
     const action = canonicalAction(app, r.action)
     const key = screenKey(app, action)
-    const linkFrom = () => (click ? cache.link(click.from, click.variant, key, click.label || action || 'home') ?? null : null)
     const hit = cache.get(key)
-    if (hit && !r.regenerate) {
+    const old = replace == null ? undefined : hit?.candidates[replace]
+    if (replace != null && (!old || old.deleted)) {
+      yield { type: 'error', message: 'no such variant to refresh' }
+      return
+    }
+    const prompt = old ? old.prompt ?? null : r.prompt
+    const linkFrom = () => (click ? cache.link(click.from, click.variant, key, click.label || action || 'home') ?? null : null)
+    if (hit && !r.regenerate && replace == null) {
       yield { type: 'meta', key, cached: true, variants: 0 }
-      yield { type: 'done', entry: hit, variants: [], failed: [], link: linkFrom() }
+      yield { type: 'done', entry: hit, variants: [], failed: [], link: linkFrom(), removed: [] }
       return
     }
     if (action && !cache.get(screenKey(app, null))) {
       yield { type: 'error', message: 'this mockup has no first screen: it was deleted, or never made' }
       return
     }
-    const count = r.regenerate ? 1 : VARIANTS
+    const count = r.regenerate || replace != null ? 1 : VARIANTS
     yield { type: 'meta', key, cached: false, variants: count }
     const existing = cache.existingScreens(app).filter((a) => a !== action)
     const streams = Array.from({ length: count }, (_, slot) => tagged(slot, generateScreen({
-      app, action: prompt ?? action, existing, model, device, alternative: slot % 2 === 1,
+      // A refreshed second variant of a pair stays the different design it was asked to be.
+      app, action: prompt ?? action, existing, model, device, alternative: replace != null ? replace === 1 : slot % 2 === 1,
       signal, fetch: opts.fetch, env: opts.env, log,
     })))
     const made: (Candidate | null)[] = Array(count).fill(null)
@@ -146,7 +157,10 @@ export function createServer(opts: ServerOptions = {}) {
     const gone = action != null && !cache.get(screenKey(app, null))
     // A variant that finished is paid for: keep it, even if the browser left before the other one.
     if (signal.aborted) {
-      if (ok.length && !gone) cache.add(app, action, ok, { parent })
+      if (ok.length && !gone) {
+        if (replace != null) cache.replace(key, replace, ok[0]!)
+        else cache.add(app, action, ok, { parent })
+      }
       return
     }
     if (gone) {
@@ -158,9 +172,15 @@ export function createServer(opts: ServerOptions = {}) {
       return
     }
     // Both variants are stored together, in slot order, so the first stays first whichever finished first.
+    if (replace != null) {
+      const done = cache.replace(key, replace, ok[0]!)
+      if (!done) yield { type: 'error', message: 'the variant was deleted while it was being refreshed' }
+      else yield { type: 'done', entry: done.entry, variants: [done.index], failed, link: null, removed: done.removed }
+      return
+    }
     const { entry, index } = cache.add(app, action, ok, { parent })
     let n = index
-    yield { type: 'done', entry, variants: made.map((c) => (c ? n++ : null)), failed, link: linkFrom() }
+    yield { type: 'done', entry, variants: made.map((c) => (c ? n++ : null)), failed, link: linkFrom(), removed: [] }
   }
 
   return Bun.serve({
@@ -200,12 +220,14 @@ export function createServer(opts: ServerOptions = {}) {
           if (prompt && prompt.length > 2000) return json({ error: 'prompt must be at most 2000 characters' }, 400)
           if (!isModelId(model)) return json({ error: `unknown model ${model}` }, 400)
           if (!isDevice(device)) return json({ error: `unknown device ${device}` }, 400)
+          const replace = b?.replace ?? null
+          if (replace != null && (!Number.isInteger(replace) || replace < 0)) return json({ error: 'replace must be a whole number' }, 400)
           const variant = b?.variant ?? 0
           if (!Number.isInteger(variant) || variant < 0) return json({ error: 'variant must be a whole number' }, 400)
           const click = typeof b?.from === 'string' && b.from
             ? { from: b.from.slice(0, 3000), variant, label: String(b?.label ?? '').slice(0, 200) }
             : null
-          return ndjson(screenEvents({ app, action, model, device, regenerate: b?.regenerate === true, prompt, click }, req.signal))
+          return ndjson(screenEvents({ app, action, model, device, regenerate: b?.regenerate === true, prompt, replace, click }, req.signal))
         },
       },
       '/api/map': (req) => {

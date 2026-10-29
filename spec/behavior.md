@@ -42,9 +42,9 @@ per level, so letters stay taken after their screens are gone; Start over begins
 ## Feed
 
 The feed shows the main flow: one row per step, from the first screen at the top down to the
-latest. A row holds the variants of one screen side by side, the picked one first. Scrolling down
-walks through the flow; scrolling sideways compares variants. On a narrow window a row snaps to
-one variant at a time, so the next variant is one swipe away.
+latest. A row holds the variants of one screen side by side, the picked one first. The feed is one
+surface on a dot grid: the page scrolls both ways, and rows never scroll on their own. Scrolling
+down walks through the flow; scrolling sideways compares variants.
 
 ```
  Step 1
@@ -70,17 +70,18 @@ one variant at a time, so the next variant is one swipe away.
   "full-screen" screens keep a normal size; a screen that still keeps growing with its window
   stops after four steps.
 - **Size**: a screen is only as wide as its content; the device width is the most it takes. The
-  model is told to start small: only what this step needs. A row too wide for the window scrolls
-  sideways.
+  model is told to start small: only what this step needs.
 - **Zoom**: pinch, or Ctrl/Cmd + scroll, zooms the feed around the pointer, also over a screen.
-  The slider at the top sets it from 10% to 150%; **Fit** shows the whole flow, **100%** goes back.
-  Screens stay live at any zoom. The zoom is remembered in this browser.
+  The slider at the top sets it from 10% to 150%, with the level shown beside it; **Fit** shows the
+  whole flow, **100%** goes back. The dot grid's spacing follows the zoom, so it shows how far in
+  or out the feed is. Screens stay live at any zoom. The zoom is remembered in this browser.
 - Each variant's bar shows its name, a ✓ when picked (with a blue outline), and four tools.
   Hovering the bar names its model, cost and time.
 
 ## Tree
 
-Left of the feed, a tree lists every screen of the mockup, one line per variant. The screens a
+A panel floating over the top right of the feed lists every screen of the mockup as a tree, one
+line per variant. Drag it by its header to move it; **–** folds it to its header. The screens a
 variant's clicks first made hang below it, under the label of the control that was clicked:
 
 ```
@@ -121,7 +122,9 @@ Each variant's bar has four tools:
 - **✎ Change** shows the prompt the variant was made from. Edit it and click **Make a new
   variant**: one more variant joins the end of the row, made from the edited prompt. It stays a
   variant of the same screen, so the click that leads here still lands here.
-- **↻ Regenerate** makes one more variant from the same prompt.
+- **↻ Refresh** makes the variant again from the same prompt. The new version takes the old one's
+  place in the row (and its pick) under a new name, and the old one is deleted, with the screens
+  only it led to. When screens were made from it, Refresh asks first.
 - **✕ Delete** asks, then deletes the variant: its markup goes, its letter stays taken. Screens
   that only it led to go too, with their rows. Deleting the last variant of a screen deletes the
   screen; deleting the last variant of the first screen deletes the mockup.
@@ -186,3 +189,9 @@ loads it, from the order things were made.
   the blue of controls that open a screen. Clean is plain Pico with neutral buttons and links. Switching restyles the screens at once; the model never sees the theme.
 
 All three choices are remembered in this browser.
+
+## Colours
+
+Black and white is the mockup, blue is a control in a mockup that opens another screen, and burnt
+orange is UX Woz itself: the Generate button, picks, flow lines, the tree's flow and the zoom
+slider.

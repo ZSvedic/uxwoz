@@ -32,6 +32,8 @@ export interface Candidate {
   feedback?: string
   /** Deleted by the user: its markup is gone, its letter stays taken. */
   deleted?: boolean
+  /** The variant this one replaced by a refresh: it shows in that variant's place. */
+  replaces?: number
 }
 
 /** The variant and click that first made a screen. */
@@ -125,6 +127,21 @@ export class ScreenCache {
     this.letters.set(at, n)
     this.save()
     return { entry, index }
+  }
+
+  /**
+   * Refresh a variant: the new version gets the next letter and shows in the old one's place (and
+   * is picked if the old one was), and the old one is deleted like deleteVariant does, with the
+   * screens only it led to. Returns the screen, the new index and the keys removed.
+   */
+  replace(key: string, index: number, candidate: Candidate): { entry: CacheEntry; index: number; removed: string[] } | undefined {
+    const entry = this.entries.get(key)
+    if (!entry || !Number.isInteger(index) || !isLive(entry, index)) return undefined
+    const old = entry.candidates[index]!
+    const { index: next } = this.add(entry.app, entry.action, [{ ...candidate, replaces: index, ...(old.prompt && { prompt: old.prompt }) }])
+    if (entry.chosen === index) entry.chosen = next
+    const { removed } = this.deleteVariant(key, index)!
+    return { entry, index: next, removed }
   }
 
   /** The action prompts of this mockup's later screens, newest first. */

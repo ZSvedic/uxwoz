@@ -20,7 +20,8 @@
     <span class="zoom" title="Zoom: pinch, or Ctrl/Cmd + scroll">
       <button id="zoomFit" type="button" title="Fit the whole flow on the page">Fit</button>
       <input id="zoomRange" type="range" min="10" max="150" step="5" value="100" aria-label="Zoom">
-      <button id="zoom100" type="button" title="Back to 100%">100%</button>
+      <output id="zoomValue" for="zoomRange">100%</output>
+      <button id="zoom100" type="button" title="Back to 100%" disabled>100%</button>
     </span>
   </div>
   <div class="examples">Try:
@@ -38,11 +39,11 @@
 <div id="metrics" class="metrics"></div>
 <div id="error" class="error" hidden></div>
 <div class="workspace">
-<nav id="tree" class="tree" aria-label="All screens"></nav>
 <section id="stage" class="stage">
   <p class="empty">Type a product idea above. Each screen comes in two variants side by side. Click a
     <span class="go">blue</span> button inside the one you like: that picks it, and the next screen appears below.</p>
 </section>
+<nav id="tree" class="tree" aria-label="All screens"></nav>
 </div>
 <script type="module" src="./app.ts"></script>
 </body>

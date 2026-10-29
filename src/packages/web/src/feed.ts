@@ -1,10 +1,10 @@
 // The feed: the mockup as rows, one per step of the flow, top to bottom. A row holds the variants
 // of one screen side by side, the picked one first. Every variant is live: any click in one picks
 // it, and a click that opens another screen also opens the next row. Each variant's bar has
-// Change, Regenerate, Delete and Info. The page scrolls normally, also over a screen.
+// Change, Refresh, Delete and Info. The feed is one surface: the page scrolls both ways, also
+// over a screen, and rows never scroll on their own.
 // Screens always show at 100% and only as wide as their content: the frame keeps the device's
-// width, so the screen's layout never changes, and the part it does not use is cut off. A row
-// that is too wide scrolls sideways. A stepped line joins the picked variant of each row to the
+// width, so the screen's layout never changes, and the part it does not use is cut off. A stepped line joins the picked variant of each row to the
 // picked variant of the next, labelled with the control that was clicked; other clicks between rows
 // (back links, skips ahead) are arcs in a gutter on the left.
 
@@ -21,8 +21,6 @@ const START_H = 600
 const GROWTH_LIMIT = 4
 const GROWTH_MS = 1500
 const GAP = 16
-/** How far a line keeps from the ends of a row, when its variant is scrolled out of view. */
-const LINE_INSET = 24
 /** The gutter left of the rows that holds the arcs (matches .feed's padding-left). */
 const GUTTER = 32
 /** How far right of a variant's left edge the flow line meets it: picks come first, so the line is straight. */
@@ -64,7 +62,7 @@ export interface FeedLink { from: string; to: string; label: string }
 export interface FeedHandlers {
   /** `bar` is true for a click on the variant's bar, false for a press inside its screen. */
   pick: (rowKey: string, id: string, bar: boolean) => void
-  /** Make one more variant like this one; with `prompt`, made from that prompt instead. */
+  /** Without `prompt`, refresh this variant in place; with it, make a new variant from that prompt. */
   regenerate: (rowKey: string, id: string, prompt: string | null) => void
   remove: (rowKey: string, id: string) => void
   action: (rowKey: string, id: string, prompt: string, label: string) => void
@@ -142,6 +140,7 @@ export class Feed {
     const px = (st.scrollLeft + ax) / this.z, py = (st.scrollTop + ay) / this.z
     this.z = z
     this.list.style.zoom = String(z)
+    st.style.setProperty('--z', String(z)) // the dot grid behind the feed scales with it
     st.scrollLeft = px * z - ax
     st.scrollTop = py * z - ay
     this.queueLines()
@@ -189,8 +188,7 @@ export class Feed {
         f.caption.textContent = v.caption
         if (f.width !== v.width) { f.width = v.width; f.frame.style.width = f.screen.style.width = `${v.width}px` }
       })
-      const front = r.variants[0]?.id ?? null
-      if (front !== row.front) { row.front = front; row.strip.scrollTo({ left: 0 }) }
+      row.front = r.variants[0]?.id ?? null
     })
     this.drawn = { rows, links }
     this.queueLines()
@@ -230,13 +228,13 @@ export class Feed {
     if (r) this.stage.scrollTo({ top: this.stage.scrollTop + r.el.getBoundingClientRect().top - this.stage.getBoundingClientRect().top - 8, behavior: smooth ? 'smooth' : 'auto' })
   }
 
-  /** Bring a variant into view within its row. */
+  /** Bring a variant into view sideways, if it is out of view. */
   scrollToVariant(id: string, smooth = true) {
     const f = this.frames.get(id)
-    const strip = f?.el.parentElement
-    if (!f || !strip) return
-    const left = strip.scrollLeft + (f.el.getBoundingClientRect().left - strip.getBoundingClientRect().left) / this.z - GAP
-    strip.scrollTo({ left: Math.max(0, left), behavior: smooth ? 'smooth' : 'auto' })
+    if (!f) return
+    const st = this.stage, s = st.getBoundingClientRect(), v = f.el.getBoundingClientRect()
+    if (v.left >= s.left && v.right <= s.right) return
+    st.scrollTo({ left: Math.max(0, st.scrollLeft + v.left - s.left - GAP), behavior: smooth ? 'smooth' : 'auto' })
   }
 
   /** Redraw the lineage lines once, before the next paint. */
@@ -263,13 +261,10 @@ export class Feed {
     const defs = svgEl('defs', {})
     defs.append(marker)
     const parts: SVGElement[] = [defs]
-    /** Where a line meets a variant: near its left edge, kept inside the visible part of the row. */
+    /** Where a line meets a variant: near its left edge. */
     const at = (f: Frame, edge: 'top' | 'bottom') => {
-      const s = f.el.parentElement!.getBoundingClientRect(), v = f.el.getBoundingClientRect()
-      return {
-        x: X(Math.min(Math.max(v.left + FLOW_X * z, s.left + LINE_INSET * z), s.right - LINE_INSET * z)),
-        y: Y(v[edge]),
-      }
+      const v = f.el.getBoundingClientRect()
+      return { x: X(v.left + FLOW_X * z), y: Y(v[edge]) }
     }
     const pick = (r: FeedRow) => {
       const v = r.variants.find((x) => x.chosen) ?? r.variants[0]
@@ -309,7 +304,6 @@ export class Feed {
     const r = el('section', 'row')
     const head = el('div', 'row-head')
     const strip = el('div', 'strip')
-    strip.addEventListener('scroll', () => this.queueLines(), { passive: true })
     r.append(head, strip)
     const row = { el: r, head, strip, front: null }
     this.rows.set(key, row)
@@ -334,7 +328,7 @@ export class Feed {
     }
     const tools = [
       tool('change', '✎', 'Change: edit the prompt and make a new variant from it'),
-      tool('regenerate', '↻', 'Regenerate: one more variant from the same prompt'),
+      tool('regenerate', '↻', 'Refresh: make this variant again, in its place, from the same prompt'),
       tool('delete', '✕', 'Delete this variant'),
       tool('info', 'ⓘ', 'Info: model, time, cost, prompt'),
     ]
@@ -437,9 +431,8 @@ export class Feed {
       const r = f.frame.getBoundingClientRect(), k = r.width / (f.frame.offsetWidth || 1)
       this.zoomBy(Number(d.dy) || 0, r.left + (Number(d.x) || 0) * k, r.top + (Number(d.y) || 0) * k)
     } else if (d.uxwoz === 'wheel') {
-      // The frame never scrolls itself: its gestures scroll the page and the row.
-      this.stage.scrollBy(0, Number(d.dy) || 0)
-      f.el.parentElement?.scrollBy(Number(d.dx) || 0, 0)
+      // The frame never scrolls itself: its gestures scroll the page.
+      this.stage.scrollBy(Number(d.dx) || 0, Number(d.dy) || 0)
     } else if (d.uxwoz === 'action' && typeof d.prompt === 'string') {
       this.on.action(f.rowKey, id, d.prompt.slice(0, 500), typeof d.label === 'string' ? d.label.slice(0, 80) : '')
     }

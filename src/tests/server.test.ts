@@ -92,6 +92,15 @@ describe('web server', () => {
     expect(changed.variants).toEqual([3])
     expect(changed.entry.key).toBe('a tiny bakery website')
     expect(changed.entry.candidates[3]).toMatchObject({ prompt: 'A tiny bakery website with one big photo of bread', letter: 'D' })
+    const before = changed.entry.candidates[2]!.html
+    // A refresh is a new variant with a new name, in the old one's place; the old one is deleted.
+    const refreshed = done(await screen({ app: APP, replace: 2 }))
+    expect(refreshed.variants).toEqual([4])
+    expect(refreshed.entry.candidates[4]).toMatchObject({ letter: 'E', replaces: 2 })
+    expect(refreshed.entry.candidates[4]!.html).not.toBe(before)
+    expect(refreshed.entry.candidates[2]).toMatchObject({ deleted: true, letter: 'C' })
+    expect((await screen({ app: APP, replace: 9 })).map((e) => e.type)).toEqual(['error'])
+    expect((await post('/api/screen', { app: APP, replace: -1 })).status).toBe(400)
     const res = await post('/api/choose', { key: regen.entry.key, index: 3 })
     expect((await res.json()).entry.chosen).toBe(3)
     expect((await post('/api/choose', { key: regen.entry.key, index: 7 })).status).toBe(404)

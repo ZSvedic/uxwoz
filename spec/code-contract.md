@@ -37,7 +37,9 @@ can spend model credits.
 - `POST /api/screen {app, action?, model?, device?, regenerate?, prompt?, from?, variant?, label?}`:
   NDJSON stream of `meta`, `chunk`*, then `done` or `error`. A new screen makes two variants at
   once: `meta.variants` is 2 and each chunk names its `variant` (0 or 1). `regenerate` makes one
-  more variant of the screen, cached or not. `prompt` (up to 2,000 characters) is asked for in place
+  more variant of the screen, cached or not. `replace` (a candidate index) refreshes that variant:
+  one new variant with the next letter and `replaces` set, picked if the old one was; the old one
+  is deleted as by `/api/delete`, and `done.removed` lists the screens that went with it. `prompt` (up to 2,000 characters) is asked for in place
   of the screen's own action prompt and stored on the new candidates; the key stays the screen's.
   `done.variants` maps each variant to its candidate index, or null if it failed (its message in
   `failed`); `error` comes only when all fail. A cache hit sends `meta` (cached true, variants 0)
@@ -89,10 +91,10 @@ CacheEntry { key; app; action: string | null; chosen: number; candidates: Candid
              // level 1 is the first screen; parent is the click that first made the screen
 Candidate  { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
              costEstimated; firstChunkMs; totalMs; finishReason; device?: Device;
-             name?; letter?; prompt?; feedback?; deleted? }
+             name?; letter?; prompt?; feedback?; deleted?; replaces? }
              // one variant; entry.chosen is the picked one. name comes from the model's <title>,
              // letter from the cache ("B" in L2-B), prompt from a Change; feedback is from before
-             // Change existed; a deleted one has html ''
+             // Change existed; a deleted one has html ''; replaces is the index a refresh took over
 Link       { from: key; variant: number; to: key; label; createdAt }
              // first click from a variant to a screen wins
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast'

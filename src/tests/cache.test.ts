@@ -163,6 +163,18 @@ describe('screen cache', () => {
     expect(cache.add('Cafe', 'Z', [cand('<h1>z</h1>')], { parent: { key: root, variant: 3, label: 'z' } }).entry.parent).toBeNull()
   })
 
+  test('a refresh gets a new letter, takes the pick, and deletes the old version with what came from it', () => {
+    const cache = new ScreenCache()
+    const root = cache.add('Cafe', null, [cand('<h1>A</h1>'), cand('<h1>B</h1>')]).entry.key
+    const kid = cache.add('Cafe', 'Cart', [cand('<h1>c</h1>')], { parent: { key: root, variant: 0, label: 'Cart' } }).entry.key
+    const done = cache.replace(root, 0, cand('<h1>A2</h1>'))!
+    expect(done.index).toBe(2)
+    expect(done.entry.candidates[2]).toMatchObject({ letter: 'C', replaces: 0, html: '<h1>A2</h1>' })
+    expect(done.entry.chosen).toBe(2)
+    expect(done.removed).toEqual([kid])
+    expect(cache.replace(root, 0, cand('<h1>x</h1>'))).toBeUndefined() // already deleted
+  })
+
   test('deleting a mockup removes all its screens and links, and no other', () => {
     const cache = new ScreenCache()
     const menu = cache.add('Cafe', null, [cand('<h1>Menu</h1>')]).entry.key

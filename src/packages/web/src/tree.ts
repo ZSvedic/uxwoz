@@ -1,7 +1,8 @@
-// The tree: every screen of a mockup, as an indented list beside the feed. Each line is one variant
-// ("L2-B Planning sync"); the screens a variant's clicks first made hang below it, under the label
-// of the control that was clicked. The variants in the main flow are marked; clicking any line
-// makes its path the flow.
+// The tree: every screen of a mockup, as an indented list in a panel floating over the feed, like
+// the panels of an image editor: drag it by its header, fold it to its header. Each line is one
+// variant ("L2-B Planning sync"); the screens a variant's clicks first made hang below it, under the
+// label of the control that was clicked. The variants in the main flow are marked; clicking any
+// line makes its path the flow.
 
 import { variantId } from '@uxwoz/core/keys'
 import type { CacheEntry } from '@uxwoz/core'
@@ -19,10 +20,46 @@ export interface TreeData {
 }
 
 export class Tree {
-  constructor(private el: HTMLElement, private on: TreeHandlers) {}
+  /** Made once, so a redraw while the panel is dragged keeps the drag going. */
+  private head = el('div', 'tree-head')
+  private count = el('span', '')
+  private fold = el('button', 'fold')
+  private body = el('div', 'tree-body')
+
+  constructor(private box: HTMLElement, private on: TreeHandlers) {
+    this.head.title = 'Drag to move'
+    this.fold.type = 'button'
+    this.fold.addEventListener('click', () => this.setFolded(!this.body.hidden))
+    this.head.append(el('b', '', 'Screens'), this.count, this.fold)
+    this.setFolded(false)
+    this.drag(this.head)
+  }
+
+  private setFolded(folded: boolean) {
+    this.body.hidden = folded
+    this.fold.textContent = folded ? '+' : '–'
+    this.fold.title = folded ? 'Show all screens' : 'Fold to this header'
+  }
+
+  /** Drag the panel by its header, kept inside the area around it. */
+  private drag(head: HTMLElement) {
+    head.addEventListener('pointerdown', (e) => {
+      if ((e.target as Element).closest('button')) return
+      const box = this.box.getBoundingClientRect(), area = this.box.offsetParent!.getBoundingClientRect()
+      const dx = e.clientX - box.left, dy = e.clientY - box.top
+      head.setPointerCapture(e.pointerId)
+      const move = (m: PointerEvent) => {
+        const x = Math.min(Math.max(0, m.clientX - dx - area.left), area.width - box.width)
+        const y = Math.min(Math.max(0, m.clientY - dy - area.top), area.height - 40)
+        Object.assign(this.box.style, { left: `${x}px`, top: `${y}px`, right: 'auto' })
+      }
+      head.addEventListener('pointermove', move)
+      head.addEventListener('pointerup', () => head.removeEventListener('pointermove', move), { once: true })
+    })
+  }
 
   render(d: TreeData | null) {
-    if (!d || !d.entries.get(d.root)) { this.el.replaceChildren(); return }
+    if (!d || !d.entries.get(d.root)) { this.box.replaceChildren(); return }
     const kids = new Map<string, CacheEntry[]>()
     for (const e of d.entries.values()) {
       if (!e.parent) continue
@@ -62,8 +99,9 @@ export class Tree {
       parts.push(el('div', 'via', 'Not linked from the first screen'))
       for (const e of rest) if (!seen.has(e.key)) parts.push(screen(e))
     }
-    const head = el('div', 'tree-head', `${seen.size} screen${seen.size === 1 ? '' : 's'} · ${variants} variant${variants === 1 ? '' : 's'}`)
-    this.el.replaceChildren(head, ...parts)
+    this.count.textContent = `${seen.size} screen${seen.size === 1 ? '' : 's'} · ${variants} variant${variants === 1 ? '' : 's'}`
+    this.body.replaceChildren(...parts)
+    if (this.head.parentElement !== this.box) this.box.replaceChildren(this.head, this.body)
   }
 }
 
