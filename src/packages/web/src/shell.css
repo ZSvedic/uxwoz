@@ -29,6 +29,7 @@ button:disabled { opacity: .45; cursor: default; }
 .error[hidden] { display: none; }
 /* The feed: one row per step of the flow, top to bottom; a row's variants sit side by side. */
 .stage { flex: 1; min-height: 0; position: relative; overflow: auto; padding: 8px 16px 40vh; }
+.empty .go { color: #2a5bd7; font-weight: 600; }
 .empty { color: var(--muted); text-align: center; margin: 15vh auto 0; max-width: 52ch; padding: 0 16px; }
 .feed { position: relative; overflow-x: clip; padding-left: 32px; }
 .row { margin-bottom: 40px; }
@@ -50,19 +51,27 @@ button:disabled { opacity: .45; cursor: default; }
 .variant.streaming { opacity: .85; }
 .variant-bar { cursor: pointer; display: flex; gap: 8px; align-items: center; min-height: 36px; padding: 4px 8px 4px 12px; font-size: 13px;
   color: var(--muted); border-bottom: 1px solid var(--line); }
-.variant-bar .caption { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.variant-bar .picked { display: none; color: var(--accent); font-weight: 600; }
+.variant-bar .caption { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); font-weight: 600; }
+.variant-bar .picked { display: none; color: var(--accent); font-weight: 700; }
 .variant.chosen .picked { display: inline; }
+.variant-bar .tool { flex: none; width: 26px; height: 26px; padding: 0; border-color: transparent; background: none; color: var(--muted);
+  font-size: 14px; line-height: 1; }
+.variant-bar .tool:hover:not(:disabled) { border-color: var(--line); color: var(--fg); }
+.variant-bar .tool[data-tool="delete"]:hover:not(:disabled) { color: var(--err); }
+/* Change and Info open here, between the bar and the screen. */
+.panel { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.panel label { color: var(--muted); }
+.panel textarea { width: 100%; resize: vertical; font: inherit; color: inherit; padding: 6px 8px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--bg); }
+.panel-buttons { display: flex; gap: 8px; }
+.panel .make { background: var(--accent); border-color: var(--accent); color: #fff; }
+.info { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; margin: 0; }
+.info dt { color: var(--muted); }
+.info dd { margin: 0; overflow-wrap: anywhere; }
 .screen { overflow: hidden; }
 .screen iframe { display: block; border: 0; background: #fff; }
-.neither { flex: none; width: 240px; display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 2px dashed var(--line);
-  border-radius: 10px; color: var(--muted); }
-.neither b { color: var(--fg); }
-.neither p { margin: 0; }
-.neither textarea { width: 100%; resize: vertical; font: inherit; color: inherit; padding: 6px 8px; border: 1px solid var(--line);
-  border-radius: 6px; background: var(--card); }
 /* On a narrow screen a row shows one variant at a time: one swipe to the next. */
 @media (max-width: 700px) {
   .strip { scroll-snap-type: x mandatory; }
-  .variant, .neither { scroll-snap-align: start; }
+  .variant { scroll-snap-align: start; }
 }

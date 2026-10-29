@@ -62,7 +62,15 @@ const feed = new Feed($('stage'), {
     choose(r, indexOf(id))
     if (bar && Number.isInteger(indexOf(id))) { r.front = indexOf(id); draw() }
   },
-  regenerate: (rowKey, feedback) => { const r = rowOf(rowKey); if (r && !state.busy) load(r, { regenerate: true, feedback }) },
+  regenerate: (rowKey, id, prompt) => {
+    const r = rowOf(rowKey), c = r?.entry?.candidates[indexOf(id)]
+    if (!r?.entry || !c || state.busy) return
+    // Regenerate keeps the variant's own prompt; a Change back to the screen's prompt is a plain regenerate.
+    const own = r.entry.action ?? r.entry.app
+    prompt ??= c.prompt ?? null
+    load(r, { regenerate: true, prompt: prompt && normalizePrompt(prompt) !== normalizePrompt(own) ? prompt : null })
+  },
+  remove: (rowKey, id) => { const r = rowOf(rowKey); if (r) removeVariant(r, indexOf(id)) },
   action: onAction,
 })
 
@@ -86,6 +94,23 @@ function nameOf(e: CacheEntry, c: Candidate): string {
 /** A variant's canonical label, e.g. "L2-B Planning sync". */
 const labelOf = (e: CacheEntry, c: Candidate) => `${variantId(e.level, c.letter ?? '?')} ${nameOf(e, c)}`
 
+function infoOf(e: CacheEntry, c: Candidate): [string, string][] {
+  const info: [string, string][] = [
+    ['Name', labelOf(e, c)],
+    ['Model', modelLabel(c.model) + (c.servedModel ? ` (served ${c.servedModel})` : '')],
+    ['Device', c.device ? DEVICES[c.device].label : 'from before devices'],
+    ['Made', new Date(c.createdAt).toLocaleString()],
+    ['First text', c.firstChunkMs == null ? '–' : fmtS(c.firstChunkMs)],
+    ['Total time', fmtS(c.totalMs)],
+    ['Cost', fmtCost(c)],
+    ['Finish', c.finishReason ?? '–'],
+    ['Size', `${c.html.length.toLocaleString()} characters`],
+    ['Prompt', c.prompt ?? e.action ?? e.app],
+  ]
+  if (c.feedback) info.push(['Asked for', c.feedback])
+  return info
+}
+
 const widthOf = (c: Candidate) => (c.device ? DEVICES[c.device].width : LEGACY_WIDTH)
 
 function feedRow(r: Row, i: number): FeedRow {
@@ -102,6 +127,8 @@ function feedRow(r: Row, i: number): FeedRow {
       tooltip: `${modelLabel(c.model)} · ${fmtCost(c)} · ${fmtS(c.totalMs)}`,
       chosen: e.chosen === j,
       streaming: false,
+      prompt: c.prompt ?? e.action ?? e.app,
+      info: infoOf(e, c),
     })
   })
   const first = variants.findIndex((v) => v.id === candidateId(r.key, r.front!))
@@ -114,6 +141,8 @@ function feedRow(r: Row, i: number): FeedRow {
     tooltip: '',
     chosen: false,
     streaming: true,
+    prompt: '',
+    info: [],
   }))
   const live = variants.length - r.streaming.length
   const note = r.streaming.length ? `making ${r.streaming.length === 1 ? 'a variant' : `${r.streaming.length} variants`}…` : `${live} variant${live === 1 ? '' : 's'}`
@@ -216,9 +245,9 @@ async function* readEvents(res: Response): AsyncGenerator<ScreenEvent> {
 
 /**
  * Fill a row: from the cache when its screen is there, else two variants streamed side by side.
- * With `regenerate`, two more variants join the row, shaped by the user's feedback if any.
+ * With `regenerate`, one more variant joins the row, made from `prompt` when given.
  */
-async function load(row: Row, { regenerate = false, feedback = '', from = null as Row | null } = {}) {
+async function load(row: Row, { regenerate = false, prompt = null as string | null, from = null as Row | null } = {}) {
   const variant = row.parent
   state.busy?.abort()
   const ctrl = new AbortController()
@@ -229,7 +258,7 @@ async function load(row: Row, { regenerate = false, feedback = '', from = null a
   let firstVisible: number | null = null
   let cached = false
   showError(null)
-  setMetrics(regenerate ? `Making 2 more variants with ${modelLabel(model)}…` : 'Asking for the screen…')
+  setMetrics(regenerate ? `Making a new variant with ${modelLabel(model)}…` : 'Asking for the screen…')
   draw()
   try {
     const css = await themeCss(themeSelect.value)
@@ -237,7 +266,7 @@ async function load(row: Row, { regenerate = false, feedback = '', from = null a
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        app, action: row.action, model, device: deviceSelect.value, regenerate, feedback,
+        app, action: row.action, model, device: deviceSelect.value, regenerate, prompt,
         from: from?.key ?? null, variant, label: from ? row.via : null,
       }),
       signal: ctrl.signal,
@@ -271,7 +300,6 @@ async function load(row: Row, { regenerate = false, feedback = '', from = null a
         state.spent += cost
         if (ev.link) addLink(ev.link)
         savePath(app)
-        if (regenerate && added.length) feed.clearFeedback(row.key)
         if (ev.failed.length) showError(`${ev.failed.length} of ${ev.variants.length} variants failed: ${ev.failed[0]}`)
         // The metrics line is final once every new variant has loaded with its script.
         let waiting = added.length
@@ -376,6 +404,32 @@ function extendPath() {
 }
 
 const newest = (e: CacheEntry) => e.candidates.reduce((t, c) => (c.createdAt > t ? c.createdAt : t), '')
+
+/** Delete a variant, after asking. Screens only it reached go too, and their rows with them. */
+async function removeVariant(row: Row, index: number) {
+  const e = row.entry, c = e?.candidates[index]
+  if (!e || !c || state.busy) return
+  const last = e.candidates.filter((x) => !x.deleted).length === 1
+  const what = last ? (e.action ? `${labelOf(e, c)}, the last variant of this screen` : 'the first screen, and with it this whole mockup') : labelOf(e, c)
+  if (!confirm(`Delete ${what}? Screens that only it leads to are deleted too.`)) return
+  const res = await fetch('/api/delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: e.key, index }),
+  }).catch(() => null)
+  if (!res?.ok) return showError('Could not delete the variant')
+  const { entry, removed } = await res.json() as { entry: CacheEntry | null; removed: string[] }
+  const gone = new Set(removed)
+  for (const k of gone) state.entries.delete(k)
+  state.links = state.links.filter((l) => !gone.has(l.from) && !gone.has(l.to) && !(l.from === e.key && l.variant === index))
+  if (entry) { state.entries.set(entry.key, entry); row.entry = entry }
+  const cut = state.rows.findIndex((r) => gone.has(r.key))
+  if (cut >= 0) state.rows = state.rows.slice(0, cut)
+  if (entry) followPick(row)
+  if (state.app) savePath(state.app)
+  loadHistory()
+  if (!state.rows.length) setMetrics('This mockup is empty now. Press <b>Generate</b> to start it again.')
+  draw()
+}
 
 /** Make a variant the one revisits show. */
 async function choose(row: Row, index: number) {

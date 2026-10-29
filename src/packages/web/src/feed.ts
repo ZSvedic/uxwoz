@@ -1,6 +1,7 @@
 // The feed: the mockup as rows, one per step of the flow, top to bottom. A row holds the variants
-// of one screen side by side, then a "Neither" tile to ask for more. Every variant is live: any
-// click in one picks it, and a click that opens another screen also opens the next row. The page scrolls normally, also over a screen.
+// of one screen side by side, the picked one first. Every variant is live: any click in one picks
+// it, and a click that opens another screen also opens the next row. Each variant's bar has
+// Change, Regenerate, Delete and Info. The page scrolls normally, also over a screen.
 // Screens always show at 100% and only as wide as their content: the frame keeps the device's
 // width, so the screen's layout never changes, and the part it does not use is cut off. A row
 // that is too wide scrolls sideways. A stepped line joins the picked variant of each row to the
@@ -39,6 +40,10 @@ export interface FeedVariant {
   tooltip: string
   chosen: boolean
   streaming: boolean
+  /** The prompt it was made with, for Change; '' while it streams. */
+  prompt: string
+  /** Name and value pairs for Info. */
+  info: [string, string][]
 }
 
 export interface FeedRow {
@@ -56,7 +61,9 @@ export interface FeedLink { from: string; to: string; label: string }
 export interface FeedHandlers {
   /** `bar` is true for a click on the variant's bar, false for a press inside its screen. */
   pick: (rowKey: string, id: string, bar: boolean) => void
-  regenerate: (rowKey: string, feedback: string) => void
+  /** Make one more variant like this one; with `prompt`, made from that prompt instead. */
+  regenerate: (rowKey: string, id: string, prompt: string | null) => void
+  remove: (rowKey: string, id: string) => void
   action: (rowKey: string, id: string, prompt: string, label: string) => void
 }
 
@@ -65,6 +72,11 @@ interface Frame {
   caption: HTMLElement
   /** Cuts the frame to the width the screen uses. */
   screen: HTMLElement
+  /** Holds the open Change or Info panel, if any, between the bar and the screen. */
+  panel: HTMLElement
+  tools: HTMLButtonElement[]
+  /** The variant as last rendered, for its panels. */
+  data: FeedVariant | null
   frame: HTMLIFrameElement
   rowKey: string
   width: number
@@ -75,8 +87,7 @@ interface Frame {
 }
 
 interface RowEl {
-  el: HTMLElement; head: HTMLElement; strip: HTMLElement; neither: HTMLElement
-  feedback: HTMLTextAreaElement; more: HTMLButtonElement
+  el: HTMLElement; head: HTMLElement; strip: HTMLElement
   /** The variant shown first, so a new one there scrolls the row back to its start. */
   front: string | null
 }
@@ -89,6 +100,7 @@ export class Feed {
   private drawn: { rows: FeedRow[]; links: FeedLink[] } = { rows: [], links: [] }
   private lines = document.createElementNS(SVG_NS, 'svg')
   private linesQueued = false
+  private busy = false
 
   /** `stage` is the scrolling page area; the feed replaces what it holds on the first render. */
   constructor(private stage: HTMLElement, private on: FeedHandlers) {
@@ -101,6 +113,7 @@ export class Feed {
   /** Draw the rows. Frames are kept and moved as little as possible, so unchanged screens do not reload. */
   render(rows: FeedRow[], busy: boolean, links: FeedLink[] = []) {
     if (this.list.parentElement !== this.stage) this.stage.replaceChildren(this.list)
+    this.busy = busy
     const keep = new Set(rows.map((r) => r.key))
     for (const [k, r] of this.rows) if (!keep.has(k)) { r.el.remove(); this.rows.delete(k) }
     const ids = new Set(rows.flatMap((r) => r.variants.map((v) => v.id)))
@@ -112,16 +125,16 @@ export class Feed {
       // Variants are placed with CSS order, not moved: moving an iframe reloads it.
       r.variants.forEach((v, j) => {
         const f = this.frame(v.id, r.key)
-        if (f.el.parentElement !== row.strip) row.strip.insertBefore(f.el, row.neither)
+        if (f.el.parentElement !== row.strip) row.strip.append(f.el)
         f.el.style.order = String(j)
+        f.data = v
+        for (const b of f.tools) b.disabled = v.streaming || (busy && b.dataset.tool !== 'info')
         f.el.classList.toggle('chosen', v.chosen)
         f.el.classList.toggle('streaming', v.streaming)
         f.el.title = v.tooltip
         f.caption.textContent = v.caption
         if (f.width !== v.width) { f.width = v.width; f.frame.style.width = f.screen.style.width = `${v.width}px` }
       })
-      row.neither.style.order = String(r.variants.length)
-      row.more.disabled = busy
       const front = r.variants[0]?.id ?? null
       if (front !== row.front) { row.front = front; row.strip.scrollTo({ left: 0 }) }
     })
@@ -156,11 +169,6 @@ export class Feed {
     f.el.dataset.id = to
   }
 
-  /** Empty a row's feedback box, once the variants it asked for have arrived. */
-  clearFeedback(key: string) {
-    const r = this.rows.get(key)
-    if (r) r.feedback.value = ''
-  }
 
   /** Bring a row to the top of the page. */
   scrollToRow(key: string, smooth = true) {
@@ -245,18 +253,8 @@ export class Feed {
     const head = el('div', 'row-head')
     const strip = el('div', 'strip')
     strip.addEventListener('scroll', () => this.queueLines(), { passive: true })
-    const neither = el('aside', 'neither')
-    const feedback = document.createElement('textarea')
-    feedback.maxLength = 500
-    feedback.rows = 4
-    feedback.placeholder = 'What should change? e.g. "bigger camera view", "fewer cards". Optional.'
-    const more = el('button', 'more', 'Make 2 more') as HTMLButtonElement
-    more.type = 'button'
-    more.addEventListener('click', () => this.on.regenerate(key, feedback.value.trim()))
-    neither.append(el('b', '', 'Neither?'), el('p', '', 'Click anything in the variant you like to pick it, or ask for two more.'), feedback, more)
-    strip.append(neither)
     r.append(head, strip)
-    const row = { el: r, head, strip, neither, feedback, more, front: null }
+    const row = { el: r, head, strip, front: null }
     this.rows.set(key, row)
     return row
   }
@@ -269,19 +267,78 @@ export class Feed {
     const bar = el('div', 'variant-bar')
     const caption = el('span', 'caption')
     bar.title = 'Click anything in a variant to pick it'
-    bar.append(caption, el('span', 'picked', '✓'))
+    const tool = (name: string, icon: string, tip: string) => {
+      const b = el('button', 'tool', icon) as HTMLButtonElement
+      b.type = 'button'
+      b.title = tip
+      b.dataset.tool = name
+      b.addEventListener('click', (e) => { e.stopPropagation(); this.onTool(f, name) })
+      return b
+    }
+    const tools = [
+      tool('change', '✎', 'Change: edit the prompt and make a new variant from it'),
+      tool('regenerate', '↻', 'Regenerate: one more variant from the same prompt'),
+      tool('delete', '✕', 'Delete this variant'),
+      tool('info', 'ⓘ', 'Info: model, time, cost, prompt'),
+    ]
+    bar.append(caption, el('span', 'picked', '✓'), ...tools)
+    const panel = el('div', 'panel')
+    panel.hidden = true
     const screen = el('div', 'screen')
     const frame = document.createElement('iframe')
     frame.setAttribute('sandbox', FRAME_SANDBOX)
     frame.title = 'Generated screen'
     frame.style.height = `${START_H}px`
     screen.append(frame)
-    v.append(bar, screen)
-    const f: Frame = { el: v, caption, screen, frame, rowKey, width: 0, shown: null, onLoad: null, growth: { count: 0, at: 0 }, frozen: false }
+    v.append(bar, panel, screen)
+    const f: Frame = {
+      el: v, caption, screen, panel, tools, data: null, frame, rowKey, width: 0, shown: null, onLoad: null,
+      growth: { count: 0, at: 0 }, frozen: false,
+    }
     bar.addEventListener('click', () => this.on.pick(f.rowKey, v.dataset.id!, true))
     frame.addEventListener('load', () => this.loaded(f))
     this.frames.set(id, f)
     return f
+  }
+
+  /** A tool button in a variant's bar. Change and Info toggle a panel above the screen. */
+  private onTool(f: Frame, name: string) {
+    const v = f.data, id = f.el.dataset.id!
+    if (!v) return
+    if (name === 'regenerate') return this.on.regenerate(f.rowKey, id, null)
+    if (name === 'delete') return this.on.remove(f.rowKey, id)
+    const open = !f.panel.hidden && f.panel.dataset.tool === name
+    f.panel.hidden = open
+    f.panel.dataset.tool = name
+    if (open) return this.queueLines()
+    if (name === 'info') {
+      const dl = el('dl', 'info')
+      for (const [k, val] of v.info) dl.append(el('dt', '', k), el('dd', '', val))
+      f.panel.replaceChildren(dl)
+    } else {
+      const text = document.createElement('textarea')
+      text.value = v.prompt
+      text.maxLength = 2000
+      text.rows = Math.min(8, Math.max(3, Math.ceil(v.prompt.length / 40)))
+      const make = el('button', 'make', 'Make a new variant') as HTMLButtonElement
+      make.type = 'button'
+      make.disabled = this.busy
+      make.addEventListener('click', () => {
+        const prompt = text.value.trim()
+        if (!prompt) return
+        f.panel.hidden = true
+        this.queueLines()
+        this.on.regenerate(f.rowKey, id, prompt)
+      })
+      const cancel = el('button', '', 'Cancel') as HTMLButtonElement
+      cancel.type = 'button'
+      cancel.addEventListener('click', () => { f.panel.hidden = true; this.queueLines() })
+      const buttons = el('div', 'panel-buttons')
+      buttons.append(make, cancel)
+      f.panel.replaceChildren(el('label', '', 'The prompt this variant was made from:'), text, buttons)
+      text.focus()
+    }
+    this.queueLines()
   }
 
   private loaded(f: Frame) {
