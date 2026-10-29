@@ -17,6 +17,11 @@
     <label>Model <select id="model"></select></label>
     <label>Device <select id="device" title="What new screens are designed for"></select></label>
     <label>Theme <select id="theme"></select></label>
+    <span class="zoom" title="Zoom: pinch, or Ctrl/Cmd + scroll">
+      <button id="zoomFit" type="button" title="Fit the whole flow on the page">Fit</button>
+      <input id="zoomRange" type="range" min="10" max="150" step="5" value="100" aria-label="Zoom">
+      <button id="zoom100" type="button" title="Back to 100%">100%</button>
+    </span>
   </div>
   <div class="examples">Try:
     <button type="button" class="example">A coffee shop ordering app</button>

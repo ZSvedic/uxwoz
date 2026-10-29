@@ -110,11 +110,11 @@ const bootstrap = (final: boolean) => `(() => {
     if (h + 'x' + w !== last) { last = h + 'x' + w; parent.postMessage({ uxwoz: 'size', height: h, width: w }, '*') }
   }
   addEventListener('load', () => { report(); new ResizeObserver(report).observe(document.body) })
-  // Ctrl/Cmd + scroll (and pinch) is left to the browser, to zoom the page.
+  // Ctrl/Cmd + scroll (and a pinch, which arrives as one) zooms the feed around the pointer.
   addEventListener('wheel', (e) => {
-    if (e.ctrlKey || e.metaKey) return
     e.preventDefault()
-    parent.postMessage({ uxwoz: 'wheel', dx: e.deltaX, dy: e.deltaY }, '*')
+    if (e.ctrlKey || e.metaKey) parent.postMessage({ uxwoz: 'zoom', dy: e.deltaY, x: e.clientX, y: e.clientY }, '*')
+    else parent.postMessage({ uxwoz: 'wheel', dx: e.deltaX, dy: e.deltaY }, '*')
   }, { passive: false })
 })()`
 

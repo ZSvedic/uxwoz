@@ -20,6 +20,9 @@ button:disabled { opacity: .45; cursor: default; }
 #go { background: var(--accent); border-color: var(--accent); color: #fff; }
 .pickers { display: flex; gap: 12px; }
 .pickers label { display: flex; gap: 6px; align-items: center; color: var(--muted); }
+.zoom { display: flex; gap: 6px; align-items: center; }
+.zoom button { padding: 3px 8px; font-variant-numeric: tabular-nums; min-width: 4.2em; }
+.zoom input { width: 110px; accent-color: var(--accent); }
 .examples { flex-basis: 100%; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .example { padding: 2px 8px; font-size: 13px; }
 #history { margin-left: auto; padding: 2px 8px; font-size: 13px; max-width: 22em; }

@@ -15,6 +15,8 @@ const modelSelect = $<HTMLSelectElement>('model')
 const themeSelect = $<HTMLSelectElement>('theme')
 const deviceSelect = $<HTMLSelectElement>('device')
 const historySelect = $<HTMLSelectElement>('history')
+const zoomRange = $<HTMLInputElement>('zoomRange')
+const zoom100 = $<HTMLButtonElement>('zoom100')
 const metrics = $('metrics')
 const errorBox = $('error')
 
@@ -73,6 +75,11 @@ const feed = new Feed($('stage'), {
   },
   remove: (rowKey, id) => { const r = rowOf(rowKey); if (r) removeVariant(r, indexOf(id)) },
   action: onAction,
+  zoomed: (z) => {
+    zoomRange.value = String(Math.round(z * 100))
+    zoom100.textContent = `${Math.round(z * 100)}%`
+    store.set('uxwoz:zoom', String(z))
+  },
 })
 
 const tree = new Tree($('tree'), { open: openVariant })
@@ -556,6 +563,11 @@ themeSelect.addEventListener('change', async () => {
 })
 
 deviceSelect.addEventListener('change', () => store.set('uxwoz:device', deviceSelect.value))
+
+zoomRange.addEventListener('input', () => feed.setZoom(Number(zoomRange.value) / 100))
+zoom100.addEventListener('click', () => feed.setZoom(1))
+$('zoomFit').addEventListener('click', () => { feed.setZoom(feed.fitZoom()); $('stage').scrollTo({ top: 0, left: 0 }) })
+feed.setZoom(Number(store.get('uxwoz:zoom')) || 1)
 
 /** Fill the History list with every mockup in the cache, newest first. */
 async function loadHistory() {

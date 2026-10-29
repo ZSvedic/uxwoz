@@ -30,6 +30,9 @@ const FLOW_X = 48
 /** The radius of a stepped line's corners. */
 const BEND = 8
 const SVG_NS = 'http://www.w3.org/2000/svg'
+/** The zoom range: 10% shows a whole mockup, 150% a detail. */
+export const MIN_ZOOM = 0.1
+export const MAX_ZOOM = 1.5
 
 export interface FeedVariant {
   /** Unique in the feed: `key#index` for a stored candidate, `key#sN` for a variant still streaming. */
@@ -65,6 +68,8 @@ export interface FeedHandlers {
   regenerate: (rowKey: string, id: string, prompt: string | null) => void
   remove: (rowKey: string, id: string) => void
   action: (rowKey: string, id: string, prompt: string, label: string) => void
+  /** The zoom changed, by a gesture or a call. */
+  zoomed: (zoom: number) => void
 }
 
 interface Frame {
@@ -101,6 +106,8 @@ export class Feed {
   private lines = document.createElementNS(SVG_NS, 'svg')
   private linesQueued = false
   private busy = false
+  /** The feed's CSS zoom. Rects inside it come back zoomed; its own coordinates (the lines) do not. */
+  private z = 1
 
   /** `stage` is the scrolling page area; the feed replaces what it holds on the first render. */
   constructor(private stage: HTMLElement, private on: FeedHandlers) {
@@ -108,6 +115,50 @@ export class Feed {
     this.list.append(this.lines)
     addEventListener('message', (e) => this.onFrameMessage(e))
     new ResizeObserver(() => this.queueLines()).observe(stage)
+    // Pinch (a wheel with ctrlKey in Chrome and Firefox) and Ctrl/Cmd + scroll zoom around the pointer.
+    stage.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      this.zoomBy(e.deltaY, e.clientX, e.clientY)
+    }, { passive: false })
+    // Safari reports a pinch as gesture events instead.
+    let z0 = 1
+    stage.addEventListener('gesturestart', (e) => { e.preventDefault(); z0 = this.z })
+    stage.addEventListener('gesturechange', (e) => {
+      e.preventDefault()
+      const g = e as Event & { scale: number; clientX: number; clientY: number }
+      this.setZoom(z0 * g.scale, g.clientX, g.clientY)
+    })
+  }
+
+  get zoom() { return this.z }
+
+  /** Zoom to `z`, keeping the point under (x, y) (the middle of the page by default) in place. */
+  setZoom(z: number, x?: number, y?: number) {
+    z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z * 100) / 100))
+    if (z === this.z) return
+    const st = this.stage, r = st.getBoundingClientRect()
+    const ax = x == null ? st.clientWidth / 2 : x - r.left, ay = y == null ? st.clientHeight / 2 : y - r.top
+    const px = (st.scrollLeft + ax) / this.z, py = (st.scrollTop + ay) / this.z
+    this.z = z
+    this.list.style.zoom = String(z)
+    st.scrollLeft = px * z - ax
+    st.scrollTop = py * z - ay
+    this.queueLines()
+    this.on.zoomed(z)
+  }
+
+  /** The zoom at which the whole flow fits the page, at most 100%. */
+  fitZoom(): number {
+    let w = 0
+    for (const r of this.rows.values()) w = Math.max(w, r.strip.scrollWidth)
+    const h = this.list.scrollHeight
+    if (!w || !h) return 1
+    return Math.min(1, (this.stage.clientWidth - 32) / (w + GUTTER), (this.stage.clientHeight - 16) / h)
+  }
+
+  private zoomBy(dy: number, x: number, y: number) {
+    this.setZoom(this.z * Math.exp(-dy * 0.01), x, y)
   }
 
   /** Draw the rows. Frames are kept and moved as little as possible, so unchanged screens do not reload. */
@@ -173,14 +224,16 @@ export class Feed {
   /** Bring a row to the top of the page. */
   scrollToRow(key: string, smooth = true) {
     const r = this.rows.get(key)
-    if (r) this.stage.scrollTo({ top: r.el.offsetTop - 8, behavior: smooth ? 'smooth' : 'auto' })
+    if (r) this.stage.scrollTo({ top: this.stage.scrollTop + r.el.getBoundingClientRect().top - this.stage.getBoundingClientRect().top - 8, behavior: smooth ? 'smooth' : 'auto' })
   }
 
   /** Bring a variant into view within its row. */
   scrollToVariant(id: string, smooth = true) {
     const f = this.frames.get(id)
     const strip = f?.el.parentElement
-    if (f && strip) strip.scrollTo({ left: Math.max(0, f.el.offsetLeft - strip.offsetLeft - GAP), behavior: smooth ? 'smooth' : 'auto' })
+    if (!f || !strip) return
+    const left = strip.scrollLeft + (f.el.getBoundingClientRect().left - strip.getBoundingClientRect().left) / this.z - GAP
+    strip.scrollTo({ left: Math.max(0, left), behavior: smooth ? 'smooth' : 'auto' })
   }
 
   /** Redraw the lineage lines once, before the next paint. */
@@ -197,7 +250,8 @@ export class Feed {
    */
   private drawLines() {
     const { rows, links } = this.drawn
-    const base = this.list.getBoundingClientRect()
+    const base = this.list.getBoundingClientRect(), z = this.z
+    const X = (vx: number) => (vx - base.left) / z, Y = (vy: number) => (vy - base.top) / z
     const svg = this.lines
     svg.setAttribute('width', String(this.list.scrollWidth))
     svg.setAttribute('height', String(this.list.scrollHeight))
@@ -210,8 +264,8 @@ export class Feed {
     const at = (f: Frame, edge: 'top' | 'bottom') => {
       const s = f.el.parentElement!.getBoundingClientRect(), v = f.el.getBoundingClientRect()
       return {
-        x: Math.min(Math.max(v.left + FLOW_X, s.left + LINE_INSET), s.right - LINE_INSET) - base.left,
-        y: v[edge] - base.top,
+        x: X(Math.min(Math.max(v.left + FLOW_X * z, s.left + LINE_INSET * z), s.right - LINE_INSET * z)),
+        y: Y(v[edge]),
       }
     }
     const pick = (r: FeedRow) => {
@@ -222,7 +276,7 @@ export class Feed {
       const a = pick(rows[i - 1]!), b = pick(rows[i]!), row = this.rows.get(rows[i]!.key)
       if (!a || !b || !row) continue
       const p = at(a, 'bottom'), q = at(b, 'top')
-      const mid = row.el.getBoundingClientRect().top - base.top - 20
+      const mid = Y(row.el.getBoundingClientRect().top) - 20
       parts.push(svgEl('path', { d: stepped(p.x, p.y, q.x, mid, q.y), class: 'step', 'marker-end': 'url(#uxwoz-arrow)' }))
       const label = svgEl('text', { x: String(p.x + (q.x < p.x ? -8 : 8)), y: String(mid - 6), class: 'via', 'text-anchor': q.x < p.x ? 'end' : 'start' })
       label.textContent = rows[i]!.via || 'next'
@@ -231,7 +285,7 @@ export class Feed {
     const index = new Map(rows.map((r, i) => [r.key, i]))
     const headY = (i: number) => {
       const h = this.rows.get(rows[i]!.key)!.head.getBoundingClientRect()
-      return h.top + h.height / 2 - base.top
+      return Y(h.top + h.height / 2)
     }
     for (const l of links) {
       const i = index.get(l.from), j = index.get(l.to)
@@ -375,6 +429,10 @@ export class Feed {
       this.queueLines()
     } else if (d.uxwoz === 'touch') {
       this.on.pick(f.rowKey, id, false)
+    } else if (d.uxwoz === 'zoom') {
+      // Coordinates inside the frame, in its own pixels; the frame is shown at the feed's zoom.
+      const r = f.frame.getBoundingClientRect(), k = r.width / (f.frame.offsetWidth || 1)
+      this.zoomBy(Number(d.dy) || 0, r.left + (Number(d.x) || 0) * k, r.top + (Number(d.y) || 0) * k)
     } else if (d.uxwoz === 'wheel') {
       // The frame never scrolls itself: its gestures scroll the page and the row.
       this.stage.scrollBy(0, Number(d.dy) || 0)
