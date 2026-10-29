@@ -4,11 +4,14 @@
 |---|---|
 | What the user sees, what the system does | [spec/behavior.md](spec/behavior.md) |
 | How a screen is generated: HTML + Pico format, rendering, models | [spec/ui-generation.md](spec/ui-generation.md) |
-| Types, env vars, exit codes | [spec/code-contract.md](spec/code-contract.md) |
-| LLM prompts | `spec/prompt-{*}.md` |
-| How to run anything (CLI / web / tests) | [README.md](README.md) |
+| Packages, HTTP API, frame messages, types, env vars, tests | [spec/code-contract.md](spec/code-contract.md) |
+| The LLM prompt | [spec/prompt-screen.md](spec/prompt-screen.md) |
+| How to run, test, re-record | [README.md](README.md) |
 | How to write any markdown you add | [process/writing-style.md](process/writing-style.md) |
+| The product idea | [process/uxwoz-product-brief.md](process/uxwoz-product-brief.md) |
 | Past decisions and status reports | [process/journal/](process/journal/): read, don't rewrite |
+
+Start a session with the latest file in `process/journal/`: it says where the work stands.
 
 ## Explaining things in chat: KISS
 
@@ -21,18 +24,52 @@ When you answer the user in chat (status updates, failure reports, "why did X ha
 
 ## Stack
 
-- **TypeScript everywhere** (CLI, core, web).
-- **Runtime + package manager: bun**, always. All `bun` commands run from `src/` (that's where `package.json` lives). Bun executes TypeScript natively (no separate compile step).
-- **Monorepo** via bun workspaces; packages live under `src/packages/`.
-- **Dependency stability**: `minimumReleaseAge = 604800` (7 days) in `src/bunfig.toml`.
+- **TypeScript everywhere**, no runtime dependencies. **bun** is the runtime, package manager and test runner; run every `bun` command from `src/`.
+- **Monorepo** via bun workspaces under `src/packages/`. `minimumReleaseAge = 604800` (7 days) in `src/bunfig.toml`.
+- API keys live in the root `.env`, read by the server and by `test:record` (`bun --env-file=../.env`).
 
-## Layout, stack & process
+## Code map
 
-The repo is organized by **lifecycle**, not by file type: see the tree in [README.md](README.md#project-layout). Why the boundaries fall where they do:
+```
+src/packages/core/src/       engine; frame.ts and layout.ts also run in the browser
+  models.ts      the 3 models, call settings, prices
+  prompt.ts      system prompt + user message (copy of spec/prompt-screen.md; a test keeps them equal)
+  providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol)
+  generate.ts    one screen: stream, 20 s deadline, cost, refuse cut-off replies
+  cache.ts       screen cache: keys, versions, links between screens, JSON file
+  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix)
+  layout.ts      card positions on the canvas
+src/packages/web/src/
+  server.ts      Bun.serve: /api/config, /api/screen (NDJSON), /api/map, /api/choose, /api/warmup, themes
+  app.ts         browser: prompt box, open() a screen, streaming, versions, pickers, metrics
+  canvas.ts      browser: cards, arrows, pan/zoom, focus, Fit all
+  index.html, shell.css   the page around the canvas
+src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
+src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
+```
 
-- **`src/` holds the JS config** because `package.json` is coupled to the code it builds, and Node module resolution walks *up*, so anything importing dependencies (app code *and* step defs) must live under the dir that holds `node_modules/`. That makes `src/` a single deployable unit you can copy and run.
-- **`.feature` files live in `spec/`; app step defs in `src/tests/`, package step defs in the package**: the same spec/implementation split as `spec/behavior.md` + `spec/code-contract.md` ↔ `src/packages/`. Step defs read fixtures from `spec/test-cases/` by plain file path (data reads, unlike imports, cross directories freely).
-- **`src/` root files are permanent** (`package.json`, `bun.lock`, `bunfig.toml`, `tsconfig.json`, `cucumber.js`) (not regenerable from `spec/`, not deletable. Only `src/`'s *subdirs* (`packages/`, `tests/`) are regenerable. `bun.lock` *is* the spec of the dependency tree) versions are never duplicated into `spec/`; when a specific pin is load-bearing, `spec/code-contract.md` records *that* it is pinned and why, not the number.
-- **`cassettes/` (root) is recorded data, never code**: the LLM responses the test suite replays, one JSON per feature. Machine-recorded, so not `spec/`; not regenerable from spec (re-recording needs a live API key, costs money, and fresh outputs can stop matching committed goldens), so not `src/` either. Refresh deliberately with `bun run test:record`; never delete casually.
-- **`benchmarks/` (root) is data + outputs, never importing code**: the model & batch-size benchmark's pricing table, ground truth, sweep results, and generated charts. Its runner is a workspace package (`src/packages/bench`, `@tamedtable/bench`) because it imports the engine and so must live under `src/` (the module-resolution rule above); the runner reads `benchmarks/` by plain path, the same way step defs read `spec/` fixtures. Keeping the data at the root: like `process/` and `marketing/`. Keeps `src/` a clean deployable unit.
-- **Exception: the UI generation benchmark** in `benchmarks/` is a self-contained Python tool (FastAPI + Playwright, run with `uv`), not a workspace package: it imports no app code, and its checks were validated against the archived full benchmark. See [benchmarks/README.md](benchmarks/README.md).
+## Do not read (large or generated)
+
+`cassettes/*.json`, `benchmarks/data/`, `src/packages/web/themes/pico.css`, `src/bun.lock`,
+`temp/`. Search them with grep if you must.
+
+## Layout rules
+
+The repo is organized by lifecycle; the tree is in [README.md](README.md#project-layout).
+
+- **`src/` is the deployable unit**: `package.json` sits there, and module resolution walks up, so
+  all code that imports packages (app and tests) lives under it. Its root files (`package.json`,
+  `bun.lock`, `bunfig.toml`, `tsconfig.json`) are permanent; versions live in `bun.lock` only.
+- **`spec/` says what, `src/` says how.** Tests read `spec/` by plain path (the prompt test does).
+- **`cassettes/` is recorded data**: the model replies the tests replay, one JSON per test file.
+  The prompt bytes are part of every key, so a prompt change means `bun run test:record` (live
+  calls, a few cents). Never delete casually.
+- **`benchmarks/`** is a self-contained Python tool (FastAPI + Playwright, `uv`) that imports no app
+  code; see [benchmarks/README.md](benchmarks/README.md).
+- **`temp/`** is git-ignored scratch; the dev server's screen cache lives there.
+
+## Before you commit
+
+From `src/`: `bun test` (offline, under a second) and `bun run typecheck`. For UI changes, also look
+at the running app. Bun's `--hot` dev server cannot pick up a newly added frontend file: restart
+`bun run dev` after adding one.

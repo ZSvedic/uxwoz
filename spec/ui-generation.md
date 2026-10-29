@@ -2,12 +2,12 @@
 
 This doc owns how one screen is generated: what the model writes, how the browser renders it, and
 which models to call with which settings. It does not own the product flow, caching or navigation
-(see [../process/uxwoz-product-brief.md](../process/uxwoz-product-brief.md)).
+(see [behavior.md](behavior.md)).
 
 ## Example
 
-The app sends the system prompt from `benchmarks/bench/prompts/system.txt` (208 tokens) and a
-screen request. The model streams back one HTML fragment, ending in one `<script>`:
+The app sends the system prompt in [prompt-screen.md](prompt-screen.md) (the benchmark's
+`benchmarks/bench/prompts/system.txt`, 208 tokens, plus two navigation bullets) and a screen request. The model streams back one HTML fragment, ending in one `<script>`:
 
 ```html
 <h1>BMI calculator</h1>
@@ -44,8 +44,8 @@ iframe. Pico styles the bare elements, so the model writes no CSS.
 The model never sees the theme, so a theme changes looks and nothing else. A theme is a drop-in
 stylesheet loaded instead of, or after, Pico: override the `--pico-*` variables (font, colours,
 radius, borders). A hand-drawn wireframe look needs a handwriting font, thick dark borders and
-irregular corners (`border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px`). SVG charts keep
-the colours the model chose. Re-check BMI screenshots after a theme change: the deterministic tests
+irregular corners (`border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px`). Clean keeps the
+model's colours; Mockup turns them grey with a filter on `main`. Re-check BMI screenshots after a theme change: the deterministic tests
 read text and positions, so a theme that moves elements can change the scale check.
 
 ## Models
@@ -82,4 +82,4 @@ All three were measured on 2026-10-22/23 with the lite benchmark (`benchmarks/`)
 
 Model-written CSS, other formats (OpenUI, CopilotKit, Alpine.js, VanJS, ClojureScript, the invented
 CalcMD, Salt, WireMD, Grafiq, ASCII) and other models (Mercury 3, Gemini 3.8 Flash, GPT-5.6 Terra,
-Claude Sonnet 5.5; Opus on price). Reasons and data: `ux-woz-full-benchmark/EXPERIMENTS.md`.
+Claude Sonnet 5.5; Opus on price). Reasons and data: `EXPERIMENTS.md` in the sibling folder `ux-woz-full-benchmark` (not in this repo).

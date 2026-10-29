@@ -26,7 +26,7 @@ There are no runtime dependencies; `@types/bun` and `typescript` are dev-only.
 
 ## HTTP API
 
-The server listens on 127.0.0.1 only. Every POST must be `application/json` (else 415) and must not
+The server listens on 127.0.0.1 by default (`UXWOZ_HOST`). Every POST must be `application/json` (else 415) and must not
 come from another origin (`Origin` or `Sec-Fetch-Site: cross-site`, else 403), so no other web page
 can spend model credits.
 
@@ -83,6 +83,6 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 ## Tests
 
 `bun test` runs `src/tests/*.test.ts`. Model calls go through `tests/cassette.ts`, which replays
-`cassettes/<feature>.json` keyed by a hash of URL and request body; `tests/no-network.ts` makes any
-other non-localhost call throw. Cucumber `.feature` files are not set up yet: the feature name is
-the test file name.
+`cassettes/<test file name>.json` keyed by a hash of URL and request body; `tests/no-network.ts` makes any
+other non-localhost call throw. A test file that calls models has a cassette of the same name;
+`cut-off.test.ts` uses a fake provider instead.

@@ -4,7 +4,7 @@
 // Ctrl/Cmd + scroll to zoom, also over a screen.
 
 import { FRAME_SANDBOX, framePage } from '@uxwoz/core/frame'
-import { CARD, layoutMap, type Box } from '@uxwoz/core/layout'
+import { layoutMap, type Box } from '@uxwoz/core/layout'
 import type { Link } from '@uxwoz/core'
 
 /** Height of a card's title bar; the screen fills the rest of the card. */

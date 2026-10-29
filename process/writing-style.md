@@ -1,21 +1,21 @@
 # Writing style
 
-Conventions for every markdown file in this repo: specs, READMEs, ops docs, prompts. Modeled on the PonyPen spec dir and the in-project [rationale.md](rationale.md).
+Conventions for every markdown file in this repo: specs, READMEs, journal entries, prompts.
 
 ## Write like you speak
-- Active voice. *"The runner replays transformations,"* not *"transformations are replayed by the runner."*
+- Active voice. *"The server streams the screen,"* not *"the screen is streamed by the server."*
 - Short concrete words. *"While a request is running"* beats *"in flight."* *"Half-succeeds"* beats *"resolves with partial application."* *"Cancel a running request"* beats *"the only legal concurrent operation is the surface-specific cancel signal."*
-- Direct subject-verb-object. Skip noun stacks like *"the surface-agnostic facade step definitions drive."*
+- Direct subject-verb-object. Skip noun stacks like *"the canvas card frame height report handler."*
 - Cut metaphors that don't earn their keep. No *"in flight,"* *"resolves cleanly,"* *"side channel,"* *"facade,"* *"surface,"* *"primitive,"* *"emits,"* unless the precise meaning matters and a plain word can't carry it.
 - Read each paragraph out loud. If it sounds like a press release or a CEO email, rewrite it.
 
 ## Four things that make writing read as machine-written
 
 Readers now spot generated prose by its habits, and these four are the ones
-they spot first. They apply to everything we ship (UI copy, marketing, docs) at
+they spot first. They apply to everything we ship (UI copy, docs) at
 least as hard as to specs, and to code comments too. They bind what you write
-from now on; `process/journal/` and the frozen design handoff keep their
-originals, because those are records of what was said at the time.
+from now on; `process/journal/` keeps its originals, because those are records
+of what was said at the time.
 
 1. **No em dashes.** Every one of them is a colon, a comma, a full stop or a
    pair of brackets wearing a costume. Pick the one you meant. If you cannot
@@ -23,8 +23,8 @@ originals, because those are records of what was said at the time.
 2. **No negative parallelism.** *"It's not a spreadsheet, it's a conversation"*,
    *"not just fast, but accurate"*, *"no setup, no server, just a key"*. The
    shape sells rather than says. Write the positive half and stop: *"It's a
-   conversation."* A plain contrast (*"the cell model runs on every row, the
-   chat model runs once"*) is not this, and is fine.
+   conversation."* A plain contrast (*"the current card is live, the others
+   are previews"*) is not this, and is fine.
 3. **No inflated vocabulary.** No *delve*, *tapestry*, *realm*, *landscape*,
    *testament to*, *leverage*, *seamless*, *robust*, *pivotal*, *cutting-edge*,
    *game-changer*, *harness* (the verb), *unlock*, *empower*, *elevate*,
@@ -39,10 +39,10 @@ Two habits we do not police: the rule of three (*"loads, transforms, saves"*
 is often just the truth), and starting a sentence with *and* or *but*.
 
 Some em dashes stay, and a sweep must skip them: model-facing text, whose bytes
-are hashed into every cassette key (`spec/prompt-app-edit.md`, the thrown
-messages in `headless/engine.ts`); recorded data (`cassettes/`, the labelled
-CSVs); a lone `—` in a table cell or UI slot, which means *no value*; and the
-records above.
+are hashed into every cassette key (`spec/prompt-screen.md` and its copy in
+`src/packages/core/src/prompt.ts`, the benchmark prompts); recorded data
+(`cassettes/`, `benchmarks/data/`); a lone `—` in a table cell or UI slot, which
+means *no value*; and the records above.
 
 ## Picture before details
 - Open every section with the simple sentence a reader needs to follow the rest. Component lists, method-by-method writeups, and feature tables come *after* the picture, not before.
@@ -54,7 +54,7 @@ records above.
 - Prose carries genuine narrative (cause and effect, state changes, the why behind a choice) not parallel-item enumeration.
 
 ## Code over prose when it's shorter
-- Pseudocode is welcome when a sequence is shorter and clearer in code than in English. *"The runner applies the patch, validates, re-runs the transformations, and commits"* reads cleaner as four labeled lines (or a numbered list).
+- Pseudocode is welcome when a sequence is shorter and clearer in code than in English. *"The server checks the cache, streams the screen, stores it, and links it to the screen clicked in"* reads cleaner as four labeled lines (or a numbered list).
 - Drop types, drop boilerplate, drop syntax that doesn't carry meaning. Keep just what conveys the idea. Self-explanatory beats syntactically valid.
 - ASCII diagrams welcome when they earn their keep: lifecycle, data flow, state.
 

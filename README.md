@@ -11,8 +11,15 @@ default) and `OPENAI_API_KEY` (the two GPT models). All `bun` commands run from 
 cd src && bun install && bun run dev
 ```
 
-Open http://localhost:3000, type a product idea, and click around. `PORT=3001 bun run dev` picks
-another port. Generated screens are cached in `temp/screen-cache.json`; delete it to start fresh.
+Open http://127.0.0.1:3000, type a product idea (or pick an example), and click around: each new
+screen appears on the canvas with an arrow from the button that made it. `PORT=3001 bun run dev`
+picks another port.
+
+Generated screens are cached in `temp/screen-cache.json`. To start fresh, stop the server, move the
+file aside, and start it again: a running server keeps its cache in memory and writes it back.
+
+If the page shows "Failed to load bundled module" after new code arrives, restart `bun run dev`:
+the live reload cannot add a new frontend file.
 
 ## Test it
 
@@ -34,7 +41,7 @@ cd src && bun run test:record
 
 ```
 spec/        what the app does: behavior, UI generation, code contract, prompts
-src/         the app (bun workspace): packages/core, packages/web, tests/
+src/         the app (bun workspace): packages/core (engine), packages/web (server + page), tests/
 cassettes/   recorded model replies the tests replay
 benchmarks/  the lite UI generation benchmark (Python) and its data
 process/     product brief, writing style, journal

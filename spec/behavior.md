@@ -18,7 +18,7 @@ versions, pickers and the numbers on screen. It does not own the screen format, 
 
 ## First screen
 
-The prompt box takes a product description (up to 2,000 characters); the three example buttons fill
+The prompt box takes a product description (up to 2,000 characters); the example buttons fill
 it in and submit. A new prompt starts a new mockup and clears the Back history.
 
 ## Canvas
@@ -77,7 +77,7 @@ changes it.
 
 ## Pickers
 
-- **Model**: Claude Haiku 5.5 (default), GPT-6 Luna fast, GPT-6.1 Sol Ultrafast. It applies to the
+- **Model**: Claude Haiku 5.5 (default), GPT-6 Luna (fast), GPT-6.1 Sol Ultrafast. It applies to the
   next generated screen; cached screens stay as they are, with their maker named in the metrics.
   Loading the page and picking a model each send a short warm-up request to warm the prompt cache.
 - **Theme**: Mockup (default) or Clean. Mockup is black and white with a handwriting font and

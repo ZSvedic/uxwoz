@@ -2,7 +2,7 @@
 
 This benchmark measures how fast and how correctly each of the three chosen models writes one
 interactive screen as semantic HTML + vanilla JS styled by classless Pico.css. It does not compare
-formats or other models: that exploration is archived in `ux-woz-full-benchmark`, and its
+formats or other models: that exploration is archived in the sibling folder `ux-woz-full-benchmark` (not in this repo), and its
 conclusions are in [../spec/ui-generation.md](../spec/ui-generation.md).
 
 ## Example
