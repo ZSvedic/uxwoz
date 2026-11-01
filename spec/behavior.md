@@ -8,15 +8,18 @@ vars (see [code-contract.md](code-contract.md)).
 ## Example
 
 1. Zel types *A coffee shop ordering app* and presses **Generate**.
-2. Two variants of the first screen stream in side by side, labelled *L1-A Menu* and *L1-B Order
-   ahead*. After about 1 s the metrics line reads *First visible screen 0.9 s*; at the end it reads
-   *all variants interactive 6.0 s · $0.0016 for 2*.
-3. Zel likes L1-B and clicks its blue **Checkout** button. That picks L1-B and moves it to the front
-   of its row, and a second row appears below with *L2-A* and *L2-B*, two variants of the checkout.
-   A line runs from L1-B down into the new row, labelled *Checkout*.
-4. Neither checkout is right. Zel clicks **✎ Change** on L2-A, adds *one big pay button* to the
-   prompt and clicks **Make a new variant**: *L2-C* joins the row, and L2-A and L2-B stay.
-5. Zel picks L1-A instead. The checkout row goes, since L1-A never led there. Picking L1-B again
+2. Two variants of the first screen stream in. *L1-B Order ahead* shows text first, so it streams in
+   front; *L1-A Menu* streams behind it, and only its right edge shows, reading *Variant A: Menu*.
+   After about 1 s the metrics line reads *First visible screen 0.9 s*; at the end it reads *all
+   variants interactive 6.0 s · $0.0016 for 2*. L1-B, the one in front, is the pick.
+3. Zel clicks the blue **Checkout** button in L1-B. A second row appears below with *L2-A* and
+   *L2-B*, two variants of the checkout, one in front. A line runs from L1-B down into the new row,
+   labelled *Checkout*.
+4. Neither checkout is right. Zel clicks **✎ Change** on the front one, adds *one big pay button*
+   to the prompt and clicks **Make a new variant**: *L2-C* streams in front and becomes the pick;
+   L2-A and L2-B stay behind it.
+5. Zel clicks **Compare** on step 1 and sees L1-A and L1-B side by side. Zel clicks into L1-A: it
+   becomes the pick, and the checkout row goes, since L1-A never led there. Picking L1-B again
    brings it back.
 
 ## First screen
@@ -42,29 +45,38 @@ per level, so letters stay taken after their screens are gone; Start over begins
 ## Feed
 
 The feed shows the main flow: one row per step, from the first screen at the top down to the
-latest. A row holds the variants of one screen side by side, the picked one first. The feed is one
-surface on a dot grid: the page scrolls both ways, and rows never scroll on their own. Scrolling
-down walks through the flow; scrolling sideways compares variants.
+latest. A row is a **stack** of the variants of one screen, like windows in Time Machine but
+stacked to the right: the pick in front, live, and each other variant behind it, a little shorter
+and darker, showing only its right edge with *Variant B*, its name, and how many screens it leads
+to. The feed is one surface on a dot grid: the page scrolls both ways, and rows never scroll on
+their own.
 
 ```
- Step 1
- [ L1-B Order ahead ✓ ]  [ L1-A Menu ]
-        │
+ Step 1  2 variants  [Compare]
+ ┌──────────────────────┐─────────┐
+ │ L1-B Order ahead     │Variant A│
+ │                      │Menu     │
+ │                      │         │
+ └──────────────────────┘─────────┘
         │ Checkout
         ↓
- Step 2
- [ L2-C Checkout ✓ ]  [ L2-A Checkout ]  [ L2-B Pay ]
+ Step 2  3 variants  [Compare]
+ ┌──────────────────────┐─────────┐─────────┐
+ │ L2-C Checkout        │Variant A│Variant B│
+ └──────────────────────┘─────────┘─────────┘
 ```
 
-- **Lineage**: a straight line runs down the left of the picked variants, from each row into the
-  next, labelled with the control that was clicked. When a variant is scrolled out of its row, the
-  line stays at the row's edge.
+- **Lineage**: a straight line runs down the left of the front variants, from each row into the
+  next, labelled with the control that was clicked.
 - **Other clicks**: a click that goes back to a row already in the flow (or ahead to a later one)
   scrolls there and draws a dashed arc in the gutter left of the rows, from the row clicked in to
   the row it opened, with an arrow. Hovering an arc names the control. Arcs are stored with the
   mockup, so they come back next time.
-- **Every variant is live**: its controls work, in any row. Controls that open another screen are
-  blue, in both themes; everything else keeps the theme's own ink.
+- **The front variant is live**: its controls work, in any row. Controls that open another screen
+  are blue, in both themes; everything else keeps the theme's own ink.
+- **Compare**: the **Compare** button by a row's title fans its stack out side by side, in letter
+  order, every variant live, the pick with an orange outline and a ✓; **Stack** stacks it again
+  with the pick in front. Holding **Alt/Option** fans out every row until it is let go.
 - **A screen is as tall as its content**, so nothing scrolls inside it: scrolling over a screen
   moves the page and the row. A screen sees an 800 px tall window (`100vh` is 800 px), so
   "full-screen" screens keep a normal size; a screen that still keeps growing with its window
@@ -75,8 +87,8 @@ down walks through the flow; scrolling sideways compares variants.
   The slider at the top sets it from 10% to 150%, with the level shown beside it; **Fit** shows the
   whole flow, **100%** goes back. The dot grid's spacing follows the zoom, so it shows how far in
   or out the feed is. Screens stay live at any zoom. The zoom is remembered in this browser.
-- Each variant's bar shows its name, a ✓ when picked (with a blue outline), and four tools.
-  Hovering the bar names its model, cost and time.
+- Each variant's bar shows its name and four tools. Hovering the bar names its model, cost and
+  time. Change and Info open a panel under the bar, as wide as the screen; long text wraps.
 
 ## Tree
 
@@ -106,12 +118,13 @@ Every new screen comes as two variants made at the same time. The second is aske
 different design, so the two are not near copies. If one fails, the other still arrives, with an
 error line naming the failure.
 
-- **Pick by using**: any click in a variant, on its screen or its bar, picks it. A click that
-  opens another screen also opens the next row; typing, ticking boxes or playing with a screen
-  only picks it.
-- **Front**: the picked variant moves to the front of its row when a click in it opens a screen,
-  when the bar is clicked, and when the mockup opens. A press inside a screen does not move it
-  at once, so it never jumps away from under the pointer.
+- **First to show goes in front**: of the two variants of a new screen, the first to show any text
+  streams in front, and becomes the pick once stored. Which one finishes first is close to random,
+  so neither the first nor the second design wins by default, and the first screen shows sooner.
+  Clicking the other one's edge while they stream brings it forward instead.
+- **The front variant is the pick**: clicking an edge brings that variant to the front and picks
+  it. In a compared row, any click in a variant, on its screen or its bar, picks it, and nothing
+  moves until the row is stacked again. A click that opens another screen also opens the next row.
 - **The rows below follow the pick**: each row remembers the variant above it that its click came
   from. Picking another variant keeps the next row only if the new pick also leads there;
   otherwise the rows below go, and the new pick's own newest path comes back, if it has one.
@@ -120,13 +133,14 @@ error line naming the failure.
 Each variant's bar has four tools:
 
 - **✎ Change** shows the prompt the variant was made from. Edit it and click **Make a new
-  variant**: one more variant joins the end of the row, made from the edited prompt. It stays a
-  variant of the same screen, so the click that leads here still lands here.
+  variant**: one more variant, made from the edited prompt, streams in front of the stack and
+  becomes the pick, so the rows below follow it. It stays a variant of the same screen, so the
+  click that leads here still lands here.
 - **↻ Refresh** makes the variant again from the same prompt. The new version takes the old one's
-  place in the row (and its pick) under a new name, and the old one is deleted, with the screens
+  place in the stack (and its pick) under a new name, and the old one is deleted, with the screens
   only it led to. When screens were made from it, Refresh asks first.
 - **✕ Delete** asks, then deletes the variant: its markup goes, its letter stays taken. Screens
-  that only it led to go too, with their rows. Deleting the last variant of a screen deletes the
+  that only it led to go too, with their rows. When the front variant goes, another one comes forward. Deleting the last variant of a screen deletes the
   screen; deleting the last variant of the first screen deletes the mockup.
 - **ⓘ Info** lists the name, model, device, when it was made, time to first text, total time,
   cost, finish reason, size and prompt.

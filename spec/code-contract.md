@@ -76,9 +76,11 @@ only from a variant's own frame.
 ```ts
 { uxwoz: 'action', prompt, label }   // a click on a control with an action prompt
 { uxwoz: 'touch' }                   // any press in the screen: picks this variant
+{ uxwoz: 'peek', on }                // Alt/Option alone pressed (on) or let go, another key, or the
+                                     // screen lost the focus (off): fans out every row while on
 { uxwoz: 'size', height, width }     // the screen's size, so the frame fits it (160-8000 px tall;
                                      // the card shows only `width`, at least 280 px)
-{ uxwoz: 'wheel', dx, dy }           // scroll over the screen: dy scrolls the page, dx the row
+{ uxwoz: 'wheel', dx, dy }           // scroll over the screen: dy and dx scroll the page
 { uxwoz: 'zoom', dy, x, y }          // Ctrl/Cmd + scroll or a pinch over the screen, at (x, y) in
                                      // the frame: zooms the feed around that point
 ```

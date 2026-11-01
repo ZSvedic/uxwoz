@@ -56,6 +56,15 @@ const bootstrap = (final: boolean) => `(() => {
   window.uxwoz = { go }
   // Any press in the screen picks this variant; the app ignores it while the screen streams.
   addEventListener('pointerdown', () => parent.postMessage({ uxwoz: 'touch' }, '*'), true)
+  // Holding Alt/Option alone compares the variants of every row, also while a screen has the focus;
+  // not in a text field, and not with another key (Option types characters on a Mac).
+  const peek = (on) => parent.postMessage({ uxwoz: 'peek', on }, '*')
+  addEventListener('keydown', (e) => {
+    if (e.key === 'Alt') peek(!(e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)))
+    else if (e.altKey) peek(false)
+  })
+  addEventListener('keyup', (e) => { if (e.key === 'Alt') peek(false) })
+  addEventListener('blur', () => peek(false))
   document.addEventListener('click', (e) => {
     const el = e.target instanceof Element && e.target.closest('[data-action], a[href]')
     if (!el) return

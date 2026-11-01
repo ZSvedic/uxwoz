@@ -1,5 +1,5 @@
-// The browser side: prompt box, the feed of screens (one row per step, variants side by side),
-// streaming two variants at once, click-to-navigate, picking, pickers, history, metrics.
+// The browser side: prompt box, the feed of screens (one row per step, its variants stacked with the
+// pick in front), streaming two variants at once, click-to-navigate, picking, pickers, history, metrics.
 
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
 import { normalizePrompt, screenKey, variantId } from '@uxwoz/core/keys'
@@ -32,10 +32,10 @@ interface Row {
   /** The variant of the row above that the click was made in; null for the first row. */
   parent: number | null
   /**
-   * The variant shown first: the pick, as it was when the row was last left or opened. Picking by
-   * playing with a variant does not move it, so a screen never jumps away under the pointer.
+   * While a new screen streams, the variant in front: the first to show anything, or the one the
+   * user brought forward. It becomes the pick once stored.
    */
-  front?: number
+  firstSlot?: number
   /** Null until the screen arrives the first time. */
   entry: CacheEntry | null
   /** The variants streaming into this row now, one renderer each. */
@@ -64,11 +64,14 @@ const store = {
 }
 
 const feed = new Feed($('stage'), {
-  pick: (rowKey, id, bar) => {
+  pick: (rowKey, id) => {
     const r = rowOf(rowKey)
-    if (!r) return
-    choose(r, indexOf(id))
-    if (bar && Number.isInteger(indexOf(id))) { r.front = indexOf(id); draw() }
+    // While Change streams its variant in front, that variant becomes the pick.
+    if (!r || (r.entry && r.streaming.length && r.replacing == null)) return
+    if (Number.isInteger(indexOf(id))) return choose(r, indexOf(id))
+    // A variant of a new screen, still streaming: bring it forward; it is picked once stored.
+    const slot = Number(id.slice(id.lastIndexOf('#s') + 2))
+    if (!r.entry && r.streaming[slot] && r.firstSlot !== slot) { r.firstSlot = slot; draw() }
   },
   regenerate: (rowKey, id, prompt) => {
     const r = rowOf(rowKey), c = r?.entry?.candidates[indexOf(id)]
@@ -131,13 +134,15 @@ function infoOf(e: CacheEntry, c: Candidate): [string, string][] {
 
 const widthOf = (c: Candidate) => (c.device ? DEVICES[c.device].width : LEGACY_WIDTH)
 
+/** How many screens a variant's clicks first made. */
+const kidsOf = (key: string, index: number) => [...state.entries.values()].filter((x) => x.parent?.key === key && x.parent.variant === index).length
+
 function feedRow(r: Row, i: number): FeedRow {
   const e = r.entry
-  const fc = e && r.front != null ? e.candidates[r.front] : undefined
-  if (e && (!fc || fc.deleted)) r.front = e.chosen
   const variants: FeedVariant[] = []
   e?.candidates.forEach((c, j) => {
     if (c.deleted) return
+    const kids = kidsOf(r.key, j)
     variants.push({
       id: candidateId(r.key, j),
       width: widthOf(c),
@@ -147,6 +152,7 @@ function feedRow(r: Row, i: number): FeedRow {
       streaming: r.replacing === j,
       prompt: c.prompt ?? e.action ?? e.app,
       info: infoOf(e, c),
+      edge: [`Variant ${c.letter ?? '?'}`, nameOf(e, c), r.replacing === j ? 'refreshing…' : kids ? `leads to ${kids} screen${kids === 1 ? '' : 's'}` : ''],
     })
   })
   // A refreshed variant shows where the one it replaced was.
@@ -155,8 +161,6 @@ function feedRow(r: Row, i: number): FeedRow {
     const x = indexOf(a.id), y = indexOf(b.id) // NaN for a variant still streaming: those stay last
     return Number.isNaN(x) || Number.isNaN(y) ? Number(Number.isNaN(x)) - Number(Number.isNaN(y)) : slot(x) - slot(y)
   })
-  const first = variants.findIndex((v) => v.id === candidateId(r.key, r.front!))
-  if (first > 0) variants.unshift(...variants.splice(first, 1))
   const device = deviceSelect.value as Device
   if (r.replacing == null) r.streaming.forEach((_, slot) => variants.push({
     id: streamId(r.key, slot),
@@ -167,10 +171,13 @@ function feedRow(r: Row, i: number): FeedRow {
     streaming: true,
     prompt: '',
     info: [],
+    edge: ['New variant', 'making…', ''],
   }))
   const live = r.replacing == null ? variants.length - r.streaming.length : variants.length
   const note = r.streaming.length ? `making ${r.streaming.length === 1 ? 'a variant' : `${r.streaming.length} variants`}…` : `${live} variant${live === 1 ? '' : 's'}`
-  return { key: r.key, title: `Step ${i + 1}`, via: r.via, note, variants }
+  // A new variant streams in front (Change, or a new screen); otherwise the pick is in front.
+  const front = r.streaming.length && r.replacing == null ? streamId(r.key, r.firstSlot ?? 0) : e ? candidateId(r.key, e.chosen) : null
+  return { key: r.key, title: `Step ${i + 1}`, via: r.via, note, variants, front }
 }
 
 /** Draw every row and put each stored variant in its frame. Streaming frames are left to their streams. */
@@ -311,8 +318,11 @@ async function load(row: Row, { regenerate = false, prompt = null as string | nu
         cached = ev.cached
         row.key = ev.key // the server's key is the truth (it was computed the same way)
         if (replace != null) row.replacing = replace
+        row.firstSlot = undefined
         const target = (slot: number) => (replace != null ? candidateId(row.key, replace) : streamId(row.key, slot))
         row.streaming = Array.from({ length: ev.variants }, (_, slot) => new StreamRenderer(target(slot), css, () => {
+          // The first variant to show anything goes in front, unless the user brought one forward.
+          if (row.firstSlot == null) { row.firstSlot = slot; if (slot) draw() }
           firstVisible ??= performance.now() - t0
           setMetrics(`First visible screen <b>${fmtS(firstVisible)}</b> · streaming ${ev.variants} variants from ${modelLabel(model)}…`)
         }))
@@ -334,7 +344,10 @@ async function load(row: Row, { regenerate = false, prompt = null as string | nu
         if (added.length) loadHistory()
         // A refreshed variant streamed into the old version's frame, which now shows the new one.
         ev.variants.forEach((i, slot) => { if (i != null) feed.rename(replace != null ? candidateId(row.key, replace) : streamId(row.key, slot), candidateId(row.key, i)) })
-        if (replace != null && row.front === replace) row.front = ev.variants[0] ?? undefined
+        // The variant that was in front while streaming is the pick: the first to show, or Change's.
+        const front = replace == null && !cached ? ev.variants[row.firstSlot ?? 0] ?? ev.variants.find((x) => x != null) : null
+        row.firstSlot = undefined
+        if (front != null && front !== ev.entry.chosen) choose(row, front)
         const cost = added.reduce((s, i) => s + (ev.entry.candidates[i]!.costUsd ?? 0), 0)
         state.spent += cost
         if (ev.link) addLink(ev.link)
@@ -401,7 +414,6 @@ function onAction(rowKey: string, id: string, prompt: string, label: string) {
   const known = !!rowOf(key)
   if (state.busy && !known) return
   if (row.entry && row.entry.chosen !== index) choose(row, index)
-  row.front = index
   if (rowOf(key)) {
     feed.scrollToRow(key)
     recordLink(row.key, index, key, label)

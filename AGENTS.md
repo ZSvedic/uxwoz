@@ -42,8 +42,8 @@ src/packages/core/src/       engine; frame.ts and keys.ts also run in the browse
   frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices
 src/packages/web/src/
   server.ts      Bun.serve: /api/config, /api/screen (NDJSON, two variants at once), /api/map, /api/apps, /api/link, /api/choose, /api/delete, /api/delete-app, /api/warmup, themes
-  app.ts         browser: prompt box, History, rows of the flow (they follow the pick), load() a row, streaming, picking, delete, pickers, metrics
-  feed.ts        browser: rows of variants, frames, heights, lineage lines, variant tools, zoom
+  app.ts         browser: prompt box, History, rows of the flow (they follow the pick), load() a row, streaming (first to show goes in front), picking, delete, pickers, metrics
+  feed.ts        browser: rows as stacks of variants, Compare, frames, heights, lineage lines, tools, zoom
   tree.ts        browser: the tree of every screen beside the feed
   index.html, shell.css   the page around the feed
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)

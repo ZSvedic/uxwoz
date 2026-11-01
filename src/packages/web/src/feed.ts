@@ -1,12 +1,14 @@
-// The feed: the mockup as rows, one per step of the flow, top to bottom. A row holds the variants
-// of one screen side by side, the picked one first. Every variant is live: any click in one picks
-// it, and a click that opens another screen also opens the next row. Each variant's bar has
-// Change, Refresh, Delete and Info. The feed is one surface: the page scrolls both ways, also
-// over a screen, and rows never scroll on their own.
+// The feed: the mockup as rows, one per step of the flow, top to bottom. A row is a stack of the
+// variants of one screen: the pick in front, live, and the others behind it to the right, like
+// windows in Time Machine, each showing only its right edge with its name. Clicking an edge brings
+// that variant to the front and picks it. Compare (a row's button, or holding Alt/Option for every
+// row) fans a stack out side by side, in letter order so nothing moves while you pick. A click that
+// opens another screen opens the next row. Each variant's bar has Change, Refresh, Delete and Info.
+// The feed is one surface: the page scrolls both ways, also over a screen.
 // Screens always show at 100% and only as wide as their content: the frame keeps the device's
-// width, so the screen's layout never changes, and the part it does not use is cut off. A stepped line joins the picked variant of each row to the
-// picked variant of the next, labelled with the control that was clicked; other clicks between rows
-// (back links, skips ahead) are arcs in a gutter on the left.
+// width, so the screen's layout never changes, and the part it does not use is cut off. A line joins
+// the front variant of each row to the next, labelled with the control that was clicked; other
+// clicks between rows (back links, skips ahead) are arcs in a gutter on the left.
 
 import { FRAME_SANDBOX, framePage } from '@uxwoz/core/frame'
 
@@ -25,6 +27,8 @@ const GAP = 16
 const GUTTER = 32
 /** How far right of a variant's left edge the flow line meets it: picks come first, so the line is straight. */
 const FLOW_X = 48
+/** How much of each variant behind the front one shows, on the right of the stack. */
+const EDGE = 112
 /** The radius of a stepped line's corners. */
 const BEND = 8
 const SVG_NS = 'http://www.w3.org/2000/svg'
@@ -45,6 +49,8 @@ export interface FeedVariant {
   prompt: string
   /** Name and value pairs for Info. */
   info: [string, string][]
+  /** What its edge says behind the front variant: "Variant B", its name, a note. */
+  edge: [string, string, string]
 }
 
 export interface FeedRow {
@@ -53,15 +59,17 @@ export interface FeedRow {
   /** The control clicked in the row above to get here. */
   via: string | null
   note: string
+  /** In letter order: the order they take when compared. */
   variants: FeedVariant[]
+  /** The variant in front of the stack. */
+  front: string | null
 }
 
 /** A click in one row's screen that opens another row's screen. */
 export interface FeedLink { from: string; to: string; label: string }
 
 export interface FeedHandlers {
-  /** `bar` is true for a click on the variant's bar, false for a press inside its screen. */
-  pick: (rowKey: string, id: string, bar: boolean) => void
+  pick: (rowKey: string, id: string) => void
   /** Without `prompt`, refresh this variant in place; with it, make a new variant from that prompt. */
   regenerate: (rowKey: string, id: string, prompt: string | null) => void
   remove: (rowKey: string, id: string) => void
@@ -77,6 +85,8 @@ interface Frame {
   screen: HTMLElement
   /** Holds the open Change or Info panel, if any, between the bar and the screen. */
   panel: HTMLElement
+  /** What shows of it behind the front variant. */
+  edge: HTMLElement
   tools: HTMLButtonElement[]
   /** The variant as last rendered, for its panels. */
   data: FeedVariant | null
@@ -89,11 +99,7 @@ interface Frame {
   frozen: boolean
 }
 
-interface RowEl {
-  el: HTMLElement; head: HTMLElement; strip: HTMLElement
-  /** The variant shown first, so a new one there scrolls the row back to its start. */
-  front: string | null
-}
+interface RowEl { el: HTMLElement; head: HTMLElement; strip: HTMLElement }
 
 export class Feed {
   private list = el('div', 'feed')
@@ -106,6 +112,10 @@ export class Feed {
   private busy = false
   /** The feed's CSS zoom. Rects inside it come back zoomed; its own coordinates (the lines) do not. */
   private z = 1
+  /** Rows fanned out by their Compare button. */
+  private fanned = new Set<string>()
+  /** Alt/Option is held: every row is fanned out until it is let go. */
+  private peek = false
 
   /** `stage` is the scrolling page area; the feed replaces what it holds on the first render. */
   constructor(private stage: HTMLElement, private on: FeedHandlers) {
@@ -127,6 +137,21 @@ export class Feed {
       const g = e as Event & { scale: number; clientX: number; clientY: number }
       this.setZoom(z0 * g.scale, g.clientX, g.clientY)
     })
+    // Holding Alt/Option alone compares every row; a screen with the focus reports the key too.
+    // Alt with another key (Option types characters on a Mac) or in a text field is not a peek.
+    addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Alt') this.setPeek(!editable(e.target))
+      else if (this.peek) this.setPeek(false)
+    })
+    addEventListener('keyup', (e: KeyboardEvent) => { if (e.key === 'Alt') this.setPeek(false) })
+    // Clicking into a screen blurs the page, but the key is still held: the screen reports its release.
+    addEventListener('blur', () => { if (!(document.activeElement instanceof HTMLIFrameElement)) this.setPeek(false) })
+  }
+
+  private setPeek(on: boolean) {
+    if (this.peek === on) return
+    this.peek = on
+    this.render(this.drawn.rows, this.busy, this.drawn.links)
   }
 
   get zoom() { return this.z }
@@ -149,15 +174,14 @@ export class Feed {
 
   /** The zoom at which the whole flow fits the page, at most 100%. */
   fitZoom(): number {
-    // The width the variants take, not the strip's: a strip is as wide as the page at this zoom.
+    // The width the variants take (with the gutter), not the feed's: the feed is as wide as the page.
+    const base = this.list.getBoundingClientRect().left
     let w = 0
-    for (const r of this.rows.values()) {
-      for (const v of r.strip.children) w = Math.max(w, (v as HTMLElement).offsetLeft + (v as HTMLElement).offsetWidth - r.strip.offsetLeft)
-    }
+    for (const f of this.frames.values()) w = Math.max(w, (f.el.getBoundingClientRect().right - base) / this.z)
     const h = this.list.scrollHeight
     if (!w || !h) return 1
     const { left, right } = this.visible()
-    return Math.min(1, (right - left - 16) / (w + GUTTER), (this.stage.clientHeight - 16) / h)
+    return Math.min(1, (right - left - 16) / w, (this.stage.clientHeight - 16) / h)
   }
 
   /** The part of the page the feed shows in, left and right: the stage's padding keeps room for the tree. */
@@ -176,26 +200,48 @@ export class Feed {
     this.busy = busy
     const keep = new Set(rows.map((r) => r.key))
     for (const [k, r] of this.rows) if (!keep.has(k)) { r.el.remove(); this.rows.delete(k) }
+    for (const k of this.fanned) if (!keep.has(k)) this.fanned.delete(k)
     const ids = new Set(rows.flatMap((r) => r.variants.map((v) => v.id)))
     for (const [id, f] of this.frames) if (!ids.has(id)) { f.el.remove(); this.frames.delete(id) }
     rows.forEach((r, i) => {
       const row = this.row(r.key)
       placeAt(this.list, row.el, i + 1) // after the lines
-      row.head.replaceChildren(el('b', 'row-title', r.title), el('span', 'row-note', r.note))
+      const fan = this.peek || this.fanned.has(r.key)
+      const head: HTMLElement[] = [el('b', 'row-title', r.title), el('span', 'row-note', r.note)]
+      if (r.variants.length > 1) {
+        const b = el('button', 'compare', this.fanned.has(r.key) ? 'Stack' : 'Compare') as HTMLButtonElement
+        b.type = 'button'
+        b.title = this.fanned.has(r.key) ? 'Stack the variants again, the pick in front' : 'Show the variants side by side (or hold Alt/Option)'
+        b.addEventListener('click', () => {
+          if (!this.fanned.delete(r.key)) this.fanned.add(r.key)
+          this.render(this.drawn.rows, this.busy, this.drawn.links)
+        })
+        head.push(b)
+      }
+      row.head.replaceChildren(...head)
+      row.strip.classList.toggle('fanned', fan)
+      // The edges behind the front variant stick out on the right; the page scrolls to them.
+      row.strip.style.marginRight = fan ? '' : `${Math.max(0, r.variants.length - 1) * EDGE}px`
       // Variants are placed with CSS order, not moved: moving an iframe reloads it.
+      let k = 0
       r.variants.forEach((v, j) => {
         const f = this.frame(v.id, r.key)
         if (f.el.parentElement !== row.strip) row.strip.append(f.el)
-        f.el.style.order = String(j)
+        const front = v.id === r.front
+        const depth = fan || front ? 0 : ++k
+        f.el.style.order = String(fan ? j : depth)
+        f.el.style.setProperty('--k', String(depth))
+        f.el.style.zIndex = fan ? '' : String(r.variants.length - depth)
+        f.el.classList.toggle('back', depth > 0)
         f.data = v
         for (const b of f.tools) b.disabled = v.streaming || (busy && b.dataset.tool !== 'info')
         f.el.classList.toggle('chosen', v.chosen)
         f.el.classList.toggle('streaming', v.streaming)
-        f.el.title = v.tooltip
+        f.el.title = depth ? `${v.edge[0]}: ${v.edge[1]}. Click to bring it to the front.` : v.tooltip
         f.caption.textContent = v.caption
+        f.edge.replaceChildren(el('b', '', v.edge[0]), el('span', '', v.edge[1]), el('small', '', v.edge[2]))
         if (f.width !== v.width) { f.width = v.width; f.frame.style.width = f.screen.style.width = `${v.width}px` }
       })
-      row.front = r.variants[0]?.id ?? null
     })
     this.drawn = { rows, links }
     this.queueLines()
@@ -232,6 +278,11 @@ export class Feed {
     this.frames.delete(from)
     this.frames.set(to, f)
     f.el.dataset.id = to
+    // A redraw from the rows already drawn (Compare, Alt) must not take the frame for a gone one.
+    for (const r of this.drawn.rows) {
+      if (r.front === from) r.front = to
+      for (const v of r.variants) if (v.id === from) v.id = to
+    }
   }
 
 
@@ -282,9 +333,10 @@ export class Feed {
       const v = f.el.getBoundingClientRect()
       return { x: X(v.left + FLOW_X * z), y: Y(v[edge]) }
     }
+    // The line runs through the front variant; in a fanned row, through the pick.
     const pick = (r: FeedRow) => {
-      const v = r.variants.find((x) => x.chosen) ?? r.variants[0]
-      return v ? this.frames.get(v.id) : undefined
+      const id = this.peek || this.fanned.has(r.key) ? r.variants.find((x) => x.chosen)?.id ?? r.front : r.front
+      return id ? this.frames.get(id) : undefined
     }
     for (let i = 1; i < rows.length; i++) {
       const a = pick(rows[i - 1]!), b = pick(rows[i]!), row = this.rows.get(rows[i]!.key)
@@ -321,7 +373,7 @@ export class Feed {
     const head = el('div', 'row-head')
     const strip = el('div', 'strip')
     r.append(head, strip)
-    const row = { el: r, head, strip, front: null }
+    const row = { el: r, head, strip }
     this.rows.set(key, row)
     return row
   }
@@ -333,7 +385,7 @@ export class Feed {
     v.dataset.id = id
     const bar = el('div', 'variant-bar')
     const caption = el('span', 'caption')
-    bar.title = 'Click anything in a variant to pick it'
+    const edge = el('div', 'edge')
     const tool = (name: string, icon: string, tip: string) => {
       const b = el('button', 'tool', icon) as HTMLButtonElement
       b.type = 'button'
@@ -357,12 +409,14 @@ export class Feed {
     frame.title = 'Generated screen'
     frame.style.height = `${START_H}px`
     screen.append(frame)
-    v.append(bar, panel, screen)
+    v.append(bar, panel, screen, edge)
     const f: Frame = {
-      el: v, caption, screen, panel, tools, data: null, frame, rowKey, width: 0, shown: null, onLoad: null,
+      el: v, caption, screen, panel, edge, tools, data: null, frame, rowKey, width: 0, shown: null, onLoad: null,
       growth: { count: 0, at: 0 }, frozen: false,
     }
-    bar.addEventListener('click', () => this.on.pick(f.rowKey, v.dataset.id!, true))
+    bar.addEventListener('click', () => this.on.pick(f.rowKey, v.dataset.id!))
+    // A variant behind the front one shows only its edge: a click anywhere on it brings it forward.
+    v.addEventListener('click', () => { if (v.classList.contains('back')) this.on.pick(f.rowKey, v.dataset.id!) })
     frame.addEventListener('load', () => this.loaded(f))
     this.frames.set(id, f)
     return f
@@ -441,7 +495,9 @@ export class Feed {
       f.frame.style.height = `${h}px`
       this.queueLines()
     } else if (d.uxwoz === 'touch') {
-      this.on.pick(f.rowKey, id, false)
+      this.on.pick(f.rowKey, id)
+    } else if (d.uxwoz === 'peek') {
+      this.setPeek(!!d.on)
     } else if (d.uxwoz === 'zoom') {
       // Coordinates inside the frame, in its own pixels; the frame is shown at the feed's zoom.
       const r = f.frame.getBoundingClientRect(), k = r.width / (f.frame.offsetWidth || 1)
@@ -454,6 +510,8 @@ export class Feed {
     }
   }
 }
+
+const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))
 
 function el(tag: string, cls: string, text?: string): HTMLElement {
   const e = document.createElement(tag)

@@ -12,8 +12,8 @@ cd src && bun install && bun run dev
 ```
 
 Open http://127.0.0.1:3000, type a product idea (or pick an example), and click around: each screen
-comes in two variants side by side, and a click inside one picks it and adds the next screen below. `PORT=3001 bun run dev`
-picks another port.
+comes in two variants, stacked with the pick in front and the other's edge on the right; a click
+on a blue control adds the next screen below. `PORT=3001 bun run dev` picks another port.
 
 Generated screens are cached in `temp/screen-cache.json`. To make a mockup again from scratch,
 open it and click **Start over**; **Delete** removes it. To clear the whole cache, stop the server,
