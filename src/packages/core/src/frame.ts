@@ -142,14 +142,14 @@ main :is(button, [role="button"], input, select):is(${GO}) { background-color: #
 main a:is(${GO}) { text-decoration-line: none !important; }
 main a:is(${GO}):hover { text-decoration-line: underline !important; }`
 
-// Our layout rules, after the theme: the screen is only as wide as its content (the window is the
-// most it may take), with less padding, and the page never scrolls (the frame is as tall as the screen). Pico grows its text with the window
+// Our layout rules, after the theme: the screen is only as wide as its content and never wider than
+// the window (fit-content alone grows past it when the content cannot shrink), with less padding, and the page never scrolls (the frame is as tall as the screen). Pico grows its text with the window
 // (20 px at 1280 px); a fixed 16 px keeps screens in scale with the app around them.
 // Pico turns a <small> right after an input into help text on its own line; after a checkbox or
 // radio in its label it is a count or note, like "All <small>(6)</small>", so it stays inline.
 const FRAME_CSS = `html, body { overflow: hidden; }
 label > :is([type="checkbox"], [type="radio"]) + small { display: inline; margin: 0 0 0 .25em; }
-body > main { width: fit-content; min-width: 280px; max-width: none; margin: 0; padding: 20px 24px; }
+body > main { width: fit-content; min-width: 280px; max-width: 100%; margin: 0; padding: 20px 24px; }
 @media (max-width: 600px) { body > main { padding: 16px; } }
 :root { --pico-font-size: 100%; --pico-spacing: .75rem; --pico-typography-spacing-vertical: .75rem;
   --pico-block-spacing-vertical: .75rem; --pico-block-spacing-horizontal: 1rem;

@@ -1,9 +1,10 @@
 // The feed: the mockup as rows, one per step of the flow, top to bottom. A row is a stack of the
 // variants of one screen: the pick in front, live, and the others behind it to the right, like
 // windows in Time Machine, each showing only its right edge with its name. Clicking an edge brings
-// that variant to the front and picks it. Compare (a row's button, or holding Alt/Option for every
+// that variant to the front and picks it, and so does its letter by the row's title; the cards slide
+// to their new places, so a swap reads as one. Compare (a row's button, or holding Alt/Option for every
 // row) fans a stack out side by side, in letter order so nothing moves while you pick. A click that
-// opens another screen opens the next row. Each variant's bar has Change, Refresh, Delete and Info.
+// opens another screen opens the next row. Each variant's bar has Edit, Refresh, Delete and Info.
 // The feed is one surface: the page scrolls both ways, also over a screen.
 // Screens always show at 100% and only as wide as their content: the frame keeps the device's
 // width, so the screen's layout never changes, and the part it does not use is cut off. A line joins
@@ -29,6 +30,8 @@ const GUTTER = 32
 const FLOW_X = 48
 /** How much of each variant behind the front one shows, on the right of the stack. */
 const EDGE = 112
+/** How long cards take to slide to their new places when a stack changes. */
+const SLIDE_MS = 260
 /** The radius of a stepped line's corners. */
 const BEND = 8
 const SVG_NS = 'http://www.w3.org/2000/svg'
@@ -45,12 +48,14 @@ export interface FeedVariant {
   tooltip: string
   chosen: boolean
   streaming: boolean
-  /** The prompt it was made with, for Change; '' while it streams. */
+  /** The prompt it was made with, to start over from in the Edit panel; '' while it streams. */
   prompt: string
   /** Name and value pairs for Info. */
   info: [string, string][]
-  /** What its edge says behind the front variant: "Variant B", its name, a note. */
+  /** What its edge says behind the front variant: "L2-B", its name, a note. */
   edge: [string, string, string]
+  /** Its letter on the row's tabs, e.g. "B". */
+  tab: string
 }
 
 export interface FeedRow {
@@ -63,6 +68,8 @@ export interface FeedRow {
   variants: FeedVariant[]
   /** The variant in front of the stack. */
   front: string | null
+  /** The front cannot change now: an Edit streams its variant in front. */
+  fixed: boolean
 }
 
 /** A click in one row's screen that opens another row's screen. */
@@ -72,6 +79,8 @@ export interface FeedHandlers {
   pick: (rowKey: string, id: string) => void
   /** Without `prompt`, refresh this variant in place; with it, make a new variant from that prompt. */
   regenerate: (rowKey: string, id: string, prompt: string | null) => void
+  /** Make a new variant by changing this one as `change` asks. */
+  edit: (rowKey: string, id: string, change: string) => void
   remove: (rowKey: string, id: string) => void
   action: (rowKey: string, id: string, prompt: string, label: string) => void
   /** The zoom changed, by a gesture or a call. */
@@ -83,7 +92,7 @@ interface Frame {
   caption: HTMLElement
   /** Cuts the frame to the width the screen uses. */
   screen: HTMLElement
-  /** Holds the open Change or Info panel, if any, between the bar and the screen. */
+  /** Holds the open Edit or Info panel, if any, between the bar and the screen. */
   panel: HTMLElement
   /** What shows of it behind the front variant. */
   edge: HTMLElement
@@ -99,7 +108,8 @@ interface Frame {
   frozen: boolean
 }
 
-interface RowEl { el: HTMLElement; head: HTMLElement; strip: HTMLElement }
+/** `sig` is the stack's layout as last drawn: when it changes, the cards slide to their new places. */
+interface RowEl { el: HTMLElement; head: HTMLElement; strip: HTMLElement; sig: string | null }
 
 export class Feed {
   private list = el('div', 'feed')
@@ -203,12 +213,35 @@ export class Feed {
     for (const k of this.fanned) if (!keep.has(k)) this.fanned.delete(k)
     const ids = new Set(rows.flatMap((r) => r.variants.map((v) => v.id)))
     for (const [id, f] of this.frames) if (!ids.has(id)) { f.el.remove(); this.frames.delete(id) }
+    const slides: Map<HTMLElement, DOMRect>[] = []
     rows.forEach((r, i) => {
       const row = this.row(r.key)
       placeAt(this.list, row.el, i + 1) // after the lines
       const fan = this.peek || this.fanned.has(r.key)
-      const head: HTMLElement[] = [el('b', 'row-title', r.title), el('span', 'row-note', r.note)]
+      const sig = `${fan}|${r.front}|${r.variants.map((v) => v.id).join()}`
+      if (row.sig != null && row.sig !== sig && !matchMedia('(prefers-reduced-motion: reduce)').matches) slides.push(where(row.strip))
+      row.sig = sig
+      const head: HTMLElement[] = [el('b', 'row-title', r.title)]
+      if (r.note) head.push(el('span', 'row-note', r.note))
       if (r.variants.length > 1) {
+        // One tab per variant, in the order Compare shows them; the front one is lit. A click brings
+        // it forward. The tabs are made anew each time, so a focused one hands its focus on.
+        const focused = row.head.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.id : undefined
+        const tabs = el('span', 'tabs')
+        for (const v of r.variants) {
+          const t = el('button', 'tab', v.tab) as HTMLButtonElement
+          t.type = 'button'
+          t.dataset.id = v.id
+          t.disabled = r.fixed
+          const on = fan ? v.chosen : v.id === r.front
+          t.classList.toggle('on', on)
+          t.setAttribute('aria-pressed', String(on))
+          t.title = on ? `${v.edge[0]} ${v.edge[1]}` : `${v.edge[0]} ${v.edge[1]}: bring it to the front`
+          t.addEventListener('click', () => this.on.pick(r.key, v.id))
+          tabs.append(t)
+        }
+        head.push(tabs)
+        if (focused) queueMicrotask(() => tabs.querySelector<HTMLElement>(`[data-id="${CSS.escape(focused)}"]`)?.focus())
         const b = el('button', 'compare', this.fanned.has(r.key) ? 'Stack' : 'Compare') as HTMLButtonElement
         b.type = 'button'
         b.title = this.fanned.has(r.key) ? 'Stack the variants again, the pick in front' : 'Show the variants side by side (or hold Alt/Option)'
@@ -235,6 +268,9 @@ export class Feed {
         f.el.classList.toggle('back', depth > 0)
         f.data = v
         for (const b of f.tools) b.disabled = v.streaming || (busy && b.dataset.tool !== 'info')
+        // A variant being refreshed is about to be replaced: an open Edit would change the old one.
+        if (v.streaming) f.panel.hidden = true
+        for (const b of f.panel.querySelectorAll<HTMLButtonElement>('button.make')) b.disabled = busy
         f.el.classList.toggle('chosen', v.chosen)
         f.el.classList.toggle('streaming', v.streaming)
         f.el.title = depth ? `${v.edge[0]}: ${v.edge[1]}. Click to bring it to the front.` : v.tooltip
@@ -243,6 +279,18 @@ export class Feed {
         if (f.width !== v.width) { f.width = v.width; f.frame.style.width = f.screen.style.width = `${v.width}px` }
       })
     })
+    // Each card that moved within its stack slides from where it was (FLIP); the feed's zoom scales the move.
+    for (const before of slides) {
+      for (const [card, a] of before) {
+        if (!card.isConnected) continue
+        const b = card.getBoundingClientRect(), s = card.parentElement!.getBoundingClientRect()
+        const dx = (a.left - (b.left - s.left)) / this.z, dy = (a.top - (b.top - s.top)) / this.z
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue
+        const slide = card.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: SLIDE_MS, easing: 'cubic-bezier(.2, .8, .2, 1)' })
+        // The lines are measured from where the cards show: draw them again once a card has arrived.
+        slide.finished.then(() => this.queueLines(), () => {})
+      }
+    }
     this.drawn = { rows, links }
     this.queueLines()
   }
@@ -373,7 +421,7 @@ export class Feed {
     const head = el('div', 'row-head')
     const strip = el('div', 'strip')
     r.append(head, strip)
-    const row = { el: r, head, strip }
+    const row = { el: r, head, strip, sig: null }
     this.rows.set(key, row)
     return row
   }
@@ -395,8 +443,8 @@ export class Feed {
       return b
     }
     const tools = [
-      tool('change', '✎', 'Change: edit the prompt and make a new variant from it'),
-      tool('regenerate', '↻', 'Refresh: make this variant again, in its place, from the same prompt'),
+      tool('change', '✎', 'Edit: say what to change in this screen, and get it changed as a new variant'),
+      tool('regenerate', '↻', 'Refresh: make this variant again, in its place, the way it was made'),
       tool('delete', '✕', 'Delete this variant'),
       tool('info', 'ⓘ', 'Info: model, time, cost, prompt'),
     ]
@@ -422,12 +470,13 @@ export class Feed {
     return f
   }
 
-  /** A tool button in a variant's bar. Change and Info toggle a panel above the screen. */
+  /** A tool button in a variant's bar. Edit and Info toggle a panel above the screen. */
   private onTool(f: Frame, name: string) {
-    const v = f.data, id = f.el.dataset.id!
+    // The id is read when a button is clicked: a refresh renames the frame while the panel is open.
+    const v = f.data, id = () => f.el.dataset.id!
     if (!v) return
-    if (name === 'regenerate') return this.on.regenerate(f.rowKey, id, null)
-    if (name === 'delete') return this.on.remove(f.rowKey, id)
+    if (name === 'regenerate') return this.on.regenerate(f.rowKey, id(), null)
+    if (name === 'delete') return this.on.remove(f.rowKey, id())
     const open = !f.panel.hidden && f.panel.dataset.tool === name
     f.panel.hidden = open
     f.panel.dataset.tool = name
@@ -437,27 +486,44 @@ export class Feed {
       for (const [k, val] of v.info) dl.append(el('dt', '', k), el('dd', '', val))
       f.panel.replaceChildren(dl)
     } else {
+      // Edit: what to change in this screen. Below it, folded: start over from an edited prompt.
+      const close = () => { f.panel.hidden = true; this.queueLines() }
+      const button = (label: string, cls: string, run: () => void) => {
+        const b = el('button', cls, label) as HTMLButtonElement
+        b.type = 'button'
+        b.disabled = cls === 'make' && this.busy
+        b.addEventListener('click', run)
+        return b
+      }
+      const change = document.createElement('textarea')
+      change.maxLength = 1000
+      change.rows = 3
+      change.placeholder = 'e.g. Show one level indicator instead of four'
+      const buttons = el('div', 'panel-buttons')
+      buttons.append(button('Make the change', 'make', () => {
+        const ask = change.value.trim()
+        if (!ask) return change.focus()
+        if (this.busy) return // the button is disabled meanwhile; keep what was typed
+        close()
+        this.on.edit(f.rowKey, id(), ask)
+      }), button('Cancel', '', close))
       const text = document.createElement('textarea')
       text.value = v.prompt
       text.maxLength = 2000
       text.rows = Math.min(8, Math.max(3, Math.ceil(v.prompt.length / 40)))
-      const make = el('button', 'make', 'Make a new variant') as HTMLButtonElement
-      make.type = 'button'
-      make.disabled = this.busy
-      make.addEventListener('click', () => {
+      const again = el('div', 'panel-buttons')
+      again.append(button('Make a new variant', 'make', () => {
         const prompt = text.value.trim()
-        if (!prompt) return
-        f.panel.hidden = true
-        this.queueLines()
-        this.on.regenerate(f.rowKey, id, prompt)
-      })
-      const cancel = el('button', '', 'Cancel') as HTMLButtonElement
-      cancel.type = 'button'
-      cancel.addEventListener('click', () => { f.panel.hidden = true; this.queueLines() })
-      const buttons = el('div', 'panel-buttons')
-      buttons.append(make, cancel)
-      f.panel.replaceChildren(el('label', '', 'The prompt this variant was made from:'), text, buttons)
-      text.focus()
+        if (!prompt) return text.focus()
+        if (this.busy) return
+        close()
+        this.on.regenerate(f.rowKey, id(), prompt)
+      }))
+      const more = el('details', 'restart')
+      more.append(el('summary', '', 'Or start over from an edited prompt'), text, again)
+      more.addEventListener('toggle', () => this.queueLines())
+      f.panel.replaceChildren(el('label', '', 'What should change in this screen?'), change, buttons, more)
+      change.focus()
     }
     this.queueLines()
   }
@@ -509,6 +575,17 @@ export class Feed {
       this.on.action(f.rowKey, id, d.prompt.slice(0, 500), typeof d.label === 'string' ? d.label.slice(0, 80) : '')
     }
   }
+}
+
+/** Where each card of a stack shows now, relative to the stack (mid-slide too); its slide stops there. */
+function where(strip: HTMLElement): Map<HTMLElement, DOMRect> {
+  const s = strip.getBoundingClientRect(), m = new Map<HTMLElement, DOMRect>()
+  for (const card of strip.children) {
+    const r = card.getBoundingClientRect()
+    m.set(card as HTMLElement, new DOMRect(r.left - s.left, r.top - s.top, r.width, r.height))
+    for (const a of card.getAnimations()) a.cancel()
+  }
+  return m
 }
 
 const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))

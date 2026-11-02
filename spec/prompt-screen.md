@@ -35,8 +35,18 @@ Design it for a phone screen, at most 390 px wide.
 Design this as a clearly different alternative to the obvious layout: change the structure, grouping or navigation, not just the wording.
 ```
 
-A variant made with **Change** sends the user's edited prompt in place of the action prompt (or of
-the product prompt, for the first screen), after the same *This screen belongs to…* line.
+A variant made from an edited prompt sends it in place of the action prompt (or of the product
+prompt, for the first screen), after the same *This screen belongs to…* line.
+
+An **Edit** sends the variant's own prompt as usual, then the screen as it is now and the change,
+with no request for a different design:
+
+```
+The screen as it is now:
+<title>Litter box details</title> …
+
+Reply with this screen again, changed only as follows; keep everything else as it is, including its data-action prompts: Show one level indicator instead of four
+```
 
 They live in the user message, so the system prompt stays the same for every request and the
 provider's prompt cache keeps working.

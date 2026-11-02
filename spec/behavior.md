@@ -9,15 +9,16 @@ vars (see [code-contract.md](code-contract.md)).
 
 1. Zel types *A coffee shop ordering app* and presses **Generate**.
 2. Two variants of the first screen stream in. *L1-B Order ahead* shows text first, so it streams in
-   front; *L1-A Menu* streams behind it, and only its right edge shows, reading *Variant A: Menu*.
+   front; the other streams behind it, and only its right edge shows. Once both are stored, that
+   edge reads *L1-A Menu*.
    After about 1 s the metrics line reads *First visible screen 0.9 s*; at the end it reads *all
    variants interactive 6.0 s · $0.0016 for 2*. L1-B, the one in front, is the pick.
 3. Zel clicks the blue **Checkout** button in L1-B. A second row appears below with *L2-A* and
    *L2-B*, two variants of the checkout, one in front. A line runs from L1-B down into the new row,
    labelled *Checkout*.
-4. Neither checkout is right. Zel clicks **✎ Change** on the front one, adds *one big pay button*
-   to the prompt and clicks **Make a new variant**: *L2-C* streams in front and becomes the pick;
-   L2-A and L2-B stay behind it.
+4. The checkout in front is close, but its pay button is small. Zel clicks **✎ Edit** on it, types
+   *one big pay button* and clicks **Make the change**: *L2-C*, the same checkout with one big pay
+   button, streams in front and becomes the pick; L2-A and L2-B stay behind it.
 5. Zel clicks **Compare** on step 1 and sees L1-A and L1-B side by side. Zel clicks into L1-A: it
    becomes the pick, and the checkout row goes, since L1-A never led there. Picking L1-B again
    brings it back.
@@ -47,22 +48,24 @@ per level, so letters stay taken after their screens are gone; Start over begins
 The feed shows the main flow: one row per step, from the first screen at the top down to the
 latest. A row is a **stack** of the variants of one screen, like windows in Time Machine but
 stacked to the right: the pick in front, live, and each other variant behind it, a little shorter
-and darker, showing only its right edge with *Variant B*, its name, and how many screens it leads
-to. The feed is one surface on a dot grid: the page scrolls both ways, and rows never scroll on
-their own.
+and darker, showing only its right edge with its name (*L1-A Menu*) and how many screens it leads
+to. By the row's title, one tab per variant (*A B*) lights the one in front. Clicking an edge or a
+tab brings that variant forward and picks it; the cards slide to their new places, so the swap is
+easy to follow. The feed is one surface on a dot grid: the page scrolls both ways, and rows never
+scroll on their own.
 
 ```
- Step 1  2 variants  [Compare]
+ Step 1  [A|B]  [Compare]
  ┌──────────────────────┐─────────┐
- │ L1-B Order ahead     │Variant A│
+ │ L1-B Order ahead     │L1-A     │
  │                      │Menu     │
  │                      │         │
  └──────────────────────┘─────────┘
         │ Checkout
         ↓
- Step 2  3 variants  [Compare]
+ Step 2  [A|B|C]  [Compare]
  ┌──────────────────────┐─────────┐─────────┐
- │ L2-C Checkout        │Variant A│Variant B│
+ │ L2-C Checkout        │L2-A     │L2-B     │
  └──────────────────────┘─────────┘─────────┘
 ```
 
@@ -81,14 +84,15 @@ their own.
   moves the page and the row. A screen sees an 800 px tall window (`100vh` is 800 px), so
   "full-screen" screens keep a normal size; a screen that still keeps growing with its window
   stops after four steps.
-- **Size**: a screen is only as wide as its content; the device width is the most it takes. The
-  model is told to start small: only what this step needs.
+- **Size**: a screen is only as wide as its content; the device width is the most it takes, even
+  when its content cannot shrink to fit. The model is told to start small: only what this step
+  needs.
 - **Zoom**: pinch, or Ctrl/Cmd + scroll, zooms the feed around the pointer, also over a screen.
   The slider at the top sets it from 10% to 150%, with the level shown beside it; **Fit** shows the
   whole flow, **100%** goes back. The dot grid's spacing follows the zoom, so it shows how far in
   or out the feed is. Screens stay live at any zoom. The zoom is remembered in this browser.
 - Each variant's bar shows its name and four tools. Hovering the bar names its model, cost and
-  time. Change and Info open a panel under the bar, as wide as the screen; long text wraps.
+  time. Edit and Info open a panel under the bar, as wide as the screen; long text wraps.
 
 ## Tree
 
@@ -132,11 +136,15 @@ error line naming the failure.
 
 Each variant's bar has four tools:
 
-- **✎ Change** shows the prompt the variant was made from. Edit it and click **Make a new
-  variant**: one more variant, made from the edited prompt, streams in front of the stack and
-  becomes the pick, so the rows below follow it. It stays a variant of the same screen, so the
-  click that leads here still lands here.
-- **↻ Refresh** makes the variant again from the same prompt. The new version takes the old one's
+- **✎ Edit** asks *What should change in this screen?* Type it (*Show one level indicator instead
+  of four*) and click **Make the change**: the model gets this screen and the request, and returns
+  the same screen with only that change, as one more variant. It streams in front of the stack and
+  becomes the pick, so the rows below follow it; the variant it changed stays behind it, and Info
+  names both. Folded under the box, **Or start over from an edited prompt** shows the prompt the
+  variant was made from: edit it and click **Make a new variant** for a new design instead. Either
+  way it stays a variant of the same screen, so the click that leads here still lands here.
+- **↻ Refresh** makes the variant again the way it was made: from the same prompt, or for an Edit,
+  the same change to the same variant (from its prompt, if that variant is gone). The new version takes the old one's
   place in the stack (and its pick) under a new name, and the old one is deleted, with the screens
   only it led to. When screens were made from it, Refresh asks first.
 - **✕ Delete** asks, then deletes the variant: its markup goes, its letter stays taken. Screens
@@ -175,7 +183,7 @@ last build, because their handlers arrive at the end of the reply. The metrics l
   tab follows.
 
 A variant that is not complete after 20 s, stops early, or hits the token limit fails; nothing of
-it is cached. If both variants fail, a new row goes away; a failed Change or Regenerate leaves the
+it is cached. If both variants fail, a new row goes away; a failed Edit or Refresh leaves the
 row as it was.
 
 ## Cache

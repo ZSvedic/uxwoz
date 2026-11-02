@@ -28,8 +28,10 @@ export interface Candidate {
   letter?: string
   /** The prompt it was made with, when the user changed it; else the screen's action prompt. */
   prompt?: string
-  /** What the user asked to change, on variants made before Change replaced it. */
+  /** What the user asked to change: an Edit's request (on old variants, feedback from before Change). */
   feedback?: string
+  /** The variant an Edit changed to make this one. */
+  editOf?: number
   /** Deleted by the user: its markup is gone, its letter stays taken. */
   deleted?: boolean
   /** Asked for as a clearly different design (the second of a pair); a refresh asks again. */

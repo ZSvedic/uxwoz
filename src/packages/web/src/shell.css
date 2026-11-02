@@ -81,6 +81,10 @@ button:disabled { opacity: .45; cursor: default; }
 .lines .arrow { fill: var(--accent); }
 .lines .via { fill: var(--accent); font: 600 13px system-ui, -apple-system, sans-serif; }
 .row-head > * { position: relative; background: var(--bg); padding: 0 4px; border-radius: 4px; }
+.row-head .tabs { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); }
+.row-head .tab { min-width: 26px; padding: 1px 7px; border: 0; border-radius: 5px; background: none; color: var(--muted); font-size: 12px; font-weight: 600; }
+.row-head .tab:hover { color: var(--fg); background: var(--bg); }
+.row-head .tab.on { background: var(--accent); color: #fff; }
 .row-head .compare { padding: 1px 8px; font-size: 12px; color: var(--muted); }
 .row-head .compare:hover { color: var(--fg); border-color: var(--accent); }
 /* A row is a stack: the front variant in the flow, the others behind it, each one EDGE (112px, see
@@ -96,9 +100,14 @@ button:disabled { opacity: .45; cursor: default; }
   filter: brightness(calc(1 - var(--k) * .05)); transition: filter .15s, border-color .15s; }
 .variant.back:hover { filter: none; border-color: var(--accent); }
 .variant.back > :not(.edge) { visibility: hidden; }
+/* A card that goes back keeps its screen while it slides (see SLIDE_MS); its edge fades in. */
+.variant > :not(.edge) { transition: visibility .26s; }
 .edge { display: none; }
+.variant.back .edge { animation: edge-in .3s ease-out; }
+@keyframes edge-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .variant > * { transition: none; } .variant.back .edge { animation: none; } }
 .variant.back .edge { display: flex; flex-direction: column; gap: 4px; position: absolute; top: 0; right: 0; bottom: 0; width: 112px;
-  padding: 12px 10px 12px 14px; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+  padding: 12px 10px 12px 14px; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; background: var(--card); }
 .edge b { color: var(--fg); }
 .edge span { color: var(--fg); }
 .edge small { font-size: 12px; }
@@ -116,13 +125,17 @@ button:disabled { opacity: .45; cursor: default; }
   font-size: 14px; line-height: 1; }
 .variant-bar .tool:hover:not(:disabled) { border-color: var(--line); color: var(--fg); }
 .variant-bar .tool[data-tool="delete"]:hover:not(:disabled) { color: var(--err); }
-/* Change and Info open here, between the bar and the screen. */
+/* Edit and Info open here, between the bar and the screen. */
 .panel { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
 .panel label { color: var(--muted); }
 .panel textarea { width: 100%; resize: vertical; font: inherit; color: inherit; padding: 6px 8px; border: 1px solid var(--line);
   border-radius: 6px; background: var(--bg); }
 .panel-buttons { display: flex; gap: 8px; }
 .panel .make { background: var(--accent); border-color: var(--accent); color: #fff; }
+.panel .restart { display: flex; flex-direction: column; gap: 8px; }
+.panel .restart summary { cursor: pointer; color: var(--muted); }
+.panel .restart summary:hover { color: var(--fg); }
+.panel .restart:not([open]) { gap: 0; }
 .info { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; margin: 0; }
 .info dt { color: var(--muted); }
 .info dd { margin: 0; overflow-wrap: anywhere; }

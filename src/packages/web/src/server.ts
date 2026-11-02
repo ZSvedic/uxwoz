@@ -13,7 +13,7 @@ const THEMES_DIR = resolve(import.meta.dir, '../themes')
 export const THEMES = { mockup: 'Mockup (sketch)', clean: 'Clean (Pico)' } as const
 const THEME_FILES = new Set(['pico', 'mockup'])
 
-/** How many variants a new screen comes with; Regenerate and Change add one. */
+/** How many variants a new screen comes with; an Edit or an edited prompt adds one. */
 export const VARIANTS = 2
 
 /**
@@ -102,12 +102,13 @@ export function createServer(opts: ServerOptions = {}) {
   interface Click { from: string; variant: number; label: string }
   /**
    * `regenerate` adds one variant to a screen even when it is cached; `prompt`, when given, is what
-   * the model is asked for instead of the screen's own prompt (the user's Change). `replace` makes
-   * a new version of that variant from the prompt it was made with; it takes the old one's place.
+   * the model is asked for instead of the screen's own prompt (an edited prompt). `edit` adds one
+   * variant made by changing that variant as asked (the user's Edit). `replace` makes a new version
+   * of that variant the way it was made (its prompt, or its Edit again); it takes the old one's place.
    */
   interface ScreenRequest {
     app: string; action: string | null; model: ModelId; device: Device; regenerate: boolean; prompt: string | null
-    replace: number | null; click: Click | null
+    edit: { variant: number; change: string } | null; replace: number | null; click: Click | null
   }
 
   async function* screenEvents(r: ScreenRequest, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
@@ -120,9 +121,17 @@ export function createServer(opts: ServerOptions = {}) {
       yield { type: 'error', message: 'no such variant to refresh' }
       return
     }
-    const prompt = old ? old.prompt ?? null : r.prompt
+    // An Edit changes a live variant; a refreshed Edit changes the same variant again, if it is still there.
+    const asked = r.edit ?? (old?.editOf != null && old.feedback ? { variant: old.editOf, change: old.feedback } : null)
+    const base = asked ? hit?.candidates[asked.variant] : undefined
+    if (r.edit && (!base || base.deleted)) {
+      yield { type: 'error', message: 'no such variant to edit' }
+      return
+    }
+    const edit = asked && base && !base.deleted ? { ...asked, html: base.html } : null
+    const prompt = old ? old.prompt ?? null : base ? base.prompt ?? null : r.prompt
     const linkFrom = () => (click ? cache.link(click.from, click.variant, key, click.label || action || 'home') ?? null : null)
-    if (hit && !r.regenerate && replace == null) {
+    if (hit && !r.regenerate && replace == null && !edit) {
       yield { type: 'meta', key, cached: true, variants: 0 }
       yield { type: 'done', entry: hit, variants: [], failed: [], link: linkFrom(), removed: [] }
       return
@@ -131,12 +140,15 @@ export function createServer(opts: ServerOptions = {}) {
       yield { type: 'error', message: 'this mockup has no first screen: it was deleted, or never made' }
       return
     }
-    const count = r.regenerate || replace != null ? 1 : VARIANTS
+    const count = r.regenerate || replace != null || edit ? 1 : VARIANTS
     yield { type: 'meta', key, cached: false, variants: count }
     const existing = cache.existingScreens(app).filter((a) => a !== action)
     const streams = Array.from({ length: count }, (_, slot) => tagged(slot, generateScreen({
       // A refreshed alternative stays the different design it was asked to be (index 1 before the flag existed).
-      app, action: prompt ?? action, existing, model, device, alternative: old ? old.alternative ?? (replace === 1 && old.replaces == null) : slot % 2 === 1,
+      // An Edit keeps the device its variant was made for, and asks for no other design.
+      app, action: prompt ?? action, existing, model, device: (edit && base!.device) || device,
+      alternative: edit ? false : old ? old.alternative ?? (replace === 1 && old.replaces == null && old.editOf == null) : slot % 2 === 1,
+      edit: edit ? { html: edit.html, change: edit.change } : undefined,
       signal, fetch: opts.fetch, env: opts.env, log,
     })))
     const made: (Candidate | null)[] = Array(count).fill(null)
@@ -148,7 +160,7 @@ export function createServer(opts: ServerOptions = {}) {
         log(`screen failed (${model}): ${message}`)
         failed.push(message)
       } else if (t.ev.type === 'chunk') yield { type: 'chunk', variant: t.slot, text: t.ev.text }
-      else made[t.slot] = prompt ? { ...t.ev.candidate, prompt } : t.ev.candidate
+      else made[t.slot] = { ...t.ev.candidate, ...(prompt && { prompt }), ...(edit && { editOf: edit.variant, feedback: edit.change }) }
     }
     const ok = made.filter((c): c is Candidate => c != null)
     const parent = click && { key: click.from, variant: click.variant, label: click.label }
@@ -215,6 +227,10 @@ export function createServer(opts: ServerOptions = {}) {
           const model = b?.model ?? DEFAULT_MODEL
           const device = b?.device ?? DEFAULT_DEVICE
           const prompt = typeof b?.prompt === 'string' && b.prompt.trim() ? b.prompt.trim() : null
+          const change = typeof b?.edit?.change === 'string' ? b.edit.change.trim() : ''
+          const edit = b?.edit != null ? { variant: b.edit.variant, change } : null
+          if (edit && (!Number.isInteger(edit.variant) || edit.variant < 0 || !change || change.length > 1000))
+            return json({ error: 'edit needs a variant number and a change of 1-1000 characters' }, 400)
           if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
           if (action && action.length > 500) return json({ error: 'action must be at most 500 characters' }, 400)
           if (prompt && prompt.length > 2000) return json({ error: 'prompt must be at most 2000 characters' }, 400)
@@ -227,7 +243,7 @@ export function createServer(opts: ServerOptions = {}) {
           const click = typeof b?.from === 'string' && b.from
             ? { from: b.from.slice(0, 3000), variant, label: String(b?.label ?? '').slice(0, 200) }
             : null
-          return ndjson(screenEvents({ app, action, model, device, regenerate: b?.regenerate === true, prompt, replace, click }, req.signal))
+          return ndjson(screenEvents({ app, action, model, device, regenerate: b?.regenerate === true, prompt, edit, replace, click }, req.signal))
         },
       },
       '/api/map': (req) => {

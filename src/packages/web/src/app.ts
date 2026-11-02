@@ -42,6 +42,8 @@ interface Row {
   streaming: StreamRenderer[]
   /** The variant being refreshed in place, if any: it streams into its own frame. */
   replacing?: number
+  /** The device the variants streaming now were asked for. */
+  device?: Device
 }
 
 const state = {
@@ -66,7 +68,7 @@ const store = {
 const feed = new Feed($('stage'), {
   pick: (rowKey, id) => {
     const r = rowOf(rowKey)
-    // While Change streams its variant in front, that variant becomes the pick.
+    // While Edit (or an edited prompt) streams its variant in front, that variant becomes the pick.
     if (!r || (r.entry && r.streaming.length && r.replacing == null)) return
     if (Number.isInteger(indexOf(id))) return choose(r, indexOf(id))
     // A variant of a new screen, still streaming: bring it forward; it is picked once stored.
@@ -75,13 +77,18 @@ const feed = new Feed($('stage'), {
   },
   regenerate: (rowKey, id, prompt) => {
     const r = rowOf(rowKey), c = r?.entry?.candidates[indexOf(id)]
-    if (!r?.entry || !c || state.busy) return
-    // Refresh (no prompt) makes a new version of the variant in its place; Change adds a variant.
+    if (!r?.entry || !c || c.deleted || state.busy) return
+    // Refresh (no prompt) makes a new version of the variant in its place; an edited prompt adds a variant.
     if (prompt == null) return refreshVariant(r, indexOf(id))
-    // Regenerate keeps the variant's own prompt; a Change back to the screen's prompt is a plain regenerate.
+    // Regenerate keeps the variant's own prompt; an edited prompt back to the screen's own is a plain regenerate.
     const own = r.entry.action ?? r.entry.app
     prompt ??= c.prompt ?? null
     load(r, { regenerate: true, prompt: prompt && normalizePrompt(prompt) !== normalizePrompt(own) ? prompt : null })
+  },
+  edit: (rowKey, id, change) => {
+    const r = rowOf(rowKey), variant = indexOf(id)
+    if (!r?.entry?.candidates[variant] || r.entry.candidates[variant]!.deleted || state.busy) return
+    load(r, { regenerate: true, edit: { variant, change } })
   },
   remove: (rowKey, id) => { const r = rowOf(rowKey); if (r) removeVariant(r, indexOf(id)) },
   action: onAction,
@@ -128,6 +135,8 @@ function infoOf(e: CacheEntry, c: Candidate): [string, string][] {
     ['Size', `${c.html.length.toLocaleString()} characters`],
     ['Prompt', c.prompt ?? e.action ?? e.app],
   ]
+  const base = c.editOf != null ? e.candidates[c.editOf] : undefined
+  if (base) info.push(['Edited from', labelOf(e, base) + (base.deleted ? ' (deleted)' : '')])
   if (c.feedback) info.push(['Asked for', c.feedback])
   return info
 }
@@ -152,7 +161,8 @@ function feedRow(r: Row, i: number): FeedRow {
       streaming: r.replacing === j,
       prompt: c.prompt ?? e.action ?? e.app,
       info: infoOf(e, c),
-      edge: [`Variant ${c.letter ?? '?'}`, nameOf(e, c), r.replacing === j ? 'refreshing…' : kids ? `leads to ${kids} screen${kids === 1 ? '' : 's'}` : ''],
+      edge: [variantId(e.level, c.letter ?? '?'), nameOf(e, c), r.replacing === j ? 'refreshing…' : kids ? `leads to ${kids} screen${kids === 1 ? '' : 's'}` : ''],
+      tab: c.letter ?? '?',
     })
   })
   // A refreshed variant shows where the one it replaced was.
@@ -161,8 +171,8 @@ function feedRow(r: Row, i: number): FeedRow {
     const x = indexOf(a.id), y = indexOf(b.id) // NaN for a variant still streaming: those stay last
     return Number.isNaN(x) || Number.isNaN(y) ? Number(Number.isNaN(x)) - Number(Number.isNaN(y)) : slot(x) - slot(y)
   })
-  const device = deviceSelect.value as Device
-  if (r.replacing == null) r.streaming.forEach((_, slot) => variants.push({
+  const device = r.device ?? deviceSelect.value as Device
+  if (r.replacing == null) r.streaming.forEach((_, slot, all) => variants.push({
     id: streamId(r.key, slot),
     width: DEVICES[device]?.width ?? LEGACY_WIDTH,
     caption: 'New variant · making…',
@@ -172,12 +182,14 @@ function feedRow(r: Row, i: number): FeedRow {
     prompt: '',
     info: [],
     edge: ['New variant', 'making…', ''],
+    tab: all.length > 1 ? `${slot + 1}` : 'new', // letters come once it is stored
   }))
   const live = r.replacing == null ? variants.length - r.streaming.length : variants.length
-  const note = r.streaming.length ? `making ${r.streaming.length === 1 ? 'a variant' : `${r.streaming.length} variants`}…` : `${live} variant${live === 1 ? '' : 's'}`
-  // A new variant streams in front (Change, or a new screen); otherwise the pick is in front.
+  // Two or more variants show as tabs, which say how many there are.
+  const note = r.streaming.length ? `making ${r.streaming.length === 1 ? 'a variant' : `${r.streaming.length} variants`}…` : live === 1 ? '1 variant' : ''
+  // A new variant streams in front (an Edit, an edited prompt, or a new screen); otherwise the pick is in front.
   const front = r.streaming.length && r.replacing == null ? streamId(r.key, r.firstSlot ?? 0) : e ? candidateId(r.key, e.chosen) : null
-  return { key: r.key, title: `Step ${i + 1}`, via: r.via, note, variants, front }
+  return { key: r.key, title: `Step ${i + 1}`, via: r.via, note, variants, front, fixed: !!(e && r.streaming.length && r.replacing == null) }
 }
 
 /** Draw every row and put each stored variant in its frame. Streaming frames are left to their streams. */
@@ -284,10 +296,12 @@ async function* readEvents(res: Response): AsyncGenerator<ScreenEvent> {
 
 /**
  * Fill a row: from the cache when its screen is there, else two variants streamed side by side.
- * With `regenerate`, one more variant joins the row, made from `prompt` when given. With `replace`,
- * that variant gets a new version in its place, streamed into its own frame.
+ * With `regenerate`, one more variant joins the row, made from `prompt` when given, or by changing
+ * variant `edit.variant` as `edit.change` asks. With `replace`, that variant gets a new version in
+ * its place, streamed into its own frame.
  */
-async function load(row: Row, { regenerate = false, prompt = null as string | null, from = null as Row | null, replace = null as number | null } = {}) {
+async function load(row: Row, { regenerate = false, prompt = null as string | null, edit = null as { variant: number; change: string } | null,
+  from = null as Row | null, replace = null as number | null } = {}) {
   const variant = row.parent
   state.busy?.abort()
   const ctrl = new AbortController()
@@ -298,7 +312,12 @@ async function load(row: Row, { regenerate = false, prompt = null as string | nu
   let firstVisible: number | null = null
   let cached = false
   showError(null)
-  setMetrics(replace != null ? `Refreshing the variant with ${modelLabel(model)}…` : regenerate ? `Making a new variant with ${modelLabel(model)}…` : 'Asking for the screen…')
+  // A refresh or an Edit keeps the device of the variant it starts from; anything else uses the picker's.
+  const own = replace ?? edit?.variant
+  const device = (own != null && row.entry?.candidates[own]?.device) || deviceSelect.value as Device
+  row.device = device
+  setMetrics(replace != null ? `Refreshing the variant with ${modelLabel(model)}…` : edit ? `Editing the variant with ${modelLabel(model)}…`
+    : regenerate ? `Making a new variant with ${modelLabel(model)}…` : 'Asking for the screen…')
   draw()
   try {
     const css = await themeCss(themeSelect.value)
@@ -306,8 +325,7 @@ async function load(row: Row, { regenerate = false, prompt = null as string | nu
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        // A refresh keeps the variant's own device; anything else uses the picker's.
-        app, action: row.action, model, device: (replace != null && row.entry?.candidates[replace]?.device) || deviceSelect.value, regenerate, prompt, replace,
+        app, action: row.action, model, device, regenerate, prompt, edit, replace,
         from: from?.key ?? null, variant, label: from ? row.via : null,
       }),
       signal: ctrl.signal,
@@ -344,7 +362,7 @@ async function load(row: Row, { regenerate = false, prompt = null as string | nu
         if (added.length) loadHistory()
         // A refreshed variant streamed into the old version's frame, which now shows the new one.
         ev.variants.forEach((i, slot) => { if (i != null) feed.rename(replace != null ? candidateId(row.key, replace) : streamId(row.key, slot), candidateId(row.key, i)) })
-        // The variant that was in front while streaming is the pick: the first to show, or Change's.
+        // The variant that was in front while streaming is the pick: the first to show, or the Edit's.
         const front = replace == null && !cached ? ev.variants[row.firstSlot ?? 0] ?? ev.variants.find((x) => x != null) : null
         row.firstSlot = undefined
         if (front != null && front !== ev.entry.chosen) choose(row, front)

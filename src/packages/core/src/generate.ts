@@ -20,6 +20,8 @@ export interface GenerateOptions {
   device?: Device
   /** True for the second variant of a pair: ask for a clearly different design. */
   alternative?: boolean
+  /** An Edit: change this screen as asked instead of designing a new one. */
+  edit?: { html: string; change: string }
   signal?: AbortSignal
   fetch?: Fetch
   env?: Record<string, string | undefined>
@@ -39,7 +41,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
   try {
     for await (const ev of streamModel({
       model: o.model, system: SYSTEM_PROMPT,
-      user: screenRequest(o.app, o.action, o.existing, { device: o.device && DEVICES[o.device].request, alternative: o.alternative }),
+      user: screenRequest(o.app, o.action, o.existing, { device: o.device && DEVICES[o.device].request, alternative: o.alternative, edit: o.edit }),
       signal, fetch: o.fetch, env: o.env,
     })) {
       if (ev.type === 'text') {

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ALTERNATIVE_REQUEST, ScreenCache, letterAt, normalizePrompt, screenKey, screenRequest, variantId, type Candidate } from '@uxwoz/core'
+import { ALTERNATIVE_REQUEST, EDIT_REQUEST, ScreenCache, letterAt, normalizePrompt, screenKey, screenRequest, variantId, type Candidate } from '@uxwoz/core'
 
 const cand = (html: string): Candidate => ({
   html, model: 'claude-haiku-5.5', servedModel: null, createdAt: '2026-10-23T00:00:00Z',
@@ -59,6 +59,11 @@ describe('screen cache', () => {
     const msg = screenRequest('Coffee app', null, [], { device: 'a phone screen', alternative: true })
     expect(msg).toBe(`Coffee app\n\nDesign it for a phone screen.\n\n${ALTERNATIVE_REQUEST}`)
     expect(screenRequest('Coffee app', null, [], { device: 'a phone screen' })).not.toContain(ALTERNATIVE_REQUEST)
+  })
+
+  test('an Edit sends the screen as it is now and the change, last', () => {
+    const msg = screenRequest('Coffee app', null, [], { device: 'a phone screen', edit: { html: '<h1>Menu</h1>', change: 'Add prices' } })
+    expect(msg).toBe(`Coffee app\n\nDesign it for a phone screen.\n\nThe screen as it is now:\n<h1>Menu</h1>\n\n${EDIT_REQUEST} Add prices`)
   })
 
   test('the cache keeps the first click between two screens and serves one mockup at a time', () => {

@@ -34,15 +34,20 @@ can spend model credits.
 
 - `GET /api/config`: models (id, label, costEstimated), themes (`mockup`, `clean`), devices (id,
   label, width), and the default model, theme and device.
-- `POST /api/screen {app, action?, model?, device?, regenerate?, prompt?, from?, variant?, label?}`:
+- `POST /api/screen {app, action?, model?, device?, regenerate?, prompt?, edit?, replace?, from?, variant?, label?}`:
   NDJSON stream of `meta`, `chunk`*, then `done` or `error`. A new screen makes two variants at
   once: `meta.variants` is 2 and each chunk names its `variant` (0 or 1). `regenerate` makes one
   more variant of the screen, cached or not. `replace` (a candidate index) refreshes that variant:
   one new variant with the next letter and `replaces` set, picked if the old one was; the old one
   is deleted as by `/api/delete`, and `done.removed` lists the screens that went with it. `prompt` (up to 2,000 characters) is asked for in place
   of the screen's own action prompt and stored on the new candidates; the key stays the screen's.
+  `edit: {variant, change}` (a candidate index and 1-1,000 characters) makes one variant by sending
+  that candidate's HTML and the change to the model, for that candidate's device and with its
+  prompt (a `prompt` given too is ignored); the new one gets `editOf` and `feedback` (the change).
+  A refresh of it makes the same edit again, or, if that candidate is gone, uses its prompt. An
+  `edit` or `replace` naming no live candidate gets an `error` event.
   `done.variants` maps each variant to its candidate index, or null if it failed (its message in
-  `failed`); `error` comes only when all fail. A cache hit sends `meta` (cached true, variants 0)
+  `failed`); `error` comes when all fail (or, as above, for a bad `edit` or `replace`). A cache hit sends `meta` (cached true, variants 0)
   and `done` only. With `from` (the key of the screen clicked in), `variant` (the candidate it was
   clicked in) and `label` (the control's text), a new screen takes that click as its parent, and
   `done` carries the `Link` it recorded, or null. 400 on an empty or too long `app` (2,000),
@@ -93,10 +98,11 @@ CacheEntry { key; app; action: string | null; chosen: number; candidates: Candid
              // level 1 is the first screen; parent is the click that first made the screen
 Candidate  { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
              costEstimated; firstChunkMs; totalMs; finishReason; device?: Device;
-             name?; letter?; prompt?; feedback?; deleted?; replaces? }
+             name?; letter?; prompt?; feedback?; editOf?; deleted?; replaces? }
              // one variant; entry.chosen is the picked one. name comes from the model's <title>,
-             // letter from the cache ("B" in L2-B), prompt from a Change; feedback is from before
-             // Change existed; a deleted one has html ''; replaces is the index a refresh took over
+             // letter from the cache ("B" in L2-B), prompt from an edited prompt; feedback is what
+             // an Edit asked for (or older feedback), editOf the index it changed; a deleted one
+             // has html ''; replaces is the index a refresh took over
 Link       { from: key; variant: number; to: key; label; createdAt }
              // first click from a variant to a screen wins
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast'

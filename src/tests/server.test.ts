@@ -108,6 +108,23 @@ describe('web server', () => {
     expect(done(await screen({ app: APP })).entry.chosen).toBe(3)
   }, 30_000)
 
+  test('an Edit adds one variant made by changing another, for its device; a refresh makes the same Edit again', async () => {
+    const first = done(await screen({ app: APP })).entry
+    const n = first.candidates.length
+    const change = 'Make the main heading say "Fresh bread daily"'
+    const edited = done(await screen({ app: APP, regenerate: true, device: 'desktop', edit: { variant: 0, change } }))
+    expect(edited.variants).toEqual([n])
+    const c = edited.entry.candidates[n]!
+    expect(c).toMatchObject({ editOf: 0, feedback: change, device: 'phone' })
+    expect(c.html).toContain('Fresh bread daily')
+    const again = done(await screen({ app: APP, replace: n }))
+    expect(again.entry.candidates[again.variants[0]!]).toMatchObject({ editOf: 0, feedback: change, replaces: n })
+    expect(again.entry.candidates[again.variants[0]!]!.html).toContain('Fresh bread daily')
+    expect((await screen({ app: APP, edit: { variant: 99, change } })).map((e) => e.type)).toEqual(['error'])
+    expect((await post('/api/screen', { app: APP, edit: { variant: 0, change: ' ' } })).status).toBe(400)
+    expect((await post('/api/screen', { app: APP, edit: { variant: 0.5, change } })).status).toBe(400)
+  }, 30_000)
+
   test('bad input is refused', async () => {
     expect((await post('/api/screen', { app: 'x', model: 'gpt-2' })).status).toBe(400)
     expect((await post('/api/screen', { app: 'x', model: 'toString' })).status).toBe(400)

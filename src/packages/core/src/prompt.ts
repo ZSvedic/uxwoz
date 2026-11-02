@@ -26,12 +26,18 @@ export interface RequestExtras {
   device?: string
   /** True for the second variant of a pair: ask for a different design. */
   alternative?: boolean
+  /** An Edit: the screen as it is now, and the change the user asked for. */
+  edit?: { html: string; change: string }
 }
+
+/** Ends an Edit's request, after the screen as it is now and before the change the user asked for. */
+export const EDIT_REQUEST = 'Reply with this screen again, changed only as follows; keep everything else as it is, including its data-action prompts:'
 
 /**
  * The user message for one screen: the product prompt alone, or the product plus an action prompt,
  * then the screens that already exist, so links to them reuse the exact prompt (and the cache).
- * The device and the alternative request follow when given.
+ * The device and the alternative request follow when given; an Edit ends with the screen as it is
+ * now and the change.
  */
 export function screenRequest(app: string, action: string | null, existing: string[] = [], extras: RequestExtras = {}): string {
   let msg = action ? `This screen belongs to a clickable mockup of: ${app}\n\nShow this screen: ${action}` : app
@@ -39,6 +45,7 @@ export function screenRequest(app: string, action: string | null, existing: stri
   if (list.length) msg += `\n\nScreens that already exist in this mockup:\n${list.map((p) => `- ${p}`).join('\n')}`
   if (extras.device) msg += `\n\nDesign it for ${extras.device}.`
   if (extras.alternative) msg += `\n\n${ALTERNATIVE_REQUEST}`
+  if (extras.edit) msg += `\n\nThe screen as it is now:\n${extras.edit.html}\n\n${EDIT_REQUEST} ${extras.edit.change}`
   return msg
 }
 
