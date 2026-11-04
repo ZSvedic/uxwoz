@@ -41,12 +41,18 @@ one, and the other is gone. After that, the user changes a screen by asking for 
 One bar, 44 px tall, with three parts:
 
 - **Project menu** (left): a button with the mockup's prompt, cut short. Its menu has
-  **New mockup…** (opens the generate panel), and, with a mockup open, **↺ Start over** (deletes
-  every screen and makes the first one again) and **✕ Delete** (deletes every screen). Both ask
-  first.
+  **New mockup…** (opens the generate panel), **Recent mockups** (the last ten, the open one
+  ticked; choosing one opens it), and, with a mockup open, **↺ Start over** (deletes every screen
+  and makes the first one again) and **✕ Delete** (deletes every screen). Both ask first.
 - **Nav** (middle): names the current screen (*L2 Camera ▾*). Its menu lists every screen as an
   indented tree, each with the control that opened it (*via Camera*), the path to the current
-  screen in orange. Choosing one makes it current and scrolls to it.
+  screen in orange. Choosing one makes it current and scrolls to it. Planned screens (see
+  Navigation) are in the tree too, greyed, marked *not made yet*; choosing one makes it, as its
+  link would.
+- **← and →** (either side of Nav): back to the screen looked at before, and forward again, like a
+  browser: every screen that becomes current is a step, and reaching a screen any other way drops
+  the steps ahead. Screens deleted since are skipped. ⌘[ and ⌘] do the same (also while a screen
+  has the focus), and so do the mouse's back and forward buttons.
 - **Zoom** (right): **−**, the zoom level, **+** and **⤢ Fit screen**. The level opens a menu: Zoom
   in ⌘+, Zoom out ⌘−, 50%, 100% ⌘0, 200%, Fit all ⇧1, Fit screen ⇧2, Fit screen width ⇧3. The keys
   work anywhere outside a text field (Ctrl in place of ⌘ off a Mac). Under 900 px wide only the
@@ -78,10 +84,13 @@ hidden when the user branches.
   screen makes it L2 at once, and Undo makes it L3 again; a delete moves screens the same way.
 - **Rows are levels.** Each level is a row, as tall as its tallest screen. Each screen hangs under
   a screen one click before it on a shortest path: the one whose click first made it, when that is
-  one, else the first other. A screen's first child sits straight below it, in the same column;
-  each later child starts a new column to the right of the subtrees before it.
+  one, else the first other. The screens of a row sit side by side, children in the order of their
+  parents; a screen's first child sits straight below it when that place is free, else in the next
+  free place to the right. A parent never moves to make room for its children.
 - **Lines**: one thin orange line from each screen to the screen it hangs under: straight down in
-  the same column, an elbow for a branch. Other buttons between screens draw no line.
+  the same column, else down, across and down. Each parent whose lines bend has its own height in
+  the gap below its row where they go across, the leftmost parent lowest, so no two lines cross or
+  run together; the gap grows with them. Other buttons between screens draw no line.
 - **Names**: above each screen, its level and the short name the model gave it (*L2 Camera*), and
   under that, its idea, on up to two lines; a longer idea ends in **more**, which shows the rest
   (and **less** folds it again). Names and ideas keep their size on screen at any zoom; below
@@ -167,23 +176,36 @@ Choosing another screen while the drawer is open shows that screen in it.
 
 ## Navigation
 
-Each control that opens another screen carries a short action prompt written by the model, and is
+Each control that opens another screen carries the name of that screen and a short prompt for it,
+written by the model (`data-action="@sleep-report: Sleep report of last night with…"`), and is
 blue; clicking it asks for *product prompt + action prompt*. The model is told to make details,
 forms, settings and tab-bar sections screens of their own, so a mockup has screens to click
 through. A plain link the screen does not handle asks for "the screen shown after clicking
 *label*"; in-page links (`#…`) stay put. Other controls (filters, inputs) work inside the screen.
 Only a real click opens a screen.
 
-- **Names for links**: when a design is picked, its screen gets a short name made from its title,
-  fixed from then on and unique in the mockup: *Sleep report* becomes `sleep-report`, a second
-  *Settings* becomes `settings-2`, and the first screen is always `home`. Info shows it. An Edit
-  that changes the title keeps the name.
-- **The tree in each request**: every request lists the picked screens as an indented tree of
-  names and what each screen is (the prompt that made it), two spaces deeper per level. The model
-  links to one of them with `@` and its name (`data-action="@sleep-report"`), back to the screen
-  before with `back`, and writes a prompt only for a screen that is not there yet. A click on an
-  `@name` goes to that screen; an `@name` that does not exist asks for a new screen named by the
-  button's words.
+- **The name says which screen**: every link to one screen uses one name, so a screen is made
+  once however many buttons lead to it, and however they word its prompt. The first screen is
+  always `home`. A screen keeps the name of the link that first opened it; an Edit that changes
+  its title keeps the name. Info shows it.
+- **Planned screens**: a name that a picked screen links to, but that no screen has yet, is a
+  planned screen: it belongs to the mockup from that moment, hangs in the tree like any screen
+  (under a screen one click nearer Home), and is made, with the prompt of the first link that names
+  it, when someone first opens it. It goes away when no screen links to it any more (after an Edit
+  or a delete). Deleting a screen that other screens still link to makes it planned again; the
+  screens only it led to go with it.
+- **The tree in each request**: every request lists the mockup's screens, made and planned, as an
+  indented tree of names and what each screen is (its prompt), two spaces deeper per level,
+  planned ones (and ones whose A OR B is open) marked *not made yet*, the screen being made or
+  changed marked *this screen*, at most 80 lines; past that, planned screens are left out first,
+  deepest first, then the deepest made ones. The model links to any of them with `@` and
+  the name alone (`data-action="@sleep-report"`), back to the screen before with `back`, and makes
+  up a name, with a prompt, only for a screen the mockup does not have. Details of different items
+  are different screens (`@latte-details`, `@mocha-details`). A link by name alone with no screen
+  and no plan behind it makes a screen from the name and the button's words.
+- **Screens from before names**: links that are a prompt alone still work: a click finds the
+  screen made from that prompt (named or not), else makes one; at the pick it gets a name from its title,
+  unique in the mockup (*Sleep report* becomes `sleep-report`, a second *Settings* `settings-2`).
 
 - **Back and Home** never make a screen. A control labelled *Home*, *Go home*, *Back to home* or
   *Main menu* goes to the first screen. A control with the action `back`, or labelled *Back*,
@@ -192,7 +214,8 @@ Only a real click opens a screen.
   label (*🏠 Home*, *⬅ Back*, icon-font words like *arrow_back*) do not count. The label wins over
   the action prompt, since models sometimes give Back a long prompt for the home screen.
 - A click that leads to a screen already on the canvas (by name, by the prompt that made it, or
-  Back and Home) makes it current and scrolls to it, at no cost.
+  Back and Home) makes it current and scrolls to it, at no cost; so does one on a screen whose
+  A OR B is open.
 - One screen is made at a time: while one is being made or changed, a click that would open
   another does nothing, and a note says so for a moment at the bottom of the canvas.
 
@@ -208,8 +231,8 @@ is cached. A failed Edit or Regenerate leaves the screen as it was.
 
 ## Cache
 
-Every screen is stored under its normalized prompt: lowercase, single spaces, no trailing
-punctuation. A screen holds its versions (the last one shows) and, until a pick, its open A OR B.
+Every screen is stored under its name (`product » @sleep-report`); a screen from before names, under
+its normalized prompt: lowercase, single spaces, no trailing punctuation. A screen holds its versions (the last one shows) and, until a pick, its open A OR B.
 Opening a stored screen makes no model call and costs nothing. The cache lives on the server and
 survives restarts, so every browser shares it. Each screen also stores its name and the screen and
 click that first made it; levels are worked out, never stored. Each side of an A OR B is stored as soon as it finishes, so a design

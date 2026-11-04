@@ -1,10 +1,11 @@
 // The tree of a mockup's screens, worked out from the screens themselves: a screen's level is the
 // fewest clicks from the first screen, following the buttons in each screen's newest version and the
-// click that first made each screen. Nothing here is stored, so an Edit, an Undo or a delete moves
-// screens at once. Runs in the browser as well as on the server, so it uses no Node or Bun APIs.
+// click that first made each screen. A link names its screen (`@sleep-report`), so a screen exists
+// as a planned screen from the moment a picked screen links to it, before anyone opens it. Nothing
+// here is stored, so an Edit, an Undo or a delete moves screens at once. Runs in the browser as well as on the server, so it uses no Node or Bun APIs.
 
 import type { CacheEntry } from './cache.ts'
-import { normalizePrompt, screenKey } from './keys.ts'
+import { nameWords, normalizePrompt, screenKey, screenRef } from './keys.ts'
 
 /** Where a screen sits: its level (1 for the first screen), the screen it hangs under, and the control clicked there. */
 export interface TreeNode { level: number; parent: string | null; label: string }
@@ -67,10 +68,10 @@ export function uniqueName(name: string, taken: Set<string>, fallback = ''): str
   return n
 }
 
-/** The screen an action prompt opens if it is already there: `@name`, `home`, or a prompt it was made from. Null for `back` and for a new screen. */
+/** The screen an action opens if the mockup has it: by `@name`, `home`, or a prompt it was made from. Null for `back` and for a new screen. */
 export function resolveAction(app: string, action: string, byName: Map<string, string>): string | null {
-  const ref = action.trim().match(/^@([\w-]+)$/)
-  if (ref) return byName.get(ref[1]!.toLowerCase()) ?? null
+  const ref = screenRef(action)
+  if (ref) return byName.get(ref.name) ?? null
   if (normalizePrompt(action) === 'back') return null
   return screenKey(app, action)
 }
@@ -78,24 +79,65 @@ export function resolveAction(app: string, action: string, byName: Map<string, s
 /** Every screen of one mockup (all from the same app) by name. */
 export const namesOf = (entries: CacheEntry[]) => new Map(entries.filter((e) => e.name).map((e) => [e.name!, e.key]))
 
+/** What a screen opened by `@name` alone shows, when no link says: its name in words, and the words of the control clicked. */
+export function promptFromLabel(name: string, label: string): string {
+  const words = nameWords(name)
+  return label && normalizePrompt(label) !== words ? `The ${words} screen, opened by "${label}"` : `The ${words} screen`
+}
+
 /**
- * The tree of one mockup. Edges are the click that first made each screen and every control in a
- * picked screen's newest version that opens a screen already there. A screen hangs under the screen
- * the click that made it came from when that is on a shortest path, else under the first other one
- * that is. Screens the first screen does not reach are left out.
+ * The planned screens of one mockup: names the picked screens link to that no screen has yet. Each
+ * one is an entry with no versions; the first link that names it (oldest screen first) gives its
+ * prompt and the screen it hangs under.
  */
-export function screenTree(entries: CacheEntry[]): Map<string, TreeNode> {
+export function plannedScreens(entries: CacheEntry[]): CacheEntry[] {
+  const first = entries[0]
+  if (!first) return []
+  const names = namesOf(entries)
+  const planned = new Map<string, CacheEntry>()
+  for (const e of entries) {
+    const v = e.versions.at(-1)
+    if (!v) continue
+    for (const l of linksIn(v.html)) {
+      const ref = screenRef(l.action)
+      if (!ref || ref.name === HOME_NAME || names.has(ref.name)) continue
+      const have = planned.get(ref.name)
+      if (have) { if (!have.action && ref.prompt) have.action = ref.prompt; continue }
+      planned.set(ref.name, {
+        key: screenKey(first.app, `@${ref.name}`), app: first.app, action: ref.prompt, name: ref.name,
+        parent: { key: e.key, label: l.label }, versions: [],
+      })
+    }
+  }
+  for (const p of planned.values()) if (!p.action) p.action = promptFromLabel(p.name!, p.parent!.label)
+  return [...planned.values()]
+}
+
+/**
+ * The tree of one mockup, planned screens included. Edges are the click that first made each screen
+ * and every control in a picked screen's newest version that opens a screen the mockup has. A screen
+ * hangs under the screen the click that made it came from when that is on a shortest path, else
+ * under the first other one that is. Screens the first screen does not reach are left out.
+ */
+export const screenTree = (made: CacheEntry[]): Map<string, TreeNode> => build(made).tree
+
+/** The tree, and every screen in it: the made ones (and open A OR Bs), then the planned ones. */
+function build(made: CacheEntry[]): { tree: Map<string, TreeNode>; entries: CacheEntry[] } {
+  const entries = [...made, ...plannedScreens(made)]
   const tree = new Map<string, TreeNode>()
   const first = entries[0]
-  if (!first) return tree
+  if (!first) return { tree, entries }
   const app = first.app
   const root = screenKey(app, null)
   const keys = new Set(entries.map((e) => e.key))
-  if (!keys.has(root)) return tree
+  if (!keys.has(root)) return { tree, entries }
   const byName = namesOf(entries)
   const edges = new Map<string, { to: string; label: string }[]>()
+  // A screen's first click counts only from a screen that is there: a planned screen has no buttons,
+  // so a screen made from one that was deleted (and is planned again) is not reached through it.
+  const madeKeys = new Set(made.map((e) => e.key))
   for (const e of entries) {
-    if (e.parent && keys.has(e.parent.key)) edges.set(e.parent.key, [...(edges.get(e.parent.key) ?? []), { to: e.key, label: e.parent.label }])
+    if (e.parent && madeKeys.has(e.parent.key)) edges.set(e.parent.key, [...(edges.get(e.parent.key) ?? []), { to: e.key, label: e.parent.label }])
   }
   for (const e of entries) {
     const v = e.versions.at(-1)
@@ -119,27 +161,33 @@ export function screenTree(entries: CacheEntry[]): Map<string, TreeNode> {
   // Prefer the click that made a screen, when it is as short as the path found first.
   for (const e of entries) {
     const node = tree.get(e.key), p = e.parent && tree.get(e.parent.key)
-    if (node && p && e.parent!.key !== node.parent && p.level === node.level - 1) Object.assign(node, { parent: e.parent!.key, label: e.parent!.label })
+    if (node && p && madeKeys.has(e.parent!.key) && e.parent!.key !== node.parent && p.level === node.level - 1) Object.assign(node, { parent: e.parent!.key, label: e.parent!.label })
   }
-  return tree
+  return { tree, entries }
 }
 
 /**
- * The picked screens as an indented tree for the model, one line each: `@name: what it is`, two
- * spaces deeper per level, children in the order they were made. Past `max` lines the deepest
- * levels go first, so the main sections stay.
+ * The mockup's screens as an indented tree for the model, one line each: `@name: what it is`, two
+ * spaces deeper per level, children in the order they were made. The screen being made or changed
+ * (`self`, a name) is marked "this screen"; planned screens, and ones whose A OR B is open, "not
+ * made yet". Past `max` lines planned screens go first, deepest first, then made ones by depth, so
+ * the model still sees the names of the screens there are.
  */
-export function treeLines(entries: CacheEntry[], max = 40): string[] {
-  const tree = screenTree(entries)
-  const rows: { level: number; text: string }[] = []
+export function treeLines(made: CacheEntry[], max = 80, self?: string): string[] {
+  const { tree, entries } = build(made)
+  const rows: { level: number; planned: boolean; text: string }[] = []
   const walk = (e: CacheEntry) => {
     const { level } = tree.get(e.key)!
-    if (e.name && e.versions.length) rows.push({ level, text: `${'  '.repeat(level - 1)}@${e.name}: ${e.action ?? `the first screen of ${e.app}`}` })
+    const what = e.action ?? `the first screen of ${e.app}`
+    const note = e.name === self ? ' (this screen)' : e.versions.length ? '' : ' (not made yet)'
+    if (e.name) rows.push({ level, planned: !e.versions.length, text: `${'  '.repeat(level - 1)}@${e.name}: ${what}${note}` })
     for (const c of entries) if (tree.get(c.key)?.parent === e.key) walk(c)
   }
   const root = entries.find((e) => tree.get(e.key)?.level === 1)
   if (root) walk(root)
-  let deepest = Math.max(1, ...rows.map((r) => r.level))
-  while (rows.filter((r) => r.level <= deepest).length > max && deepest > 1) deepest--
-  return rows.filter((r) => r.level <= deepest).slice(0, max).map((r) => r.text)
+  let kept = rows
+  for (let d = Math.max(1, ...rows.map((r) => r.level)); kept.length > max && d > 1; d--) kept = kept.filter((r) => !(r.planned && r.level === d))
+  let deepest = Math.max(1, ...kept.map((r) => r.level))
+  while (kept.filter((r) => r.level <= deepest).length > max && deepest > 1) deepest--
+  return kept.filter((r) => r.level <= deepest).slice(0, max).map((r) => r.text)
 }

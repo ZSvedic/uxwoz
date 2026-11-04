@@ -19,16 +19,20 @@ This screen belongs to a clickable mockup of: A coffee shop ordering app
 
 Show this screen: Checkout screen of a coffee shop app with 2 lattes in the cart
 
-Screens that already exist in this mockup, as a tree:
+Screens of this mockup, as a tree:
 @home: the first screen of A coffee shop ordering app
   @menu: Menu screen of a coffee shop app with drinks and sizes
+    @order-checkout: Checkout screen of a coffee shop app with 2 lattes in the cart (not made yet)
     @order-confirmation: Order confirmation screen for a coffee shop app showing a pickup time
+  @profile: Profile screen of a coffee shop app with saved cards (not made yet)
 ```
 
-The tree holds the picked screens of this mockup, at most 40 lines: each one's name for links and
-what it is (the prompt that made it), two spaces deeper per level, where a level is the fewest
-clicks from the first screen. A new screen links to one of them with `@` and its name, so the click
-goes to that screen; the tree also shows the model how the mockup is laid out.
+The tree holds the screens of this mockup, at most 80 lines: each one's name for links and what it
+is (its prompt), two spaces deeper per level, where a level is the fewest clicks from the first
+screen. Planned screens, the ones a made screen links to that nobody has opened yet, are marked
+"(not made yet)"; the screen being made or changed, when it is in the tree, "(this screen)". A new screen links to any of them with `@` and its name, so every link to one
+screen uses one name and every click on it reaches the same screen; the tree also shows the model
+how the mockup is laid out.
 
 Two lines may follow, each after a blank line: the device and, for one side of an A OR B only
 (a random one), a request for a different design:
@@ -47,7 +51,7 @@ change, with no request for a different design:
 The screen as it is now:
 <title>Litter box details</title> …
 
-Reply with this screen again, changed only as follows; keep everything else as it is, including its data-action prompts: Show one level indicator instead of four
+Reply with this screen again, changed only as follows; keep everything else as it is, including its data-action links, and add no second control for a screen it already links to: Show one level indicator instead of four
 ```
 
 They live in the user message, so the system prompt stays the same for every request and the
@@ -59,14 +63,16 @@ The first bullet names the screen and its idea: the app shows the name in each s
 (*L2 Order checkout*), and the idea, one sentence about the design, above each side of an A OR B
 and under the name everywhere else. Neither element renders inside the screen. The next five are the benchmark prompt
 (`benchmarks/bench/prompts/system.txt`) unchanged. The next three add navigation: each control that
-opens another screen carries its action prompt in a `data-action` attribute, so the prompt arrives
-with the control itself. Left alone, a model builds one self-contained page with tabs and panels
-switched by script, which leaves nothing to click through; so details, forms, settings and tab-bar
-sections must be screens of their own, at least three per screen. Links back say `back` (the
-app goes to the screen that opened this one), and links to a listed screen give its `@name`, so
-every way back lands on a screen that already exists. A name is short and exact, so a model copies
-it more reliably than a long prompt. The last keeps a first sketch small: given room, a model fills it, but an early mockup
-should show only the few things its step needs.
+opens another screen carries that screen's name and prompt in a `data-action` attribute
+(`@order-checkout: Checkout screen of…`), so both arrive with the control itself. Left alone, a
+model builds one self-contained page with tabs and panels switched by script, which leaves nothing
+to click through; so details, forms, settings and tab-bar sections must be screens of their own, at
+least three per screen. Links back say `back` (the app goes to the screen one level up), and links
+to a listed screen give its `@name` alone. The name, not the prompt, says which screen a link opens:
+two prompts for one screen are never worded alike, but a short name in front of the model is copied
+exactly, so a screen is made once however many screens link to it. The last keeps a first sketch
+small: given room, a model fills it, but an early mockup should show only the few things its step
+needs.
 
 ```text
 You build interactive UIs as one HTML fragment with plain JavaScript, styled by classless Pico.css (already loaded; do not load anything else). Reply with the HTML only: no markdown fences, no prose, no <html>/<head>/<body> tags.
@@ -78,9 +84,9 @@ You build interactive UIs as one HTML fragment with plain JavaScript, styled by 
 - Everything must work offline: no fetch, no external images or fonts. Draw charts as inline SVG.
 - Show values formatted for humans (e.g. toLocaleString / toFixed).
 - Be brief: keep the whole reply under about 2,500 characters: no comments, no input validation beyond what is needed, minimal markup.
-- The screen is one page of a clickable mockup. Every button or link that would open another screen gets a data-action attribute with a short prompt for that screen, e.g. <button data-action="Checkout screen of a coffee shop app with 2 lattes in the cart">Checkout</button>. The prompt must make sense without seeing this screen. Use realistic sample data.
+- The screen is one page of a clickable mockup. Every button or link that would open another screen gets a data-action attribute: @, a name for that screen (1-4 lowercase words joined by dashes), a colon and a short prompt for it, e.g. <button data-action="@order-checkout: Checkout screen of a coffee shop app with 2 lattes in the cart">Checkout</button>. The prompt must make sense without seeing this screen; leave it out only for a screen the request lists. Use realistic sample data.
 - People explore the mockup by clicking from screen to screen, so split the app into screens as a real app would: an item's details, a form to add or edit, settings, a profile, checkout, and each section of a tab bar or menu open another screen through data-action; never show, hide or switch them with script inside this screen. Give every screen at least 3 controls with data-action; the first screen also shows the app's main navigation (a tab bar or menu). Script is only for what stays on this screen, like filters, inputs and counters.
-- A control that goes back to the previous screen gets data-action="back". When the request lists the screens that already exist, a control that opens one of them gets @ and its name instead of a prompt, e.g. data-action="@home" or data-action="@order-checkout". Use a name only for that very screen; any other screen gets a prompt.
+- A control that goes back to the previous screen gets data-action="back". The request lists the mockup's screens as a tree of names, made and planned: a control that opens one of them gets just @ and its name, e.g. data-action="@home" or data-action="@order-checkout". One screen has one name, and one name is one screen: the details of two items are two screens, e.g. @latte-details and @mocha-details. Before you make up a new name, look in the tree and in this screen's links for one that already opens that screen; a new name is only for a screen the mockup does not have.
 - Start small: this is an early sketch, so show only what this step needs, with 2-4 sample items per list. The device width is a maximum, not a canvas to fill: the screen is only as wide and tall as its content.
 ```
 

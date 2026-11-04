@@ -6,7 +6,7 @@
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { canonicalAction, normalizePrompt, screenKey } from './keys.ts'
+import { canonicalAction, nameWords, normalizePrompt, screenKey, screenRef } from './keys.ts'
 import { screenName, type Device } from './frame.ts'
 import { HOME_NAME, nameFrom, screenTree, treeLines, uniqueName } from './tree.ts'
 import type { ModelId } from './models.ts'
@@ -40,7 +40,10 @@ export interface CacheEntry {
   key: string
   app: string
   action: string | null
-  /** The name links use (`@sleep-report`), fixed at the pick: `home` for the first screen. */
+  /**
+   * The name links use (`@sleep-report`): the one in the link that opened it, `home` for the first
+   * screen; a screen opened by a plain prompt gets one from its title at the pick.
+   */
   name?: string
   /** The screen and click that first made it; null for the first screen (and screens made without a click). */
   parent: Parent | null
@@ -86,6 +89,19 @@ export class ScreenCache {
     return this.entries.get(key)
   }
 
+  /**
+   * The screen an action opens, if the mockup has it: by name for `@name`; for a plain prompt (a
+   * link from before names), the screen made from that prompt, else a named one with that prompt.
+   */
+  find(app: string, action: string | null): CacheEntry | undefined {
+    const ref = action ? screenRef(action) : null
+    if (ref && canonicalAction(app, action)) return this.mockup(normalizePrompt(app)).find((e) => e.name === ref.name)
+    const hit = this.entries.get(screenKey(app, action))
+    if (hit || !action) return hit
+    const a = normalizePrompt(action)
+    return this.mockup(normalizePrompt(app)).find((e) => e.action != null && normalizePrompt(e.action) === a)
+  }
+
   /** A moment to compare deletes against: see removedSince. */
   now(): number {
     return this.clock
@@ -102,18 +118,22 @@ export class ScreenCache {
 
   /**
    * Store one finished side of a new screen's A OR B. The first side to finish makes the screen,
-   * with the click as its parent. Returns the screen, or undefined when a side was already picked
-   * (the other one is dropped).
+   * with the click as its parent; `@name: prompt` gives it its name and prompt. Returns the screen,
+   * or undefined when a side was already picked (the other one is dropped).
    */
   propose(app: string, action: string | null, side: number, version: Version, parent: Parent | null = null): CacheEntry | undefined {
     action = canonicalAction(app, action)
-    const key = screenKey(app, action)
-    let entry = this.entries.get(key)
+    let entry = this.find(app, action)
     if (!entry) {
+      const key = screenKey(app, action)
+      const ref = action ? screenRef(action) : null
       // A parent must be a picked screen of this mockup; a click that raced a delete makes no parent.
       const from = parent && this.entries.get(parent.key)
       const ok = action && parent && from?.versions.length && normalizePrompt(from.app) === normalizePrompt(app)
-      entry = { key, app, action, parent: ok ? { key: parent!.key, label: parent!.label } : null, versions: [], proposals: Array(PROPOSALS).fill(null) }
+      entry = {
+        key, app, action: ref ? ref.prompt || nameWords(ref.name) : action, ...(ref && { name: ref.name }),
+        parent: ok ? { key: parent!.key, label: parent!.label } : null, versions: [], proposals: Array(PROPOSALS).fill(null),
+      }
       this.entries.set(key, entry)
     }
     if (!entry.proposals || !Number.isInteger(side) || side < 0 || side >= entry.proposals.length) return undefined
@@ -134,7 +154,7 @@ export class ScreenCache {
     return entry
   }
 
-  /** Give a picked screen its fixed name, once: home for the first screen, else from its title. */
+  /** Give a picked screen opened by a plain prompt its fixed name, once: home for the first screen, else from its title. */
   private name(e: CacheEntry) {
     if (e.name || !e.versions.length) return
     const taken = new Set(this.mockup(normalizePrompt(e.app)).map((x) => x.name).filter((n): n is string => !!n))
@@ -163,9 +183,9 @@ export class ScreenCache {
     return entry
   }
 
-  /** This mockup's picked screens as the indented tree the model links to (see treeLines). */
-  existingScreens(app: string): string[] {
-    return treeLines(this.mockup(normalizePrompt(app)))
+  /** This mockup's screens as the indented tree the model links to, `self` (a name) marked as the screen being made (see treeLines). */
+  existingScreens(app: string, self?: string): string[] {
+    return treeLines(this.mockup(normalizePrompt(app)), undefined, self)
   }
 
   /** One mockup: its screens, oldest first. */
@@ -211,7 +231,7 @@ export class ScreenCache {
     // A screen first made from a screen that is gone now hangs under the one that reaches it.
     for (const e of this.mockup(root)) {
       const node = after.get(e.key)
-      if (e.parent && !this.entries.has(e.parent.key)) e.parent = node?.parent ? { key: node.parent, label: node.label } : null
+      if (e.parent && !this.entries.has(e.parent.key)) e.parent = node?.parent && this.entries.has(node.parent) ? { key: node.parent, label: node.label } : null
     }
     for (const k of removed) this.tomb(k)
     this.save()

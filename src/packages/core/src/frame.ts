@@ -65,15 +65,21 @@ const bootstrap = (final: boolean) => `(() => {
   window.uxwoz = { go }
   // Any press in the screen makes it the current one.
   addEventListener('pointerdown', () => parent.postMessage({ uxwoz: 'touch' }, '*'), true)
-  // The app's zoom keys and Esc work while a screen has the focus too; the fit keys not in a text field.
+  // The app's zoom keys, ⌘[ ⌘] and Esc work while a screen has the focus too; the fit keys not in a text field.
   addEventListener('keydown', (e) => {
     const mod = e.metaKey || e.ctrlKey
     const field = e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)
-    const zoom = mod && ['=', '+', '-', '0'].includes(e.key)
+    const zoom = mod && ['=', '+', '-', '0', '[', ']'].includes(e.key)
     const fit = !mod && !e.altKey && e.shiftKey && !field && /^Digit[123]$/.test(e.code)
     if (!zoom && !fit && e.key !== 'Escape') return
     if (zoom) e.preventDefault()
     parent.postMessage({ uxwoz: 'key', key: e.key, code: e.code, shift: e.shiftKey, mod }, '*')
+  })
+  // The mouse's back and forward buttons walk the app's screens instead of leaving the page.
+  addEventListener('mouseup', (e) => {
+    if (e.button !== 3 && e.button !== 4) return
+    e.preventDefault()
+    parent.postMessage({ uxwoz: 'key', key: e.button === 3 ? '[' : ']', code: '', shift: false, mod: true }, '*')
   })
   document.addEventListener('click', (e) => {
     const el = e.target instanceof Element && e.target.closest('[data-action], a[href]')

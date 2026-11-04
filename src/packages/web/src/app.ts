@@ -3,8 +3,8 @@
 // Info, Delete) with the drawer for Edit and Info, pickers, recent mockups, errors in a pill.
 
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
-import { normalizePrompt, screenKey, wayBack } from '@uxwoz/core/keys'
-import { namesOf, screenTree, type TreeNode } from '@uxwoz/core/tree'
+import { nameWords, normalizePrompt, screenKey, screenRef, wayBack } from '@uxwoz/core/keys'
+import { namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
 import type { CacheEntry, Version } from '@uxwoz/core'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
@@ -76,10 +76,12 @@ function nameOf(e: CacheEntry, v: Version): string {
   return (text || e.action || e.app).slice(0, 60)
 }
 
-/** A screen's label, e.g. "L2 Camera". */
+/** A screen's label, e.g. "L2 Camera"; a planned screen's comes from its name. */
 const labelOf = (e: CacheEntry) => {
   const level = state.tree.get(e.key)?.level ?? '?'
-  return e.versions.length ? `L${level} ${nameOf(e, e.versions.at(-1)!)}` : `L${level} New screen · pick one`
+  if (e.versions.length) return `L${level} ${nameOf(e, e.versions.at(-1)!)}`
+  if (!state.entries.has(e.key)) return `L${level} ${nameWords(e.name!).replace(/^./, (c) => c.toUpperCase())}`
+  return `L${level} New screen · pick one`
 }
 
 /** The screen a screen hangs under in the tree (the one fewest clicks from home that leads to it). */
@@ -384,8 +386,9 @@ async function dropChoice(key: string) {
 
 /**
  * Where a click leads, and the prompt for it if it is a new screen: Back to the screen this one
- * hangs under (one click nearer the first screen), Home to the first screen, `@name` to the screen with that name, anything else to the
- * screen of its action prompt. An `@name` that does not exist asks for a new screen from the label.
+ * hangs under (one click nearer the first screen), Home to the first screen, `@name` to the screen
+ * with that name, anything else to the screen of its action prompt. A name no screen has yet is made
+ * by the server from the link's prompt, the planned screen's, or the words clicked.
  */
 function target(app: string, from: string, prompt: string, label: string): { to: string; prompt: string } {
   const way = wayBack(prompt, label)
@@ -396,13 +399,9 @@ function target(app: string, from: string, prompt: string, label: string): { to:
     return { to: treeParent(from) ?? (made && state.entries.has(made) ? made : root), prompt }
   }
   if (way === 'home') return { to: root, prompt }
-  const ref = prompt.trim().match(/^@([\w-]+)$/)
-  if (ref) {
-    const known = namesOf([...state.entries.values()]).get(ref[1]!.toLowerCase())
-    if (known) return { to: known, prompt }
-    prompt = label ? `The "${label}" screen` : ref[1]!.replace(/-/g, ' ')
-  }
-  return { to: screenKey(app, prompt), prompt }
+  const ref = screenRef(prompt)
+  const known = ref && namesOf([...state.entries.values()]).get(ref.name)
+  return { to: known || screenKey(app, prompt), prompt }
 }
 
 /** A click inside a picked screen: open the screen it leads to, or go to it when it is already there. */
@@ -430,7 +429,39 @@ function setCurrent(key: string | null) {
 
 const currentKey = (app: string) => `uxwoz:current:${normalizePrompt(app)}`
 function saveCurrent() {
-  if (state.app && state.current) store.set(currentKey(state.app), state.current)
+  if (!state.app || !state.current) return
+  store.set(currentKey(state.app), state.current)
+  // A screen reached any way but ← and → ends the trail here, as a browser's history does.
+  if (!trail.moving && trail.keys[trail.at] !== state.current) {
+    trail.keys = [...trail.keys.slice(0, trail.at + 1), state.current]
+    trail.at = trail.keys.length - 1
+  }
+}
+
+/** The screens looked at in the open mockup, in order, for ← and →. */
+const trail = { keys: [] as string[], at: -1, moving: false }
+
+function resetTrail() {
+  trail.keys = state.current ? [state.current] : []
+  trail.at = trail.keys.length - 1
+}
+
+/** The nearest screen on the trail in a direction that is still there, by its place on the trail. */
+function trailStep(dir: 1 | -1): number | null {
+  for (let i = trail.at + dir; i >= 0 && i < trail.keys.length; i += dir) {
+    const k = trail.keys[i]!
+    if (k !== state.current && state.entries.get(k)?.versions.length) return i
+  }
+  return null
+}
+
+/** ← and →: the screen looked at before, or after. */
+function walkTrail(dir: 1 | -1) {
+  const i = trailStep(dir)
+  if (i == null) return
+  trail.at = i
+  trail.moving = true
+  try { goTo(trail.keys[i]!) } finally { trail.moving = false }
 }
 
 /** Take the server's copy of the open mockup. */
@@ -515,7 +546,7 @@ async function undo(key: string) {
 /** How many other screens a delete takes with it: those the first screen would no longer reach. */
 function goesWith(key: string): number {
   const rest = screenTree([...state.entries.values()].filter((e) => e.key !== key))
-  return [...state.tree.keys()].filter((k) => k !== key && !rest.has(k)).length
+  return [...state.tree.keys()].filter((k) => k !== key && state.entries.has(k) && !rest.has(k)).length
 }
 
 /** Delete a screen, after asking. Screens only it leads to go too; the first screen takes the mockup. */
@@ -639,6 +670,7 @@ async function start(app: string, make = true) {
   const root = screenKey(app, null)
   const saved = store.get(currentKey(app))
   state.current = saved && state.entries.get(saved)?.versions.length ? saved : state.entries.get(root)?.versions.length ? root : null
+  resetTrail()
   // A mockup keeps the device it was made for: new screens in it, and Start over, use it too.
   const made = state.entries.get(root)
   const device = made?.versions[0]?.device ?? made?.proposals?.find(Boolean)?.device
@@ -663,6 +695,7 @@ function closeMockup() {
   state.app = null
   state.entries = new Map()
   state.current = null
+  resetTrail()
   state.making = null
   state.revising = null
   state.drawer = null
@@ -723,19 +756,39 @@ addEventListener('keydown', (e: KeyboardEvent) => {
   if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); canvas.step(1) }
   else if (mod && e.key === '-') { e.preventDefault(); canvas.step(-1) }
   else if (mod && e.key === '0') { e.preventDefault(); canvas.setZoom(1) }
+  else if (mod && (e.key === '[' || e.key === ']') && !editable(e.target)) { e.preventDefault(); walkTrail(e.key === '[' ? -1 : 1) }
   else if (editable(e.target) || mod || e.altKey || !e.shiftKey) return
   else if (e.code === 'Digit1') fitAll()
   else if (e.code === 'Digit2') fitScreen()
   else if (e.code === 'Digit3') fitWidth()
 })
 
-/** Fill the generate panel's Recent list with every mockup, newest first. */
+/** Every mockup, newest first, as the server last listed them. */
+let recentApps: { app: string; screens: number }[] = []
+const screensNote = (n: number) => `${n} screen${n === 1 ? '' : 's'}`
+
+/** Fill the generate panel's Recent list (and the project menu's) with every mockup, newest first. */
 async function loadRecent() {
   const res = await fetch('/api/apps').catch(() => null)
   if (!res?.ok) return
-  const { apps } = await res.json() as { apps: { app: string; screens: number }[] }
-  $('recent').replaceChildren(...apps.map((a) => item(a.app, `${a.screens} screen${a.screens === 1 ? '' : 's'}`, () => open(a.app))))
-  $('recentBox').hidden = apps.length === 0
+  recentApps = (await res.json() as { apps: { app: string; screens: number }[] }).apps
+  $('recent').replaceChildren(...recentApps.map((a) => item(a.app, screensNote(a.screens), () => open(a.app))))
+  $('recentBox').hidden = recentApps.length === 0
+  renderRecentMenu()
+}
+
+/** The project menu's recent mockups, the open one ticked: a click switches to one. */
+function renderRecentMenu() {
+  const now = state.app && normalizePrompt(state.app)
+  const rows = recentApps.slice(0, 10).map((a) => {
+    const here = normalizePrompt(a.app) === now
+    const b = item(a.app, here ? '✓' : screensNote(a.screens), () => { if (!here) open(a.app) })
+    b.classList.toggle('current', here)
+    return b
+  })
+  const head = document.createElement('h3')
+  head.textContent = 'Recent mockups'
+  $('menuRecent').replaceChildren(...(rows.length ? [head, ...rows] : []))
 }
 
 /** A row in a list or menu: a label, a note on the right, and what a click does. */
@@ -772,6 +825,7 @@ for (const [b, m] of MENUS) $(b).addEventListener('click', () => {
   if (!show) return
   renderToolbar()
   if (m === 'navMenu') renderNav()
+  if (m === 'projectMenu') renderRecentMenu()
   $(m).hidden = false
   $(m).querySelector<HTMLElement>('.current, .item')?.focus()
 })
@@ -811,15 +865,24 @@ function renderToolbar() {
   const nav = $<HTMLButtonElement>('navButton')
   nav.hidden = !app || !state.entries.size
   const cur = state.current ? state.entries.get(state.current) : undefined
+  for (const [id, dir] of [['trailBack', -1], ['trailForward', 1]] as const) {
+    const b = $<HTMLButtonElement>(id)
+    b.hidden = nav.hidden
+    b.disabled = trailStep(dir) == null
+  }
   $('navName').textContent = cur ? labelOf(cur) : 'Screens'
   nav.title = cur ? labelOf(cur) : 'Every screen of this mockup'
   if (!$('navMenu').hidden) renderNav()
 }
 
-/** Every screen as an indented tree, children in the order they were made; the current path marked. */
+/**
+ * Every screen as an indented tree, children in the order they were made, planned screens greyed
+ * (a click makes one, as its link would); the current path marked.
+ */
 function renderNav() {
   const menu = $('navMenu')
-  const all = [...state.entries.values()]
+  const made = [...state.entries.values()]
+  const all = [...made, ...plannedScreens(made)]
   const path = new Set<string>()
   for (let k = state.current; k && !path.has(k); k = treeParent(k)) path.add(k)
   const rows: HTMLElement[] = []
@@ -828,7 +891,11 @@ function renderNav() {
     if (seen.has(e.key)) return
     seen.add(e.key)
     const via = state.tree.get(e.key)?.label
-    const b = item(labelOf(e), via ? `via ${via}` : '', () => goTo(e.key))
+    const planned = !state.entries.has(e.key)
+    const b = planned
+      ? item(labelOf(e), 'not made yet', () => (state.busy ? hint() : openScreen(`@${e.name}`, e.parent!.key, e.parent!.label)))
+      : item(labelOf(e), via ? `via ${via}` : '', () => goTo(e.key))
+    b.classList.toggle('planned', planned)
     b.style.setProperty('--depth', String(depth))
     b.classList.toggle('path', path.has(e.key))
     b.classList.toggle('current', e.key === state.current)
@@ -847,6 +914,15 @@ function goTo(key: string) {
   canvas.moved = performance.now()
   if (e.versions.length) { setCurrent(key); canvas.reveal(key) } else fitChoice(key)
 }
+
+$('trailBack').addEventListener('click', () => walkTrail(-1))
+$('trailForward').addEventListener('click', () => walkTrail(1))
+// The mouse's own back and forward buttons do the same, instead of leaving the page.
+addEventListener('mouseup', (e: MouseEvent) => {
+  if (e.button !== 3 && e.button !== 4) return
+  e.preventDefault()
+  walkTrail(e.button === 3 ? -1 : 1)
+})
 
 $('menuNew').addEventListener('click', () => { closeMenus(); openGenerate() })
 $('startOver').addEventListener('click', () => { closeMenus(); deleteApp(true).catch((e) => showError(String(e))) })

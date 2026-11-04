@@ -1,6 +1,6 @@
 // Feature: the web server streams a new screen's A OR B, keeps the pick, and revises screens (cassette: server).
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { ScreenCache, linksIn, type CacheEntry } from '@uxwoz/core'
+import { ScreenCache, linksIn, plannedScreens, screenRef, type CacheEntry } from '@uxwoz/core'
 import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
 import { cassette } from './cassette.ts'
 
@@ -20,8 +20,9 @@ async function stream(path: string, body: object): Promise<ScreenEvent[]> {
   return (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
 }
 const screen = (body: object) => stream('/api/screen', body)
-/** The prompts for new screens in a screen, in page order: without "home", "back" and links by @name. */
-const actions = (html: string) => [...html.matchAll(/data-action="([^"]+)"/g)].map((m) => m[1]!).filter((a) => !['home', 'back'].includes(a.toLowerCase()) && !a.startsWith('@'))
+/** The links to new screens in a screen (`@name: prompt`), in page order. */
+const actions = (html: string) => linksIn(html).map((l) => l.action).filter((a) => screenRef(a)?.prompt && screenRef(a)!.name !== 'home')
+const nameOf = (action: string) => screenRef(action)!.name
 const done = (evs: ScreenEvent[]) => evs.find((e) => e.type === 'done') as Extract<ScreenEvent, { type: 'done' }>
 const pick = async (key: string, index: number) => (await (await post('/api/pick', { key, index })).json()).entry as CacheEntry
 const shown = (e: CacheEntry) => e.versions.at(-1)!.html
@@ -55,16 +56,26 @@ describe('web server', () => {
     expect((await post('/api/pick', { key: before.key, index: 0 })).status).toBe(404)
   })
 
-  test('a click opens a new screen under its own key, with the click as its parent; the pick names it', async () => {
+  test('a click opens a new screen under its name, with the prompt of its link and the click as its parent', async () => {
     const first = done(await screen({ app: APP })).entry
     expect(first.name).toBe('home')
     const action = actions(shown(first))[0]!
     const evs = await screen({ app: APP, action, from: first.key, label: 'Our breads' })
     const { entry } = done(evs)
-    expect(entry.key).toBe(`a tiny bakery website » ${action.toLowerCase().replace(/\s+/g, ' ').replace(/[\s.!?;:,]+$/, '')}`)
-    expect(entry.parent).toEqual({ key: first.key, label: 'Our breads' })
-    expect((await pick(entry.key, 0)).name).toMatch(/^[a-z0-9-]+$/)
+    expect(entry.key).toBe(`a tiny bakery website » @${nameOf(action)}`)
+    expect(entry).toMatchObject({ name: nameOf(action), action: screenRef(action)!.prompt, parent: { key: first.key, label: 'Our breads' } })
+    expect((await pick(entry.key, 0)).name).toBe(nameOf(action))
   }, 30_000)
+
+  test('another link with the same name, worded differently, opens the same screen with no model call', async () => {
+    const first = done(await screen({ app: APP })).entry
+    const name = nameOf(actions(shown(first))[0]!)
+    for (const action of [`@${name}`, `@${name.toUpperCase()}: Some other words for the same screen`]) {
+      const evs = await screen({ app: APP, action, from: first.key, label: 'x' })
+      expect(evs.map((e) => e.type)).toEqual(['meta', 'done'])
+      expect(done(evs).entry.name).toBe(name)
+    }
+  })
 
   test('a "home" link opens the cached first screen with no model call', async () => {
     const evs = await screen({ app: APP, action: 'home' })
@@ -72,20 +83,39 @@ describe('web server', () => {
     expect(done(evs).entry.key).toBe('a tiny bakery website')
   })
 
-  test('a later screen gets the tree of screens and links to them by names that exist', async () => {
+  test('a planned screen opened by its name alone is made from the prompt of the link that planned it', async () => {
     const first = done(await screen({ app: APP })).entry
-    const action = actions(shown(first))[0]!
-    const second = done(await screen({ app: APP, action })).entry
-    const next = actions(shown(second))[0]
+    const planned = plannedScreens([first]).at(-1)!
+    expect(planned.action).toBe(screenRef(actions(shown(first)).find((a) => nameOf(a) === planned.name)!)!.prompt)
+    const second = done(await screen({ app: APP, action: `@${planned.name}`, from: first.key, label: 'More' })).entry
+    expect(second).toMatchObject({ key: `a tiny bakery website » @${planned.name}`, name: planned.name, action: planned.action })
+    await pick(second.key, 0)
+  }, 30_000)
+
+  test('a later screen gets the tree of made and planned screens, and links to them by name', async () => {
+    const first = done(await screen({ app: APP })).entry
+    const second = done(await screen({ app: APP, action: actions(shown(first))[0]! })).entry
+    const made = async () => (await (await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}`, server.url))).json() as { entries: CacheEntry[] }).entries
+    const madeNames = new Set((await made()).map((e) => e.name))
+    const next = actions(shown(second)).find((a) => !madeNames.has(nameOf(a)))
     expect(next).toBeTruthy()
     const third = done(await screen({ app: APP, action: next, from: second.key, label: 'Next' })).entry
     const map = await (await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}`, server.url))).json() as { entries: CacheEntry[] }
-    const names = new Set(map.entries.map((e) => e.name).filter(Boolean))
-    // Every link by name points at a screen that exists, and at least one link goes back to one.
+    const known = new Set([...map.entries, ...plannedScreens(map.entries)].map((e) => e.name).filter(Boolean))
     const links = third.proposals!.flatMap((p) => linksIn(p!.html).map((l) => l.action))
-    const refs = links.filter((a) => a.startsWith('@')).map((a) => a.slice(1))
-    for (const r of refs) expect(names).toContain(r)
-    expect(links.some((a) => a === 'back' || a.startsWith('@'))).toBe(true)
+    // Links by name to screens the mockup has: home at least, from the tree.
+    const refs = links.map(screenRef).filter((r) => r != null)
+    // (A new name without a prompt happens now and then; it is made from its words and the button's.)
+    expect(refs.some((r) => known.has(r.name))).toBe(true)
+    // One name is one screen: in one design, a name never comes with two different prompts.
+    for (const p of third.proposals!) {
+      const prompts = new Map<string, Set<string>>()
+      for (const l of linksIn(p!.html)) {
+        const r = screenRef(l.action)
+        if (r?.prompt && !known.has(r.name)) prompts.set(r.name, new Set([...prompts.get(r.name) ?? [], r.prompt]))
+      }
+      for (const [, set] of prompts) expect(set.size).toBe(1)
+    }
     await pick(third.key, 0)
   }, 60_000)
 
@@ -164,7 +194,7 @@ describe('web server', () => {
     expect((await (await post('/api/delete-app', { app: APP })).json()).removed).toBeGreaterThan(1) // the first screen and the bakers' A OR B
     expect((await (await fetch(new URL('/api/apps', server.url))).json()).apps).toEqual([])
     // A later screen of the deleted mockup is refused before any model call.
-    const late = await screen({ app: APP, action: 'Our breads' })
+    const late = await screen({ app: APP, action: '@breads: Our breads' })
     expect(late.map((e) => e.type)).toEqual(['error'])
   })
 })

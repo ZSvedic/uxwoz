@@ -40,7 +40,9 @@ can spend model credits.
 - `GET /api/config`: models (id, label, costEstimated), themes (`mockup`, `clean`), devices (id,
   label, width), and the default model, theme and device.
 - `POST /api/screen {app, action?, model?, device?, from?, label?}`: a new screen, as an NDJSON
-  stream. A cache hit sends `meta` (cached true, variants 0) and `done` only; a screen whose A OR B
+  stream. `action` is `@name: prompt`, `@name` alone (a screen the mockup has or plans; one with no
+  plan is made from the name and `label`), or a plain prompt (links from before names). A screen
+  with that name, else with that prompt's key, is a cache hit. A cache hit sends `meta` (cached true, variants 0) and `done` only; a screen whose A OR B
   is still open comes back with its `proposals`, at no cost. Otherwise two designs stream at once:
   `meta.variants` is 2 and each `chunk` names its side (`variant` 0 or 1). One random side is asked
   for a clearly different design. Each side that finishes is stored at once as that side's
@@ -63,10 +65,11 @@ can spend model credits.
   devices). 400 on a bad `change`, model or device, 404 for an unknown screen, 409 while its A OR B
   is open; `error` if the model fails or the screen was deleted meanwhile.
 - `POST /api/undo {key}`: drop the newest version; `{entry}`, or 404 when one or none is left.
-- `GET /api/map?app=…`: `{root, entries: CacheEntry[]}` for one mockup, oldest first. Levels and the
-  tree are not stored: `screenTree` in `core/src/tree.ts` works them out (server and browser).
+- `GET /api/map?app=…`: `{root, entries: CacheEntry[]}` for one mockup, oldest first. Levels, the
+  tree and planned screens are not stored: `screenTree` and `plannedScreens` in `core/src/tree.ts`
+  work them out (server and browser).
 - `GET /api/apps`: `{apps: {app, screens, updatedAt}[]}`, every mockup once as first typed,
-  most recently changed first. The History list.
+  most recently changed first, for the Recent mockups lists.
 - `POST /api/delete {key}`: delete a screen. Screens the first screen reached before and no longer
   reaches (through the clicks that made screens and the buttons in each screen's newest version) go
   too; a screen whose first click came from a screen that is gone takes the screen that reaches it
@@ -85,7 +88,7 @@ only from a card's own frame.
 ```ts
 { uxwoz: 'action', prompt, label }   // a click on a control with an action prompt (ignored on a side of an A OR B)
 { uxwoz: 'touch' }                   // any press in the screen: it becomes the current screen
-{ uxwoz: 'key', key, code, shift, mod } // a zoom key (⌘/Ctrl with + − 0), ⇧1-3 outside a text field,
+{ uxwoz: 'key', key, code, shift, mod } // a zoom key (⌘/Ctrl with + − 0), ⌘[ ⌘], ⇧1-3 outside a text field,
                                      // or Esc: the app handles it as if pressed outside the screen
 { uxwoz: 'size', height, width }     // the screen's size, so the frame fits it (160-8000 px tall;
                                      // the card shows only `width`, at least 280 px)
@@ -99,9 +102,13 @@ only from a card's own frame.
 ```ts
 CacheEntry { key; app; action: string | null; name?: string; parent: { key; label } | null;
              versions: Version[]; proposals?: (Version | null)[] }
-             // name is set at the pick and never changes: "home" for the first screen, else from
-             // the title ("sleep-report"), unique in the mockup; links use it as "@sleep-report".
-             // parent is the screen and click that first made it.
+             // name never changes: "home" for the first screen, else the one in the link that
+             // opened it ("@sleep-report: …"), or, for a screen opened by a plain prompt, one
+             // from its title at the pick; unique in the mockup; links use it as "@sleep-report".
+             // action is the screen's prompt (without "@name: "). parent is the screen and
+             // click that first made it.
+             // A planned screen (plannedScreens) has the same shape with no versions and no
+             // proposals; it is never stored.
              // The last version shows; versions is empty and proposals holds the two sides of
              // the open A OR B (null until a side finishes) until a pick
 Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
@@ -113,8 +120,9 @@ TreeNode   { level; parent: key | null; label }
              // from screenTree: level 1 is the first screen, the fewest clicks from it otherwise
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast'
 Device     'phone' (390 px wide) | 'desktop' (1024 px)
-key        normalize(app) or normalize(app) + ' » ' + normalize(action); normalize turns » into >; action
-           "home" or the product prompt itself means the first screen (action null)
+key        normalize(app), normalize(app) + ' » @' + name for a screen opened by name, or
+           normalize(app) + ' » ' + normalize(action) for one opened by a plain prompt; normalize
+           turns » into >; action "home", "@home" or the product prompt means the first screen
 ```
 
 ## Env vars

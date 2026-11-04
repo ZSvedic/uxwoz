@@ -9,18 +9,35 @@ export function normalizePrompt(s: string): string {
 /** The action prompt that means "the first screen" (the model writes `@home`, which means the same). */
 export const HOME_ACTION = 'home'
 
+/**
+ * A link by name: `@sleep-report` for a screen the mockup has (made or planned), or
+ * `@sleep-report: what the screen shows` for one it does not have yet. Null for a plain prompt.
+ */
+export function screenRef(action: string): { name: string; prompt: string } | null {
+  const m = action.trim().match(/^@([a-z0-9][a-z0-9_-]*)\s*(?::\s*([\s\S]*))?$/i)
+  return m ? { name: m[1]!.toLowerCase(), prompt: (m[2] ?? '').trim() } : null
+}
+
+/** A name in words: `sleep-report` becomes "sleep report". */
+export const nameWords = (name: string) => name.replace(/[-_]+/g, ' ')
+
 /** The action as stored: null for the first screen, whether asked for as no action, "home", "@home", or the product prompt. */
 export function canonicalAction(app: string, action: string | null): string | null {
   if (!action) return null
   const a = normalizePrompt(action)
-  return a === '' || a === HOME_ACTION || a === `@${HOME_ACTION}` || a === normalizePrompt(app) ? null : action
+  return a === '' || a === HOME_ACTION || screenRef(a)?.name === HOME_ACTION || a === normalizePrompt(app) ? null : action
 }
 
-/** The cache key: the normalized product prompt, plus the normalized action prompt for later screens. */
+/**
+ * The cache key: the normalized product prompt, plus `@name` for a screen opened by name, or the
+ * normalized action prompt for one opened by a plain prompt (as screens were before names).
+ */
 export function screenKey(app: string, action: string | null): string {
   const root = normalizePrompt(app)
   const a = canonicalAction(app, action)
-  return a ? `${root} » ${normalizePrompt(a)}` : root
+  if (!a) return root
+  const ref = screenRef(a)
+  return `${root} » ${ref ? `@${ref.name}` : normalizePrompt(a)}`
 }
 
 /** Labels (after icons and arrows) that mean "the first screen", and "the screen before". */

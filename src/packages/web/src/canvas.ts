@@ -1,7 +1,8 @@
 // The canvas: every screen of the mockup on one panning, zooming surface, laid out as a tree. Each
-// level is a row, as tall as its tallest screen. A screen's first child sits straight below it, in
-// the same column; each later child starts a new column to the right of the subtrees before it.
-// A thin line joins each screen to the one it hangs under. A new screen shows as A OR B: two locked
+// level is a row, as tall as its tallest screen, with its screens side by side: children in the order
+// of their parents, a screen's first child straight below it when there is room, else in the next
+// free place to the right. A thin line joins each screen to the one it hangs under; each parent's
+// lines branch at a height of their own in the gap below its row, so lines never cross. A new screen shows as A OR B: two locked
 // previews side by side, with its idea above each; a click on a finished one picks it. Right of
 // each picked screen is a rail of tools, kept at the same size on screen whatever the zoom.
 // Screens show only as wide as their content: the frame keeps the device's width, so the screen's
@@ -31,8 +32,14 @@ const RAIL_W = 60
 const OR_MIN = 120
 /** Empty canvas around the tree, so any screen can be scrolled to the middle. */
 const PAD = 600
-/** How far right of a screen's left edge the lines meet it. */
+/**
+ * How far right of a screen's left edge its lines leave it, and a line that bends enters it: never
+ * the same, so a line into a screen that sits below another parent does not run on from that parent's.
+ */
 const LINE_X = 40
+const ENTRY_X = 110
+/** How far apart the branch heights of two parents' lines are, in pixels on screen. */
+const LANE = 14
 /** The height of the name and idea above a screen, and of the idea above a side, in pixels on screen. */
 const LABEL_H = 62
 const IDEA_H = 76
@@ -140,6 +147,10 @@ export class Canvas {
   /** The OR between the sides of each open A OR B, by screen key. */
   private ors = new Map<string, HTMLElement>()
   private screens: ScreenView[] = []
+  /** From the last layout: the screen each one hangs under, the bottom of each one's row, and each parent's branch height (0 the highest). */
+  private parentOf = new Map<string, string>()
+  private rowBottom = new Map<string, number>()
+  private lanes = new Map<string, number>()
   /** Where each screen sits, from the last layout, in canvas pixels. */
   private boxes = new Map<string, Box>()
   private extent: Box = { x: 0, y: 0, w: 0, h: 0 }
@@ -430,9 +441,12 @@ export class Canvas {
     const keys = new Set(this.screens.map((s) => s.key))
     const kids = new Map<string, string[]>()
     const roots: string[] = []
+    this.parentOf.clear()
     for (const s of this.screens) {
-      if (s.parent && keys.has(s.parent) && s.parent !== s.key) kids.set(s.parent, [...(kids.get(s.parent) ?? []), s.key])
-      else roots.push(s.key)
+      if (s.parent && keys.has(s.parent) && s.parent !== s.key) {
+        kids.set(s.parent, [...(kids.get(s.parent) ?? []), s.key])
+        this.parentOf.set(s.key, s.parent)
+      } else roots.push(s.key)
     }
     const depth = new Map<string, number>()
     const walk = (k: string, d: number) => {
@@ -441,25 +455,50 @@ export class Canvas {
       for (const c of kids.get(k) ?? []) walk(c, d + 1)
     }
     for (const r of roots) walk(r, 0)
+    // The rows, top down: each the children of the row above, in its order.
+    const rows: string[][] = [roots.filter((r) => depth.get(r) === 0)]
+    while (rows.at(-1)!.length) rows.push(rows.at(-1)!.flatMap((k) => (kids.get(k) ?? []).filter((c) => depth.get(c) === rows.length)))
+    rows.pop()
+    // Across: side by side, a first child below its parent when that place is free.
+    this.boxes.clear()
+    const xs = new Map<string, number>()
+    let maxX = PAD
+    for (const row of rows) {
+      let cursor = PAD
+      for (const k of row) {
+        const p = this.parentOf.get(k), first = p != null && kids.get(p)![0] === k
+        const x = Math.max(cursor, first ? xs.get(p)! : cursor)
+        xs.set(k, x)
+        cursor = x + sizes.get(k)!.w + gapX
+        maxX = Math.max(maxX, x + sizes.get(k)!.w)
+      }
+    }
+    // Each parent whose lines bend gets a branch height of its own below its row, the leftmost lowest,
+    // so no line crosses another; the gap under a row grows with them.
+    const lane = Math.max(LANE / z, 10)
+    this.lanes.clear()
+    const lanesIn = rows.map((row) => {
+      const bending = row.filter((k) => (kids.get(k) ?? []).some((c) => Math.abs(xs.get(c)! - xs.get(k)!) >= 1))
+      bending.forEach((k, i) => this.lanes.set(k, bending.length - 1 - i))
+      return bending.length
+    })
     // Each row holds the names above its screens, which keep their size on screen.
-    const rowH: number[] = []
-    for (const [k, d] of depth) rowH[d] = Math.max(rowH[d] ?? 0, sizes.get(k)!.h)
-    const above = (d: number) => ([...depth].some(([k, dd]) => dd === d && sizes.get(k)!.parts.length > 1) ? IDEA_H : labelH(z)) / z
+    const rowH = rows.map((row) => Math.max(...row.map((k) => sizes.get(k)!.h)))
+    const above = (d: number) => (rows[d]!.some((k) => sizes.get(k)!.parts.length > 1) ? IDEA_H : labelH(z)) / z
     const rowY: number[] = []
     let y = PAD
-    for (let d = 0; d < rowH.length; d++) { y += above(d); rowY[d] = y; y += (rowH[d] ?? 0) + GAP_Y }
-    this.boxes.clear()
-    const place = (k: string, x: number): number => {
-      if (this.boxes.has(k)) return x
-      const s = sizes.get(k)!
-      this.boxes.set(k, { x, y: rowY[depth.get(k)!]!, w: s.w, h: s.h })
-      let right = x + s.w, cx = x
-      for (const c of kids.get(k) ?? []) { right = Math.max(right, place(c, cx)); cx = right + gapX }
-      return right
+    for (let d = 0; d < rows.length; d++) {
+      y += above(d)
+      rowY[d] = y
+      y += rowH[d]! + GAP_Y + Math.max(0, lanesIn[d]! - 1) * lane
     }
-    let x = PAD, maxX = PAD
-    for (const r of roots) { maxX = place(r, x); x = maxX + gapX }
-    this.extent = { x: PAD, y: PAD, w: Math.max(0, maxX - PAD), h: Math.max(0, y - GAP_Y - PAD) }
+    this.rowBottom.clear()
+    rows.forEach((row, d) => row.forEach((k) => {
+      this.boxes.set(k, { x: xs.get(k)!, y: rowY[d]!, w: sizes.get(k)!.w, h: sizes.get(k)!.h })
+      this.rowBottom.set(k, rowY[d]! + rowH[d]!)
+    }))
+    const lastGap = rows.length ? GAP_Y + Math.max(0, lanesIn.at(-1)! - 1) * lane : 0
+    this.extent = { x: PAD, y: PAD, w: Math.max(0, maxX - PAD), h: Math.max(0, y - lastGap - PAD) }
     // The cards, and the OR between the sides of an A OR B.
     for (const s of this.screens) {
       const b = this.boxes.get(s.key)
@@ -501,7 +540,7 @@ export class Canvas {
     })
   }
 
-  /** One line from each screen to the one it hangs under: straight down in its column, else an elbow. */
+  /** One line from each screen to the one it hangs under: straight down in its column, else an elbow at its parent's branch height. */
   private drawLines(kids: Map<string, string[]>) {
     const svg = this.lines
     svg.setAttribute('width', this.surface.style.width)
@@ -515,8 +554,9 @@ export class Canvas {
         const b = this.boxes.get(k)
         if (!b) continue
         const choice = this.screens.find((s) => s.key === k)!.cards.length > 1
-        const x1 = a.x + LINE_X, y1 = a.y + a.h, x2 = b.x + LINE_X, y2 = b.y - (choice ? IDEA_H : labelH(z)) / z - 6 / z
-        const mid = Math.min(y1 + GAP_Y / 2, y2 - 1)
+        const x1 = a.x + LINE_X, y1 = a.y + a.h, x2 = b.x + (Math.abs(b.x - a.x) < 1 ? LINE_X : ENTRY_X), y2 = b.y - (choice ? IDEA_H : labelH(z)) / z - 6 / z
+        const lane = Math.max(LANE / z, 10) * (this.lanes.get(p) ?? 0)
+        const mid = Math.min((this.rowBottom.get(p) ?? y1) + GAP_Y / 2 + lane, y2 - 1)
         parts.push(svgEl('path', { d: elbow(x1, y1, x2, mid, y2), class: 'line' }))
       }
     }

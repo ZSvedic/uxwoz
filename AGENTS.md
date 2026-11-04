@@ -37,16 +37,16 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
                  (system prompt is a copy of spec/prompt-screen.md; a test keeps them equal)
   providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol)
   generate.ts    one design: stream, 20 s deadline, cost, name and idea, refuse cut-off replies
-  keys.ts        cache keys: normalize a prompt, "home" means the first screen; which clicks mean Back or Home
-  tree.ts        the tree, worked out: links in each screen, @names, shortest-path levels, the tree lines for the model
-  cache.ts       screen cache: proposals (the open A OR B) and pick, names, versions and undo, parents,
+  keys.ts        cache keys: a link by @name, normalize a prompt, "home" means the first screen; which clicks mean Back or Home
+  tree.ts        the tree, worked out: links in each screen, @names, planned screens, shortest-path levels, the tree lines for the model
+  cache.ts       screen cache: find by name, proposals (the open A OR B) and pick, names, versions and undo, parents,
                  delete with pruning, migration of old files, JSON file
   frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices; name, idea
 src/packages/web/src/
   server.ts      Bun.serve: /api/config, /api/screen (NDJSON, A OR B at once), /api/pick, /api/revise, /api/undo,
                  /api/map, /api/apps, /api/delete, /api/delete-app, /api/warmup, themes
-  app.ts         browser: generate panel, A OR B streaming, refit and pick, clicks (@names, Back, Home), rail tools, drawer, toolbar menus, errors
-  canvas.ts      browser: the tree layout, lines, cards and frames, A OR B sides, rail, pan and zoom, fits
+  app.ts         browser: generate panel, A OR B streaming, refit and pick, clicks (@names, Back, Home), rail tools, drawer, toolbar menus, ← → trail, errors
+  canvas.ts      browser: the tree layout (packed rows, line lanes), cards and frames, A OR B sides, rail, pan and zoom, fits
   index.html, shell.css   the page around the canvas
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest

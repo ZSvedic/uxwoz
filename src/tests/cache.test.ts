@@ -64,7 +64,7 @@ describe('screen cache', () => {
 
   test('the request lists the picked screens as a tree of names, for links', () => {
     const lines = ['@home: the first screen of Coffee app', '  @cart: Cart']
-    expect(screenRequest('Coffee app', 'Pay', lines)).toEndWith('Screens that already exist in this mockup, as a tree:\n@home: the first screen of Coffee app\n  @cart: Cart')
+    expect(screenRequest('Coffee app', 'Pay', lines)).toEndWith('Screens of this mockup, as a tree:\n@home: the first screen of Coffee app\n  @cart: Cart')
     expect(screenRequest('Coffee app', null)).toBe('Coffee app')
   })
 

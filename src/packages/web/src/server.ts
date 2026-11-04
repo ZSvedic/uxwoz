@@ -4,7 +4,7 @@
 import { join, resolve } from 'node:path'
 import {
   DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, PROPOSALS, ScreenCache, canonicalAction, generateScreen, isDevice, isModelId,
-  screenKey, warmUp, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type Version,
+  plannedScreens, promptFromLabel, screenKey, screenRef, warmUp, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type Version,
 } from '@uxwoz/core'
 import index from './index.html'
 
@@ -110,9 +110,9 @@ export function createServer(opts: ServerOptions = {}) {
   /** A new screen: from the cache when it is there (with its open A OR B, if any), else two designs at once. */
   async function* screenEvents(r: ScreenRequest, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
     const { app, model, device, click } = r
-    const action = canonicalAction(app, r.action)
-    const key = screenKey(app, action)
-    const hit = cache.get(key)
+    let action = canonicalAction(app, r.action)
+    const hit = cache.find(app, action)
+    const key = hit?.key ?? screenKey(app, action)
     if (hit) {
       yield { type: 'meta', key, cached: true, variants: 0 }
       yield { type: 'done', entry: hit }
@@ -131,15 +131,22 @@ export function createServer(opts: ServerOptions = {}) {
     // (Delete, Start over, dropping the A OR B) is not kept: it would bring them back.
     const since = cache.now()
     const gone = () => cache.removedSince(key, since) || cache.removedSince(root, since) || (!!click && cache.removedSince(click.from, since))
+    // A screen opened by name alone is made from the planned screen's prompt, else from the words clicked.
+    const ref = action && screenRef(action)
+    if (ref && !ref.prompt) {
+      const planned = plannedScreens(cache.map(app).entries).find((p) => p.name === ref.name)
+      action = `@${ref.name}: ${planned?.action ?? promptFromLabel(ref.name, click?.label ?? '')}`
+    }
+    const prompt = ref ? screenRef(action!)!.prompt : action
     yield { type: 'meta', key, cached: false, variants: PROPOSALS }
-    const existing = cache.existingScreens(app)
+    const existing = cache.existingScreens(app, ref ? ref.name : undefined)
     // One random side asks for a clearly different design, so the side says nothing about which is which.
     const different = Math.min(PROPOSALS - 1, Math.floor(random() * PROPOSALS))
     const streams = Array.from({ length: PROPOSALS }, (_, slot) => tagged(slot, generateScreen({
-      app, action, existing, model, device, alternative: slot === different,
+      app, action: prompt, existing, model, device, alternative: slot === different,
       signal, fetch: opts.fetch, env: opts.env, log,
     })))
-    const parent = click && { key: click.from, label: click.label || action || 'home' }
+    const parent = click && { key: click.from, label: click.label || prompt || 'home' }
     const failed: string[] = []
     for await (const t of merge(streams)) {
       if ('error' in t) {
@@ -172,7 +179,7 @@ export function createServer(opts: ServerOptions = {}) {
     try {
       for await (const ev of generateScreen({
         // A revise keeps the device the screen was made for.
-        app, action, existing: cache.existingScreens(app), model, device: now.device ?? device,
+        app, action, existing: cache.existingScreens(app, entry.name), model, device: now.device ?? device,
         edit: change ? { html: now.html, change } : undefined,
         signal, fetch: opts.fetch, env: opts.env, log,
       })) {
