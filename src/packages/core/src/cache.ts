@@ -67,6 +67,9 @@ export class ScreenCache {
   private entries = new Map<string, CacheEntry>()
   /** Keyed by "from\nto": the first click between two screens names it. */
   private links = new Map<string, Link>()
+  /** When each key was last deleted, on a counter, so a design still streaming cannot bring it back. */
+  private removed = new Map<string, number>()
+  private clock = 0
 
   /** With a file, the cache loads it now and rewrites it after every change. */
   constructor(private file: string | null = null) {
@@ -83,6 +86,8 @@ export class ScreenCache {
         this.save()
       }
     } catch (err) {
+      this.entries.clear()
+      this.links.clear()
       const aside = `${file}.corrupt-${Date.now()}`
       renameSync(file, aside)
       console.warn(`screen cache ${file} was unreadable (${err}); moved it to ${aside} and started empty`)
@@ -91,6 +96,20 @@ export class ScreenCache {
 
   get(key: string): CacheEntry | undefined {
     return this.entries.get(key)
+  }
+
+  /** A moment to compare deletes against: see removedSince. */
+  now(): number {
+    return this.clock
+  }
+
+  /** True when `key` was deleted after `since` (a value of now()), even if it did not exist then. */
+  removedSince(key: string, since: number): boolean {
+    return (this.removed.get(key) ?? -1) > since
+  }
+
+  private tomb(key: string) {
+    this.removed.set(key, ++this.clock)
   }
 
   /**
@@ -195,6 +214,8 @@ export class ScreenCache {
    */
   delete(key: string): string[] | undefined {
     const entry = this.entries.get(key)
+    // Even an unknown key is marked: an A OR B dropped before its first side finished stays dropped.
+    this.tomb(key)
     if (!entry) return undefined
     const root = normalizePrompt(entry.app)
     if (key === root) {
@@ -205,14 +226,17 @@ export class ScreenCache {
     const before = this.reach(root)
     this.entries.delete(key)
     const removed = [key, ...this.prune(root, before)]
+    for (const k of removed) this.tomb(k)
     this.save()
     return removed
   }
 
   /** Delete a whole mockup: all its screens and links. Returns how many screens went. */
   deleteApp(app: string): number {
-    const gone = this.mockup(normalizePrompt(app))
-    for (const e of gone) this.entries.delete(e.key)
+    const root = normalizePrompt(app)
+    const gone = this.mockup(root)
+    this.tomb(root)
+    for (const e of gone) { this.entries.delete(e.key); this.tomb(e.key) }
     this.dropLinks()
     if (gone.length) this.save()
     return gone.length

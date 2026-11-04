@@ -11,16 +11,17 @@ default) and `OPENAI_API_KEY` (the two GPT models). All `bun` commands run from 
 cd src && bun install && bun run dev
 ```
 
-Open http://127.0.0.1:3000, type a product idea (or pick an example), and click around: each screen
-comes in two variants, stacked with the pick in front and the other's edge on the right; a click
-on a blue control adds the next screen below. `PORT=3001 bun run dev` picks another port.
+Open http://127.0.0.1:3000, type a product idea (or pick a template), and click around: each new
+screen comes as two designs side by side, A OR B; click the one you like to keep it. A click on a
+blue control inside a screen makes the next screen below it. Change a screen with the buttons to
+its right: ✎ Edit, ↻ Regenerate, ↶ Undo, ⓘ Info, ✕ Delete. `PORT=3001 bun run dev` picks another port.
 
 Generated screens are cached in `temp/screen-cache.json`. To make a mockup again from scratch,
-open it and click **Start over**; **Delete** removes it. To clear the whole cache, stop the server,
+open it and choose **Start over** in the project menu (top left); **Delete** removes it. To clear the whole cache, stop the server,
 move the file aside, and start it again: a running server keeps its cache in memory and writes it
 back.
 
-If an edit to `feed.ts` does not show up after a reload, restart `bun run dev`: the live reload
+If an edit to `canvas.ts` does not show up after a reload, restart `bun run dev`: the live reload
 sometimes keeps an old copy of it.
 
 If the page shows "Failed to load bundled module" after new code arrives, restart `bun run dev`:

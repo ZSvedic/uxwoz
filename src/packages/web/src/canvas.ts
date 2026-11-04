@@ -26,6 +26,9 @@ const GAP_X = 120
 const GAP_Y = 150
 /** The space between the two sides of an A OR B, where the OR sits. */
 const OR_W = 160
+/** The room a rail takes right of its screen, and the least room the OR needs, in pixels on screen. */
+const RAIL_W = 60
+const OR_MIN = 120
 /** Empty canvas around the tree, so any screen can be scrolled to the middle. */
 const PAD = 600
 /** How far right of a screen's left edge the lines meet it. */
@@ -178,10 +181,25 @@ export class Canvas {
     if (z === this.z) return
     const st = this.stage, r = st.getBoundingClientRect()
     const ax = x == null ? st.clientWidth / 2 : x - r.left, ay = y == null ? st.clientHeight / 2 : y - r.top
-    const px = (st.scrollLeft + ax) / this.z, py = (st.scrollTop + ay) / this.z
+    let px = (st.scrollLeft + ax) / this.z, py = (st.scrollTop + ay) / this.z
+    // Names and rails keep their size on screen, so screens move a little on the canvas as the zoom
+    // changes: the point under the pointer follows the screen nearest to it.
+    const near = this.nearest(px, py), before = near && { ...this.boxes.get(near)! }
     this.applyZoom(z)
+    const after = near && this.boxes.get(near)
+    if (before && after) { px += after.x - before.x; py += after.y - before.y }
     st.scrollLeft = px * z - ax
     st.scrollTop = py * z - ay
+  }
+
+  /** The screen whose box is nearest to a canvas point. */
+  private nearest(px: number, py: number): string | undefined {
+    let best: string | undefined, dist = Infinity
+    for (const [k, b] of this.boxes) {
+      const dx = Math.max(b.x - px, 0, px - b.x - b.w), dy = Math.max(b.y - py, 0, py - b.y - b.h)
+      if (dx * dx + dy * dy < dist) { dist = dx * dx + dy * dy; best = k }
+    }
+    return best
   }
 
   /** The next zoom step in or out from now. */
@@ -212,13 +230,14 @@ export class Canvas {
     this.stage.scrollTo({ left: v.left, top: v.top })
   }
 
-  /** A screen's place with the names above it, or the whole tree's without a key. */
+  /** A screen's place with the names above it and its rail, or the whole tree's without a key. */
   box(key?: string): Box | undefined {
     if (key == null) return this.extent.w ? this.extent : undefined
     const b = this.boxes.get(key)
     if (!b) return undefined
-    const above = (this.screens.find((s) => s.key === key)?.cards[0]?.side ? IDEA_H : LABEL_H) / this.z
-    return { x: b.x, y: b.y - above, w: b.w, h: b.h + above }
+    const choice = !!this.screens.find((s) => s.key === key)?.cards[0]?.side
+    const above = (choice ? IDEA_H : LABEL_H) / this.z
+    return { x: b.x, y: b.y - above, w: b.w + (choice ? 0 : RAIL_W / this.z), h: b.h + above }
   }
 
   /**
@@ -257,7 +276,7 @@ export class Canvas {
     const b = this.box(key)
     if (!b) return
     const st = this.stage, z = this.z, m = 24
-    const l = b.x * z, t = b.y * z, r = (b.x + b.w) * z + 56, btm = (b.y + b.h) * z
+    const l = b.x * z, t = b.y * z, r = (b.x + b.w) * z, btm = (b.y + b.h) * z
     const inX = l >= st.scrollLeft + m && r <= st.scrollLeft + st.clientWidth - m
     const inY = t >= st.scrollTop + m && btm <= st.scrollTop + st.clientHeight - m
     if (inX && inY) return
@@ -291,6 +310,9 @@ export class Canvas {
         c.idea.title = v.idea
         c.note.textContent = v.side ? '' : s.note
         c.note.hidden = !c.note.textContent
+        // While a screen is being changed, the note takes the idea's line, so the names keep their room.
+        if (!c.note.hidden) c.idea.hidden = true
+        else c.idea.hidden = false
         c.error.textContent = v.error ?? ''
         c.error.hidden = !v.error
         c.screen.hidden = !!v.error
@@ -363,10 +385,12 @@ export class Canvas {
   /** Place every screen as a tree, size the canvas, and draw the lines. */
   private layout() {
     const z = this.z
+    // At a low zoom, rails and the OR need more of the canvas than the fixed gaps give.
+    const gapX = Math.max(GAP_X, (RAIL_W + 24) / z), orW = Math.max(OR_W, OR_MIN / z)
     const sizes = new Map<string, { w: number; h: number; parts: { id: string; w: number; h: number }[] }>()
     for (const s of this.screens) {
       const parts = s.cards.map((v) => ({ id: v.id, ...this.size(this.cards.get(v.id)!) }))
-      const w = parts.reduce((t, p) => t + p.w, 0) + OR_W * (parts.length - 1)
+      const w = parts.reduce((t, p) => t + p.w, 0) + orW * (parts.length - 1)
       sizes.set(s.key, { w, h: Math.max(...parts.map((p) => p.h)), parts })
     }
     // The tree from the parents; a screen whose parent is not here starts a tree of its own, to the right.
@@ -397,11 +421,11 @@ export class Canvas {
       const s = sizes.get(k)!
       this.boxes.set(k, { x, y: rowY[depth.get(k)!]!, w: s.w, h: s.h })
       let right = x + s.w, cx = x
-      for (const c of kids.get(k) ?? []) { right = Math.max(right, place(c, cx)); cx = right + GAP_X }
+      for (const c of kids.get(k) ?? []) { right = Math.max(right, place(c, cx)); cx = right + gapX }
       return right
     }
     let x = PAD, maxX = PAD
-    for (const r of roots) { maxX = place(r, x); x = maxX + GAP_X }
+    for (const r of roots) { maxX = place(r, x); x = maxX + gapX }
     this.extent = { x: PAD, y: PAD, w: Math.max(0, maxX - PAD), h: Math.max(0, y - GAP_Y - PAD) }
     // The cards, and the OR between the sides of an A OR B.
     for (const s of this.screens) {
@@ -412,12 +436,12 @@ export class Canvas {
         const c = this.cards.get(p.id)!
         Object.assign(c.el.style, { left: `${cx}px`, top: `${b.y}px`, width: `${p.w}px`, height: `${p.h}px` })
         c.screen.style.width = `${p.w}px`
-        cx += p.w + OR_W
+        cx += p.w + orW
       }
       const o = this.ors.get(s.key)
       if (o) {
         const first = sizes.get(s.key)!.parts[0]!
-        Object.assign(o.style, { left: `${b.x + first.w}px`, top: `${b.y}px`, width: `${OR_W}px`, height: `${Math.min(b.h, 700)}px` })
+        Object.assign(o.style, { left: `${b.x + first.w}px`, top: `${b.y}px`, width: `${orW}px`, height: `${Math.min(b.h, 700)}px` })
       }
     }
     // The canvas reaches past the tree, and at least fills the stage, so any screen can be centred.
@@ -518,6 +542,9 @@ export class Canvas {
       c.height = h
       c.frame.style.height = `${h}px`
       this.queue()
+    } else if (d.uxwoz === 'key' && typeof d.key === 'string' && typeof d.code === 'string') {
+      // A key pressed in a screen, handed on as if pressed in the app.
+      dispatchEvent(new KeyboardEvent('keydown', { key: d.key, code: d.code, shiftKey: !!d.shift, metaKey: !!d.mod }))
     } else if (d.uxwoz === 'touch') {
       if (!c.view?.side) this.on.focus(c.key)
     } else if (d.uxwoz === 'zoom') {

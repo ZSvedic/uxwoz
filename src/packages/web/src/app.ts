@@ -2,7 +2,7 @@
 // (streamed side by side, then picked), click-to-navigate, the rail's tools (Edit, Regenerate, Undo,
 // Info, Delete) with the drawer for Edit and Info, pickers, recent mockups, the status pill.
 
-import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, screenIdea, type Device } from '@uxwoz/core/frame'
+import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
 import { normalizePrompt, screenKey } from '@uxwoz/core/keys'
 import type { CacheEntry, Link, Version } from '@uxwoz/core'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
@@ -34,6 +34,10 @@ const state = {
   /** The screen the user last picked, clicked in, or chose in Nav. */
   current: null as string | null,
   making: null as Making | null,
+  /** Why a side of an A OR B failed, by card id, so it still shows once the screen is stored. */
+  failed: new Map<string, string>(),
+  /** A pick on its way to the server, so a second click does not pick again. */
+  picking: false,
   /** A picked screen getting a new version: an Edit with `change`, else a Regenerate. */
   revising: null as { key: string; change: string | null } | null,
   /** The open drawer tab, if any. It shows the current screen. */
@@ -76,13 +80,14 @@ function nameOf(e: CacheEntry, v: Version): string {
 const labelOf = (e: CacheEntry) => (e.versions.length ? `L${e.level} ${nameOf(e, e.versions.at(-1)!)}` : `L${e.level} New screen · pick one`)
 
 const widthOf = (d: Device | undefined) => (d ? DEVICES[d].width : LEGACY_WIDTH)
-const ideaOf = (v: Version) => v.idea ?? screenIdea(v.html)
+const ideaOf = (v: Version) => v.idea ?? ''
 
 function sideCard(key: string, index: number, side: Side | null, stored: Version | null, device: Device | undefined): CardView {
   const version = stored ?? side?.version ?? null
-  const error = version ? undefined : side ? side.error ?? undefined : 'This design was not finished.'
+  const id = `${key}#${index}`
+  const error = version ? undefined : side ? side.error ?? undefined : state.failed.get(id) ?? 'This design was not finished.'
   return {
-    id: `${key}#${index}`, width: widthOf(version?.device ?? device), name: '', idea: version ? ideaOf(version) : '',
+    id, width: widthOf(version?.device ?? device), name: '', idea: version ? ideaOf(version) : '',
     side: { index, pickable: !!version }, error, streaming: !version && !error,
   }
 }
@@ -263,7 +268,7 @@ async function openScreen(action: string | null, from: string | null, label: str
         s.stream?.cancel()
         s.stream = null
         if (ev.type === 'version') { s.version = ev.version; state.spent += ev.version.costUsd ?? 0 }
-        else s.error = ev.message
+        else { s.error = ev.message; state.failed.set(`${m!.key}#${ev.variant}`, ev.message) }
         draw()
       } else if (ev.type === 'error') throw new Error(ev.message)
       else if (ev.type === 'done') {
@@ -311,27 +316,34 @@ function back() {
 /** Keep one side of an open A OR B. If the other one is still streaming, it stops. */
 async function pick(key: string, index: number) {
   const m = state.making?.key === key ? state.making : null
-  if (!(m?.sides[index]?.version ?? state.entries.get(key)?.proposals?.[index])) return
-  if (m) {
-    state.busy?.abort()
-    state.busy = null
-    for (const s of m.sides) s.stream?.cancel()
-    state.making = null
+  if (state.picking || !(m?.sides[index]?.version ?? state.entries.get(key)?.proposals?.[index])) return
+  state.picking = true
+  try {
+    // The other side stops; the A OR B stays drawn until the server answers, so the picked frame
+    // is kept (and renamed below) instead of loading again.
+    if (m) {
+      state.busy?.abort()
+      state.busy = null
+      for (const s of m.sides) { s.stream?.cancel(); s.stream = null }
+    }
+    const res = await post('/api/pick', { key, index }).catch(() => null)
+    if (state.making === m) state.making = null
+    if (!res?.ok) {
+      showError('Could not keep that design')
+      return reloadMap()
+    }
+    const { entry } = await res.json() as { entry: CacheEntry }
+    state.entries.set(key, entry)
+    canvas.rename(`${key}#${index}`, key)
+    state.current = key
+    saveCurrent()
+    status(`Kept <b>${labelOf(entry)}</b>`)
+    await draw()
+    back()
+    canvas.reveal(key, false)
+  } finally {
+    state.picking = false
   }
-  const res = await post('/api/pick', { key, index }).catch(() => null)
-  if (!res?.ok) {
-    showError('Could not keep that design')
-    return reloadMap()
-  }
-  const { entry } = await res.json() as { entry: CacheEntry }
-  state.entries.set(key, entry)
-  canvas.rename(`${key}#${index}`, key)
-  state.current = key
-  saveCurrent()
-  status(`Kept <b>${labelOf(entry)}</b>`)
-  await draw()
-  back()
-  canvas.reveal(key, false)
 }
 
 /** Drop both designs of an open A OR B; for the first screen, that drops the mockup too. */
@@ -541,7 +553,8 @@ function renderDrawer() {
     ['Name', labelOf(e)],
     ['Idea', ideaOf(v) || '–'],
     ['Opened by', parent ? `${e.parent!.label || 'a click'} in ${labelOf(parent)}` : e.action ? '–' : 'the first screen'],
-    ['Version', `${e.versions.length} of ${e.versions.length}${v.feedback ? ` (Edit: ${v.feedback})` : e.versions.length > 1 ? ' (Regenerated)' : ''}`],
+    ['Made by', v.feedback ? `Edit: ${v.feedback}` : e.versions.length > 1 ? 'Regenerate' : 'your pick of two designs'],
+    ['Versions', `${e.versions.length}${e.versions.length > 1 ? ' (↶ Undo goes back one)' : ''}`],
     ['Model', modelLabel(v.model) + (v.servedModel ? ` (served ${v.servedModel})` : '')],
     ['Device', v.device ? DEVICES[v.device].label : 'from before devices'],
     ['Made', new Date(v.createdAt).toLocaleString()],
@@ -577,8 +590,8 @@ addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape' && st
 
 // ---- Mockups ----------------------------------------------------------------------------------
 
-/** Open a mockup: its screens from the cache, else its first screen as A OR B. */
-async function start(app: string) {
+/** Open a mockup: its screens from the cache, else (unless `make` is false) its first screen as A OR B. */
+async function start(app: string, make = true) {
   state.busy?.abort()
   state.busy = null
   state.making = null
@@ -588,7 +601,11 @@ async function start(app: string) {
   if (!res.ok) throw new Error(`could not load the mockup: HTTP ${res.status}`)
   const map = await res.json() as { entries: CacheEntry[]; links: Link[] }
   if (n !== state.starts) return // a newer mockup was opened meanwhile
+  if (!make && !map.entries.length) { store.set('uxwoz:app', ''); return draw() }
   state.app = app
+  state.drawer = null
+  state.failed.clear()
+  store.set('uxwoz:app', app)
   generate.classList.remove('open')
   applyMap(map)
   const root = screenKey(app, null)
@@ -603,6 +620,7 @@ async function start(app: string) {
 
 function closeMockup(msg: string) {
   state.busy?.abort()
+  store.set('uxwoz:app', '')
   state.app = null
   state.entries = new Map()
   state.links = []
@@ -629,9 +647,12 @@ promptInput.addEventListener('keydown', (e) => {
 })
 
 // A template with a long prompt shows a short name and keeps the full prompt in data-prompt.
+// They show in the generate panel and in the project menu.
 for (const b of document.querySelectorAll<HTMLButtonElement>('.example')) {
+  const prompt = b.dataset.prompt ?? b.textContent ?? ''
   b.title = b.dataset.prompt ?? ''
-  b.addEventListener('click', () => { promptInput.value = b.dataset.prompt ?? b.textContent ?? ''; generate.requestSubmit() })
+  b.addEventListener('click', () => open(prompt))
+  $('menuTemplates').append(item(b.textContent ?? '', '', () => open(prompt)))
 }
 
 
@@ -790,9 +811,6 @@ function goTo(key: string) {
 }
 
 $('menuNew').addEventListener('click', () => { closeMenus(); openGenerate() })
-for (const b of document.querySelectorAll<HTMLButtonElement>('.example')) {
-  $('menuTemplates').append(item(b.textContent ?? '', '', () => open(b.dataset.prompt ?? b.textContent ?? '')))
-}
 $('startOver').addEventListener('click', () => { closeMenus(); deleteApp(true).catch((e) => showError(String(e))) })
 $('deleteApp').addEventListener('click', () => { closeMenus(); deleteApp(false).catch((e) => showError(String(e))) })
 
@@ -844,6 +862,9 @@ async function init() {
   warmUp(modelSelect.value)
   loadRecent()
   await themeCss(themeSelect.value)
+  // A reload opens the mockup that was open, with its A OR B if one was waiting for a pick.
+  const last = store.get('uxwoz:app')
+  if (last) return start(last, false)
   draw()
   promptInput.focus()
 }

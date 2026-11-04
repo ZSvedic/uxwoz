@@ -26,8 +26,8 @@ Screens that already exist in this mockup:
 The list holds the action prompts of the screens this mockup already has, newest first, at most 30.
 It lets a new screen link to an old one with the exact same prompt, so the click hits the cache.
 
-Two lines may follow, each after a blank line: the device and, for the second variant of a pair
-only, a request for a different design:
+Two lines may follow, each after a blank line: the device and, for one side of an A OR B only
+(a random one), a request for a different design:
 
 ```
 Design it for a phone screen, at most 390 px wide.
@@ -35,11 +35,9 @@ Design it for a phone screen, at most 390 px wide.
 Design this as a clearly different alternative to the obvious layout: change the structure, grouping or navigation, not just the wording.
 ```
 
-A variant made from an edited prompt sends it in place of the action prompt (or of the product
-prompt, for the first screen), after the same *This screen belongs to…* line.
-
-An **Edit** sends the variant's own prompt as usual, then the screen as it is now and the change,
-with no request for a different design:
+A **Regenerate** sends the same request as the screen's first design, with no request for a
+different design. An **Edit** sends the screen's prompt as usual, then its newest version and the
+change, with no request for a different design:
 
 ```
 The screen as it is now:
@@ -53,8 +51,9 @@ provider's prompt cache keeps working.
 
 ## System prompt
 
-The first bullet names the screen: the app shows the name in each variant's label (*L2-B Order
-checkout*), and the `<title>` element never renders. The next five are the benchmark prompt
+The first bullet names the screen and its idea: the app shows the name in each screen's label
+(*L2 Order checkout*), and the idea, one sentence about the design, above each side of an A OR B
+and under the name everywhere else. Neither element renders inside the screen. The next five are the benchmark prompt
 (`benchmarks/bench/prompts/system.txt`) unchanged. The next three add navigation: each control that
 opens another screen carries its action prompt in a `data-action` attribute, so the prompt arrives
 with the control itself. Left alone, a model builds one self-contained page with tabs and panels

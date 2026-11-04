@@ -65,6 +65,16 @@ const bootstrap = (final: boolean) => `(() => {
   window.uxwoz = { go }
   // Any press in the screen makes it the current one.
   addEventListener('pointerdown', () => parent.postMessage({ uxwoz: 'touch' }, '*'), true)
+  // The app's zoom keys and Esc work while a screen has the focus too; the fit keys not in a text field.
+  addEventListener('keydown', (e) => {
+    const mod = e.metaKey || e.ctrlKey
+    const field = e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)
+    const zoom = mod && ['=', '+', '-', '0'].includes(e.key)
+    const fit = !mod && !e.altKey && e.shiftKey && !field && /^Digit[123]$/.test(e.code)
+    if (!zoom && !fit && e.key !== 'Escape') return
+    if (zoom) e.preventDefault()
+    parent.postMessage({ uxwoz: 'key', key: e.key, code: e.code, shift: e.shiftKey, mod }, '*')
+  })
   document.addEventListener('click', (e) => {
     const el = e.target instanceof Element && e.target.closest('[data-action], a[href]')
     if (!el) return
@@ -119,7 +129,7 @@ const bootstrap = (final: boolean) => `(() => {
     if (h + 'x' + w !== last) { last = h + 'x' + w; parent.postMessage({ uxwoz: 'size', height: h, width: w }, '*') }
   }
   addEventListener('load', () => { report(); new ResizeObserver(report).observe(document.body) })
-  // Ctrl/Cmd + scroll (and a pinch, which arrives as one) zooms the feed around the pointer.
+  // Ctrl/Cmd + scroll (and a pinch, which arrives as one) zooms the canvas around the pointer.
   addEventListener('wheel', (e) => {
     e.preventDefault()
     if (e.ctrlKey || e.metaKey) parent.postMessage({ uxwoz: 'zoom', dy: e.deltaY, x: e.clientX, y: e.clientY }, '*')

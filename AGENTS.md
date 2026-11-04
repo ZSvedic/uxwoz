@@ -33,19 +33,20 @@ When you answer the user in chat (status updates, failure reports, "why did X ha
 ```
 src/packages/core/src/       engine; frame.ts and keys.ts also run in the browser
   models.ts      the 3 models, call settings, prices
-  prompt.ts      system prompt + user message: device, ask for a different 2nd variant, an Edit's screen and change
+  prompt.ts      system prompt + user message: device, ask one side for a different design, an Edit's screen and change
                  (system prompt is a copy of spec/prompt-screen.md; a test keeps them equal)
   providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol)
-  generate.ts    one screen: stream, 20 s deadline, cost, refuse cut-off replies
-  keys.ts        cache keys: normalize a prompt, "home" means the first screen; variant names (L2-B)
-  cache.ts       screen cache: variants (candidates) and the pick, levels, letters, parents, links, delete, JSON file
-  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices
+  generate.ts    one design: stream, 20 s deadline, cost, name and idea, refuse cut-off replies
+  keys.ts        cache keys: normalize a prompt, "home" means the first screen
+  cache.ts       screen cache: proposals (the open A OR B) and pick, versions and undo, levels, parents, links,
+                 delete with pruning, migration of old files, JSON file
+  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices; name, idea
 src/packages/web/src/
-  server.ts      Bun.serve: /api/config, /api/screen (NDJSON, two variants at once), /api/map, /api/apps, /api/link, /api/choose, /api/delete, /api/delete-app, /api/warmup, themes
-  app.ts         browser: prompt box, History, rows of the flow (they follow the pick), load() a row, streaming (first to show goes in front), picking, delete, pickers, metrics
-  feed.ts        browser: rows as stacks of variants (tabs, sliding swaps), Compare, frames, heights, lineage lines, tools, zoom
-  tree.ts        browser: the tree of every screen beside the feed
-  index.html, shell.css   the page around the feed
+  server.ts      Bun.serve: /api/config, /api/screen (NDJSON, A OR B at once), /api/pick, /api/revise, /api/undo,
+                 /api/map, /api/apps, /api/link, /api/delete, /api/delete-app, /api/warmup, themes
+  app.ts         browser: generate panel, A OR B streaming and pick, clicks, rail tools, drawer, toolbar menus, status pill
+  canvas.ts      browser: the tree layout, lines, cards and frames, A OR B sides, rail, pan and zoom, fits
+  index.html, shell.css   the page around the canvas
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
 ```

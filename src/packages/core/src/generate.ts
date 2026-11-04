@@ -60,6 +60,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
       if (ev.finishReason !== 'stop') throw new ProviderError(`the screen was cut off (${ev.finishReason})`)
       const html = extractFragment(raw)
       if (!html.trim()) throw new ProviderError('the model returned an empty screen')
+      const name = screenName(html), idea = screenIdea(html)
       yield {
         type: 'done',
         version: {
@@ -73,8 +74,8 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
           totalMs: Math.round(performance.now() - t0),
           finishReason: ev.finishReason,
           ...(o.device && { device: o.device }),
-          ...(screenName(html) && { name: screenName(html) }),
-          ...(screenIdea(html) && { idea: screenIdea(html) }),
+          ...(name && { name }),
+          ...(idea && { idea }),
         },
       }
       return

@@ -119,13 +119,19 @@ export function createServer(opts: ServerOptions = {}) {
       yield { type: 'done', entry: hit, link: linkFrom() }
       return
     }
-    // A later screen of a mockup deleted meanwhile (Delete, Start over) is not kept: it would bring
-    // the mockup back without its first screen.
-    const gone = () => action != null && !cache.get(screenKey(app, null))
-    if (gone()) {
+    const root = screenKey(app, null)
+    if (action != null && !cache.get(root)) {
       yield { type: 'error', message: 'this mockup has no first screen: it was deleted, or never made' }
       return
     }
+    if (click && !cache.get(click.from)?.versions.length) {
+      yield { type: 'error', message: 'the screen clicked in is gone' }
+      return
+    }
+    // A design that finishes after its screen, the screen clicked in, or its mockup was deleted
+    // (Delete, Start over, dropping the A OR B) is not kept: it would bring them back.
+    const since = cache.now()
+    const gone = () => cache.removedSince(key, since) || cache.removedSince(root, since) || (!!click && cache.removedSince(click.from, since))
     yield { type: 'meta', key, cached: false, variants: PROPOSALS }
     const existing = cache.existingScreens(app).filter((a) => a !== action)
     // One random side asks for a clearly different design, so the side says nothing about which is which.
@@ -136,7 +142,6 @@ export function createServer(opts: ServerOptions = {}) {
     })))
     const parent = click && { key: click.from, label: click.label || action || 'home' }
     const failed: string[] = []
-    let made = false
     let link: Link | null = null
     for await (const t of merge(streams)) {
       if ('error' in t) {
@@ -146,18 +151,18 @@ export function createServer(opts: ServerOptions = {}) {
         yield { type: 'failed', variant: t.slot, message: message(t.error) }
       } else if (t.ev.type === 'chunk') yield { type: 'chunk', variant: t.slot, text: t.ev.text }
       else {
-        // A side that finished is paid for: keep it, even if the browser left. Not when the screen
-        // was deleted meanwhile, or the other side was already picked.
-        if (gone() || (made && !cache.get(key))) continue
+        // A side that finished is paid for: keep it, even if the browser left (or picked the other
+        // side, which aborts this one). Not when the screen was deleted meanwhile, or the other side
+        // was already picked (by another browser).
+        if (gone()) continue
         if (!cache.propose(app, action, t.slot, t.ev.version, parent)) continue
-        made = true
         link ??= linkFrom()
         yield { type: 'version', variant: t.slot, version: t.ev.version }
       }
     }
     if (signal.aborted) return
     const entry = cache.get(key)
-    if (gone() || (made && !entry)) yield { type: 'error', message: 'this screen was deleted while it was being made' }
+    if (gone()) yield { type: 'error', message: 'this screen was deleted while it was being made' }
     else if (!entry) yield { type: 'error', message: [...new Set(failed)].join('; ') || 'no screen was made' }
     else yield { type: 'done', entry, link }
   }

@@ -1,219 +1,213 @@
 # Behavior: what the user sees
 
-This doc owns the product flow of the MVP: the prompt box, names, the feed of screens, the tree,
-variants and picking, navigation, the cache, pickers and the numbers on screen. It does not own the screen
-format, rendering or model settings (see [ui-generation.md](ui-generation.md)) or types and env
-vars (see [code-contract.md](code-contract.md)).
+This doc owns the product flow of the MVP: the toolbar, the generate panel, the canvas of screens,
+A OR B and picking, the rail and the drawer, navigation, the cache, pickers and the numbers on
+screen. It does not own the screen format, rendering or model settings (see
+[ui-generation.md](ui-generation.md)) or types and env vars (see [code-contract.md](code-contract.md)).
+
+Only screens the user picked exist. A new screen shows two designs side by side; the user clicks
+one, and the other is gone. After that, the user changes a screen by asking for an edit.
 
 ## Example
 
-1. Zel types *A coffee shop ordering app* and presses **Generate**.
-2. Two variants of the first screen stream in. *L1-B Order ahead* shows text first, so it streams in
-   front; the other streams behind it, and only its right edge shows. Once both are stored, that
-   edge reads *L1-A Menu*.
-   After about 1 s the metrics line reads *First visible screen 0.9 s*; at the end it reads *all
-   variants interactive 6.0 s · $0.0016 for 2*. L1-B, the one in front, is the pick.
-3. Zel clicks the blue **Checkout** button in L1-B. A second row appears below with *L2-A* and
-   *L2-B*, two variants of the checkout, one in front. A line runs from L1-B down into the new row,
-   labelled *Checkout*.
-4. The checkout in front is close, but its pay button is small. Zel clicks **✎ Edit** on it, types
-   *one big pay button* and clicks **Make the change**: *L2-C*, the same checkout with one big pay
-   button, streams in front and becomes the pick; L2-A and L2-B stay behind it.
-5. Zel clicks **Compare** on step 1 and sees L1-A and L1-B side by side. Zel clicks into L1-A: it
-   becomes the pick, and the checkout row goes, since L1-A never led there. Picking L1-B again
-   brings it back.
-
-## First screen
-
-The prompt box takes a product description (up to 2,000 characters); the example buttons fill
-it in and submit. A new prompt starts a new mockup. A prompt this browser has seen before shows
-the rows it had last time, from the cache, at no cost.
-
-**History** lists every mockup in the cache, most recently changed first, with its number of
-screens. Choosing one opens it like typing its prompt again. The list comes from the server, so
-it is the same in every browser. **Start over** deletes every screen of the open mockup and makes
-its first screen again; **Delete** only deletes them. Both ask first.
-
-## Names
-
-Every variant has a fixed name: the level its screen was made at, a letter, and a short name the
-model gives the screen in the same reply, as in *L2-B Planning sync*. Letters count all variants
-made at a level of a mockup, so the level-2 screens made from L1-A and from L1-B share one run of
-letters (L2-A, L2-B, then L2-C, L2-D). A letter is never reused, even after its variant is deleted,
-and a screen keeps its level when another path reaches it. Each mockup keeps a letter count
-per level, so letters stay taken after their screens are gone; Start over begins again at A. So *L2-B* always means the same variant.
-
-## Feed
-
-The feed shows the main flow: one row per step, from the first screen at the top down to the
-latest. A row is a **stack** of the variants of one screen, like windows in Time Machine but
-stacked to the right: the pick in front, live, and each other variant behind it, a little shorter
-and darker, showing only its right edge with its name (*L1-A Menu*) and how many screens it leads
-to. By the row's title, one tab per variant (*A B*) lights the one in front. Clicking an edge or a
-tab brings that variant forward and picks it; the cards slide to their new places, so the swap is
-easy to follow. The feed is one surface on a dot grid: the page scrolls both ways, and rows never
-scroll on their own.
+1. Zel types *a cat litter box app* and clicks **Generate**. The canvas zooms to fit two screens
+   side by side, with a large **OR** between them. Above each is one sentence naming its idea:
+   *Status cards first, actions below* and *One big clean button on top*. Both stream in, and
+   neither is clickable inside.
+2. Zel clicks anywhere on the right one. It becomes *L1 Home*, the zoom goes back to what it was
+   before, and the left one is deleted.
+3. Zel clicks *Camera* inside L1. The new screen's A OR B appears below L1, in L2's place. Zel
+   picks one.
+4. Zel clicks ✎ in the rail to the right of L2. A drawer opens at the window's right edge. Zel
+   types *show one level indicator, not four* and clicks **Make the change**. L2 updates in place,
+   and **↶ Undo** brings the old version back.
+5. Back in L1, Zel clicks *Settings*. Its A OR B appears in a new column beside the Camera branch,
+   still at level 2. **Fit all** shows the whole tree, like a Figma page.
 
 ```
- Step 1  [A|B]  [Compare]
- ┌──────────────────────┐─────────┐
- │ L1-B Order ahead     │L1-A     │
- │                      │Menu     │
- │                      │         │
- └──────────────────────┘─────────┘
-        │ Checkout
-        ↓
- Step 2  [A|B|C]  [Compare]
- ┌──────────────────────┐─────────┐─────────┐
- │ L2-C Checkout        │L2-A     │L2-B     │
- └──────────────────────┘─────────┘─────────┘
+ L1 Home ──────────────┐
+ ┌────────┐            │
+ │        │ ✎ ↻ ⓘ ✕    │
+ └────────┘            │
+     │                 │
+ L2 Camera         L2 Settings
+ ┌────────┐        ┌────────┐
+ │        │        │        │
+ └────────┘        └────────┘
 ```
 
-- **Lineage**: a straight line runs down the left of the front variants, from each row into the
-  next, labelled with the control that was clicked.
-- **Other clicks**: a click that goes back to a row already in the flow (or ahead to a later one)
-  scrolls there and draws a dashed arc in the gutter left of the rows, from the row clicked in to
-  the row it opened, with an arrow. Hovering an arc names the control. Arcs are stored with the
-  mockup, so they come back next time.
-- **The front variant is live**: its controls work, in any row. Controls that open another screen
-  are blue, in both themes; everything else keeps the theme's own ink.
-- **Compare**: the **Compare** button by a row's title fans its stack out side by side, in letter
-  order, every variant live, the pick with an orange outline and a ✓; **Stack** stacks it again
-  with the pick in front. Holding **Alt/Option** fans out every row until it is let go.
+## Toolbar
+
+One bar, 44 px tall, with three parts:
+
+- **Project menu** (left): a button with the mockup's prompt, cut short. Its menu has
+  **New mockup…** (opens the generate panel), **Templates** (example prompts that start a mockup
+  at once), **Recent mockups** (every mockup in the cache, most recently changed first, with its
+  number of screens; the list comes from the server, so it is the same in every browser), and at
+  the bottom **↺ Start over** (deletes every screen and makes the first one again) and **✕ Delete**
+  (deletes every screen). Both ask first.
+- **Nav** (middle): names the current screen (*L2 Camera ▾*). Its menu lists every screen as an
+  indented tree, each with the control that opened it (*via Camera*), the path to the current
+  screen in orange. Choosing one makes it current and scrolls to it.
+- **Zoom** (right): **−**, the zoom level, **+** and **⤢ Fit screen**. The level opens a menu: Zoom
+  in ⌘+, Zoom out ⌘−, 50%, 100% ⌘0, 200%, Fit all ⇧1, Fit screen ⇧2, Fit screen width ⇧3. The keys
+  work anywhere outside a text field (Ctrl in place of ⌘ off a Mac). Under 900 px wide only the
+  level stays. The keys also work while a screen has the focus.
+
+Menus close on Esc, on a press outside them, or on a click into a screen.
+
+## Generate panel
+
+The prompt box takes a product description (up to 2,000 characters) and grows with it; Enter makes
+the mockup, Shift+Enter adds a line. Beside **Generate** sit the **Model**, **Device** and **Theme**
+pickers. With no mockup open, the panel sits large in the middle of the canvas with Templates and
+Recent mockups under it. With one open, **New mockup…** shows it as a popover under the project
+menu; Esc or a press outside closes it. A prompt seen before opens its mockup from the cache, at no
+cost, with the current screen it had last time in this browser. A reload opens the mockup that
+was open, with its A OR B if one was waiting for a pick; it never starts a new design by itself.
+
+## Canvas
+
+The canvas holds every picked screen of the mockup, laid out as a tree on a dot grid. Nothing is
+hidden when the user branches.
+
+- **Rows are levels.** Each level is a row, as tall as its tallest screen. A screen's first child
+  sits straight below it, in the same column; each later child starts a new column to the right of
+  the subtrees before it.
+- **Lines**: one thin orange line from a parent to each child it made: straight down in the same
+  column, an elbow for a branch. A click back to a screen already there draws no line.
+- **Names**: above each screen, its level and the short name the model gave it (*L2 Camera*), and
+  under that, its idea. Names and ideas keep their size on screen at any zoom.
+- **Current screen**: the one the user last picked, clicked in, or chose in Nav. It has an orange
+  outline and its rail at full strength; other screens show their rail on hover. Fit screen uses
+  it.
+- **Live screens**: a picked screen works: controls that open another screen are blue, in both
+  themes; everything else keeps the theme's own ink.
 - **A screen is as tall as its content**, so nothing scrolls inside it: scrolling over a screen
-  moves the page and the row. A screen sees an 800 px tall window (`100vh` is 800 px), so
-  "full-screen" screens keep a normal size; a screen that still keeps growing with its window
-  stops after four steps.
+  moves the canvas. A screen sees an 800 px tall window (`100vh` is 800 px), so "full-screen"
+  screens keep a normal size; a screen that still keeps growing with its window stops after four
+  steps.
 - **Size**: a screen is only as wide as its content; the device width is the most it takes, even
-  when its content cannot shrink to fit. The model is told to start small: only what this step
-  needs.
-- **Zoom**: pinch, or Ctrl/Cmd + scroll, zooms the feed around the pointer, also over a screen.
-  The slider at the top sets it from 10% to 150%, with the level shown beside it; **Fit** shows the
-  whole flow, **100%** goes back. The dot grid's spacing follows the zoom, so it shows how far in
-  or out the feed is. Screens stay live at any zoom. The zoom is remembered in this browser.
-- Each variant's bar shows its name and four tools. Hovering the bar names its model, cost and
-  time. Edit and Info open a panel under the bar, as wide as the screen; long text wraps.
+  when its content cannot shrink to fit. The model is told to start small.
+- **Pan and zoom**: scroll, or drag the empty canvas, to pan. Pinch or Ctrl/Cmd + scroll zooms
+  around the pointer, also over a screen, from 10% to 200%. The dot grid's spacing follows the
+  zoom.
+- **Status pill**: at the bottom of the canvas, what is happening and what it cost (*2 designs in
+  5.3 s · $0.0011 · this session $0.0011 · pick one*). Errors show there in red until closed.
 
-## Tree
+## A OR B
 
-A panel floating over the top right of the feed lists every screen of the mockup as a tree, one
-line per variant. Drag it by its header to move it; **–** folds it to its header. The screens a
-variant's clicks first made hang below it, under the label of the control that was clicked:
+Every new screen, the first one and every click to a new screen, comes as two designs made at the
+same time. One of them, on a random side, is asked to be a clearly different design, so the side
+says nothing about which is which.
 
-```
-4 screens · 7 variants
-L1-A Menu
-  Checkout →
-    L2-A Checkout
-    L2-B Pay
-    L2-C Checkout
-L1-B Order ahead
-  Checkout →
-    L2-D Quick pay
-```
+- **Fit and restore**: before an A OR B shows, the canvas remembers its zoom and scroll, then fits
+  both designs to the stage's width, top first. After the pick, the zoom and scroll come back, and
+  the picked screen scrolls into view.
+- **The idea** sits above each side in larger type: one sentence the model writes about the design
+  (*One big clean button on top*).
+- **Locked previews**: both stream in live, and their scripts run once finished, so charts draw.
+  Nothing inside them can be clicked. A side can be picked once it has finished: hovering it
+  outlines it and shows **Pick this design**.
+- **Picking**: a click anywhere on a finished side keeps it as the screen's first version and
+  deletes the other. If the other is still streaming, it stops and nothing of it is kept. The
+  frame does not reload, so the picked screen stays as it was.
+- **Failures**: a side that fails shows its error in its place. If both fail, the A OR B goes
+  away.
+- **✕** under the OR drops both designs; for the first screen, that drops the mockup.
+- **Reloads**: an A OR B stays open until a pick, so a reload shows the same two designs again, at
+  no cost. A side that was still streaming at the reload shows as not finished.
+- **Deletes win**: a side that finishes after its A OR B was dropped, or its mockup deleted or
+  started over, is not kept.
 
-The variants in the main flow are marked. Clicking any line makes its path the flow: each screen
-on the way picks the variant the path goes through, the feed shows those rows and goes on below
-the chosen variant, and the page scrolls to it. Under 700 px the tree is hidden.
+## Rail
 
-## Variants and picking
+A column of large icon buttons right of each picked screen, kept at 40 px on screen whatever the
+zoom:
 
-Every new screen comes as two variants made at the same time. The second is asked to be a clearly
-different design, so the two are not near copies. If one fails, the other still arrives, with an
-error line naming the failure.
+- **✎ Edit** opens the drawer on Edit.
+- **↻ Regenerate** makes one new design of the screen in its place, from the screen's prompt, at
+  once.
+- **↶ Undo** brings back the version before the newest. It shows only when there are two or more.
+- **ⓘ Info** opens the drawer on Info.
+- **✕ Delete** asks, then deletes the screen and the screens only it leads to. A screen that
+  another click also reaches stays, under that click. Deleting the first screen deletes the
+  mockup.
 
-- **First to show goes in front**: of the two variants of a new screen, the first to show any text
-  streams in front, and becomes the pick once stored. Which one finishes first is close to random,
-  so neither the first nor the second design wins by default, and the first screen shows sooner.
-  Clicking the other one's edge while they stream brings it forward instead.
-- **The front variant is the pick**: clicking an edge brings that variant to the front and picks
-  it. In a compared row, any click in a variant, on its screen or its bar, picks it, and nothing
-  moves until the row is stacked again. A click that opens another screen also opens the next row.
-- **The rows below follow the pick**: each row remembers the variant above it that its click came
-  from. Picking another variant keeps the next row only if the new pick also leads there;
-  otherwise the rows below go, and the new pick's own newest path comes back, if it has one.
-- The pick is stored with the screen, so every later visit shows it as the picked variant.
+Using a rail button makes its screen current. While a screen is being made or changed, the rail's
+buttons wait (Info still works).
 
-Each variant's bar has four tools:
+## Drawer
 
-- **✎ Edit** asks *What should change in this screen?* Type it (*Show one level indicator instead
-  of four*) and click **Make the change**: the model gets this screen and the request, and returns
-  the same screen with only that change, as one more variant. It streams in front of the stack and
-  becomes the pick, so the rows below follow it; the variant it changed stays behind it, and Info
-  names both. Folded under the box, **Or start over from an edited prompt** shows the prompt the
-  variant was made from: edit it and click **Make a new variant** for a new design instead. Either
-  way it stays a variant of the same screen, so the click that leads here still lands here.
-- **↻ Refresh** makes the variant again the way it was made: from the same prompt, or for an Edit,
-  the same change to the same variant (from its prompt, if that variant is gone). The new version takes the old one's
-  place in the stack (and its pick) under a new name, and the old one is deleted, with the screens
-  only it led to. When screens were made from it, Refresh asks first.
-- **✕ Delete** asks, then deletes the variant: its markup goes, its letter stays taken. Screens
-  that only it led to go too, with their rows. When the front variant goes, another one comes forward. Deleting the last variant of a screen deletes the
-  screen; deleting the last variant of the first screen deletes the mockup.
-- **ⓘ Info** lists the name, model, device, when it was made, time to first text, total time,
-  cost, finish reason, size and prompt.
+A 360 px panel docked at the right edge, for the current screen. The canvas gets narrower and
+scrolls so the screen stays fully visible beside it. Esc or ✕ closes it. It has two tabs:
+
+- **Edit**: *What should change?* Type it and click **Make the change** (or press Enter): the
+  model gets this screen and the request, and returns the same screen with only that change, as a
+  new version in place. **Past changes** lists the versions, newest first: *Edit: show one level
+  indicator, not four*, *Regenerated*, *The design you picked*, the one showing marked.
+- **Info**: name, idea, the click that opened it, what made the version showing (the pick, an Edit
+  and its request, or Regenerate), the number of versions, model, device, when it was made, time to
+  first text, total time, cost, cost of all versions, finish reason, size and prompt.
+
+Choosing another screen while the drawer is open shows that screen in it.
 
 ## Navigation
 
 Each control that opens another screen carries a short action prompt written by the model, and is
 blue; clicking it asks for *product prompt + action prompt*. The model is told to make details,
 forms, settings and tab-bar sections screens of their own, so a mockup has screens to click
-through. A plain link the screen does not handle asks for "the
-screen shown after clicking *label*"; in-page links (`#…`) stay put. Other controls (filters,
-inputs) work inside the screen. Each request lists the screens that already exist, and the model
-links to them by their exact prompt, and to the first screen with `home`. Only a real click opens
-a screen.
+through. A plain link the screen does not handle asks for "the screen shown after clicking
+*label*"; in-page links (`#…`) stay put. Other controls (filters, inputs) work inside the screen.
+Each request lists the screens that already exist, and the model links to them by their exact
+prompt, and to the first screen with `home`. Only a real click opens a screen.
 
-- A click that leads to a screen already in the feed scrolls to its row and adds nothing. This is
-  how "Back to menu" works.
-- A click in an earlier row that leads to a new screen replaces the rows below that row. The
-  replaced screens stay in the cache and in the tree: the same click brings them back at once.
-- While a screen is being made, clicks that would open another screen do nothing.
+- A click that leads to a screen already on the canvas makes it current and scrolls to it. It is
+  stored as a link, with no line. This is how "Back to menu" works.
+- One screen is made at a time: while one is being made or changed, a click that would open
+  another says so in the status pill and does nothing.
 
 ## Streaming and timing
 
-While the model writes, the screen is rebuilt at most every 300 ms. Controls do nothing until the
-last build, because their handlers arrive at the end of the reply. The metrics line shows:
+While the model writes, a screen is rebuilt at most every 300 ms. Controls do nothing until the
+last build, because their handlers arrive at the end of the reply. The status pill shows the time
+to the first design with text, then the time and cost of the finished designs. Cost is billed cost
+for Claude Haiku (reported by OpenRouter); for the GPT models an estimate from tokens, marked *~*.
+A running total for this browser tab follows. Info has the numbers of each version.
 
-- **First visible screen**: from the click to the first frame load of either variant that shows text.
-- **All variants interactive**: from the click to the load of the last final variant, scripts
-  included. Both variants are stored together once both finish.
-- **Cost**: of the new variants together. Billed cost for Claude Haiku (reported by OpenRouter); for
-  the GPT models an estimate from tokens, marked *~* and *(est.)*. A running total for this browser
-  tab follows.
-
-A variant that is not complete after 20 s, stops early, or hits the token limit fails; nothing of
-it is cached. If both variants fail, a new row goes away; a failed Edit or Refresh leaves the
-row as it was.
+A design that is not complete after 20 s, stops early, or hits the token limit fails; nothing of it
+is cached. A failed Edit or Regenerate leaves the screen as it was.
 
 ## Cache
 
 Every screen is stored under its normalized prompt: lowercase, single spaces, no trailing
-punctuation, with all its variants and the pick. Opening a stored screen makes no model call,
-costs nothing, and shows the same variants every time. The cache lives on the server and survives
-restarts, so every browser shares it. Each screen also stores the variant and click that first
-made it, its level, and each variant's letter. Two browsers opening the same new screen at once
-both generate it; the second pair joins as two more variants. Which rows a mockup showed is
-remembered per browser. A cache file from before levels and letters gets them when the server
-loads it, from the order things were made.
+punctuation. A screen holds its versions (the last one shows) and, until a pick, its open A OR B.
+Opening a stored screen makes no model call and costs nothing. The cache lives on the server and
+survives restarts, so every browser shares it. Each screen also stores the screen and click that
+first made it, and its level. Each side of an A OR B is stored as soon as it finishes, so a design
+that was paid for is kept even if the browser leaves. The current screen is remembered per mockup
+in this browser.
+
+A cache file from before versions keeps only each screen's picked variant; screens that only other
+variants led to go. The old file stays beside the new one as `screen-cache.json.before-versions`.
 
 ## Pickers
 
 - **Model**: Claude Haiku 5.5 (default), GPT-6 Luna (fast), GPT-6.1 Sol Ultrafast. It applies to the
-  next generated screen; cached screens stay as they are, with their maker named in each variant's
-  tooltip and Info.
-- **Device**: Phone (default, at most 390 px wide) or Desktop (at most 1024 px). The model is told which one, and
-  the screen gets a window that wide. Like the model, it applies to the next generated screen.
-  Screens made before devices existed show at 800 px.
-  Loading the page and picking a model each send a short warm-up request to warm the prompt cache.
+  next design made; stored screens stay as they are, with their maker in Info.
+- **Device**: Phone (default, at most 390 px wide) or Desktop (at most 1024 px). The model is told
+  which one, and the screen gets a window that wide. It applies to new screens; Edit and Regenerate
+  keep the screen's own device. Screens made before devices existed show at 800 px.
 - **Theme**: Mockup (default) or Clean. Mockup is black and white with a handwriting font and
   wobbly borders, so a screen reads as a sketch; even the model's chart colours turn grey, except
-  the blue of controls that open a screen. Clean is plain Pico with neutral buttons and links. Switching restyles the screens at once; the model never sees the theme.
+  the blue of controls that open a screen. Clean is plain Pico with neutral buttons and links.
+  Switching restyles the screens at once; the model never sees the theme.
 
+Loading the page and picking a model each send a short warm-up request to warm the prompt cache.
 All three choices are remembered in this browser.
 
 ## Colours
 
 Black and white is the mockup, blue is a control in a mockup that opens another screen, and burnt
-orange is UX Woz itself: the Generate button, picks, flow lines, the tree's flow and the zoom
-slider.
+orange is UX Woz itself: Generate, the current screen, lines, the OR, Nav's path and the picked
+outline.

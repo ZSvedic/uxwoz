@@ -10,10 +10,15 @@ and model settings ([ui-generation.md](ui-generation.md)).
 POST /api/screen  {"app": "A coffee shop ordering app", "action": null, "model": "claude-haiku-5.5", "device": "phone"}
 
 {"type":"meta","key":"a coffee shop ordering app","cached":false,"variants":2}
-{"type":"chunk","variant":0,"text":"<h1>Brew"}
-{"type":"chunk","variant":1,"text":"<h1>Coffee"}
+{"type":"chunk","variant":0,"text":"<title>Menu</title><meta name=\"idea\" ..."}
+{"type":"chunk","variant":1,"text":"<title>Order"}
 ...
-{"type":"done","entry":{...CacheEntry},"variants":[0,1],"failed":[],"link":null}
+{"type":"version","variant":1,"version":{...Version}}
+{"type":"version","variant":0,"version":{...Version}}
+{"type":"done","entry":{...CacheEntry, "versions":[], "proposals":[{...}, {...}]},"link":null}
+
+POST /api/pick  {"key": "a coffee shop ordering app", "index": 1}
+{"entry":{...CacheEntry, "versions":[{...the second proposal}]}}
 ```
 
 ## Packages
@@ -22,7 +27,7 @@ POST /api/screen  {"app": "A coffee shop ordering app", "action": null, "model":
   frame page and devices. `frame.ts` and `keys.ts` run in the browser too, so they use no Node or
   Bun APIs.
 - `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`,
-  `feed.ts`, `tree.ts`, bundled by Bun's HTML import), and the themes in `themes/`.
+  `canvas.ts`, `shell.css`, bundled by Bun's HTML import), and the themes in `themes/`.
 
 There are no runtime dependencies; `@types/bun` and `typescript` are dev-only.
 
@@ -34,40 +39,42 @@ can spend model credits.
 
 - `GET /api/config`: models (id, label, costEstimated), themes (`mockup`, `clean`), devices (id,
   label, width), and the default model, theme and device.
-- `POST /api/screen {app, action?, model?, device?, regenerate?, prompt?, edit?, replace?, from?, variant?, label?}`:
-  NDJSON stream of `meta`, `chunk`*, then `done` or `error`. A new screen makes two variants at
-  once: `meta.variants` is 2 and each chunk names its `variant` (0 or 1). `regenerate` makes one
-  more variant of the screen, cached or not. `replace` (a candidate index) refreshes that variant:
-  one new variant with the next letter and `replaces` set, picked if the old one was; the old one
-  is deleted as by `/api/delete`, and `done.removed` lists the screens that went with it. `prompt` (up to 2,000 characters) is asked for in place
-  of the screen's own action prompt and stored on the new candidates; the key stays the screen's.
-  `edit: {variant, change}` (a candidate index and 1-1,000 characters) makes one variant by sending
-  that candidate's HTML and the change to the model, for that candidate's device and with its
-  prompt (a `prompt` given too is ignored); the new one gets `editOf` and `feedback` (the change).
-  A refresh of it makes the same edit again, or, if that candidate is gone, uses its prompt. An
-  `edit` or `replace` naming no live candidate gets an `error` event.
-  `done.variants` maps each variant to its candidate index, or null if it failed (its message in
-  `failed`); `error` comes when all fail (or, as above, for a bad `edit` or `replace`). A cache hit sends `meta` (cached true, variants 0)
-  and `done` only. With `from` (the key of the screen clicked in), `variant` (the candidate it was
-  clicked in) and `label` (the control's text), a new screen takes that click as its parent, and
-  `done` carries the `Link` it recorded, or null. 400 on an empty or too long `app` (2,000),
-  `action` (500), `prompt` (2,000), an unknown model or device, or a `variant` that is not a whole
-  number. A later screen of a mockup without a first screen gets `error` before any model call,
-  and a reply that finishes after its mockup was deleted is not kept. A closed browser connection aborts the model calls; a variant that
-  already finished is still cached.
+- `POST /api/screen {app, action?, model?, device?, from?, label?}`: a new screen, as an NDJSON
+  stream. A cache hit sends `meta` (cached true, variants 0) and `done` only; a screen whose A OR B
+  is still open comes back with its `proposals`, at no cost. Otherwise two designs stream at once:
+  `meta.variants` is 2 and each `chunk` names its side (`variant` 0 or 1). One random side is asked
+  for a clearly different design. Each side that finishes is stored at once as that side's
+  proposal and sent as `version`; one that fails sends `failed` with its message. The first side to
+  finish makes the screen, with the click as its parent (`from`, the key of the screen clicked in,
+  and `label`, the control's text). `done` ends the stream with the screen and the `Link` the click
+  recorded (or null); `error` comes when both sides fail. A side that finishes after the other was
+  picked, or after the screen, the screen clicked in or its mockup was deleted (even before the
+  screen existed: the cache remembers when each key was deleted), is dropped. A `from` that is not
+  a picked screen gets `error` before any model call. 400 on an empty or too long
+  `app` (2,000) or `action` (500), or an unknown model or device. A later screen of a mockup without
+  a first screen gets `error` before any model call. A closed browser connection aborts the model
+  calls; a side that already finished is still stored.
+- `POST /api/pick {key, index}`: keep proposal `index` as the screen's first version and drop the
+  other; `{entry}`, or 404 if the screen has no open A OR B or that side has not finished.
+- `POST /api/revise {key, change?, model?, device?}`: one new version of a picked screen, streamed
+  like `/api/screen` with one side (`meta.variants` 1, then `chunk`*, `version`, `done`). With
+  `change` (1-1,000 characters) it is an Edit: the model gets the newest version's HTML and the
+  change, and the version stores it as `feedback`. Without it, a Regenerate from the screen's own
+  prompt. Both keep the device of the newest version (`device` only for screens made before
+  devices). 400 on a bad `change`, model or device, 404 for an unknown screen, 409 while its A OR B
+  is open; `error` if the model fails or the screen was deleted meanwhile.
+- `POST /api/undo {key}`: drop the newest version; `{entry}`, or 404 when one or none is left.
 - `GET /api/map?app=…`: `{root, entries: CacheEntry[], links: Link[]}` for one mockup, oldest first.
-- `POST /api/link {from, variant, to, label}`: record a click in variant `variant` of one screen to
-  another one already in the flow (no screen is made); `{link}`, or 404 if a key or the variant is
-  unknown or the two belong to different mockups. The first click from a variant to a screen keeps
-  its label.
+- `POST /api/link {from, to, label}`: record a click in one screen to another one already on the
+  canvas (no screen is made); `{link}`, or 404 if a key is unknown, `from` has no version yet, or
+  the two belong to different mockups. The first click between two screens keeps its label.
 - `GET /api/apps`: `{apps: {app, screens, updatedAt}[]}`, every mockup once as first typed,
   most recently changed first. The History list.
-- `POST /api/choose {key, index}`: set the picked variant; 404 if either is unknown or deleted.
-- `POST /api/delete {key, index}`: delete a variant. Screens the first screen reached before and
-  no longer reaches through live variants go too; a screen still reached by another click takes
-  it as its new parent, so every parent chain leads to the first screen. `{entry, removed, root,
-  entries, links}`: the screen (null once it is gone), the keys removed, and the whole mockup as
-  `/api/map` sends it; 404 if unknown.
+- `POST /api/delete {key}`: delete a screen. Screens the first screen reached before and no longer
+  reaches (through parents and links) go too; a screen still reached by another click takes it as
+  its new parent, and levels follow the parents again. Deleting the first screen deletes the
+  mockup. `{removed, root, entries, links}`: the keys removed and the whole mockup as `/api/map`
+  sends it; 404 if unknown.
 - `POST /api/delete-app {app}`: delete every screen and link of a mockup; `{removed}`.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
@@ -76,35 +83,35 @@ can spend model credits.
 ## Frame messages
 
 The script we add to every screen talks to the app with `postMessage`; the app accepts a message
-only from a variant's own frame.
+only from a card's own frame.
 
 ```ts
-{ uxwoz: 'action', prompt, label }   // a click on a control with an action prompt
-{ uxwoz: 'touch' }                   // any press in the screen: picks this variant
-{ uxwoz: 'peek', on }                // Alt/Option alone pressed (on) or let go, another key, or the
-                                     // screen lost the focus (off): fans out every row while on
+{ uxwoz: 'action', prompt, label }   // a click on a control with an action prompt (ignored on a side of an A OR B)
+{ uxwoz: 'touch' }                   // any press in the screen: it becomes the current screen
+{ uxwoz: 'key', key, code, shift, mod } // a zoom key (⌘/Ctrl with + − 0), ⇧1-3 outside a text field,
+                                     // or Esc: the app handles it as if pressed outside the screen
 { uxwoz: 'size', height, width }     // the screen's size, so the frame fits it (160-8000 px tall;
                                      // the card shows only `width`, at least 280 px)
-{ uxwoz: 'wheel', dx, dy }           // scroll over the screen: dy and dx scroll the page
+{ uxwoz: 'wheel', dx, dy }           // scroll over the screen: dy and dx scroll the canvas
 { uxwoz: 'zoom', dy, x, y }          // Ctrl/Cmd + scroll or a pinch over the screen, at (x, y) in
-                                     // the frame: zooms the feed around that point
+                                     // the frame: zooms the canvas around that point
 ```
 
 ## Types
 
 ```ts
-CacheEntry { key; app; action: string | null; chosen: number; candidates: Candidate[];
-             level: number; parent: { key; variant: number; label } | null }
-             // level 1 is the first screen; parent is the click that first made the screen
-Candidate  { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
+CacheEntry { key; app; action: string | null; level: number; parent: { key; label } | null;
+             versions: Version[]; proposals?: (Version | null)[] }
+             // level 1 is the first screen; parent is the screen and click that first made it.
+             // The last version shows; versions is empty and proposals holds the two sides of
+             // the open A OR B (null until a side finishes) until a pick
+Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
              costEstimated; firstChunkMs; totalMs; finishReason; device?: Device;
-             name?; letter?; prompt?; feedback?; editOf?; deleted?; replaces? }
-             // one variant; entry.chosen is the picked one. name comes from the model's <title>,
-             // letter from the cache ("B" in L2-B), prompt from an edited prompt; feedback is what
-             // an Edit asked for (or older feedback), editOf the index it changed; a deleted one
-             // has html ''; replaces is the index a refresh took over
-Link       { from: key; variant: number; to: key; label; createdAt }
-             // first click from a variant to a screen wins
+             name?; idea?; feedback? }
+             // name comes from the model's <title>, idea from its <meta name="idea">;
+             // feedback is the Edit request that made this version
+Link       { from: key; to: key; label; createdAt }
+             // first click between two screens wins
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast'
 Device     'phone' (390 px wide) | 'desktop' (1024 px)
 key        normalize(app) or normalize(app) + ' » ' + normalize(action); normalize turns » into >; action
@@ -121,7 +128,7 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 | `OPENAI_API_KEY` | GPT-6 Luna, GPT-6.1 Sol |
 | `PORT` | server port, default 3000 |
 | `UXWOZ_HOST` | listen address, default `127.0.0.1` |
-| `UXWOZ_CACHE_FILE` | screen cache `{entries, links}`, default `temp/screen-cache.json` |
+| `UXWOZ_CACHE_FILE` | screen cache `{version: 2, entries, links}`, default `temp/screen-cache.json` |
 | `UXWOZ_RECORD` | `1` makes tests call the live APIs and rewrite `cassettes/` |
 
 ## Tests
