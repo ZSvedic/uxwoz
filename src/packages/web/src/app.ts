@@ -14,7 +14,7 @@ const promptInput = $<HTMLTextAreaElement>('prompt')
 const modelSelect = $<HTMLSelectElement>('model')
 const themeSelect = $<HTMLSelectElement>('theme')
 const deviceSelect = $<HTMLSelectElement>('device')
-const zoomValue = $<HTMLButtonElement>('zoomValue')
+const zoomPct = $('zoomPct')
 const statusBox = $('status')
 const statusText = $('statusText')
 const statusClose = $<HTMLButtonElement>('statusClose')
@@ -58,7 +58,7 @@ const canvas = new Canvas($('stage'), {
   cancel: dropChoice,
   focus: (key) => setCurrent(key),
   tool: onTool,
-  zoomed: (z) => { zoomValue.textContent = `${Math.round(z * 100)}%` },
+  zoomed: (z) => { zoomPct.textContent = `${Math.round(z * 100)}%` },
 })
 
 // ---- Views ------------------------------------------------------------------------------------
@@ -73,7 +73,7 @@ function nameOf(e: CacheEntry, v: Version): string {
 }
 
 /** A screen's label, e.g. "L2 Camera". */
-const labelOf = (e: CacheEntry) => (e.versions.length ? `L${e.level} ${nameOf(e, e.versions.at(-1)!)}` : `L${e.level} New screen`)
+const labelOf = (e: CacheEntry) => (e.versions.length ? `L${e.level} ${nameOf(e, e.versions.at(-1)!)}` : `L${e.level} New screen · pick one`)
 
 const widthOf = (d: Device | undefined) => (d ? DEVICES[d].width : LEGACY_WIDTH)
 const ideaOf = (v: Version) => v.idea ?? screenIdea(v.html)
@@ -116,6 +116,7 @@ async function draw() {
   generate.hidden = !!state.app && !generate.classList.contains('open')
   generate.classList.toggle('pop', !!state.app)
   renderDrawer()
+  renderToolbar()
   const theme = themeSelect.value
   const css = await themeCss(theme)
   if (theme !== themeSelect.value) return // a newer draw shows the newer theme
@@ -633,11 +634,6 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('.example')) {
   b.addEventListener('click', () => { promptInput.value = b.dataset.prompt ?? b.textContent ?? ''; generate.requestSubmit() })
 }
 
-$('newMockup').addEventListener('click', () => {
-  generate.classList.toggle('open')
-  draw()
-  if (!generate.hidden) promptInput.focus()
-})
 
 // While a screen streams, the new theme applies when it finishes.
 themeSelect.addEventListener('change', async () => {
@@ -653,7 +649,6 @@ deviceSelect.addEventListener('change', () => store.set('uxwoz:device', deviceSe
 
 $('zoomIn').addEventListener('click', () => canvas.step(1))
 $('zoomOut').addEventListener('click', () => canvas.step(-1))
-zoomValue.addEventListener('click', () => canvas.setZoom(1))
 $('fitScreen').addEventListener('click', () => fitScreen())
 
 const fitAll = () => canvas.fit()
@@ -673,25 +668,160 @@ addEventListener('keydown', (e: KeyboardEvent) => {
   else if (e.code === 'Digit3') fitWidth()
 })
 
-/** Fill the Recent list with every mockup in the cache, newest first. */
+let recent: { app: string; screens: number }[] = []
+
+/** Fill the Recent lists (in the generate panel and the project menu) with every mockup, newest first. */
 async function loadRecent() {
   const res = await fetch('/api/apps').catch(() => null)
   if (!res?.ok) return
-  const { apps } = await res.json() as { apps: { app: string; screens: number }[] }
-  const list = $('recent')
-  list.replaceChildren(...apps.map((a) => {
-    const b = document.createElement('button')
-    b.type = 'button'
-    b.title = a.app
-    const name = document.createElement('span'), n = document.createElement('small')
-    name.textContent = a.app
-    n.textContent = `${a.screens} screen${a.screens === 1 ? '' : 's'}`
-    b.append(name, n)
-    b.addEventListener('click', () => { promptInput.value = a.app; generate.requestSubmit() })
-    return b
-  }))
-  $('recentBox').hidden = apps.length === 0
+  recent = (await res.json() as { apps: { app: string; screens: number }[] }).apps
+  $('recent').replaceChildren(...recent.map((a) => item(a.app, `${a.screens} screen${a.screens === 1 ? '' : 's'}`, () => open(a.app))))
+  $('recentBox').hidden = recent.length === 0
+  renderToolbar()
 }
+
+/** A row in a list or menu: a label, a note on the right, and what a click does. */
+function item(label: string, note: string, run: () => void, cls = 'item'): HTMLButtonElement {
+  const b = document.createElement('button')
+  b.type = 'button'
+  b.className = cls
+  b.title = label
+  const name = document.createElement('span'), n = document.createElement('small')
+  name.textContent = label
+  n.textContent = note
+  b.append(name, n)
+  b.addEventListener('click', () => { closeMenus(); run() })
+  return b
+}
+
+/** Open a mockup by its prompt, as if typed. */
+function open(app: string) {
+  promptInput.value = app
+  generate.requestSubmit()
+}
+
+// ---- The toolbar: project menu, Nav, zoom --------------------------------------------------------
+
+const MENUS: [string, string][] = [['projectButton', 'projectMenu'], ['navButton', 'navMenu'], ['zoomValue', 'zoomMenu']]
+
+function closeMenus() {
+  for (const [, m] of MENUS) $(m).hidden = true
+}
+
+for (const [b, m] of MENUS) $(b).addEventListener('click', () => {
+  const show = $(m).hidden
+  closeMenus()
+  if (!show) return
+  renderToolbar()
+  if (m === 'navMenu') renderNav()
+  $(m).hidden = false
+  $(m).querySelector<HTMLElement>('.current, .item')?.focus()
+})
+
+// A press outside a menu closes it; so does a click into a screen (the page loses focus to the frame).
+document.addEventListener('pointerdown', (e) => {
+  const t = e.target as Node
+  if (!MENUS.some(([b, m]) => $(b).contains(t) || $(m).contains(t))) closeMenus()
+  if (state.app && generate.classList.contains('open') && !generate.contains(t) && !$('projectMenu').contains(t)) closeGenerate()
+})
+addEventListener('blur', closeMenus)
+addEventListener('keydown', (e: KeyboardEvent) => {
+  if (e.key !== 'Escape') return
+  closeMenus()
+  if (state.app && generate.classList.contains('open')) closeGenerate()
+})
+
+function openGenerate() {
+  generate.classList.add('open')
+  promptInput.value = ''
+  draw()
+  promptInput.focus()
+}
+
+function closeGenerate() {
+  generate.classList.remove('open')
+  draw()
+}
+
+/** The project button names the open mockup; Nav names the current screen; the menus list what they offer. */
+function renderToolbar() {
+  const app = state.app
+  $('projectName').textContent = app ? (app.length > 40 ? app.slice(0, 39) + '…' : app) : 'New mockup'
+  $('projectButton').title = app ?? 'Make a new mockup'
+  $('menuFoot').hidden = !app
+  $('menuRecentHead').hidden = !recent.length
+  $('menuRecent').replaceChildren(...recent.map((a) => item(a.app, `${a.screens}`, () => open(a.app))))
+  const nav = $<HTMLButtonElement>('navButton')
+  nav.hidden = !app || !state.entries.size
+  const cur = state.current ? state.entries.get(state.current) : undefined
+  $('navName').textContent = cur ? labelOf(cur) : 'Screens'
+  if (!$('navMenu').hidden) renderNav()
+}
+
+/** Every screen as an indented tree, children in the order they were made; the current path marked. */
+function renderNav() {
+  const menu = $('navMenu')
+  const all = [...state.entries.values()]
+  const path = new Set<string>()
+  for (let e = state.current ? state.entries.get(state.current) : undefined; e && !path.has(e.key); e = e.parent ? state.entries.get(e.parent.key) : undefined) path.add(e.key)
+  const rows: HTMLElement[] = []
+  const seen = new Set<string>()
+  const walk = (e: CacheEntry, depth: number) => {
+    if (seen.has(e.key)) return
+    seen.add(e.key)
+    const b = item(labelOf(e), e.parent?.label ? `via ${e.parent.label}` : '', () => goTo(e.key))
+    b.style.setProperty('--depth', String(depth))
+    b.classList.toggle('path', path.has(e.key))
+    b.classList.toggle('current', e.key === state.current)
+    rows.push(b)
+    for (const k of all) if (k.parent?.key === e.key) walk(k, depth + 1)
+  }
+  // The first screen first; screens whose parent is gone after it, as their own trees.
+  for (const e of all) if (!e.parent || !state.entries.has(e.parent.key)) walk(e, 0)
+  for (const e of all) walk(e, 0)
+  menu.replaceChildren(...rows)
+}
+
+/** Make a screen current and bring it into view; an open A OR B is fitted instead. */
+function goTo(key: string) {
+  const e = state.entries.get(key)
+  if (!e) return
+  if (e.versions.length) { setCurrent(key); canvas.reveal(key) } else canvas.fit(key, { top: true })
+}
+
+$('menuNew').addEventListener('click', () => { closeMenus(); openGenerate() })
+for (const b of document.querySelectorAll<HTMLButtonElement>('.example')) {
+  $('menuTemplates').append(item(b.textContent ?? '', '', () => open(b.dataset.prompt ?? b.textContent ?? '')))
+}
+$('startOver').addEventListener('click', () => { closeMenus(); deleteApp(true).catch((e) => showError(String(e))) })
+$('deleteApp').addEventListener('click', () => { closeMenus(); deleteApp(false).catch((e) => showError(String(e))) })
+
+/** Delete every screen of the open mockup, after asking; then make its first screen again, or close it. */
+async function deleteApp(again: boolean) {
+  const app = state.app
+  if (!app) return
+  const n = state.entries.size
+  const what = n === 1 ? 'the only screen of this mockup' : `all ${n} screens of this mockup`
+  if (!confirm(again ? `Start over? This deletes ${what} and makes its first screen again.` : `Delete ${what}?`)) return
+  state.busy?.abort()
+  const res = await post('/api/delete-app', { app }).catch(() => null)
+  if (!res?.ok) return showError('Could not delete the mockup')
+  store.set(currentKey(app), '')
+  loadRecent()
+  if (again) return start(app)
+  closeMockup(`Deleted ${what}.`)
+}
+
+for (const b of $('zoomMenu').querySelectorAll<HTMLButtonElement>('[data-zoom]')) b.addEventListener('click', () => {
+  closeMenus()
+  const z = b.dataset.zoom!
+  if (z === 'in') canvas.step(1)
+  else if (z === 'out') canvas.step(-1)
+  else if (z === 'all') fitAll()
+  else if (z === 'screen') fitScreen()
+  else if (z === 'width') fitWidth()
+  else canvas.setZoom(Number(z))
+})
 
 const warmUp = (model: string) => post('/api/warmup', { model }).catch(() => {})
 

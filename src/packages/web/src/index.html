@@ -10,14 +10,42 @@
 <header class="toolbar">
   <div class="tb-left">
     <strong class="logo">UX Woz</strong>
-    <button id="newMockup" type="button" title="Make a new mockup">New mockup</button>
+    <button id="projectButton" type="button" class="menu-button" aria-haspopup="menu" title="Mockup: new, templates, recent, start over, delete">
+      <span id="projectName">New mockup</span> <span class="caret">▾</span></button>
+    <div id="projectMenu" class="menu" role="menu" hidden>
+      <button type="button" class="item" id="menuNew">＋ New mockup…</button>
+      <h3>Templates</h3>
+      <div id="menuTemplates"></div>
+      <h3 id="menuRecentHead">Recent mockups</h3>
+      <div id="menuRecent" class="menu-scroll"></div>
+      <div class="menu-foot" id="menuFoot">
+        <button type="button" id="startOver" title="Start over: delete every screen and make the first one again">↺ Start over</button>
+        <button type="button" id="deleteApp" class="danger" title="Delete this mockup">✕ Delete</button>
+      </div>
+    </div>
   </div>
-  <div class="tb-mid"></div>
+  <div class="tb-mid">
+    <button id="navButton" type="button" class="menu-button" aria-haspopup="menu" title="Every screen of this mockup" hidden>
+      <span id="navName"></span> <span class="caret">▾</span></button>
+    <div id="navMenu" class="menu nav-menu" role="menu" hidden></div>
+  </div>
   <div class="tb-right zoom">
-    <button id="zoomOut" type="button" title="Zoom out (⌘−)">−</button>
-    <button id="zoomValue" type="button" title="Zoom">100%</button>
-    <button id="zoomIn" type="button" title="Zoom in (⌘+)">+</button>
-    <button id="fitScreen" type="button" title="Fit screen (⇧2)">⤢</button>
+    <button id="zoomOut" type="button" class="wide-only" title="Zoom out (⌘−)">−</button>
+    <button id="zoomValue" type="button" class="menu-button" aria-haspopup="menu" title="Zoom"><span id="zoomPct">100%</span> <span class="caret">▾</span></button>
+    <button id="zoomIn" type="button" class="wide-only" title="Zoom in (⌘+)">+</button>
+    <button id="fitScreen" type="button" class="wide-only" title="Fit screen (⇧2)">⤢</button>
+    <div id="zoomMenu" class="menu zoom-menu" role="menu" hidden>
+      <button type="button" class="item" data-zoom="in">Zoom in <kbd>⌘+</kbd></button>
+      <button type="button" class="item" data-zoom="out">Zoom out <kbd>⌘−</kbd></button>
+      <hr>
+      <button type="button" class="item" data-zoom="0.5">50% </button>
+      <button type="button" class="item" data-zoom="1">100% <kbd>⌘0</kbd></button>
+      <button type="button" class="item" data-zoom="2">200% </button>
+      <hr>
+      <button type="button" class="item" data-zoom="all">Fit all <kbd>⇧1</kbd></button>
+      <button type="button" class="item" data-zoom="screen">Fit screen <kbd>⇧2</kbd></button>
+      <button type="button" class="item" data-zoom="width">Fit screen width <kbd>⇧3</kbd></button>
+    </div>
   </div>
 </header>
 <div class="workspace">

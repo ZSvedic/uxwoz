@@ -27,7 +27,38 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .logo { font-size: 15px; white-space: nowrap; color: var(--accent); }
 .toolbar button { padding: 4px 9px; border-color: transparent; background: none; }
 .toolbar button:hover:not(:disabled) { border-color: var(--line); background: var(--bg); }
-.zoom #zoomValue { min-width: 4.5em; font-variant-numeric: tabular-nums; }
+.zoom #zoomValue { min-width: 5em; font-variant-numeric: tabular-nums; }
+.tb-left, .tb-mid, .tb-right { position: relative; }
+.menu-button { display: inline-flex; gap: 4px; align-items: center; max-width: 100%; min-width: 0; font-weight: 600; }
+.menu-button > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.caret { color: var(--muted); font-size: 11px; }
+#projectButton { max-width: min(36ch, 40vw); }
+#navButton { max-width: min(40ch, 36vw); }
+@media (max-width: 900px) { .wide-only { display: none; } .logo { display: none; } }
+/* Dropdowns from the toolbar. */
+.menu { position: absolute; top: calc(100% + 6px); z-index: 30; min-width: 240px; max-width: min(440px, calc(100vw - 20px));
+  max-height: calc(100vh - 70px); overflow: auto; display: flex; flex-direction: column; padding: 6px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); font-size: 13px; }
+.tb-left .menu { left: 0; }
+.tb-mid .menu { left: 50%; transform: translateX(-50%); }
+.tb-right .menu { right: 0; }
+.menu h3 { margin: 8px 8px 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+.menu hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.menu .item { display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left; border: 0; background: none; padding: 5px 8px;
+  border-radius: 6px; }
+.menu .item:hover, .menu .item:focus-visible { background: var(--bg); }
+.menu .item > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu .item small, .menu kbd { color: var(--muted); font: inherit; margin-left: auto; white-space: nowrap; }
+.menu-scroll { max-height: 14em; overflow: auto; }
+.menu-foot { display: flex; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.menu-foot button { flex: 1; }
+.menu-foot .danger:hover { color: var(--err); border-color: var(--err); }
+/* Nav: every screen as an indented tree; the path to the current screen in the accent colour. */
+.nav-menu .item { padding-left: calc(8px + var(--depth, 0) * 16px); }
+.nav-menu .item b { font-variant-numeric: tabular-nums; color: var(--muted); }
+.nav-menu .item.path, .nav-menu .item.path b { color: var(--accent); }
+.nav-menu .item.current { font-weight: 700; background: var(--bg); }
+.nav-menu .via { color: var(--muted); font-size: 12px; }
 
 /* The workspace: the canvas, the generate panel over it, the drawer at the right. */
 .workspace { flex: 1; min-height: 0; display: flex; position: relative; }
@@ -44,6 +75,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   border-radius: 12px; box-shadow: var(--shadow); max-height: calc(100% - 24px); overflow: auto; }
 .generate.pop { left: 10px; top: 8px; transform: none; width: min(560px, calc(100% - 20px)); }
 .generate h2 { margin: 0; font-size: 18px; }
+.generate.pop .gen-list { display: none; }
 .generate h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 #prompt { width: 100%; resize: none; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
   font-size: 15px; field-sizing: content; min-height: 3.2em; max-height: 14em; }
