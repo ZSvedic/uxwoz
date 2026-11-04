@@ -59,8 +59,8 @@ Menus close on Esc, on a press outside them, or on a click into a screen.
 ## Generate panel
 
 The prompt box takes a product description (up to 2,000 characters) and grows with it; Enter makes
-the mockup, Shift+Enter adds a line. Beside **Generate** sit the **Model**, **Device** and **Theme**
-pickers. With no mockup open, the panel sits large in the middle of the canvas with Templates and
+the mockup, Shift+Enter adds a line. Under it, the **Model**, **Device** and **Theme** pickers sit
+in one row, and a large **Generate** button below them. With no mockup open, the panel sits large in the middle of the canvas with Templates and
 Recent mockups under it. With one open, **New mockup…** shows it as a popover under the project
 menu; Esc or a press outside closes it. A prompt seen before opens its mockup from the cache, at no
 cost, with the current screen it had last time in this browser. A reload opens the mockup that
@@ -77,7 +77,9 @@ hidden when the user branches.
 - **Lines**: one thin orange line from a parent to each child it made: straight down in the same
   column, an elbow for a branch. A click back to a screen already there draws no line.
 - **Names**: above each screen, its level and the short name the model gave it (*L2 Camera*), and
-  under that, its idea. Names and ideas keep their size on screen at any zoom.
+  under that, its idea, on up to two lines; a longer idea ends in **more**, which shows the rest
+  (and **less** folds it again). Names and ideas keep their size on screen at any zoom; below
+  50% only the names show. Hovering a name shows it whole.
 - **Current screen**: the one the user last picked, clicked in, or chose in Nav. It has an orange
   outline and its rail at full strength; other screens show their rail on hover. Fit screen uses
   it.
@@ -89,11 +91,13 @@ hidden when the user branches.
   steps.
 - **Size**: a screen is only as wide as its content; the device width is the most it takes, even
   when its content cannot shrink to fit. The model is told to start small.
+- **Opening a mockup** fits its current screen, and fits it again once the screen has its real
+  size. **Fit screen** keeps a tall screen readable and shows its top, like the A OR B fit.
 - **Pan and zoom**: scroll, or drag the empty canvas, to pan. Pinch or Ctrl/Cmd + scroll zooms
   around the pointer, also over a screen, from 10% to 200%. The dot grid's spacing follows the
   zoom.
-- **Status pill**: at the bottom of the canvas, what is happening and what it cost (*2 designs in
-  5.3 s · $0.0011 · this session $0.0011 · pick one*). Errors show there in red until closed.
+- **Errors** show in a red pill at the bottom of the canvas until closed, or until the next screen
+  or change starts. Time and cost are in Info.
 
 ## A OR B
 
@@ -102,8 +106,11 @@ same time. One of them, on a random side, is asked to be a clearly different des
 says nothing about which is which.
 
 - **Fit and restore**: before an A OR B shows, the canvas remembers its zoom and scroll, then fits
-  both designs to the stage's width, top first. After the pick, the zoom and scroll come back, and
-  the picked screen scrolls into view.
+  both designs to the stage's width, top first. Once both have finished and taken their real size
+  (usually narrower than the device), it fits them again, height included, unless the user has
+  scrolled, zoomed, used a fit or chosen a screen in Nav meanwhile; a very tall pair keeps a readable
+  zoom and shows its top. After the pick, the zoom and scroll come back, and the picked screen
+  scrolls into view. A new mockup's first screen has no view to come back to: it is fitted instead.
 - **The idea** sits above each side in larger type: one sentence the model writes about the design
   (*One big clean button on top*).
 - **Locked previews**: both stream in live, and their scripts run once finished, so charts draw.
@@ -160,20 +167,26 @@ forms, settings and tab-bar sections screens of their own, so a mockup has scree
 through. A plain link the screen does not handle asks for "the screen shown after clicking
 *label*"; in-page links (`#…`) stay put. Other controls (filters, inputs) work inside the screen.
 Each request lists the screens that already exist, and the model links to them by their exact
-prompt, and to the first screen with `home`. Only a real click opens a screen.
+prompt, back to the screen before with `back`, and to the first screen with `home`. Only a real
+click opens a screen.
 
+- **Back and Home** never make a screen. A control labelled *Home*, *Go home*, *Back to home* or
+  *Main menu* goes to the first screen. A control with the action `back`, or labelled *Back*,
+  *Go back*, *Return*, *Back to …* (*Back to cats*) or only an arrow (*←*, *‹*, *«*), goes to the
+  screen that opened this one (the first screen, if it has none). Icons and arrows in front of a
+  label (*🏠 Home*, *⬅ Back*, icon-font words like *arrow_back*) do not count. The label wins over
+  the action prompt, since models sometimes give Back a long prompt for the home screen.
 - A click that leads to a screen already on the canvas makes it current and scrolls to it. It is
-  stored as a link, with no line. This is how "Back to menu" works.
+  stored as a link, with no line.
 - One screen is made at a time: while one is being made or changed, a click that would open
-  another says so in the status pill and does nothing.
+  another does nothing, and a note says so for a moment at the bottom of the canvas.
 
 ## Streaming and timing
 
 While the model writes, a screen is rebuilt at most every 300 ms. Controls do nothing until the
-last build, because their handlers arrive at the end of the reply. The status pill shows the time
-to the first design with text, then the time and cost of the finished designs. Cost is billed cost
-for Claude Haiku (reported by OpenRouter); for the GPT models an estimate from tokens, marked *~*.
-A running total for this browser tab follows. Info has the numbers of each version.
+last build, because their handlers arrive at the end of the reply. Info shows each version's time
+to first text, total time and cost. Cost is billed cost for Claude Haiku (reported by OpenRouter);
+for the GPT models an estimate from tokens, marked *~* and *(est.)*.
 
 A design that is not complete after 20 s, stops early, or hits the token limit fails; nothing of it
 is cached. A failed Edit or Regenerate leaves the screen as it was.
@@ -197,14 +210,16 @@ variants led to go. The old file stays beside the new one as `screen-cache.json.
   next design made; stored screens stay as they are, with their maker in Info.
 - **Device**: Phone (default, at most 390 px wide) or Desktop (at most 1024 px). The model is told
   which one, and the screen gets a window that wide. It applies to new screens; Edit and Regenerate
-  keep the screen's own device. Screens made before devices existed show at 800 px.
+  keep the screen's own device. While a mockup is open, the picker shows the device of its first
+  screen, so its next screens, and Start over, match it; **New mockup…** and closing the mockup
+  bring back the saved choice. Screens made before devices existed show at 800 px.
 - **Theme**: Mockup (default) or Clean. Mockup is black and white with a handwriting font and
   wobbly borders, so a screen reads as a sketch; even the model's chart colours turn grey, except
   the blue of controls that open a screen. Clean is plain Pico with neutral buttons and links.
   Switching restyles the screens at once; the model never sees the theme.
 
 Loading the page and picking a model each send a short warm-up request to warm the prompt cache.
-All three choices are remembered in this browser.
+All three choices are remembered in this browser, when they change and again on Generate.
 
 ## Colours
 

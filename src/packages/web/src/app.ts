@@ -1,9 +1,9 @@
 // The browser side: the generate panel, the canvas of picked screens, a new screen's A OR B
 // (streamed side by side, then picked), click-to-navigate, the rail's tools (Edit, Regenerate, Undo,
-// Info, Delete) with the drawer for Edit and Info, pickers, recent mockups, the status pill.
+// Info, Delete) with the drawer for Edit and Info, pickers, recent mockups, errors in a pill.
 
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
-import { normalizePrompt, screenKey } from '@uxwoz/core/keys'
+import { normalizePrompt, screenKey, wayBack } from '@uxwoz/core/keys'
 import type { CacheEntry, Link, Version } from '@uxwoz/core'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
@@ -15,9 +15,8 @@ const modelSelect = $<HTMLSelectElement>('model')
 const themeSelect = $<HTMLSelectElement>('theme')
 const deviceSelect = $<HTMLSelectElement>('device')
 const zoomPct = $('zoomPct')
-const statusBox = $('status')
-const statusText = $('statusText')
-const statusClose = $<HTMLButtonElement>('statusClose')
+const errorBox = $('error')
+const errorText = $('errorText')
 const drawer = $('drawer')
 const changeInput = $<HTMLTextAreaElement>('change')
 
@@ -47,7 +46,6 @@ const state = {
   before: null as View | null,
   /** Counts mockups opened, so a slower earlier open gives way to a newer one. */
   starts: 0,
-  spent: 0,
   css: {} as Record<string, string>,
 }
 
@@ -154,8 +152,7 @@ class StreamRenderer {
   private shown: string | null = null
   private lastBuild = 0
   private timer: ReturnType<typeof setTimeout> | null = null
-  private visible = false
-  constructor(private id: string, private css: string, private onVisible: () => void) {}
+  constructor(private id: string, private css: string) {}
 
   push(text: string) {
     this.raw += text
@@ -178,32 +175,32 @@ class StreamRenderer {
     if (fragment === this.shown || !hasVisibleText(fragment)) return
     this.lastBuild = now
     this.shown = fragment
-    canvas.show(this.id, fragment, false, this.css, this.visible ? undefined : () => { this.visible = true; this.onVisible() })
+    canvas.show(this.id, fragment, false, this.css)
   }
 }
 
-// ---- Status -----------------------------------------------------------------------------------
+// ---- Errors -----------------------------------------------------------------------------------
 
 const fmtS = (ms: number) => `${(ms / 1000).toFixed(ms < 1000 ? 2 : 1)} s`
 const fmtUsd = (v: number) => `$${v < 0.01 ? v.toFixed(4) : v.toFixed(3)}`
 const modelLabel = (id: string) => [...modelSelect.options].find((o) => o.value === id)?.text ?? id
 
-/** The pill at the bottom of the canvas. An error stays until closed; anything else replaces it. */
-function status(html: string) {
-  statusBox.classList.remove('error')
-  statusClose.hidden = true
-  statusText.innerHTML = html
-  statusBox.hidden = !html
+/** An error shows in a red pill at the bottom of the canvas until closed, or until the next one. */
+function showError(msg: string | null) {
+  errorText.textContent = msg ?? ''
+  errorBox.hidden = !msg
 }
 
-function showError(msg: string) {
-  statusBox.classList.add('error')
-  statusClose.hidden = false
-  statusText.textContent = msg
-  statusBox.hidden = false
-}
+$('errorClose').addEventListener('click', () => showError(null))
 
-statusClose.addEventListener('click', () => status(''))
+let hintTimer: ReturnType<typeof setTimeout> | undefined
+/** A click that would start a second screen while one is being made says why nothing happens, briefly. */
+function hint() {
+  const h = $('hint')
+  h.hidden = false
+  clearTimeout(hintTimer)
+  hintTimer = setTimeout(() => { h.hidden = true }, 2500)
+}
 
 async function* readEvents(res: Response): AsyncGenerator<ScreenEvent> {
   if (!res.ok || !res.body) {
@@ -234,14 +231,14 @@ const post = (url: string, body: object, signal?: AbortSignal) =>
  */
 async function openScreen(action: string | null, from: string | null, label: string | null) {
   const app = state.app!
+  showError(null)
   state.busy?.abort()
   const ctrl = new AbortController()
   state.busy = ctrl
-  const t0 = performance.now()
   const model = modelSelect.value
   const device = deviceSelect.value as Device
-  let first: number | null = null
-  status('Asking for the screen…')
+  /** When the A OR B was fitted: if the user has not moved the canvas since, it is fitted again once both finish. */
+  let fitted: number | null = null
   try {
     const css = await themeCss(themeSelect.value)
     const res = await post('/api/screen', { app, action, model, device, from, label }, ctrl.signal)
@@ -252,22 +249,21 @@ async function openScreen(action: string | null, from: string | null, label: str
         m = { key: ev.key, parent: from, device, sides: [] }
         m.sides = Array.from({ length: ev.variants }, (_, i) => ({
           version: null, error: null,
-          stream: new StreamRenderer(`${ev.key}#${i}`, css, () => {
-            first ??= performance.now() - t0
-            status(`First design in <b>${fmtS(first)}</b> · making ${ev.variants} with ${modelLabel(model)}…`)
-          }),
+          stream: new StreamRenderer(`${ev.key}#${i}`, css),
         }))
         state.making = m
-        if (!state.before && state.app) state.before = canvas.view()
+        // The view to come back to after the pick; a new mockup's first screen has none.
+        if (!state.before && state.entries.size) state.before = canvas.view()
         await draw()
         canvas.fit(ev.key, { top: true })
+        fitted = performance.now()
       } else if (ev.type === 'chunk') m?.sides[ev.variant]?.stream?.push(ev.text)
       else if (ev.type === 'version' || ev.type === 'failed') {
         const s = m?.sides[ev.variant]
         if (!s) continue
         s.stream?.cancel()
         s.stream = null
-        if (ev.type === 'version') { s.version = ev.version; state.spent += ev.version.costUsd ?? 0 }
+        if (ev.type === 'version') s.version = ev.version
         else { s.error = ev.message; state.failed.set(`${m!.key}#${ev.variant}`, ev.message) }
         draw()
       } else if (ev.type === 'error') throw new Error(ev.message)
@@ -278,18 +274,13 @@ async function openScreen(action: string | null, from: string | null, label: str
         if (state.making === m) state.making = null
         loadRecent()
         await draw()
-        if (m) {
-          const made = (ev.entry.proposals ?? []).filter(Boolean) as Version[]
-          const cost = made.reduce((t, v) => t + (v.costUsd ?? 0), 0), est = made.some((v) => v.costEstimated)
-          status(`${made.length === 1 ? 'One design' : `${made.length} designs`} in <b>${fmtS(performance.now() - t0)}</b> · `
-            + `<b>${est ? '~' : ''}${fmtUsd(cost)}</b> · this session ${fmtUsd(state.spent)} · pick one`)
-        } else {
+        if (m) refit(ev.entry.key, fitted)
+        else {
           // Already made (another tab, or a reload while its A OR B was open).
-          status('<b>Cached</b> · $0')
           if (ev.entry.versions.length) setCurrent(ev.entry.key)
           else {
             if (!state.before) state.before = canvas.view()
-            canvas.fit(ev.entry.key, { top: true })
+            fitChoice(ev.entry.key)
           }
         }
       }
@@ -305,6 +296,30 @@ async function openScreen(action: string | null, from: string | null, label: str
     if (state.busy === ctrl) state.busy = null
     draw().catch((e) => showError(String(e)))
   }
+}
+
+/**
+ * Once a screen (or both designs of an A OR B) has its final size, fit it again snugly: it is
+ * often smaller than the window it was fitted for. Not when the user has moved the view since
+ * `fitted`, and not for an A OR B that was picked meanwhile (`choice`).
+ */
+async function refit(key: string, fitted: number | null, choice = true) {
+  await canvas.sized(key)
+  const e = state.entries.get(key)
+  if (fitted == null || !e || (choice && e.versions.length) || canvas.moved > fitted) return
+  canvas.fit(key, { snug: true })
+}
+
+/** Fit an A OR B that is already finished: by width at once, then snugly once both have their size. */
+function fitChoice(key: string) {
+  canvas.fit(key, { top: true })
+  refit(key, performance.now())
+}
+
+/** Fit a picked screen now, and again once it has its size. */
+function fitScreenSoon(key: string) {
+  canvas.fit(key, { snug: true })
+  refit(key, performance.now(), false)
 }
 
 /** Go back to the view from before an A OR B, if there was one. */
@@ -337,10 +352,8 @@ async function pick(key: string, index: number) {
     canvas.rename(`${key}#${index}`, key)
     state.current = key
     saveCurrent()
-    status(`Kept <b>${labelOf(entry)}</b>`)
     await draw()
-    back()
-    canvas.reveal(key, false)
+    if (state.before) { back(); canvas.reveal(key, false) } else fitScreenSoon(key)
   } finally {
     state.picking = false
   }
@@ -357,26 +370,33 @@ async function dropChoice(key: string) {
   const root = state.app && screenKey(state.app, null) === key
   await post('/api/delete', { key }).catch(() => null)
   state.entries.delete(key)
-  if (root) return closeMockup('Dropped both designs.')
+  if (root) return closeMockup()
   back()
-  status('Dropped both designs.')
   await draw()
+}
+
+/** Where a click leads: back to the screen that opened this one, home to the first screen, or to the screen of its action prompt. */
+function target(app: string, from: string, prompt: string, label: string): string {
+  const way = wayBack(prompt, label)
+  const parent = state.entries.get(from)?.parent?.key
+  if (way === 'back' && parent && state.entries.has(parent)) return parent
+  return way ? screenKey(app, null) : screenKey(app, prompt)
 }
 
 /** A click inside a picked screen: open the screen it leads to, or go to it when it is already there. */
 function onAction(from: string, prompt: string, label: string) {
   const app = state.app
   if (!app) return
-  const to = screenKey(app, prompt)
+  const to = target(app, from, prompt, label)
   setCurrent(from)
   if (to === from) return
   const there = state.entries.get(to)
   if (there || state.making?.key === to) {
     if (there) recordLink(from, to, label)
-    if (there?.versions.length) { setCurrent(to); canvas.reveal(to) } else canvas.fit(to, { top: true })
+    if (there?.versions.length) { setCurrent(to); canvas.reveal(to) } else fitChoice(to)
     return
   }
-  if (state.busy) return status('One screen at a time: wait until this one is made.')
+  if (state.busy) return hint()
   openScreen(prompt, from, label)
 }
 
@@ -433,17 +453,16 @@ function onTool(key: string, tool: string) {
 async function revise(key: string, change: string | null) {
   const e = state.entries.get(key)
   if (!e?.versions.length) return
-  if (state.busy) return status('One screen at a time: wait until this one is made.')
+  if (state.busy) return hint()
+  showError(null)
   const ctrl = new AbortController()
   state.busy = ctrl
   state.revising = { key, change }
-  const t0 = performance.now()
   const model = modelSelect.value
-  status(change ? `Making the change with ${modelLabel(model)}…` : `Making a new design with ${modelLabel(model)}…`)
   draw()
   try {
     const css = await themeCss(themeSelect.value)
-    const stream = new StreamRenderer(key, css, () => {})
+    const stream = new StreamRenderer(key, css)
     const res = await post('/api/revise', { key, change, model, device: deviceSelect.value }, ctrl.signal)
     let finished = false
     try {
@@ -454,12 +473,10 @@ async function revise(key: string, change: string | null) {
           finished = true
           stream.cancel()
           state.entries.set(key, ev.entry)
-          const v = ev.entry.versions.at(-1)!
-          state.spent += v.costUsd ?? 0
           state.revising = null
           if (change) changeInput.value = ''
-          status(`${change ? 'Changed' : 'New design'} in <b>${fmtS(performance.now() - t0)}</b> · <b>${v.costEstimated ? '~' : ''}${fmtUsd(v.costUsd ?? 0)}</b>`
-            + ` · ↶ Undo brings the old one back`)
+          // The new version may be taller or narrower: keep it in view once it has its size.
+          canvas.sized(key).then(() => canvas.reveal(key))
         }
       }
     } finally {
@@ -482,7 +499,6 @@ async function undo(key: string) {
   if (!res?.ok) return showError('Nothing to undo')
   const { entry } = await res.json() as { entry: CacheEntry }
   state.entries.set(key, entry)
-  status("Back to the version before")
   draw()
 }
 
@@ -505,11 +521,10 @@ async function removeScreen(key: string) {
   if (!res?.ok) return showError('Could not delete the screen')
   const map = await res.json() as { removed: string[]; entries: CacheEntry[]; links: Link[] }
   loadRecent()
-  if (root) return closeMockup('Deleted the mockup.')
+  if (root) return closeMockup()
   const parent = e.parent?.key
   applyMap(map)
   setCurrent(parent && state.entries.has(parent) ? parent : screenKey(state.app, null))
-  status(`Deleted ${map.removed.length === 1 ? 'one screen' : `${map.removed.length} screens`}`)
   if (state.current) canvas.reveal(state.current)
 }
 
@@ -592,6 +607,7 @@ addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape' && st
 
 /** Open a mockup: its screens from the cache, else (unless `make` is false) its first screen as A OR B. */
 async function start(app: string, make = true) {
+  showError(null)
   state.busy?.abort()
   state.busy = null
   state.making = null
@@ -611,15 +627,26 @@ async function start(app: string, make = true) {
   const root = screenKey(app, null)
   const saved = store.get(currentKey(app))
   state.current = saved && state.entries.get(saved)?.versions.length ? saved : state.entries.get(root)?.versions.length ? root : null
+  // A mockup keeps the device it was made for: new screens in it, and Start over, use it too.
+  const made = state.entries.get(root)
+  const device = made?.versions[0]?.device ?? made?.proposals?.find(Boolean)?.device
+  if (device) deviceSelect.value = device // for this mockup only: the saved choice stays
   if (!state.entries.has(root)) return openScreen(null, null, null)
   await draw()
   const open = [...state.entries.values()].find((e) => !e.versions.length)
-  status(`<b>Cached</b> · ${state.entries.size} screen${state.entries.size === 1 ? '' : 's'} · $0`)
-  canvas.fit(open?.key ?? state.current ?? root, { top: !!open })
+  if (open) fitChoice(open.key)
+  else fitScreenSoon(state.current ?? root)
 }
 
-function closeMockup(msg: string) {
+/** The pickers as last chosen in this browser. */
+function restorePickers() {
+  const d = store.get('uxwoz:device')
+  if (isDevice(d)) deviceSelect.value = d
+}
+
+function closeMockup() {
   state.busy?.abort()
+  restorePickers()
   store.set('uxwoz:app', '')
   state.app = null
   state.entries = new Map()
@@ -630,7 +657,6 @@ function closeMockup(msg: string) {
   state.drawer = null
   state.before = null
   loadRecent()
-  status(msg)
   draw()
 }
 
@@ -638,6 +664,10 @@ function closeMockup(msg: string) {
 
 generate.addEventListener('submit', (e) => {
   e.preventDefault()
+  // The pickers as they are now are the ones to keep, also if a change event was missed.
+  store.set('uxwoz:model', modelSelect.value)
+  store.set('uxwoz:device', deviceSelect.value)
+  store.set('uxwoz:theme', themeSelect.value)
   const app = promptInput.value.trim()
   if (app) start(app).catch((err) => showError(String(err)))
 })
@@ -672,9 +702,10 @@ $('zoomIn').addEventListener('click', () => canvas.step(1))
 $('zoomOut').addEventListener('click', () => canvas.step(-1))
 $('fitScreen').addEventListener('click', () => fitScreen())
 
-const fitAll = () => canvas.fit()
-const fitScreen = () => canvas.fit(state.current ?? undefined)
-const fitWidth = () => { if (state.current) canvas.fitWidth(state.current) }
+// The user's own fits count as moving the canvas: a refit waiting for sizes must not undo them.
+const fitAll = () => { canvas.moved = performance.now(); canvas.fit() }
+const fitScreen = () => { canvas.moved = performance.now(); canvas.fit(state.current ?? undefined, { snug: true }) }
+const fitWidth = () => { canvas.moved = performance.now(); if (state.current) canvas.fitWidth(state.current) }
 
 // Zoom keys as in Figma: ⌘+ and ⌘− (Ctrl on other systems), ⌘0 for 100%, ⇧1 fit all, ⇧2 fit screen, ⇧3 fit width.
 const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))
@@ -753,6 +784,7 @@ addEventListener('keydown', (e: KeyboardEvent) => {
 })
 
 function openGenerate() {
+  restorePickers()
   generate.classList.add('open')
   promptInput.value = ''
   draw()
@@ -776,6 +808,7 @@ function renderToolbar() {
   nav.hidden = !app || !state.entries.size
   const cur = state.current ? state.entries.get(state.current) : undefined
   $('navName').textContent = cur ? labelOf(cur) : 'Screens'
+  nav.title = cur ? labelOf(cur) : 'Every screen of this mockup'
   if (!$('navMenu').hidden) renderNav()
 }
 
@@ -807,7 +840,8 @@ function renderNav() {
 function goTo(key: string) {
   const e = state.entries.get(key)
   if (!e) return
-  if (e.versions.length) { setCurrent(key); canvas.reveal(key) } else canvas.fit(key, { top: true })
+  canvas.moved = performance.now()
+  if (e.versions.length) { setCurrent(key); canvas.reveal(key) } else fitChoice(key)
 }
 
 $('menuNew').addEventListener('click', () => { closeMenus(); openGenerate() })
@@ -827,7 +861,7 @@ async function deleteApp(again: boolean) {
   store.set(currentKey(app), '')
   loadRecent()
   if (again) return start(app)
-  closeMockup(`Deleted ${what}.`)
+  closeMockup()
 }
 
 for (const b of $('zoomMenu').querySelectorAll<HTMLButtonElement>('[data-zoom]')) b.addEventListener('click', () => {
@@ -850,7 +884,7 @@ modelSelect.addEventListener('change', () => {
 
 async function init() {
   const cfg = await (await fetch('/api/config')).json()
-  for (const m of cfg.models) modelSelect.add(new Option(m.label + (m.costEstimated ? ' (cost est.)' : ''), m.id))
+  for (const m of cfg.models) modelSelect.add(new Option(m.label, m.id))
   for (const t of cfg.themes) themeSelect.add(new Option(t.label, t.id))
   for (const d of cfg.devices) deviceSelect.add(new Option(d.label, d.id))
   const savedModel = store.get('uxwoz:model')

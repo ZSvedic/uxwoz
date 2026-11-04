@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ALTERNATIVE_REQUEST, EDIT_REQUEST, ScreenCache, normalizePrompt, screenIdea, screenKey, screenRequest, type Version } from '@uxwoz/core'
+import { ALTERNATIVE_REQUEST, EDIT_REQUEST, ScreenCache, normalizePrompt, screenIdea, screenKey, screenRequest, wayBack, type Version } from '@uxwoz/core'
 
 const ver = (html: string, createdAt = '2026-10-23T00:00:00Z'): Version => ({
   html, model: 'claude-haiku-5.5', servedModel: null, createdAt,
@@ -81,6 +81,22 @@ describe('screen cache', () => {
   test('an Edit sends the screen as it is now and the change, last', () => {
     const msg = screenRequest('Coffee app', null, [], { device: 'a phone screen', edit: { html: '<h1>Menu</h1>', change: 'Add prices' } })
     expect(msg).toBe(`Coffee app\n\nDesign it for a phone screen.\n\nThe screen as it is now:\n<h1>Menu</h1>\n\n${EDIT_REQUEST} Add prices`)
+  })
+
+  test('Back and Home go to screens that exist, whatever prompt the model wrote', () => {
+    expect(wayBack('back', 'Return')).toBe('back')
+    expect(wayBack('Sleep overview of a snoring tracker app', '← Back')).toBe('back')
+    expect(wayBack('Sleep overview of a snoring tracker app', '‹')).toBe('back')
+    expect(wayBack('Snoring tracker home screen', ' Home ')).toBe('home')
+    expect(wayBack('Cat list of a cat app', 'Back to cats')).toBe('back')
+    expect(wayBack('Home screen of a sleep app', '⬅ Back')).toBe('back')
+    expect(wayBack('Home screen of a sleep app', 'arrow_back Back')).toBe('back')
+    expect(wayBack('Home screen of a sleep app', '«')).toBe('back')
+    expect(wayBack('Home screen of a sleep app', '🏠 Home')).toBe('home')
+    expect(wayBack('Home screen of a sleep app', 'Back to home')).toBe('home')
+    expect(wayBack('Home screen of a sleep app', 'Return to the main menu')).toBe('home')
+    expect(wayBack('Settings screen', 'Settings')).toBeNull()
+    expect(wayBack('Booking for 2 people', '2 people')).toBeNull()
   })
 
   test('the idea is read from its meta tag', () => {

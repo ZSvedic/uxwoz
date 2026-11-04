@@ -20,8 +20,8 @@ async function stream(path: string, body: object): Promise<ScreenEvent[]> {
   return (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
 }
 const screen = (body: object) => stream('/api/screen', body)
-/** The action prompts in a screen, in page order, without "home". */
-const actions = (html: string) => [...html.matchAll(/data-action="([^"]+)"/g)].map((m) => m[1]!).filter((a) => a.toLowerCase() !== 'home')
+/** The action prompts in a screen, in page order, without "home" and "back". */
+const actions = (html: string) => [...html.matchAll(/data-action="([^"]+)"/g)].map((m) => m[1]!).filter((a) => !['home', 'back'].includes(a.toLowerCase()))
 const done = (evs: ScreenEvent[]) => evs.find((e) => e.type === 'done') as Extract<ScreenEvent, { type: 'done' }>
 const pick = async (key: string, index: number) => (await (await post('/api/pick', { key, index })).json()).entry as CacheEntry
 const shown = (e: CacheEntry) => e.versions.at(-1)!.html
@@ -79,9 +79,9 @@ describe('web server', () => {
     const next = actions(shown(second)).find((a) => a !== action)
     expect(next).toBeTruthy()
     const third = done(await screen({ app: APP, action: next, from: second.key, label: 'Next' })).entry
-    // The third screen may link to "home" or the first action; either way it reuses a known prompt.
+    // The third screen may link "back", "home" or to the first action; each reuses a known screen.
     const links = third.proposals!.flatMap((p) => p!.html.match(/data-action="([^"]+)"/g)!.map((m) => m.slice(13, -1)))
-    expect(links.some((a) => a === 'home' || a === action)).toBe(true)
+    expect(links.some((a) => a === 'back' || a === 'home' || a === action)).toBe(true)
     await pick(third.key, 0)
   }, 60_000)
 

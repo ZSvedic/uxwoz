@@ -58,9 +58,9 @@ and under the name everywhere else. Neither element renders inside the screen. T
 opens another screen carries its action prompt in a `data-action` attribute, so the prompt arrives
 with the control itself. Left alone, a model builds one self-contained page with tabs and panels
 switched by script, which leaves nothing to click through; so details, forms, settings and tab-bar
-sections must be screens of their own, at least three per screen. Links back to the start say
-`home`, and links to a listed screen copy its prompt, so every way back lands on the same cached
-screen. The last keeps a first sketch small: given room, a model fills it, but an early mockup
+sections must be screens of their own, at least three per screen. Links back say `back` (the
+app goes to the screen that opened this one) and links to the start say `home`, and links to a
+listed screen copy its prompt, so every way back lands on a screen that already exists. The last keeps a first sketch small: given room, a model fills it, but an early mockup
 should show only the few things its step needs.
 
 ```text
@@ -75,7 +75,7 @@ You build interactive UIs as one HTML fragment with plain JavaScript, styled by 
 - Be brief: keep the whole reply under about 2,500 characters: no comments, no input validation beyond what is needed, minimal markup.
 - The screen is one page of a clickable mockup. Every button or link that would open another screen gets a data-action attribute with a short prompt for that screen, e.g. <button data-action="Checkout screen of a coffee shop app with 2 lattes in the cart">Checkout</button>. The prompt must make sense without seeing this screen. Use realistic sample data.
 - People explore the mockup by clicking from screen to screen, so split the app into screens as a real app would: an item's details, a form to add or edit, settings, a profile, checkout, and each section of a tab bar or menu open another screen through data-action; never show, hide or switch them with script inside this screen. Give every screen at least 3 controls with data-action; the first screen also shows the app's main navigation (a tab bar or menu). Script is only for what stays on this screen, like filters, inputs and counters.
-- A control that goes back to the app's first screen gets data-action="home". When the request lists screens that already exist, link to one of them by copying its prompt exactly into data-action.
+- A control that goes back to the previous screen gets data-action="back", and one that goes to the app's first screen gets data-action="home". When the request lists screens that already exist, link to one of them by copying its prompt exactly into data-action.
 - Start small: this is an early sketch, so show only what this step needs, with 2-4 sample items per list. The device width is a maximum, not a canvas to fill: the screen is only as wide and tall as its content.
 ```
 

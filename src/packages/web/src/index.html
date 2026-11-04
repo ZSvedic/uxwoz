@@ -51,7 +51,8 @@
 <div class="workspace">
   <div class="canvas-area">
   <main id="stage" class="stage"></main>
-  <div id="status" class="status" hidden><span id="statusText"></span><button id="statusClose" type="button" title="Close" hidden>✕</button></div>
+  <div id="hint" class="hint-pill" role="status" hidden>One screen at a time: wait until this one is made.</div>
+  <div id="error" class="error-pill" role="alert" hidden><span id="errorText"></span><button id="errorClose" type="button" title="Close">✕</button></div>
   </div>
   <aside id="drawer" class="drawer" hidden>
     <div class="drawer-head">
@@ -76,11 +77,11 @@
     <textarea id="prompt" name="prompt" rows="2" maxlength="2000" required
       placeholder="Describe a product, e.g. a coffee shop ordering app"></textarea>
     <div class="gen-row">
-      <button id="go" type="submit" class="primary">Generate</button>
       <label>Model <select id="model"></select></label>
-      <label>Device <select id="device" title="What new screens are designed for"></select></label>
+      <label>Device <select id="device" title="What the mockup's screens are designed for"></select></label>
       <label>Theme <select id="theme"></select></label>
     </div>
+    <button id="go" type="submit" class="primary go">Generate</button>
     <div class="gen-list">
       <h3>Templates</h3>
       <div id="templates" class="chips">

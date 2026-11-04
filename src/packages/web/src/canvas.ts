@@ -34,7 +34,7 @@ const PAD = 600
 /** How far right of a screen's left edge the lines meet it. */
 const LINE_X = 40
 /** The height of the name and idea above a screen, and of the idea above a side, in pixels on screen. */
-const LABEL_H = 44
+const LABEL_H = 62
 const IDEA_H = 76
 /** The radius of a line's corners. */
 const BEND = 10
@@ -95,6 +95,8 @@ interface Card {
   el: HTMLElement
   name: HTMLElement
   idea: HTMLElement
+  /** Shows an idea longer than two lines in full. */
+  more: HTMLButtonElement
   note: HTMLElement
   screen: HTMLElement
   frame: HTMLIFrameElement
@@ -112,6 +114,8 @@ interface Card {
   used: number | null
   height: number
   shown: { html: string; final: boolean; css: string } | null
+  /** The final screen has reported its size since it was shown. */
+  sized: boolean
   onLoad: (() => void) | null
   growth: { count: number; at: number }
   frozen: boolean
@@ -148,6 +152,7 @@ export class Canvas {
     new ResizeObserver(() => this.queue()).observe(stage)
     // Pinch (a wheel with ctrlKey in Chrome and Firefox) and Ctrl/Cmd + scroll zoom around the pointer.
     stage.addEventListener('wheel', (e) => {
+      this.moved = performance.now()
       if (!e.ctrlKey && !e.metaKey) return
       e.preventDefault()
       this.zoomBy(e.deltaY, e.clientX, e.clientY)
@@ -162,6 +167,7 @@ export class Canvas {
     })
     // Dragging the empty canvas pans it.
     stage.addEventListener('pointerdown', (e) => {
+      this.moved = performance.now()
       if (e.button !== 0 || (e.target !== stage && e.target !== this.surface && e.target !== this.lines)) return
       const x0 = e.clientX, y0 = e.clientY, l0 = stage.scrollLeft, t0 = stage.scrollTop
       stage.setPointerCapture(e.pointerId)
@@ -175,8 +181,12 @@ export class Canvas {
 
   get zoom() { return this.z }
 
+  /** When the user last scrolled, dragged or zoomed the canvas (performance.now()); fits do not count. */
+  moved = 0
+
   /** Zoom to `z`, keeping the point under (x, y) (the middle of the stage by default) in place. */
   setZoom(z: number, x?: number, y?: number) {
+    this.moved = performance.now()
     z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z * 100) / 100))
     if (z === this.z) return
     const st = this.stage, r = st.getBoundingClientRect()
@@ -212,6 +222,7 @@ export class Canvas {
     this.z = z
     this.surface.style.zoom = String(z)
     this.surface.style.setProperty('--z', String(z))
+    this.surface.classList.toggle('far', z < 0.5)
     this.stage.style.setProperty('--z', String(z)) // the dot grid behind the canvas scales with it
     this.layout() // names and rails keep their size on screen, so the room they need changes
     this.on.zoomed(z)
@@ -243,21 +254,35 @@ export class Canvas {
   /**
    * Zoom and scroll so a screen (or the whole tree, without a key) fills the stage, at most `max`.
    * With `top`, only its width counts, and its top shows: for an A OR B, whose heights still change.
+   * With `snug`, the height counts too, but never shrinks the zoom below 60% of the width's fit:
+   * a tall screen shows its top at a readable size instead of all of it, tiny.
    */
-  fit(key?: string, { max = 1, top = false } = {}) {
+  fit(key?: string, { max = 1, top = false, snug = false } = {}) {
     const st = this.stage, m = 48
+    if (this.queued) this.layout() // sizes that arrived since the last frame count
     // Names and rails keep their size on screen, so they take more of the canvas at a lower zoom:
     // the box changes with the zoom, and a few rounds settle it.
     for (let i = 0; i < 4; i++) {
       const box = this.box(key)
       if (!box) return
-      const z = Math.min(max, MAX_ZOOM, (st.clientWidth - 2 * m) / box.w, top ? Infinity : (st.clientHeight - 2 * m) / box.h)
+      const zw = (st.clientWidth - 2 * m) / box.w, zh = (st.clientHeight - 2 * m) / box.h
+      const z = Math.min(max, MAX_ZOOM, zw, top ? Infinity : snug ? Math.max(zh, 0.6 * zw) : zh)
       const next = Math.max(MIN_ZOOM, Math.floor(z * 100) / 100)
       if (next === this.z) break
       this.applyZoom(next)
     }
     const box = this.box(key)
     if (box) this.center(top ? { ...box, h: Infinity } : box)
+  }
+
+  /** Resolves once every card of a screen has its final screen and its size (or after 4 s). */
+  async sized(key: string): Promise<void> {
+    for (let t = 0; t < 40; t++) {
+      const cards = this.screens.find((s) => s.key === key)?.cards.map((v) => this.cards.get(v.id))
+      const done = !cards || cards.every((c) => !c || c.view?.error || (c.shown?.final && c.sized))
+      await new Promise((r) => setTimeout(r, done ? 150 : 100)) // once done, a late report may still come
+      if (done) return
+    }
   }
 
   /** Zoom so a screen fills the stage's width (at most 200%), and scroll to its top. */
@@ -273,6 +298,7 @@ export class Canvas {
 
   /** Scroll a screen into view if any of it is out of view (its top first, if it is taller than the stage). */
   reveal(key: string, smooth = true) {
+    if (this.queued) this.layout()
     const b = this.box(key)
     if (!b) return
     const st = this.stage, z = this.z, m = 24
@@ -305,14 +331,16 @@ export class Canvas {
         c.el.classList.toggle('failed', !!v.error)
         c.el.classList.toggle('current', s.current && !v.side)
         c.name.textContent = v.name
+        c.name.title = v.name
         c.name.hidden = !v.name
+        // A new idea (after an Edit or a Regenerate) starts folded again.
+        if (c.idea.title !== v.idea) { c.el.querySelector('.head')!.classList.remove('open'); c.more.textContent = 'more' }
         c.idea.textContent = v.idea || (v.side ? (v.streaming ? 'Making a design…' : v.error ? '' : 'A design') : '')
         c.idea.title = v.idea
         c.note.textContent = v.side ? '' : s.note
         c.note.hidden = !c.note.textContent
         // While a screen is being changed, the note takes the idea's line, so the names keep their room.
-        if (!c.note.hidden) c.idea.hidden = true
-        else c.idea.hidden = false
+        c.idea.parentElement!.hidden = !c.note.hidden
         c.error.textContent = v.error ?? ''
         c.error.hidden = !v.error
         c.screen.hidden = !!v.error
@@ -352,6 +380,7 @@ export class Canvas {
     // While a screen streams it keeps the full width, so its neighbours do not jump with every chunk.
     if (!final && c.used != null) { c.used = null; this.queue() }
     c.shown = { html, final, css }
+    c.sized = false
     c.frame.srcdoc = framePage(html, css, final)
   }
 
@@ -449,6 +478,23 @@ export class Canvas {
     this.surface.style.width = `${w}px`
     this.surface.style.height = `${h}px`
     this.drawLines(kids)
+    this.queueMore()
+  }
+
+  private moreQueued = false
+
+  /** Show "more" by each idea cut off at two lines; the room it has changes with the zoom. */
+  private queueMore() {
+    if (this.moreQueued) return
+    this.moreQueued = true
+    requestAnimationFrame(() => {
+      this.moreQueued = false
+      for (const c of this.cards.values()) {
+        if (c.view?.side) { c.more.hidden = true; continue }
+        const open = c.more.textContent === 'less'
+        c.more.hidden = !open && c.idea.scrollHeight <= c.idea.clientHeight + 1
+      }
+    })
   }
 
   /** One line from each parent to each child it made: straight down in its column, else an elbow. */
@@ -480,8 +526,17 @@ export class Canvas {
     const head = el('div', 'head')
     const name = el('b', 'name')
     const idea = el('span', 'idea')
+    const more = el('button', 'more', 'more') as HTMLButtonElement
+    more.type = 'button'
+    more.hidden = true
+    more.addEventListener('click', () => {
+      const open = head.classList.toggle('open')
+      more.textContent = open ? 'less' : 'more'
+    })
+    const ideaRow = el('div', 'idea-row')
+    ideaRow.append(idea, more)
     const note = el('span', 'note')
-    head.append(name, idea, note)
+    head.append(name, ideaRow, note)
     const screen = el('div', 'screen')
     const frame = document.createElement('iframe')
     frame.setAttribute('sandbox', FRAME_SANDBOX)
@@ -504,8 +559,8 @@ export class Canvas {
     })
     root.append(head, screen, error, rail)
     const c: Card = {
-      el: root, name, idea, note, screen, frame, shield, error, rail, undo: tools[2]!, tools, key, view: null,
-      width: 0, used: null, height: START_H, shown: null, onLoad: null, growth: { count: 0, at: 0 }, frozen: false,
+      el: root, name, idea, more, note, screen, frame, shield, error, rail, undo: tools[2]!, tools, key, view: null,
+      width: 0, used: null, height: START_H, shown: null, sized: false, onLoad: null, growth: { count: 0, at: 0 }, frozen: false,
     }
     shield.addEventListener('click', () => { if (c.view?.side?.pickable) this.on.pick(c.key, c.view.side.index) })
     frame.addEventListener('load', () => this.loaded(c))
@@ -528,6 +583,7 @@ export class Canvas {
     for (const x of this.cards.values()) if (x.frame.contentWindow === e.source) c = x
     if (!c) return
     if (d.uxwoz === 'size' && Number.isFinite(d.height)) {
+      if (c.shown?.final) c.sized = true
       if (c.shown?.final && Number.isFinite(d.width) && c.used !== Math.round(d.width)) { c.used = Math.round(d.width); this.queue() }
       const h = Math.min(MAX_SCREEN_H, Math.max(MIN_SCREEN_H, Math.round(d.height)))
       if (c.height === h) return
@@ -553,6 +609,7 @@ export class Canvas {
       this.zoomBy(Number(d.dy) || 0, r.left + (Number(d.x) || 0) * k, r.top + (Number(d.y) || 0) * k)
     } else if (d.uxwoz === 'wheel') {
       // The frame never scrolls itself: its gestures scroll the canvas.
+      this.moved = performance.now()
       this.stage.scrollBy(Number(d.dx) || 0, Number(d.dy) || 0)
     } else if (d.uxwoz === 'action' && typeof d.prompt === 'string' && !c.view?.side) {
       this.on.action(c.key, d.prompt.slice(0, 500), typeof d.label === 'string' ? d.label.slice(0, 80) : '')
