@@ -6,14 +6,14 @@ export function normalizePrompt(s: string): string {
   return s.normalize('NFKC').toLowerCase().replace(/»/g, '>').replace(/\s+/g, ' ').trim().replace(/[\s.!?;:,]+$/, '')
 }
 
-/** The action prompt that means "the first screen"; the model writes it on back-to-start links. */
+/** The action prompt that means "the first screen" (the model writes `@home`, which means the same). */
 export const HOME_ACTION = 'home'
 
-/** The action as stored: null for the first screen, whether asked for as no action, "home", or the product prompt. */
+/** The action as stored: null for the first screen, whether asked for as no action, "home", "@home", or the product prompt. */
 export function canonicalAction(app: string, action: string | null): string | null {
   if (!action) return null
   const a = normalizePrompt(action)
-  return a === '' || a === HOME_ACTION || a === normalizePrompt(app) ? null : action
+  return a === '' || a === HOME_ACTION || a === `@${HOME_ACTION}` || a === normalizePrompt(app) ? null : action
 }
 
 /** The cache key: the normalized product prompt, plus the normalized action prompt for later screens. */

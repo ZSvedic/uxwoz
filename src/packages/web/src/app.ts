@@ -4,7 +4,8 @@
 
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
 import { normalizePrompt, screenKey, wayBack } from '@uxwoz/core/keys'
-import type { CacheEntry, Link, Version } from '@uxwoz/core'
+import { namesOf, screenTree, type TreeNode } from '@uxwoz/core/tree'
+import type { CacheEntry, Version } from '@uxwoz/core'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
 
@@ -29,7 +30,8 @@ const state = {
   app: null as string | null,
   /** Every screen of this mockup, by key, as the server last sent it. */
   entries: new Map<string, CacheEntry>(),
-  links: [] as Link[],
+  /** Where each screen sits (level, the screen it hangs under), worked out from the screens on every draw. */
+  tree: new Map<string, TreeNode>(),
   /** The screen the user last picked, clicked in, or chose in Nav. */
   current: null as string | null,
   making: null as Making | null,
@@ -75,7 +77,13 @@ function nameOf(e: CacheEntry, v: Version): string {
 }
 
 /** A screen's label, e.g. "L2 Camera". */
-const labelOf = (e: CacheEntry) => (e.versions.length ? `L${e.level} ${nameOf(e, e.versions.at(-1)!)}` : `L${e.level} New screen · pick one`)
+const labelOf = (e: CacheEntry) => {
+  const level = state.tree.get(e.key)?.level ?? '?'
+  return e.versions.length ? `L${level} ${nameOf(e, e.versions.at(-1)!)}` : `L${level} New screen · pick one`
+}
+
+/** The screen a screen hangs under in the tree (the one fewest clicks from home that leads to it). */
+const treeParent = (key: string) => state.tree.get(key)?.parent ?? null
 
 const widthOf = (d: Device | undefined) => (d ? DEVICES[d].width : LEGACY_WIDTH)
 const ideaOf = (v: Version) => v.idea ?? ''
@@ -98,11 +106,11 @@ function views(): ScreenView[] {
     const making = m?.key === e.key ? m : null
     const revising = state.revising?.key === e.key ? state.revising : null
     out.push(v ? {
-      key: e.key, parent: e.parent?.key ?? null, current: state.current === e.key, undo: e.versions.length > 1,
+      key: e.key, parent: treeParent(e.key), current: state.current === e.key, undo: e.versions.length > 1,
       note: revising ? (revising.change ? 'Making the change…' : 'Making a new design…') : '',
       cards: [{ id: e.key, width: widthOf(v.device), name: labelOf(e), idea: ideaOf(v), streaming: !!revising }],
     } : {
-      key: e.key, parent: e.parent?.key ?? null, current: false, undo: false, note: '',
+      key: e.key, parent: treeParent(e.key), current: false, undo: false, note: '',
       cards: (e.proposals ?? []).map((p, i) => sideCard(e.key, i, making?.sides[i] ?? null, p, making?.device)),
     })
   }
@@ -115,6 +123,7 @@ function views(): ScreenView[] {
 
 /** Draw every screen and put each stored design in its frame. Streaming frames are left to their streams. */
 async function draw() {
+  state.tree = screenTree([...state.entries.values()])
   canvas.render(views(), !!state.busy)
   generate.hidden = !!state.app && !generate.classList.contains('open')
   renderDrawer()
@@ -269,7 +278,6 @@ async function openScreen(action: string | null, from: string | null, label: str
       else if (ev.type === 'done') {
         finished = true
         state.entries.set(ev.entry.key, ev.entry)
-        if (ev.link) addLink(ev.link)
         if (state.making === m) state.making = null
         loadRecent()
         await draw()
@@ -374,39 +382,43 @@ async function dropChoice(key: string) {
   await draw()
 }
 
-/** Where a click leads: back to the screen that opened this one, home to the first screen, or to the screen of its action prompt. */
-function target(app: string, from: string, prompt: string, label: string): string {
+/**
+ * Where a click leads, and the prompt for it if it is a new screen: Back to the screen this one
+ * hangs under (one click nearer the first screen), Home to the first screen, `@name` to the screen with that name, anything else to the
+ * screen of its action prompt. An `@name` that does not exist asks for a new screen from the label.
+ */
+function target(app: string, from: string, prompt: string, label: string): { to: string; prompt: string } {
   const way = wayBack(prompt, label)
-  const parent = state.entries.get(from)?.parent?.key
-  if (way === 'back' && parent && state.entries.has(parent)) return parent
-  return way ? screenKey(app, null) : screenKey(app, prompt)
+  const root = screenKey(app, null)
+  if (way === 'back') {
+    // The screen it hangs under on the canvas; else the one whose click made it.
+    const made = state.entries.get(from)?.parent?.key
+    return { to: treeParent(from) ?? (made && state.entries.has(made) ? made : root), prompt }
+  }
+  if (way === 'home') return { to: root, prompt }
+  const ref = prompt.trim().match(/^@([\w-]+)$/)
+  if (ref) {
+    const known = namesOf([...state.entries.values()]).get(ref[1]!.toLowerCase())
+    if (known) return { to: known, prompt }
+    prompt = label ? `The "${label}" screen` : ref[1]!.replace(/-/g, ' ')
+  }
+  return { to: screenKey(app, prompt), prompt }
 }
 
 /** A click inside a picked screen: open the screen it leads to, or go to it when it is already there. */
-function onAction(from: string, prompt: string, label: string) {
+function onAction(from: string, action: string, label: string) {
   const app = state.app
   if (!app) return
-  const to = target(app, from, prompt, label)
+  const { to, prompt } = target(app, from, action, label)
   setCurrent(from)
   if (to === from) return
   const there = state.entries.get(to)
   if (there || state.making?.key === to) {
-    if (there) recordLink(from, to, label)
     if (there?.versions.length) { setCurrent(to); canvas.reveal(to) } else fitChoice(to)
     return
   }
   if (state.busy) return hint()
   openScreen(prompt, from, label)
-}
-
-function addLink(l: Link) {
-  if (!state.links.some((x) => x.from === l.from && x.to === l.to)) state.links.push(l)
-}
-
-/** A click to a screen already on the canvas: store it with the mockup. */
-async function recordLink(from: string, to: string, label: string) {
-  addLink({ from, to, label, createdAt: new Date().toISOString() })
-  await post('/api/link', { from, to, label }).catch(() => null)
 }
 
 function setCurrent(key: string | null) {
@@ -430,9 +442,8 @@ async function reloadMap() {
   applyMap(await res.json())
 }
 
-function applyMap(map: { entries: CacheEntry[]; links: Link[] }) {
+function applyMap(map: { entries: CacheEntry[] }) {
   state.entries = new Map(map.entries.map((e) => [e.key, e]))
-  state.links = map.links
   if (state.current && !state.entries.has(state.current)) state.current = null
   draw()
 }
@@ -501,10 +512,10 @@ async function undo(key: string) {
   draw()
 }
 
-/** The screens a screen's clicks made, and theirs: what a delete takes with it (at most). */
-function below(key: string): CacheEntry[] {
-  const kids = [...state.entries.values()].filter((e) => e.parent?.key === key && e.key !== key)
-  return kids.flatMap((k) => [k, ...below(k.key)])
+/** How many other screens a delete takes with it: those the first screen would no longer reach. */
+function goesWith(key: string): number {
+  const rest = screenTree([...state.entries.values()].filter((e) => e.key !== key))
+  return [...state.tree.keys()].filter((k) => k !== key && !rest.has(k)).length
 }
 
 /** Delete a screen, after asking. Screens only it leads to go too; the first screen takes the mockup. */
@@ -512,16 +523,16 @@ async function removeScreen(key: string) {
   const e = state.entries.get(key)
   if (!e || state.busy || !state.app) return
   const root = screenKey(state.app, null) === key
-  const n = below(key).length
+  const n = goesWith(key)
   const what = root ? `${labelOf(e)}, the first screen? That deletes the whole mockup.`
-    : `${labelOf(e)}${n ? ` and the ${n === 1 ? 'screen' : `${n} screens`} below it` : ''}?`
+    : `${labelOf(e)}${n ? ` and the ${n === 1 ? 'screen' : `${n} screens`} only it leads to` : ''}?`
   if (!confirm(`Delete ${what}`)) return
   const res = await post('/api/delete', { key }).catch(() => null)
   if (!res?.ok) return showError('Could not delete the screen')
-  const map = await res.json() as { removed: string[]; entries: CacheEntry[]; links: Link[] }
+  const map = await res.json() as { removed: string[]; entries: CacheEntry[] }
   loadRecent()
   if (root) return closeMockup()
-  const parent = e.parent?.key
+  const parent = treeParent(key)
   applyMap(map)
   setCurrent(parent && state.entries.has(parent) ? parent : screenKey(state.app, null))
   if (state.current) canvas.reveal(state.current)
@@ -562,11 +573,13 @@ function renderDrawer() {
     li.classList.toggle('now', i === e.versions.length - 1)
     return li
   }).reverse())
-  const parent = e.parent && state.entries.get(e.parent.key)
+  const node = state.tree.get(e.key)
+  const parent = node?.parent ? state.entries.get(node.parent) : undefined
   const info: [string, string][] = [
     ['Name', labelOf(e)],
     ['Idea', ideaOf(v) || '–'],
-    ['Opened by', parent ? `${e.parent!.label || 'a click'} in ${labelOf(parent)}` : e.action ? '–' : 'the first screen'],
+    ['Name in links', e.name ? `@${e.name}` : '–'],
+    ['Reached by', parent ? `${node!.label || 'a click'} in ${labelOf(parent)}` : e.action ? '–' : 'the first screen'],
     ['Made by', v.feedback ? `Edit: ${v.feedback}` : e.versions.length > 1 ? 'Regenerate' : 'your pick of two designs'],
     ['Versions', `${e.versions.length}${e.versions.length > 1 ? ' (↶ Undo goes back one)' : ''}`],
     ['Model', modelLabel(v.model) + (v.servedModel ? ` (served ${v.servedModel})` : '')],
@@ -614,7 +627,7 @@ async function start(app: string, make = true) {
   const n = ++state.starts
   const res = await fetch(`/api/map?app=${encodeURIComponent(app)}`)
   if (!res.ok) throw new Error(`could not load the mockup: HTTP ${res.status}`)
-  const map = await res.json() as { entries: CacheEntry[]; links: Link[] }
+  const map = await res.json() as { entries: CacheEntry[] }
   if (n !== state.starts) return // a newer mockup was opened meanwhile
   if (!make && !map.entries.length) { store.set('uxwoz:app', ''); return draw() }
   state.app = app
@@ -649,7 +662,6 @@ function closeMockup() {
   store.set('uxwoz:app', '')
   state.app = null
   state.entries = new Map()
-  state.links = []
   state.current = null
   state.making = null
   state.revising = null
@@ -809,22 +821,22 @@ function renderNav() {
   const menu = $('navMenu')
   const all = [...state.entries.values()]
   const path = new Set<string>()
-  for (let e = state.current ? state.entries.get(state.current) : undefined; e && !path.has(e.key); e = e.parent ? state.entries.get(e.parent.key) : undefined) path.add(e.key)
+  for (let k = state.current; k && !path.has(k); k = treeParent(k)) path.add(k)
   const rows: HTMLElement[] = []
   const seen = new Set<string>()
   const walk = (e: CacheEntry, depth: number) => {
     if (seen.has(e.key)) return
     seen.add(e.key)
-    const b = item(labelOf(e), e.parent?.label ? `via ${e.parent.label}` : '', () => goTo(e.key))
+    const via = state.tree.get(e.key)?.label
+    const b = item(labelOf(e), via ? `via ${via}` : '', () => goTo(e.key))
     b.style.setProperty('--depth', String(depth))
     b.classList.toggle('path', path.has(e.key))
     b.classList.toggle('current', e.key === state.current)
     rows.push(b)
-    for (const k of all) if (k.parent?.key === e.key) walk(k, depth + 1)
+    for (const k of all) if (treeParent(k.key) === e.key) walk(k, depth + 1)
   }
-  // The first screen first; screens whose parent is gone after it, as their own trees.
-  for (const e of all) if (!e.parent || !state.entries.has(e.parent.key)) walk(e, 0)
-  for (const e of all) walk(e, 0)
+  // The first screen first; screens the first screen does not reach after it, as their own trees.
+  for (const e of all) if (!treeParent(e.key)) walk(e, 0)
   menu.replaceChildren(...rows)
 }
 

@@ -1,6 +1,6 @@
 // Feature: the web server streams a new screen's A OR B, keeps the pick, and revises screens (cassette: server).
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { ScreenCache, type CacheEntry } from '@uxwoz/core'
+import { ScreenCache, linksIn, type CacheEntry } from '@uxwoz/core'
 import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
 import { cassette } from './cassette.ts'
 
@@ -20,8 +20,8 @@ async function stream(path: string, body: object): Promise<ScreenEvent[]> {
   return (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
 }
 const screen = (body: object) => stream('/api/screen', body)
-/** The action prompts in a screen, in page order, without "home" and "back". */
-const actions = (html: string) => [...html.matchAll(/data-action="([^"]+)"/g)].map((m) => m[1]!).filter((a) => !['home', 'back'].includes(a.toLowerCase()))
+/** The prompts for new screens in a screen, in page order: without "home", "back" and links by @name. */
+const actions = (html: string) => [...html.matchAll(/data-action="([^"]+)"/g)].map((m) => m[1]!).filter((a) => !['home', 'back'].includes(a.toLowerCase()) && !a.startsWith('@'))
 const done = (evs: ScreenEvent[]) => evs.find((e) => e.type === 'done') as Extract<ScreenEvent, { type: 'done' }>
 const pick = async (key: string, index: number) => (await (await post('/api/pick', { key, index })).json()).entry as CacheEntry
 const shown = (e: CacheEntry) => e.versions.at(-1)!.html
@@ -55,15 +55,15 @@ describe('web server', () => {
     expect((await post('/api/pick', { key: before.key, index: 0 })).status).toBe(404)
   })
 
-  test('a click opens a new screen under its own key, with the click as its parent and a link', async () => {
+  test('a click opens a new screen under its own key, with the click as its parent; the pick names it', async () => {
     const first = done(await screen({ app: APP })).entry
+    expect(first.name).toBe('home')
     const action = actions(shown(first))[0]!
     const evs = await screen({ app: APP, action, from: first.key, label: 'Our breads' })
-    const { entry, link } = done(evs)
+    const { entry } = done(evs)
     expect(entry.key).toBe(`a tiny bakery website » ${action.toLowerCase().replace(/\s+/g, ' ').replace(/[\s.!?;:,]+$/, '')}`)
-    expect(entry).toMatchObject({ level: 2, parent: { key: first.key, label: 'Our breads' } })
-    expect(link).toMatchObject({ from: first.key, to: entry.key, label: 'Our breads' })
-    await pick(entry.key, 0)
+    expect(entry.parent).toEqual({ key: first.key, label: 'Our breads' })
+    expect((await pick(entry.key, 0)).name).toMatch(/^[a-z0-9-]+$/)
   }, 30_000)
 
   test('a "home" link opens the cached first screen with no model call', async () => {
@@ -72,28 +72,27 @@ describe('web server', () => {
     expect(done(evs).entry.key).toBe('a tiny bakery website')
   })
 
-  test('a later screen is told which screens exist, so it can link back to them', async () => {
+  test('a later screen gets the tree of screens and links to them by names that exist', async () => {
     const first = done(await screen({ app: APP })).entry
     const action = actions(shown(first))[0]!
     const second = done(await screen({ app: APP, action })).entry
-    const next = actions(shown(second)).find((a) => a !== action)
+    const next = actions(shown(second))[0]
     expect(next).toBeTruthy()
     const third = done(await screen({ app: APP, action: next, from: second.key, label: 'Next' })).entry
-    // The third screen may link "back", "home" or to the first action; each reuses a known screen.
-    const links = third.proposals!.flatMap((p) => p!.html.match(/data-action="([^"]+)"/g)!.map((m) => m.slice(13, -1)))
-    expect(links.some((a) => a === 'back' || a === 'home' || a === action)).toBe(true)
+    const map = await (await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}`, server.url))).json() as { entries: CacheEntry[] }
+    const names = new Set(map.entries.map((e) => e.name).filter(Boolean))
+    // Every link by name points at a screen that exists, and at least one link goes back to one.
+    const links = third.proposals!.flatMap((p) => linksIn(p!.html).map((l) => l.action))
+    const refs = links.filter((a) => a.startsWith('@')).map((a) => a.slice(1))
+    for (const r of refs) expect(names).toContain(r)
+    expect(links.some((a) => a === 'back' || a.startsWith('@'))).toBe(true)
     await pick(third.key, 0)
   }, 60_000)
 
-  test('a click to a screen already there is recorded as a link', async () => {
-    const first = done(await screen({ app: APP })).entry
-    const second = done(await screen({ app: APP, action: actions(shown(first))[0]! })).entry
-    const back = await post('/api/link', { from: second.key, to: first.key, label: 'Home' })
-    expect((await back.json()).link).toMatchObject({ from: second.key, to: first.key, label: 'Home' })
-    expect((await post('/api/link', { from: first.key, to: 'no such screen', label: 'x' })).status).toBe(404)
+  test('the map lists one mockup, and the apps list every mockup', async () => {
     const map = await (await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}`, server.url))).json()
     expect(map.root).toBe('a tiny bakery website')
-    expect(map.links.some((l: { label: string }) => l.label === 'Home')).toBe(true)
+    expect(map.links).toBeUndefined()
     const { apps } = await (await fetch(new URL('/api/apps', server.url))).json()
     expect(apps.map((a: { app: string }) => a.app)).toEqual([APP])
   })
@@ -121,7 +120,7 @@ describe('web server', () => {
 
   test('a screen whose A OR B is still open cannot be revised', async () => {
     const first = done(await screen({ app: APP })).entry
-    const open = done(await screen({ app: APP, action: actions(shown(first))[1]!, from: first.key, label: 'x' })).entry
+    const open = done(await screen({ app: APP, action: 'A page about the bakers of a tiny bakery', from: first.key, label: 'Our bakers' })).entry
     expect(open.versions).toEqual([])
     expect((await post('/api/revise', { key: open.key })).status).toBe(409)
     expect((await post('/api/undo', { key: open.key })).status).toBe(404)
@@ -162,7 +161,7 @@ describe('web server', () => {
     const del = await (await post('/api/delete', { key: second.key })).json()
     expect(del.removed).toContain(second.key)
     expect(del.entries.map((e: { key: string }) => e.key)).toContain(first.key) // the whole mockup, as /api/map sends it
-    expect((await (await post('/api/delete-app', { app: APP })).json()).removed).toBeGreaterThan(1)
+    expect((await (await post('/api/delete-app', { app: APP })).json()).removed).toBeGreaterThan(1) // the first screen and the bakers' A OR B
     expect((await (await fetch(new URL('/api/apps', server.url))).json()).apps).toEqual([])
     // A later screen of the deleted mockup is refused before any model call.
     const late = await screen({ app: APP, action: 'Our breads' })

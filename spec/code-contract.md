@@ -15,7 +15,7 @@ POST /api/screen  {"app": "A coffee shop ordering app", "action": null, "model":
 ...
 {"type":"version","variant":1,"version":{...Version}}
 {"type":"version","variant":0,"version":{...Version}}
-{"type":"done","entry":{...CacheEntry, "versions":[], "proposals":[{...}, {...}]},"link":null}
+{"type":"done","entry":{...CacheEntry, "versions":[], "proposals":[{...}, {...}]}}
 
 POST /api/pick  {"key": "a coffee shop ordering app", "index": 1}
 {"entry":{...CacheEntry, "versions":[{...the second proposal}]}}
@@ -46,8 +46,7 @@ can spend model credits.
   for a clearly different design. Each side that finishes is stored at once as that side's
   proposal and sent as `version`; one that fails sends `failed` with its message. The first side to
   finish makes the screen, with the click as its parent (`from`, the key of the screen clicked in,
-  and `label`, the control's text). `done` ends the stream with the screen and the `Link` the click
-  recorded (or null); `error` comes when both sides fail. A side that finishes after the other was
+  and `label`, the control's text). `done` ends the stream with the screen; `error` comes when both sides fail. A side that finishes after the other was
   picked, or after the screen, the screen clicked in or its mockup was deleted (even before the
   screen existed: the cache remembers when each key was deleted), is dropped. A `from` that is not
   a picked screen gets `error` before any model call. 400 on an empty or too long
@@ -64,18 +63,16 @@ can spend model credits.
   devices). 400 on a bad `change`, model or device, 404 for an unknown screen, 409 while its A OR B
   is open; `error` if the model fails or the screen was deleted meanwhile.
 - `POST /api/undo {key}`: drop the newest version; `{entry}`, or 404 when one or none is left.
-- `GET /api/map?app=…`: `{root, entries: CacheEntry[], links: Link[]}` for one mockup, oldest first.
-- `POST /api/link {from, to, label}`: record a click in one screen to another one already on the
-  canvas (no screen is made); `{link}`, or 404 if a key is unknown, `from` has no version yet, or
-  the two belong to different mockups. The first click between two screens keeps its label.
+- `GET /api/map?app=…`: `{root, entries: CacheEntry[]}` for one mockup, oldest first. Levels and the
+  tree are not stored: `screenTree` in `core/src/tree.ts` works them out (server and browser).
 - `GET /api/apps`: `{apps: {app, screens, updatedAt}[]}`, every mockup once as first typed,
   most recently changed first. The History list.
 - `POST /api/delete {key}`: delete a screen. Screens the first screen reached before and no longer
-  reaches (through parents and links) go too; a screen still reached by another click takes it as
-  its new parent, and levels follow the parents again. Deleting the first screen deletes the
-  mockup. `{removed, root, entries, links}`: the keys removed and the whole mockup as `/api/map`
-  sends it; 404 if unknown.
-- `POST /api/delete-app {app}`: delete every screen and link of a mockup; `{removed}`.
+  reaches (through the clicks that made screens and the buttons in each screen's newest version) go
+  too; a screen whose first click came from a screen that is gone takes the screen that reaches it
+  now as its parent. Deleting the first screen deletes the mockup. `{removed, root, entries}`: the
+  keys removed and the whole mockup as `/api/map` sends it; 404 if unknown.
+- `POST /api/delete-app {app}`: delete every screen of a mockup; `{removed}`.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
   `pico.css` followed by `mockup.css`.
@@ -100,9 +97,11 @@ only from a card's own frame.
 ## Types
 
 ```ts
-CacheEntry { key; app; action: string | null; level: number; parent: { key; label } | null;
+CacheEntry { key; app; action: string | null; name?: string; parent: { key; label } | null;
              versions: Version[]; proposals?: (Version | null)[] }
-             // level 1 is the first screen; parent is the screen and click that first made it.
+             // name is set at the pick and never changes: "home" for the first screen, else from
+             // the title ("sleep-report"), unique in the mockup; links use it as "@sleep-report".
+             // parent is the screen and click that first made it.
              // The last version shows; versions is empty and proposals holds the two sides of
              // the open A OR B (null until a side finishes) until a pick
 Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
@@ -110,8 +109,8 @@ Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | nul
              name?; idea?; feedback? }
              // name comes from the model's <title>, idea from its <meta name="idea">;
              // feedback is the Edit request that made this version
-Link       { from: key; to: key; label; createdAt }
-             // first click between two screens wins
+TreeNode   { level; parent: key | null; label }
+             // from screenTree: level 1 is the first screen, the fewest clicks from it otherwise
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast'
 Device     'phone' (390 px wide) | 'desktop' (1024 px)
 key        normalize(app) or normalize(app) + ' » ' + normalize(action); normalize turns » into >; action
@@ -128,7 +127,7 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 | `OPENAI_API_KEY` | GPT-6 Luna, GPT-6.1 Sol |
 | `PORT` | server port, default 3000 |
 | `UXWOZ_HOST` | listen address, default `127.0.0.1` |
-| `UXWOZ_CACHE_FILE` | screen cache `{version: 2, entries, links}`, default `temp/screen-cache.json` |
+| `UXWOZ_CACHE_FILE` | screen cache `{version: 3, entries}`, default `temp/screen-cache.json` |
 | `UXWOZ_RECORD` | `1` makes tests call the live APIs and rewrite `cassettes/` |
 
 ## Tests

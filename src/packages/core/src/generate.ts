@@ -13,7 +13,7 @@ export const DEADLINE_MS = 20_000
 export interface GenerateOptions {
   app: string
   action: string | null
-  /** Action prompts of screens the mockup already has; the model links to them by exact prompt. */
+  /** The tree of screens the mockup already has (lines from treeLines); the model links to them by @name. */
   existing?: string[]
   model: ModelId
   /** The device to design for; left out of the request when absent. */

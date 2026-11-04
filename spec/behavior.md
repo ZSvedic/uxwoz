@@ -72,11 +72,16 @@ was open, with its A OR B if one was waiting for a pick; it never starts a new d
 The canvas holds every picked screen of the mockup, laid out as a tree on a dot grid. Nothing is
 hidden when the user branches.
 
-- **Rows are levels.** Each level is a row, as tall as its tallest screen. A screen's first child
-  sits straight below it, in the same column; each later child starts a new column to the right of
-  the subtrees before it.
-- **Lines**: one thin orange line from a parent to each child it made: straight down in the same
-  column, an elbow for a branch. A click back to a screen already there draws no line.
+- **Levels**: a screen's level is the fewest clicks from the first screen (L1). The app works it
+  out each time from the buttons in each screen's newest version, plus the click that first made
+  each screen; nothing about it is stored. So an Edit that adds a button on Home straight to an L3
+  screen makes it L2 at once, and Undo makes it L3 again; a delete moves screens the same way.
+- **Rows are levels.** Each level is a row, as tall as its tallest screen. Each screen hangs under
+  a screen one click before it on a shortest path: the one whose click first made it, when that is
+  one, else the first other. A screen's first child sits straight below it, in the same column;
+  each later child starts a new column to the right of the subtrees before it.
+- **Lines**: one thin orange line from each screen to the screen it hangs under: straight down in
+  the same column, an elbow for a branch. Other buttons between screens draw no line.
 - **Names**: above each screen, its level and the short name the model gave it (*L2 Camera*), and
   under that, its idea, on up to two lines; a longer idea ends in **more**, which shows the rest
   (and **less** folds it again). Names and ideas keep their size on screen at any zoom; below
@@ -138,9 +143,9 @@ zoom:
   once.
 - **↶ Undo** brings back the version before the newest. It shows only when there are two or more.
 - **ⓘ Info** opens the drawer on Info.
-- **✕ Delete** asks, then deletes the screen and the screens only it leads to. A screen that
-  another click also reaches stays, under that click. Deleting the first screen deletes the
-  mockup.
+- **✕ Delete** asks, then deletes the screen and the screens only it leads to. A screen that a
+  button in another screen also reaches stays, under that screen. Deleting the first screen deletes
+  the mockup.
 
 Using a rail button makes its screen current. While a screen is being made or changed, the rail's
 buttons wait (Info still works).
@@ -167,9 +172,18 @@ blue; clicking it asks for *product prompt + action prompt*. The model is told t
 forms, settings and tab-bar sections screens of their own, so a mockup has screens to click
 through. A plain link the screen does not handle asks for "the screen shown after clicking
 *label*"; in-page links (`#…`) stay put. Other controls (filters, inputs) work inside the screen.
-Each request lists the screens that already exist, and the model links to them by their exact
-prompt, back to the screen before with `back`, and to the first screen with `home`. Only a real
-click opens a screen.
+Only a real click opens a screen.
+
+- **Names for links**: when a design is picked, its screen gets a short name made from its title,
+  fixed from then on and unique in the mockup: *Sleep report* becomes `sleep-report`, a second
+  *Settings* becomes `settings-2`, and the first screen is always `home`. Info shows it. An Edit
+  that changes the title keeps the name.
+- **The tree in each request**: every request lists the picked screens as an indented tree of
+  names and what each screen is (the prompt that made it), two spaces deeper per level. The model
+  links to one of them with `@` and its name (`data-action="@sleep-report"`), back to the screen
+  before with `back`, and writes a prompt only for a screen that is not there yet. A click on an
+  `@name` goes to that screen; an `@name` that does not exist asks for a new screen named by the
+  button's words.
 
 - **Back and Home** never make a screen. A control labelled *Home*, *Go home*, *Back to home* or
   *Main menu* goes to the first screen. A control with the action `back`, or labelled *Back*,
@@ -177,8 +191,8 @@ click opens a screen.
   screen that opened this one (the first screen, if it has none). Icons and arrows in front of a
   label (*🏠 Home*, *⬅ Back*, icon-font words like *arrow_back*) do not count. The label wins over
   the action prompt, since models sometimes give Back a long prompt for the home screen.
-- A click that leads to a screen already on the canvas makes it current and scrolls to it. It is
-  stored as a link, with no line.
+- A click that leads to a screen already on the canvas (by name, by the prompt that made it, or
+  Back and Home) makes it current and scrolls to it, at no cost.
 - One screen is made at a time: while one is being made or changed, a click that would open
   another does nothing, and a note says so for a moment at the bottom of the canvas.
 
@@ -197,13 +211,15 @@ is cached. A failed Edit or Regenerate leaves the screen as it was.
 Every screen is stored under its normalized prompt: lowercase, single spaces, no trailing
 punctuation. A screen holds its versions (the last one shows) and, until a pick, its open A OR B.
 Opening a stored screen makes no model call and costs nothing. The cache lives on the server and
-survives restarts, so every browser shares it. Each screen also stores the screen and click that
-first made it, and its level. Each side of an A OR B is stored as soon as it finishes, so a design
+survives restarts, so every browser shares it. Each screen also stores its name and the screen and
+click that first made it; levels are worked out, never stored. Each side of an A OR B is stored as soon as it finishes, so a design
 that was paid for is kept even if the browser leaves. The current screen is remembered per mockup
 in this browser.
 
-A cache file from before versions keeps only each screen's picked variant; screens that only other
-variants led to go. The old file stays beside the new one as `screen-cache.json.before-versions`.
+A cache file from before names (version 2) gets names for its picked screens when the server loads
+it, from each screen's title, else its first heading, else its prompt; its stored levels and
+clicks go. A file from before versions is moved aside to `screen-cache.json.before-versions`, and
+the cache starts empty.
 
 ## Pickers
 

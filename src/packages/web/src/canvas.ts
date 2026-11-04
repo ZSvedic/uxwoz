@@ -1,7 +1,7 @@
 // The canvas: every screen of the mockup on one panning, zooming surface, laid out as a tree. Each
 // level is a row, as tall as its tallest screen. A screen's first child sits straight below it, in
 // the same column; each later child starts a new column to the right of the subtrees before it.
-// A thin line joins each parent to each child it made. A new screen shows as A OR B: two locked
+// A thin line joins each screen to the one it hangs under. A new screen shows as A OR B: two locked
 // previews side by side, with its idea above each; a click on a finished one picks it. Right of
 // each picked screen is a rail of tools, kept at the same size on screen whatever the zoom.
 // Screens show only as wide as their content: the frame keeps the device's width, so the screen's
@@ -36,6 +36,10 @@ const LINE_X = 40
 /** The height of the name and idea above a screen, and of the idea above a side, in pixels on screen. */
 const LABEL_H = 62
 const IDEA_H = 76
+/** Zoomed out further than this, a screen shows only its name (see .surface.far), which needs less room. */
+const FAR = 0.5
+const NAME_H = 26
+const labelH = (z: number) => (z < FAR ? NAME_H : LABEL_H)
 /** The radius of a line's corners. */
 const BEND = 10
 const SVG_NS = 'http://www.w3.org/2000/svg'
@@ -222,7 +226,7 @@ export class Canvas {
     this.z = z
     this.surface.style.zoom = String(z)
     this.surface.style.setProperty('--z', String(z))
-    this.surface.classList.toggle('far', z < 0.5)
+    this.surface.classList.toggle('far', z < FAR)
     this.stage.style.setProperty('--z', String(z)) // the dot grid behind the canvas scales with it
     this.layout() // names and rails keep their size on screen, so the room they need changes
     this.on.zoomed(z)
@@ -247,7 +251,7 @@ export class Canvas {
     const b = this.boxes.get(key)
     if (!b) return undefined
     const choice = !!this.screens.find((s) => s.key === key)?.cards[0]?.side
-    const above = (choice ? IDEA_H : LABEL_H) / this.z
+    const above = (choice ? IDEA_H : labelH(this.z)) / this.z
     return { x: b.x, y: b.y - above, w: b.w + (choice ? 0 : RAIL_W / this.z), h: b.h + above }
   }
 
@@ -440,7 +444,7 @@ export class Canvas {
     // Each row holds the names above its screens, which keep their size on screen.
     const rowH: number[] = []
     for (const [k, d] of depth) rowH[d] = Math.max(rowH[d] ?? 0, sizes.get(k)!.h)
-    const above = (d: number) => ([...depth].some(([k, dd]) => dd === d && sizes.get(k)!.parts.length > 1) ? IDEA_H : LABEL_H) / z
+    const above = (d: number) => ([...depth].some(([k, dd]) => dd === d && sizes.get(k)!.parts.length > 1) ? IDEA_H : labelH(z)) / z
     const rowY: number[] = []
     let y = PAD
     for (let d = 0; d < rowH.length; d++) { y += above(d); rowY[d] = y; y += (rowH[d] ?? 0) + GAP_Y }
@@ -497,7 +501,7 @@ export class Canvas {
     })
   }
 
-  /** One line from each parent to each child it made: straight down in its column, else an elbow. */
+  /** One line from each screen to the one it hangs under: straight down in its column, else an elbow. */
   private drawLines(kids: Map<string, string[]>) {
     const svg = this.lines
     svg.setAttribute('width', this.surface.style.width)
@@ -511,7 +515,7 @@ export class Canvas {
         const b = this.boxes.get(k)
         if (!b) continue
         const choice = this.screens.find((s) => s.key === k)!.cards.length > 1
-        const x1 = a.x + LINE_X, y1 = a.y + a.h, x2 = b.x + LINE_X, y2 = b.y - (choice ? IDEA_H : LABEL_H) / z - 6 / z
+        const x1 = a.x + LINE_X, y1 = a.y + a.h, x2 = b.x + LINE_X, y2 = b.y - (choice ? IDEA_H : labelH(z)) / z - 6 / z
         const mid = Math.min(y1 + GAP_Y / 2, y2 - 1)
         parts.push(svgEl('path', { d: elbow(x1, y1, x2, mid, y2), class: 'line' }))
       }

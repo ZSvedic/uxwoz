@@ -4,7 +4,7 @@
 import { join, resolve } from 'node:path'
 import {
   DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, PROPOSALS, ScreenCache, canonicalAction, generateScreen, isDevice, isModelId,
-  screenKey, warmUp, type CacheEntry, type Device, type Fetch, type GenerateEvent, type Link, type ModelId, type Version,
+  screenKey, warmUp, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type Version,
 } from '@uxwoz/core'
 import index from './index.html'
 
@@ -24,7 +24,7 @@ export type ScreenEvent =
   | { type: 'chunk'; variant: number; text: string }
   | { type: 'version'; variant: number; version: Version }
   | { type: 'failed'; variant: number; message: string }
-  | { type: 'done'; entry: CacheEntry; link: Link | null }
+  | { type: 'done'; entry: CacheEntry }
   | { type: 'error'; message: string }
 
 export interface ServerOptions {
@@ -112,11 +112,10 @@ export function createServer(opts: ServerOptions = {}) {
     const { app, model, device, click } = r
     const action = canonicalAction(app, r.action)
     const key = screenKey(app, action)
-    const linkFrom = () => (click ? cache.link(click.from, key, click.label || action || 'home') ?? null : null)
     const hit = cache.get(key)
     if (hit) {
       yield { type: 'meta', key, cached: true, variants: 0 }
-      yield { type: 'done', entry: hit, link: linkFrom() }
+      yield { type: 'done', entry: hit }
       return
     }
     const root = screenKey(app, null)
@@ -133,7 +132,7 @@ export function createServer(opts: ServerOptions = {}) {
     const since = cache.now()
     const gone = () => cache.removedSince(key, since) || cache.removedSince(root, since) || (!!click && cache.removedSince(click.from, since))
     yield { type: 'meta', key, cached: false, variants: PROPOSALS }
-    const existing = cache.existingScreens(app).filter((a) => a !== action)
+    const existing = cache.existingScreens(app)
     // One random side asks for a clearly different design, so the side says nothing about which is which.
     const different = Math.min(PROPOSALS - 1, Math.floor(random() * PROPOSALS))
     const streams = Array.from({ length: PROPOSALS }, (_, slot) => tagged(slot, generateScreen({
@@ -142,7 +141,6 @@ export function createServer(opts: ServerOptions = {}) {
     })))
     const parent = click && { key: click.from, label: click.label || action || 'home' }
     const failed: string[] = []
-    let link: Link | null = null
     for await (const t of merge(streams)) {
       if ('error' in t) {
         if (signal.aborted) continue // the browser left; nothing to report
@@ -156,7 +154,6 @@ export function createServer(opts: ServerOptions = {}) {
         // was already picked (by another browser).
         if (gone()) continue
         if (!cache.propose(app, action, t.slot, t.ev.version, parent)) continue
-        link ??= linkFrom()
         yield { type: 'version', variant: t.slot, version: t.ev.version }
       }
     }
@@ -164,7 +161,7 @@ export function createServer(opts: ServerOptions = {}) {
     const entry = cache.get(key)
     if (gone()) yield { type: 'error', message: 'this screen was deleted while it was being made' }
     else if (!entry) yield { type: 'error', message: [...new Set(failed)].join('; ') || 'no screen was made' }
-    else yield { type: 'done', entry, link }
+    else yield { type: 'done', entry }
   }
 
   /** One new version of a picked screen: an Edit with `change`, else a Regenerate from its prompt. */
@@ -175,7 +172,7 @@ export function createServer(opts: ServerOptions = {}) {
     try {
       for await (const ev of generateScreen({
         // A revise keeps the device the screen was made for.
-        app, action, existing: cache.existingScreens(app).filter((a) => a !== action), model, device: now.device ?? device,
+        app, action, existing: cache.existingScreens(app), model, device: now.device ?? device,
         edit: change ? { html: now.html, change } : undefined,
         signal, fetch: opts.fetch, env: opts.env, log,
       })) {
@@ -185,7 +182,7 @@ export function createServer(opts: ServerOptions = {}) {
         if (signal.aborted) return
         if (!stored) { yield { type: 'error', message: 'this screen was deleted while it was being changed' }; return }
         yield { type: 'version', variant: 0, version }
-        yield { type: 'done', entry: stored, link: null }
+        yield { type: 'done', entry: stored }
       }
     } catch (err) {
       if (signal.aborted) return
@@ -281,16 +278,6 @@ export function createServer(opts: ServerOptions = {}) {
         return json(cache.map(app))
       },
       '/api/apps': () => json({ apps: cache.apps() }),
-      // A click to a screen already in the flow opens no new screen; this records it as a link.
-      '/api/link': {
-        POST: async (req) => {
-          const refused = refuseForeign(req)
-          if (refused) return refused
-          const b = await req.json().catch(() => null)
-          const link = cache.link(String(b?.from ?? ''), String(b?.to ?? ''), String(b?.label ?? '').slice(0, 200))
-          return link ? json({ link }) : json({ error: 'no such screens, or not in the same mockup' }, 404)
-        },
-      },
       // Delete a screen and the screens only it reaches; the first screen takes the mockup with it.
       // Returns the mockup as /api/map does: a delete can give other screens new parents.
       '/api/delete': {

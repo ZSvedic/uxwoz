@@ -19,12 +19,16 @@ This screen belongs to a clickable mockup of: A coffee shop ordering app
 
 Show this screen: Checkout screen of a coffee shop app with 2 lattes in the cart
 
-Screens that already exist in this mockup:
-- Order confirmation screen for a coffee shop app showing a pickup time and order number
+Screens that already exist in this mockup, as a tree:
+@home: the first screen of A coffee shop ordering app
+  @menu: Menu screen of a coffee shop app with drinks and sizes
+    @order-confirmation: Order confirmation screen for a coffee shop app showing a pickup time
 ```
 
-The list holds the action prompts of the screens this mockup already has, newest first, at most 30.
-It lets a new screen link to an old one with the exact same prompt, so the click hits the cache.
+The tree holds the picked screens of this mockup, at most 40 lines: each one's name for links and
+what it is (the prompt that made it), two spaces deeper per level, where a level is the fewest
+clicks from the first screen. A new screen links to one of them with `@` and its name, so the click
+goes to that screen; the tree also shows the model how the mockup is laid out.
 
 Two lines may follow, each after a blank line: the device and, for one side of an A OR B only
 (a random one), a request for a different design:
@@ -59,8 +63,9 @@ opens another screen carries its action prompt in a `data-action` attribute, so 
 with the control itself. Left alone, a model builds one self-contained page with tabs and panels
 switched by script, which leaves nothing to click through; so details, forms, settings and tab-bar
 sections must be screens of their own, at least three per screen. Links back say `back` (the
-app goes to the screen that opened this one) and links to the start say `home`, and links to a
-listed screen copy its prompt, so every way back lands on a screen that already exists. The last keeps a first sketch small: given room, a model fills it, but an early mockup
+app goes to the screen that opened this one), and links to a listed screen give its `@name`, so
+every way back lands on a screen that already exists. A name is short and exact, so a model copies
+it more reliably than a long prompt. The last keeps a first sketch small: given room, a model fills it, but an early mockup
 should show only the few things its step needs.
 
 ```text
@@ -75,7 +80,7 @@ You build interactive UIs as one HTML fragment with plain JavaScript, styled by 
 - Be brief: keep the whole reply under about 2,500 characters: no comments, no input validation beyond what is needed, minimal markup.
 - The screen is one page of a clickable mockup. Every button or link that would open another screen gets a data-action attribute with a short prompt for that screen, e.g. <button data-action="Checkout screen of a coffee shop app with 2 lattes in the cart">Checkout</button>. The prompt must make sense without seeing this screen. Use realistic sample data.
 - People explore the mockup by clicking from screen to screen, so split the app into screens as a real app would: an item's details, a form to add or edit, settings, a profile, checkout, and each section of a tab bar or menu open another screen through data-action; never show, hide or switch them with script inside this screen. Give every screen at least 3 controls with data-action; the first screen also shows the app's main navigation (a tab bar or menu). Script is only for what stays on this screen, like filters, inputs and counters.
-- A control that goes back to the previous screen gets data-action="back", and one that goes to the app's first screen gets data-action="home". When the request lists screens that already exist, link to one of them by copying its prompt exactly into data-action.
+- A control that goes back to the previous screen gets data-action="back". When the request lists the screens that already exist, a control that opens one of them gets @ and its name instead of a prompt, e.g. data-action="@home" or data-action="@order-checkout". Use a name only for that very screen; any other screen gets a prompt.
 - Start small: this is an early sketch, so show only what this step needs, with 2-4 sample items per list. The device width is a maximum, not a canvas to fill: the screen is only as wide and tall as its content.
 ```
 
