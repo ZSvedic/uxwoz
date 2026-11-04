@@ -1,15 +1,16 @@
 // Cached generative exploration: every screen is stored under its normalized prompt.
-// Each screen has variants (candidates); regenerating adds more, and only an explicit choose()
-// changes which one revisits show. Screens form a tree: each one remembers the variant and click
-// that first made it, and each variant gets a fixed name like "L2-B" when it is made.
+// A new screen first holds two proposals (the A OR B); a pick keeps one as the screen's first
+// version and drops the other. Edit and Regenerate add versions; Undo drops the newest. Screens
+// form a tree: each one remembers the screen and click that first made it.
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { canonicalAction, letterAt, letterIndex, normalizePrompt, screenKey } from './keys.ts'
-import type { Device } from './frame.ts'
+import { canonicalAction, normalizePrompt, screenKey } from './keys.ts'
+import { screenIdea, type Device } from './frame.ts'
 import type { ModelId } from './models.ts'
 
-export interface Candidate {
+/** One design of a screen, as the model made it. */
+export interface Version {
   html: string
   model: ModelId
   servedModel: string | null
@@ -24,81 +25,67 @@ export interface Candidate {
   device?: Device
   /** A short name the model gave the screen, e.g. "Planning sync". */
   name?: string
-  /** This variant's letter at its screen's level, set by the cache: "B" in "L2-B". */
-  letter?: string
-  /** The prompt it was made with, when the user changed it; else the screen's action prompt. */
-  prompt?: string
-  /** What the user asked to change: an Edit's request (on old variants, feedback from before Change). */
+  /** One sentence naming the design idea, e.g. "Common actions as buttons on top". */
+  idea?: string
+  /** The Edit request that made this version. */
   feedback?: string
-  /** The variant an Edit changed to make this one. */
-  editOf?: number
-  /** Deleted by the user: its markup is gone, its letter stays taken. */
-  deleted?: boolean
-  /** Asked for as a clearly different design (the second of a pair); a refresh asks again. */
-  alternative?: boolean
-  /** The variant this one replaced by a refresh: it shows in that variant's place. */
-  replaces?: number
 }
 
-/** The variant and click that first made a screen. */
-export interface Parent { key: string; variant: number; label: string }
+/** The screen and click that first made a screen. */
+export interface Parent { key: string; label: string }
 
 export interface CacheEntry {
   key: string
   app: string
   action: string | null
-  /** Index of the candidate a revisit shows. */
-  chosen: number
-  candidates: Candidate[]
   /** 1 for the first screen, one more than its parent's for the others. */
   level: number
   /** Null for the first screen (and for screens made without a click). */
   parent: Parent | null
+  /** Oldest first; the last one shows. Empty while the A OR B is open. */
+  versions: Version[]
+  /** The open A OR B, by side; a side is null until it finishes (or if it failed). Gone after a pick. */
+  proposals?: (Version | null)[]
 }
 
 /** One click that led from one screen to another. */
 export interface Link {
   from: string
-  /** The variant of `from` the click was made in. */
-  variant: number
   to: string
   /** The text of the control that was clicked, e.g. "Checkout". */
   label: string
   createdAt: string
 }
 
-/** Where new variants come from: the click that asked for a new screen. */
-export interface AddOptions { parent?: Parent | null }
+/** How many designs a new screen offers. */
+export const PROPOSALS = 2
 
-const isLive = (e: CacheEntry | undefined, v: number) => !!e?.candidates[v] && !e.candidates[v]!.deleted
-const linkId = (l: { from: string; variant: number; to: string }) => `${l.from}#${l.variant}\n${l.to}`
+const FORMAT = 2
+const linkId = (l: { from: string; to: string }) => `${l.from}\n${l.to}`
 
 export class ScreenCache {
   private entries = new Map<string, CacheEntry>()
-  /** Keyed by "from#variant\nto": the first click between two screens names the arrow. */
+  /** Keyed by "from\nto": the first click between two screens names it. */
   private links = new Map<string, Link>()
-  /**
-   * The next letter at each level of each mockup, keyed by "root\nlevel". Kept apart from the
-   * screens, so a letter stays taken after its screen is deleted.
-   */
-  private letters = new Map<string, number>()
 
   /** With a file, the cache loads it now and rewrites it after every change. */
   constructor(private file: string | null = null) {
-    if (file && existsSync(file)) {
-      try {
-        // The first file format was a bare list of entries.
-        const data = JSON.parse(readFileSync(file, 'utf8')) as CacheEntry[] | { entries: CacheEntry[]; links: Link[]; letters?: Record<string, number> }
-        const { entries, links, letters = {} } = Array.isArray(data) ? { entries: data, links: [] } : data
-        for (const e of entries) this.entries.set(e.key, e)
-        for (const l of links) this.links.set(linkId(l), l)
-        for (const [k, n] of Object.entries(letters)) this.letters.set(k, n)
-      } catch (err) {
-        const aside = `${file}.corrupt-${Date.now()}`
-        renameSync(file, aside)
-        console.warn(`screen cache ${file} was unreadable (${err}); moved it to ${aside} and started empty`)
+    if (!file || !existsSync(file)) return
+    try {
+      const data = JSON.parse(readFileSync(file, 'utf8'))
+      if (data?.version === FORMAT) {
+        for (const e of data.entries as CacheEntry[]) this.entries.set(e.key, e)
+        for (const l of data.links as Link[]) this.links.set(linkId(l), l)
+      } else {
+        // A file from before versions: keep it on disk, and carry over each screen's pick.
+        copyFileSync(file, `${file}.before-versions`)
+        this.migrate(Array.isArray(data) ? { entries: data, links: [] } : data)
+        this.save()
       }
-      if (this.migrate()) this.save()
+    } catch (err) {
+      const aside = `${file}.corrupt-${Date.now()}`
+      renameSync(file, aside)
+      console.warn(`screen cache ${file} was unreadable (${err}); moved it to ${aside} and started empty`)
     }
   }
 
@@ -107,45 +94,54 @@ export class ScreenCache {
   }
 
   /**
-   * Store new candidates, in order, each with the next free letter at its screen's level. The first
-   * candidate of a key becomes the chosen one; later ones do not. A new screen made by a click
-   * remembers that click as its parent. Returns the index of the first one added.
+   * Store one finished side of a new screen's A OR B. The first side to finish makes the screen,
+   * with the click as its parent. Returns the screen, or undefined when a side was already picked
+   * (the other one is dropped).
    */
-  add(app: string, action: string | null, candidates: Candidate[], opts: AddOptions = {}): { entry: CacheEntry; index: number } {
+  propose(app: string, action: string | null, side: number, version: Version, parent: Parent | null = null): CacheEntry | undefined {
     action = canonicalAction(app, action)
     const key = screenKey(app, action)
     let entry = this.entries.get(key)
-    const root = normalizePrompt(app)
     if (!entry) {
-      // A parent must be a live variant of this mockup; a click that raced a delete makes no parent.
-      const p = opts.parent, from = p && this.entries.get(p.key)
-      const parent = action && p && from && normalizePrompt(from.app) === root && isLive(from, p.variant) ? p : null
-      const level = action ? (parent ? this.entries.get(parent.key)!.level + 1 : 2) : 1
-      entry = { key, app, action, chosen: 0, candidates: [], level, parent }
+      // A parent must be a picked screen of this mockup; a click that raced a delete makes no parent.
+      const from = parent && this.entries.get(parent.key)
+      const ok = action && parent && from?.versions.length && normalizePrompt(from.app) === normalizePrompt(app)
+      entry = { key, app, action, level: action ? (ok ? from!.level + 1 : 2) : 1, parent: ok ? { key: parent!.key, label: parent!.label } : null, versions: [], proposals: Array(PROPOSALS).fill(null) }
       this.entries.set(key, entry)
     }
-    const index = entry.candidates.length
-    const at = `${root}\n${entry.level}`
-    let n = this.letters.get(at) ?? 0
-    entry.candidates.push(...candidates.map((c) => ({ ...c, letter: letterAt(n++) })))
-    this.letters.set(at, n)
+    if (!entry.proposals || !Number.isInteger(side) || side < 0 || side >= entry.proposals.length) return undefined
+    entry.proposals[side] = version
     this.save()
-    return { entry, index }
+    return entry
   }
 
-  /**
-   * Refresh a variant: the new version gets the next letter and shows in the old one's place (and
-   * is picked if the old one was), and the old one is deleted like deleteVariant does, with the
-   * screens only it led to. Returns the screen, the new index and the keys removed.
-   */
-  replace(key: string, index: number, candidate: Candidate): { entry: CacheEntry; index: number; removed: string[] } | undefined {
+  /** Keep one side of the open A OR B as the screen's first version; the other is gone. */
+  pick(key: string, side: number): CacheEntry | undefined {
     const entry = this.entries.get(key)
-    if (!entry || !Number.isInteger(index) || !isLive(entry, index)) return undefined
-    const old = entry.candidates[index]!
-    const { index: next } = this.add(entry.app, entry.action, [{ ...candidate, replaces: index, ...(old.prompt && { prompt: old.prompt }) }])
-    if (entry.chosen === index) entry.chosen = next
-    const { removed } = this.deleteVariant(key, index)!
-    return { entry, index: next, removed }
+    const v = Number.isInteger(side) ? entry?.proposals?.[side] : null
+    if (!entry || !v) return undefined
+    entry.versions = [v]
+    delete entry.proposals
+    this.save()
+    return entry
+  }
+
+  /** Add a version to a picked screen (an Edit or a Regenerate); it shows from now on. */
+  addVersion(key: string, version: Version): CacheEntry | undefined {
+    const entry = this.entries.get(key)
+    if (!entry?.versions.length) return undefined
+    entry.versions.push(version)
+    this.save()
+    return entry
+  }
+
+  /** Drop the newest version, so the one before shows again. Never the last one. */
+  undo(key: string): CacheEntry | undefined {
+    const entry = this.entries.get(key)
+    if (!entry || entry.versions.length < 2) return undefined
+    entry.versions.pop()
+    this.save()
+    return entry
   }
 
   /** The action prompts of this mockup's later screens, newest first. */
@@ -157,14 +153,14 @@ export class ScreenCache {
       .reverse()
   }
 
-  /** Record that a click in variant `variant` of `from` led to `to`. Both must be screens of the same mockup. */
-  link(from: string, variant: number, to: string, label: string): Link | undefined {
+  /** Record that a click in `from` led to `to`. Both must be screens of the same mockup, and `from` picked. */
+  link(from: string, to: string, label: string): Link | undefined {
     const a = this.entries.get(from), b = this.entries.get(to)
-    if (!a || !b || from === to || !isLive(a, variant) || normalizePrompt(a.app) !== normalizePrompt(b.app)) return undefined
-    const id = linkId({ from, variant, to })
+    if (!a || !b || from === to || !a.versions.length || normalizePrompt(a.app) !== normalizePrompt(b.app)) return undefined
+    const id = linkId({ from, to })
     const existing = this.links.get(id)
     if (existing) return existing
-    const l: Link = { from, variant, to, label: label.trim().replace(/\s+/g, ' ').slice(0, 80), createdAt: new Date().toISOString() }
+    const l: Link = { from, to, label: label.trim().replace(/\s+/g, ' ').slice(0, 80), createdAt: new Date().toISOString() }
     this.links.set(id, l)
     this.save()
     return l
@@ -186,49 +182,37 @@ export class ScreenCache {
       const root = normalizePrompt(e.app)
       const a = byRoot.get(root) ?? { app: e.app, screens: 0, updatedAt: '' }
       a.screens++
-      for (const c of e.candidates) if (c.createdAt > a.updatedAt) a.updatedAt = c.createdAt
+      for (const v of [...e.versions, ...(e.proposals ?? [])]) if (v && v.createdAt > a.updatedAt) a.updatedAt = v.createdAt
       byRoot.set(root, a)
     }
     return [...byRoot.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   }
 
-  choose(key: string, index: number): CacheEntry | undefined {
-    const entry = this.entries.get(key)
-    if (!entry || !Number.isInteger(index) || !isLive(entry, index)) return undefined
-    entry.chosen = index
-    this.save()
-    return entry
-  }
-
   /**
-   * Delete one variant: its markup goes, its letter stays taken. A screen with no variant left goes
-   * too, and so does every screen that can no longer be reached from the first one. Returns the
-   * screen (undefined once it is gone) and the keys of the screens removed.
+   * Delete a screen, and every screen the first screen no longer reaches without it. A screen still
+   * reached by another click takes that click as its new parent. The first screen takes the whole
+   * mockup with it. Returns the keys removed.
    */
-  deleteVariant(key: string, index: number): { entry: CacheEntry | undefined; removed: string[] } | undefined {
+  delete(key: string): string[] | undefined {
     const entry = this.entries.get(key)
-    if (!entry || !Number.isInteger(index) || !isLive(entry, index)) return undefined
+    if (!entry) return undefined
     const root = normalizePrompt(entry.app)
-    const before = this.reach(root)
-    const c = entry.candidates[index]!
-    entry.candidates[index] = { ...c, html: '', deleted: true }
-    for (const [id, l] of this.links) if (l.from === key && l.variant === index) this.links.delete(id)
-    if (entry.chosen === index) {
-      const live = entry.candidates.findIndex((x) => !x.deleted)
-      if (live >= 0) entry.chosen = live
+    if (key === root) {
+      const gone = this.mockup(root).map((e) => e.key)
+      this.deleteApp(entry.app)
+      return gone
     }
-    const removed = this.prune(root, before)
+    const before = this.reach(root)
+    this.entries.delete(key)
+    const removed = [key, ...this.prune(root, before)]
     this.save()
-    return { entry: this.entries.get(key), removed }
+    return removed
   }
 
   /** Delete a whole mockup: all its screens and links. Returns how many screens went. */
   deleteApp(app: string): number {
-    const root = normalizePrompt(app)
-    const gone = this.mockup(root)
+    const gone = this.mockup(normalizePrompt(app))
     for (const e of gone) this.entries.delete(e.key)
-    // A mockup made again from its prompt starts over at L1-A.
-    for (const k of this.letters.keys()) if (k.startsWith(`${root}\n`)) this.letters.delete(k)
     this.dropLinks()
     if (gone.length) this.save()
     return gone.length
@@ -242,30 +226,27 @@ export class ScreenCache {
     return [...this.entries.values()].filter((e) => normalizePrompt(e.app) === root)
   }
 
-
   private dropLinks() {
     for (const [id, l] of this.links) if (!this.entries.has(l.from) || !this.entries.has(l.to)) this.links.delete(id)
   }
 
   /**
-   * The screens of a mockup the first screen reaches through live variants, following both parents
-   * and other clicks, each with the click that reached it first (null for the first screen).
+   * The screens of a mockup the first screen reaches, following parents first and then other
+   * clicks, each with the click that reached it first (null for the first screen).
    */
   private reach(root: string): Map<string, Parent | null> {
     const entries = this.mockup(root)
-    const first = this.entries.get(root)
     const reached = new Map<string, Parent | null>()
-    if (first && first.candidates.some((c) => !c.deleted)) reached.set(root, null)
+    if (this.entries.has(root)) reached.set(root, null)
     const queue = [...reached.keys()]
     while (queue.length) {
-      const from = this.entries.get(queue.shift()!)!
+      const from = queue.shift()!
       const edges: Parent[] = []
-      for (const e of entries) if (e.parent?.key === from.key) edges.push({ ...e.parent, key: e.key })
-      for (const l of this.links.values()) if (l.from === from.key) edges.push({ key: l.to, variant: l.variant, label: l.label })
-      for (const { key, variant, label } of edges) {
-        const to = this.entries.get(key)
-        if (!to || reached.has(key) || !isLive(from, variant) || !to.candidates.some((c) => !c.deleted)) continue
-        reached.set(key, { key: from.key, variant, label })
+      for (const e of entries) if (e.parent?.key === from) edges.push({ key: e.key, label: e.parent.label })
+      for (const l of this.links.values()) if (l.from === from) edges.push({ key: l.to, label: l.label })
+      for (const { key, label } of edges) {
+        if (reached.has(key) || !this.entries.has(key)) continue
+        reached.set(key, { key: from, label })
         queue.push(key)
       }
     }
@@ -274,9 +255,8 @@ export class ScreenCache {
 
   /**
    * After a delete: remove the screens the first screen reached `before` and no longer reaches.
-   * Screens it never reached (from old files without links) are left alone. A screen still reached
-   * whose parent chain no longer leads to the first screen takes the click that reaches it now.
-   * Returns the keys removed.
+   * Screens it never reached are left alone. Then every parent chain leads to the first screen
+   * again, and levels follow the parents. Returns the keys removed.
    */
   private prune(root: string, before: Map<string, Parent | null>): string[] {
     const reached = this.reach(root)
@@ -286,85 +266,71 @@ export class ScreenCache {
       this.entries.delete(key)
       removed.push(key)
     }
-    // Repeat until stable: each fix points a screen at one the search found earlier, so it ends.
+    this.dropLinks()
+    this.settle(root, reached)
+    return removed
+  }
+
+  /** Point each reached screen whose parent chain does not lead home at the click that reaches it; then fix levels. */
+  private settle(root: string, reached: Map<string, Parent | null>) {
     const leadsHome = (e: CacheEntry) => {
       const seen = new Set<string>()
       for (let x: CacheEntry | undefined = e; x; x = x.parent ? this.entries.get(x.parent.key) : undefined) {
         if (x.key === root) return true
-        if (seen.has(x.key) || (x.parent && !isLive(this.entries.get(x.parent.key), x.parent.variant))) return false
+        if (seen.has(x.key)) return false
         seen.add(x.key)
       }
       return false
     }
+    // Repeat until stable: each fix points a screen at one the search found earlier, so it ends.
     for (let changed = true; changed;) {
       changed = false
       for (const [key, via] of reached) {
-        const e = this.entries.get(key)!
-        if (key === root || leadsHome(e)) continue
+        const e = this.entries.get(key)
+        if (!e || key === root || leadsHome(e)) continue
         e.parent = via
         changed = true
       }
     }
-    this.dropLinks()
-    return removed
+    const level = (e: CacheEntry, depth = 0): number => {
+      const p = e.parent && this.entries.get(e.parent.key)
+      return e.key === root ? 1 : p && depth < 1000 ? level(p, depth + 1) + 1 : e.level
+    }
+    for (const e of this.mockup(root)) e.level = level(e)
   }
 
   /**
-   * Fill in what files from before the tree lack: each link's variant (the screen's pick), each
-   * screen's level and parent (the earliest click into it, walking out from the first screen), and
-   * each variant's letter (in the order made). Returns true if anything changed.
+   * Carry over a file from before versions: each screen keeps only its picked variant. Links and
+   * parents from other variants go, and so do the screens no picked screen reaches any more.
    */
-  private migrate(): boolean {
-    let changed = false
-    for (const l of this.links.values()) {
-      if (l.variant != null) continue
-      l.variant = this.entries.get(l.from)?.chosen ?? 0
-      changed = true
+  private migrate(data: { entries: OldEntry[]; links?: OldLink[] }) {
+    const chosen = new Map<string, number>()
+    for (const o of data.entries) {
+      const live = (i: number) => o.candidates[i] && !o.candidates[i]!.deleted
+      const i = live(o.chosen) ? o.chosen : o.candidates.findIndex((_, j) => live(j))
+      if (i < 0) continue
+      chosen.set(o.key, i)
+      const { html, model, servedModel, createdAt, costUsd, costEstimated, firstChunkMs, totalMs, finishReason, device, name, feedback } = o.candidates[i]!
+      const idea = screenIdea(html)
+      const version: Version = { html, model, servedModel, createdAt, costUsd, costEstimated, firstChunkMs, totalMs, finishReason,
+        ...(device && { device }), ...(name && { name }), ...(idea && { idea }), ...(feedback && { feedback }) }
+      this.entries.set(o.key, { key: o.key, app: o.app, action: o.action, level: o.level ?? (o.action ? 2 : 1), parent: null, versions: [version] })
     }
-    // Links stored before variants existed were keyed without one.
-    this.links = new Map([...this.links.values()].map((l) => [linkId(l), l]))
-    const roots = new Set([...this.entries.values()].map((e) => normalizePrompt(e.app)))
-    for (const root of roots) {
-      const entries = this.mockup(root)
-      if (entries.every((e) => e.level != null && e.candidates.every((c) => c.letter))) continue
-      changed = true
-      const links = [...this.links.values()].filter((l) => entries.some((e) => e.key === l.from)).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-      const queue = entries.filter((e) => !e.action)
-      for (const e of queue) { e.level ??= 1; e.parent ??= null }
-      while (queue.length) {
-        const from = queue.shift()!
-        for (const l of links) {
-          const to = this.entries.get(l.to)
-          if (l.from !== from.key || !to || to.level != null) continue
-          to.level = from.level + 1
-          to.parent = { key: from.key, variant: l.variant, label: l.label }
-          queue.push(to)
-        }
-      }
-      for (const e of entries) { e.level ??= 2; e.parent ??= null }
-      // A pair is stored in slot order, but its second variant may have finished first: within a
-      // screen, a variant counts as made no later than the ones after it, so A stays before B.
-      const byLevel = new Map<number, { c: Candidate; at: string }[]>()
-      for (const e of entries) {
-        let at = '￿'
-        const timed = e.candidates.map((c) => ({ c, at: '' })).reverse()
-        for (const t of timed) t.at = at = t.c.createdAt < at ? t.c.createdAt : at
-        byLevel.set(e.level, [...(byLevel.get(e.level) ?? []), ...timed.reverse()])
-      }
-      for (const list of byLevel.values()) {
-        let n = list.filter((t) => t.c.letter).length
-        for (const t of [...list].sort((a, b) => a.at.localeCompare(b.at))) t.c.letter ??= letterAt(n++)
-      }
+    const fromPick = (key: string, variant: number | undefined) => chosen.has(key) && (variant == null || variant === chosen.get(key))
+    for (const o of data.entries) {
+      const p = o.parent, e = this.entries.get(o.key)
+      if (e && p && fromPick(p.key, p.variant)) e.parent = { key: p.key, label: p.label }
     }
-    // Letter counters start after the highest letter in use at each level.
-    for (const e of this.entries.values()) {
-      const at = `${normalizePrompt(e.app)}\n${e.level}`
-      for (const c of e.candidates) {
-        const next = letterIndex(c.letter ?? '') + 1
-        if (next > (this.letters.get(at) ?? 0)) { this.letters.set(at, next); changed = true }
-      }
+    for (const l of data.links ?? []) {
+      if (fromPick(l.from, l.variant) && this.entries.has(l.to) && !this.links.has(linkId(l)))
+        this.links.set(linkId(l), { from: l.from, to: l.to, label: l.label, createdAt: l.createdAt })
     }
-    return changed
+    for (const root of new Set([...this.entries.values()].map((e) => normalizePrompt(e.app)))) {
+      const reached = this.reach(root)
+      for (const e of this.mockup(root)) if (!reached.has(e.key)) this.entries.delete(e.key)
+      this.settle(root, reached)
+    }
+    this.dropLinks()
   }
 
   private save() {
@@ -372,7 +338,15 @@ export class ScreenCache {
     mkdirSync(dirname(this.file), { recursive: true })
     // Write a temp file, then rename, so a crash never leaves half a cache file.
     const tmp = `${this.file}.tmp`
-    writeFileSync(tmp, JSON.stringify({ entries: [...this.entries.values()], links: [...this.links.values()], letters: Object.fromEntries(this.letters) }, null, 1))
+    writeFileSync(tmp, JSON.stringify({ version: FORMAT, entries: [...this.entries.values()], links: [...this.links.values()] }, null, 1))
     renameSync(tmp, this.file)
   }
 }
+
+/** A screen in a file from before versions: variants ("candidates") and the one picked. */
+interface OldEntry {
+  key: string; app: string; action: string | null; chosen: number; level?: number
+  parent?: { key: string; variant?: number; label: string } | null
+  candidates: (Version & { deleted?: boolean })[]
+}
+interface OldLink { from: string; variant?: number; to: string; label: string; createdAt: string }

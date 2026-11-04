@@ -10,7 +10,7 @@ async function run(model: ModelId, action: string | null) {
   const chunks: string[] = []
   for await (const ev of generateScreen({ app: 'A coffee shop ordering app', action, model, fetch: tape.fetch, env: tape.env, log: () => {} })) {
     if (ev.type === 'chunk') chunks.push(ev.text)
-    else return { chunks, candidate: ev.candidate }
+    else return { chunks, version: ev.version }
   }
   throw new Error('no final event')
 }
@@ -18,7 +18,7 @@ async function run(model: ModelId, action: string | null) {
 describe('generate a screen', () => {
   for (const model of Object.keys(MODELS) as ModelId[]) {
     test(`${model} streams an HTML fragment with action prompts and a cost`, async () => {
-      const { chunks, candidate: c } = await run(model, null)
+      const { chunks, version: c } = await run(model, null)
       expect(chunks.length).toBeGreaterThan(5)
       expect(c.html).toContain('<script>')
       expect(c.html).not.toContain('```')
@@ -30,11 +30,12 @@ describe('generate a screen', () => {
       expect(c.finishReason).toBe('stop')
       expect(c.name?.length).toBeGreaterThan(2)
       expect(c.html).toMatch(/^\s*<title>/)
+      expect(c.idea?.length).toBeGreaterThan(8)
     }, 30_000)
   }
 
   test('a later screen is asked for with the product and the action prompt', async () => {
-    const { candidate } = await run('claude-haiku-5.5', 'Checkout screen with 2 lattes in the cart')
-    expect(candidate.html.toLowerCase()).toContain('checkout')
+    const { version } = await run('claude-haiku-5.5', 'Checkout screen with 2 lattes in the cart')
+    expect(version.html.toLowerCase()).toContain('checkout')
   }, 30_000)
 })

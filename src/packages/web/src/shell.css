@@ -1,143 +1,112 @@
-/* The app around the screen. Generated screens get only the theme CSS, inside their iframe. */
+/* The app around the screens. Generated screens get only the theme CSS, inside their iframe. */
 :root {
   /* The app's own colour is burnt orange; blue belongs to the mockups (controls that open a screen). */
   --bg: #f6f6f4; --fg: #1d1d1f; --muted: #6b6b70; --line: #d9d9d6; --accent: #c2501a; --card: #fff; --err: #b3261e;
-  --dot: #cfcfca;
+  --dot: #cfcfca; --shadow: 0 6px 24px rgba(0, 0, 0, .18);
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #151517; --fg: #ececee; --muted: #9a9aa0; --line: #33333a; --accent: #f08a4b; --card: #1e1e22; --err: #ff8a80;
-    --dot: #34343b; }
+    --dot: #34343b; --shadow: 0 6px 24px rgba(0, 0, 0, .5); }
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, -apple-system, sans-serif;
   height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-header { padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
-#promptForm { display: flex; gap: 8px; flex: 1 1 480px; align-items: center; }
-.logo { font-size: 16px; white-space: nowrap; }
-input, select, button { font: inherit; color: inherit; }
-#prompt { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); }
-button, select { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); cursor: pointer; }
+input, select, button, textarea { font: inherit; color: inherit; }
+button, select { padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); cursor: pointer; }
 button:disabled { opacity: .45; cursor: default; }
-#go { background: var(--accent); border-color: var(--accent); color: #fff; }
-.pickers { display: flex; flex-wrap: wrap; gap: 8px 12px; min-width: 0; }
-.pickers label { display: flex; gap: 6px; align-items: center; color: var(--muted); }
-.zoom { display: flex; gap: 6px; align-items: center; }
-.zoom button { padding: 3px 8px; }
-.zoom input { width: 110px; accent-color: var(--accent); }
-.zoom output { min-width: 3.2em; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
-.examples { flex-basis: 100%; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.example { padding: 2px 8px; font-size: 13px; }
-.app-tool { padding: 2px 8px; font-size: 13px; }
-#deleteApp:hover { color: var(--err); border-color: var(--err); }
-#history { margin-left: auto; padding: 2px 8px; font-size: 13px; max-width: 22em; }
-.metrics { flex: none; padding: 6px 16px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.4em; }
-.metrics b { color: var(--fg); font-weight: 600; }
-.error { margin: 0 16px; padding: 8px 12px; border: 1px solid var(--err); color: var(--err); border-radius: 6px; }
-.error[hidden] { display: none; }
-/* The feed fills the workspace; the tree of all screens floats over it, top right. */
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* The toolbar: project menu on the left, Nav in the middle, zoom on the right. */
+.toolbar { flex: none; height: 44px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px;
+  padding: 0 10px; border-bottom: 1px solid var(--line); background: var(--card); position: relative; z-index: 20; }
+.tb-left { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.tb-mid { display: flex; justify-content: center; min-width: 0; }
+.tb-right { display: flex; gap: 4px; justify-content: flex-end; align-items: center; }
+.logo { font-size: 15px; white-space: nowrap; color: var(--accent); }
+.toolbar button { padding: 4px 9px; border-color: transparent; background: none; }
+.toolbar button:hover:not(:disabled) { border-color: var(--line); background: var(--bg); }
+.zoom #zoomValue { min-width: 4.5em; font-variant-numeric: tabular-nums; }
+
+/* The workspace: the canvas, the generate panel over it, the drawer at the right. */
 .workspace { flex: 1; min-height: 0; display: flex; position: relative; }
-.tree { position: absolute; top: 12px; right: 24px; z-index: 5; width: 280px; max-height: calc(100% - 24px); display: flex;
-  flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, .25); font-size: 13px; }
-.tree:empty { display: none; }
-.tree-head { flex: none; display: flex; gap: 8px; align-items: center; padding: 6px 6px 6px 12px; border-bottom: 1px solid var(--line);
-  color: var(--muted); cursor: grab; user-select: none; touch-action: none; }
-.tree-head b { color: var(--fg); }
-.tree-head span { flex: 1; }
-.tree-head .fold { width: 24px; height: 24px; padding: 0; border-color: transparent; background: none; color: var(--muted); }
-.tree-head .fold:hover { border-color: var(--line); color: var(--fg); }
-.tree-body { overflow: auto; padding: 6px 8px 10px; }
-.tree ul { list-style: none; margin: 0; padding: 0; }
-.tree .branch { margin-left: 10px; padding-left: 8px; border-left: 1px solid var(--line); }
-.tree .via { color: var(--muted); margin: 2px 0 0 4px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tree .line { display: flex; gap: 6px; width: 100%; padding: 2px 4px; border: 0; border-radius: 4px; background: none; text-align: left;
-  color: var(--muted); }
-.tree .line:hover { background: var(--bg); color: var(--fg); }
-.tree .line .id { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
-.tree .line .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tree .line.flow { color: var(--accent); }
-.tree .line.flow .name { color: var(--fg); font-weight: 600; }
-@media (max-width: 700px) { .tree { display: none; } .stage { padding-right: 16px; } }
-/* The feed: one row per step of the flow, top to bottom; a row is a stack of variants. It is
-   one surface that scrolls both ways, on a dot grid whose spacing follows the zoom. Room on the
-   right lets the last variant scroll out from under the floating tree. */
-.stage { flex: 1; min-width: 0; min-height: 0; position: relative; overflow: auto; padding: 8px 320px 40vh 16px;
+.stage { flex: 1; min-width: 0; min-height: 0; position: relative; overflow: auto; outline: none;
   --z: 1; background: var(--bg) radial-gradient(circle, var(--dot) 1.2px, transparent 1.4px) 0 0 / calc(24px * var(--z)) calc(24px * var(--z));
   background-attachment: local; }
-.empty .go { color: #2a5bd7; font-weight: 600; }
-.empty { color: var(--muted); text-align: center; margin: 15vh auto 0; max-width: 52ch; padding: 0 16px; }
-.feed { position: relative; width: max-content; min-width: 100%; padding-left: 32px; }
-.row { margin-bottom: 40px; }
-.row-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; margin: 0 0 10px; }
-.row-title { font-size: 15px; }
-.row-note { color: var(--muted); }
-/* The flow's lines (drawn by feed.ts): a line from front variant to front variant, dashed arcs in the
-   left gutter for other clicks. Row titles sit on a background, so a line passes behind them. */
+.stage.panning { cursor: grabbing; }
+.stage.panning iframe { pointer-events: none; }
+
+/* The generate panel: large in the middle with no mockup open, else a popover under the project menu. */
+.generate { position: absolute; z-index: 15; left: 50%; top: 12vh; transform: translateX(-50%); width: min(680px, calc(100% - 32px));
+  display: flex; flex-direction: column; gap: 12px; padding: 20px; background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: var(--shadow); max-height: calc(100% - 24px); overflow: auto; }
+.generate.pop { left: 10px; top: 8px; transform: none; width: min(560px, calc(100% - 20px)); }
+.generate h2 { margin: 0; font-size: 18px; }
+.generate h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+#prompt { width: 100%; resize: none; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
+  font-size: 15px; field-sizing: content; min-height: 3.2em; max-height: 14em; }
+.gen-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.gen-row label { display: flex; gap: 6px; align-items: center; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.example { padding: 3px 9px; font-size: 13px; }
+.example:hover, .recent button:hover { border-color: var(--accent); }
+.recent { display: flex; flex-direction: column; gap: 2px; max-height: 15em; overflow: auto; }
+.recent button { text-align: left; border-color: transparent; background: none; padding: 4px 8px; display: flex; gap: 8px; }
+.recent button span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent button small { color: var(--muted); white-space: nowrap; }
+
+/* The status pill at the bottom of the canvas: what is happening, what it cost; errors in red. */
+.status { position: absolute; z-index: 12; left: 50%; bottom: 14px; transform: translateX(-50%); max-width: calc(100% - 32px);
+  display: flex; gap: 8px; align-items: center; padding: 6px 8px 6px 14px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--card); color: var(--muted); box-shadow: var(--shadow); font-variant-numeric: tabular-nums; font-size: 13px; }
+.status b { color: var(--fg); font-weight: 600; }
+.status.error { border-color: var(--err); color: var(--err); }
+.status button { padding: 0 6px; border: 0; background: none; color: inherit; }
+
+/* The canvas: screens at fixed places, in canvas pixels; CSS zoom scales it. Names, ideas and
+   rails divide by --z, so they keep their size on screen. */
+.surface { position: relative; }
 .lines { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
-.lines .step { fill: none; stroke: var(--accent); stroke-width: 2; }
-.lines .back { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: stroke; }
-.lines .arrow { fill: var(--accent); }
-.lines .via { fill: var(--accent); font: 600 13px system-ui, -apple-system, sans-serif; }
-.row-head > * { position: relative; background: var(--bg); padding: 0 4px; border-radius: 4px; }
-.row-head .tabs { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); }
-.row-head .tab { min-width: 26px; padding: 1px 7px; border: 0; border-radius: 5px; background: none; color: var(--muted); font-size: 12px; font-weight: 600; }
-.row-head .tab:hover { color: var(--fg); background: var(--bg); }
-.row-head .tab.on { background: var(--accent); color: #fff; }
-.row-head .compare { padding: 1px 8px; font-size: 12px; color: var(--muted); }
-.row-head .compare:hover { color: var(--fg); border-color: var(--accent); }
-/* A row is a stack: the front variant in the flow, the others behind it, each one EDGE (112px, see
-   feed.ts) further right, a little shorter and darker, like windows in Time Machine. Only their
-   right edge shows, with their name. Fanned out (Compare), the variants sit side by side. */
-.strip { position: relative; isolation: isolate; width: fit-content; display: flex; gap: 16px; align-items: flex-start; padding: 4px 4px 12px; }
-.variant { flex: none; position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, .12); }
-.strip:not(.fanned) .variant:not(.back) { box-shadow: 8px 0 18px rgba(0, 0, 0, .22); }
-.variant.back { position: absolute; cursor: pointer; --step: calc(var(--k) * 112px);
-  left: calc(4px + var(--step)); right: calc(4px - var(--step));
-  top: calc(4px + var(--k) * 10px); bottom: calc(12px + var(--k) * 10px);
-  filter: brightness(calc(1 - var(--k) * .05)); transition: filter .15s, border-color .15s; }
-.variant.back:hover { filter: none; border-color: var(--accent); }
-.variant.back > :not(.edge) { visibility: hidden; }
-/* A card that goes back keeps its screen while it slides (see SLIDE_MS); its edge fades in. */
-.variant > :not(.edge) { transition: visibility .26s; }
-.edge { display: none; }
-.variant.back .edge { animation: edge-in .3s ease-out; }
-@keyframes edge-in { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .variant > * { transition: none; } .variant.back .edge { animation: none; } }
-.variant.back .edge { display: flex; flex-direction: column; gap: 4px; position: absolute; top: 0; right: 0; bottom: 0; width: 112px;
-  padding: 12px 10px 12px 14px; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; background: var(--card); }
-.edge b { color: var(--fg); }
-.edge span { color: var(--fg); }
-.edge small { font-size: 12px; }
-.variant.back:hover .edge b { color: var(--accent); }
-.strip.fanned .variant.chosen { outline: 3px solid var(--accent); outline-offset: 1px; }
-.variant.streaming { opacity: .85; }
-/* The bar and panels take the screen's width, never set it: a long prompt wraps instead. */
-.variant-bar, .panel { width: 0; min-width: 100%; }
-.variant-bar { cursor: pointer; display: flex; gap: 8px; align-items: center; min-height: 36px; padding: 4px 8px 4px 12px; font-size: 13px;
-  color: var(--muted); border-bottom: 1px solid var(--line); }
-.variant-bar .caption { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); font-weight: 600; }
-.variant-bar .picked { display: none; color: var(--accent); font-weight: 700; }
-.strip.fanned .variant.chosen .picked { display: inline; }
-.variant-bar .tool { flex: none; width: 26px; height: 26px; padding: 0; border-color: transparent; background: none; color: var(--muted);
-  font-size: 14px; line-height: 1; }
-.variant-bar .tool:hover:not(:disabled) { border-color: var(--line); color: var(--fg); }
-.variant-bar .tool[data-tool="delete"]:hover:not(:disabled) { color: var(--err); }
-/* Edit and Info open here, between the bar and the screen. */
-.panel { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
-.panel label { color: var(--muted); }
-.panel textarea { width: 100%; resize: vertical; font: inherit; color: inherit; padding: 6px 8px; border: 1px solid var(--line);
-  border-radius: 6px; background: var(--bg); }
-.panel-buttons { display: flex; gap: 8px; }
-.panel .make { background: var(--accent); border-color: var(--accent); color: #fff; }
-.panel .restart { display: flex; flex-direction: column; gap: 8px; }
-.panel .restart summary { cursor: pointer; color: var(--muted); }
-.panel .restart summary:hover { color: var(--fg); }
-.panel .restart:not([open]) { gap: 0; }
-.info { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; margin: 0; }
-.info dt { color: var(--muted); }
-.info dd { margin: 0; overflow-wrap: anywhere; }
-.screen { overflow: hidden; }
-.screen iframe { display: block; border: 0; background: #fff; }
+.lines .line { fill: none; stroke: var(--accent); stroke-width: calc(1.5px / var(--z)); opacity: .8; }
+.card { position: absolute; }
+.card .screen { position: relative; overflow: hidden; background: #fff; border: calc(1px / var(--z)) solid var(--line);
+  border-radius: calc(8px / var(--z)); box-shadow: 0 2px 10px rgba(0, 0, 0, .12); }
+.card.current .screen { outline: calc(2px / var(--z)) solid var(--accent); outline-offset: calc(2px / var(--z)); }
+.card iframe { display: block; border: 0; background: #fff; }
+.card .head { position: absolute; left: 0; bottom: 100%; width: 100%; padding-bottom: calc(6px / var(--z));
+  display: flex; flex-direction: column; font-size: calc(13px / var(--z)); line-height: 1.3; }
+.card .head > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .name { color: var(--fg); }
+.card.current .name { color: var(--accent); }
+.card .idea { color: var(--muted); }
+.card .note { color: var(--accent); font-weight: 600; }
+.card.streaming .screen { opacity: .8; }
+/* A side of an A OR B: its idea above in larger type, and a shield over the frame that takes the click. */
+.card.side .head > * { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.card.side .idea { color: var(--fg); font-size: calc(16px / var(--z)); font-weight: 600; }
+.card .shield { display: none; }
+.card.side .shield { display: flex; position: absolute; inset: 0; cursor: progress; align-items: flex-start; justify-content: center;
+  padding-top: calc(160px / var(--z)); }
+.card.side.pickable .shield { cursor: pointer; }
+.card.side.pickable:hover .screen { outline: calc(3px / var(--z)) solid var(--accent); outline-offset: calc(3px / var(--z)); }
+.pick-hint { opacity: 0; transition: opacity .15s; padding: calc(8px / var(--z)) calc(16px / var(--z)); border-radius: 999px;
+  background: var(--accent); color: #fff; font-weight: 600; font-size: calc(14px / var(--z)); box-shadow: var(--shadow); }
+.card.side.pickable:hover .pick-hint { opacity: 1; }
+.error-box { height: 100%; padding: calc(16px / var(--z)); border: calc(1px / var(--z)) dashed var(--err); border-radius: calc(8px / var(--z));
+  color: var(--err); font-size: calc(13px / var(--z)); overflow: auto; background: var(--card); }
+.or { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(12px / var(--z));
+  pointer-events: none; }
+.or b { font-size: calc(40px / var(--z)); font-weight: 800; color: var(--accent); letter-spacing: .04em; }
+.or .drop { pointer-events: auto; width: calc(32px / var(--z)); height: calc(32px / var(--z)); padding: 0; border-radius: 50%;
+  font-size: calc(14px / var(--z)); color: var(--muted); border-width: calc(1px / var(--z)); }
+.or .drop:hover { color: var(--err); border-color: var(--err); }
+
+/* The rail: big icon buttons right of a screen, full strength on the current screen, else on hover. */
+.rail { position: absolute; left: 100%; top: 0; padding-left: calc(10px / var(--z)); display: flex; flex-direction: column;
+  gap: calc(6px / var(--z)); opacity: 0; transition: opacity .15s; }
+.card:hover .rail, .card.current .rail, .rail:focus-within { opacity: 1; }
+.rail .tool { width: calc(40px / var(--z)); height: calc(40px / var(--z)); padding: 0; border-radius: calc(10px / var(--z));
+  border-width: calc(1px / var(--z)); font-size: calc(18px / var(--z)); line-height: 1; color: var(--muted); box-shadow: 0 1px 4px rgba(0, 0, 0, .1); }
+.rail .tool:hover:not(:disabled) { color: var(--fg); border-color: var(--accent); }
+.rail .tool[data-tool="delete"]:hover:not(:disabled) { color: var(--err); border-color: var(--err); }

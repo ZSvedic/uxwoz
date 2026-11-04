@@ -3,7 +3,7 @@
 
 export const SYSTEM_PROMPT = `You build interactive UIs as one HTML fragment with plain JavaScript, styled by classless Pico.css (already loaded; do not load anything else). Reply with the HTML only: no markdown fences, no prose, no <html>/<head>/<body> tags.
 
-- Begin the reply with <title>Name</title>: a name of 1-4 words for this screen, e.g. <title>Order checkout</title>.
+- Begin the reply with <title>Name</title>: a name of 1-4 words for this screen, e.g. <title>Order checkout</title>. Then add <meta name="idea" content="...">: one short sentence naming the idea of this design, e.g. <meta name="idea" content="Common actions as buttons on top">.
 
 - Write no CSS and no classes: use semantic HTML that Pico styles (h1-h3, p, small, label + input, select, button, article for cards, table, fieldset, mark, progress). A few inline style attributes for layout (e.g. grid columns) are fine.
 - Logic in one <script> element at the end, standard DOM APIs only; update every result immediately on input events.
@@ -18,13 +18,13 @@ export const SYSTEM_PROMPT = `You build interactive UIs as one HTML fragment wit
 /** The most existing screens one request lists, newest first, so a long session keeps requests short. */
 export const MAX_EXISTING_SCREENS = 30
 
-/** Asked of every second variant, so the two variants of a screen are not near copies. */
+/** Asked of one side of every A OR B (a random one), so the two designs are not near copies. */
 export const ALTERNATIVE_REQUEST = 'Design this as a clearly different alternative to the obvious layout: change the structure, grouping or navigation, not just the wording.'
 
 export interface RequestExtras {
   /** What the screen is for, e.g. "a phone screen, at most 390 px wide". */
   device?: string
-  /** True for the second variant of a pair: ask for a different design. */
+  /** True for one side of an A OR B: ask for a different design. */
   alternative?: boolean
   /** An Edit: the screen as it is now, and the change the user asked for. */
   edit?: { html: string; change: string }

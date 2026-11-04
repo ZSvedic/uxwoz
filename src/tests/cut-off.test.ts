@@ -38,22 +38,22 @@ test('the server reports a cut-off screen and caches nothing', async () => {
   }
 })
 
-test('when one of the two variants fails, the other is still cached and shown', async () => {
+test('when one side of the A OR B fails, the other is still cached and shown', async () => {
   const whole = sse({ model: 'anthropic/claude-haiku-5.5', choices: [{ delta: { content: '<h1>Whole</h1>' }, finish_reason: 'stop' }], usage: { cost: 0.001 } })
-  // The second variant (asked for a different design) stops early; the first finishes.
+  // The side asked for a different design (the second, here) stops early; the other finishes.
   const fetch: Fetch = async (_url, init) => new Response(String(init?.body).includes(ALTERNATIVE_REQUEST) ? halfScreen : whole)
   const cache = new ScreenCache()
-  const server = createServer({ port: 0, cache, fetch, env, log: () => {} })
+  const server = createServer({ port: 0, cache, fetch, env, log: () => {}, random: () => 0.9 })
   try {
     const res = await globalThis.fetch(new URL('/api/screen', server.url), {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app: 'Shop' }),
     })
     const evs: ScreenEvent[] = (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
+    expect(evs.find((e) => e.type === 'failed')).toMatchObject({ variant: 1, message: expect.stringContaining('ended before the screen was complete') })
+    expect(evs.find((e) => e.type === 'version')).toMatchObject({ variant: 0 })
     const done = evs.at(-1) as Extract<ScreenEvent, { type: 'done' }>
     expect(done.type).toBe('done')
-    expect(done.variants).toEqual([0, null])
-    expect(done.failed[0]).toContain('ended before the screen was complete')
-    expect(cache.get(screenKey('Shop', null))?.candidates.map((c) => c.html)).toEqual(['<h1>Whole</h1>'])
+    expect(cache.get(screenKey('Shop', null))?.proposals?.map((v) => v?.html ?? null)).toEqual(['<h1>Whole</h1>', null])
   } finally {
     server.stop(true)
   }

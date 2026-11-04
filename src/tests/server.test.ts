@@ -1,6 +1,6 @@
-// Feature: the web server streams two variants per screen, caches them and keeps the pick (cassette: server).
+// Feature: the web server streams a new screen's A OR B, keeps the pick, and revises screens (cassette: server).
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { ScreenCache } from '@uxwoz/core'
+import { ScreenCache, type CacheEntry } from '@uxwoz/core'
 import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
 import { cassette } from './cassette.ts'
 
@@ -10,45 +10,60 @@ const APP = 'A tiny bakery website'
 const post = (path: string, body: object, headers: Record<string, string> = {}) =>
   fetch(new URL(path, server.url), { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) })
 
-beforeAll(() => { server = createServer({ port: 0, cache: new ScreenCache(), fetch: tape.fetch, env: tape.env, log: () => {} }) })
+// The second side always asks for the different design, so the recorded requests replay.
+beforeAll(() => { server = createServer({ port: 0, cache: new ScreenCache(), fetch: tape.fetch, env: tape.env, log: () => {}, random: () => 0.9 }) })
 afterAll(() => { server.stop(true); tape.save() })
 
-async function screen(body: object): Promise<ScreenEvent[]> {
-  const res = await post('/api/screen', body)
+async function stream(path: string, body: object): Promise<ScreenEvent[]> {
+  const res = await post(path, body)
   expect(res.headers.get('content-type')).toContain('application/x-ndjson')
   return (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
 }
+const screen = (body: object) => stream('/api/screen', body)
 /** The action prompts in a screen, in page order, without "home". */
 const actions = (html: string) => [...html.matchAll(/data-action="([^"]+)"/g)].map((m) => m[1]!).filter((a) => a.toLowerCase() !== 'home')
 const done = (evs: ScreenEvent[]) => evs.find((e) => e.type === 'done') as Extract<ScreenEvent, { type: 'done' }>
+const pick = async (key: string, index: number) => (await (await post('/api/pick', { key, index })).json()).entry as CacheEntry
+const shown = (e: CacheEntry) => e.versions.at(-1)!.html
 
 describe('web server', () => {
-  test('a new prompt streams two variants side by side, then caches both', async () => {
+  test('a new prompt streams two designs at once, each stored as it finishes, with its idea', async () => {
     const evs = await screen({ app: APP })
     expect(evs[0]).toEqual({ type: 'meta', key: 'a tiny bakery website', cached: false, variants: 2 })
     const chunks = evs.filter((e) => e.type === 'chunk')
     for (const v of [0, 1]) expect(chunks.filter((c) => c.variant === v).length).toBeGreaterThan(5)
-    const d = done(evs)
-    expect(d.variants).toEqual([0, 1])
-    expect(d.entry.candidates).toHaveLength(2)
-    expect(d.entry.candidates.map((c) => c.device)).toEqual(['phone', 'phone'])
-    expect(d.entry.candidates.map((c) => !!c.alternative)).toEqual([false, true]) // a refresh asks for it again
-    expect(d.entry.candidates[0]!.html).not.toBe(d.entry.candidates[1]!.html)
+    expect(evs.filter((e) => e.type === 'version').map((e) => e.variant).sort()).toEqual([0, 1])
+    const { entry } = done(evs)
+    expect(entry.versions).toEqual([])
+    expect(entry.proposals!.map((p) => p!.device)).toEqual(['phone', 'phone'])
+    expect(entry.proposals![0]!.html).not.toBe(entry.proposals![1]!.html)
+    for (const p of entry.proposals!) expect(p!.idea!.length).toBeGreaterThan(8)
   }, 30_000)
 
-  test('the same prompt, written differently, comes from the cache with no model call', async () => {
+  test('while the A OR B is open, the same prompt, written differently, shows it again at no cost', async () => {
     const evs = await screen({ app: '  a tiny BAKERY website. ' })
     expect(evs.map((e) => e.type)).toEqual(['meta', 'done'])
     expect(evs[0]).toMatchObject({ cached: true, variants: 0 })
-    expect(done(evs).variants).toEqual([])
+    expect(done(evs).entry.proposals).toHaveLength(2)
   })
 
-  test('clicking an action opens a new screen under its own key', async () => {
-    const first = done(await screen({ app: APP })).entry.candidates[0]!.html
-    const action = actions(first)[0]
-    expect(action).toBeTruthy()
-    const evs = await screen({ app: APP, action })
-    expect(done(evs).entry.key).toBe(`a tiny bakery website » ${action!.toLowerCase().replace(/\s+/g, ' ').replace(/[\s.!?;:,]+$/, '')}`)
+  test('a pick keeps one design as the first version and drops the other', async () => {
+    const before = done(await screen({ app: APP })).entry
+    const entry = await pick(before.key, 1)
+    expect(entry.versions).toEqual([before.proposals![1]!])
+    expect(entry.proposals).toBeUndefined()
+    expect((await post('/api/pick', { key: before.key, index: 0 })).status).toBe(404)
+  })
+
+  test('a click opens a new screen under its own key, with the click as its parent and a link', async () => {
+    const first = done(await screen({ app: APP })).entry
+    const action = actions(shown(first))[0]!
+    const evs = await screen({ app: APP, action, from: first.key, label: 'Our breads' })
+    const { entry, link } = done(evs)
+    expect(entry.key).toBe(`a tiny bakery website » ${action.toLowerCase().replace(/\s+/g, ' ').replace(/[\s.!?;:,]+$/, '')}`)
+    expect(entry).toMatchObject({ level: 2, parent: { key: first.key, label: 'Our breads' } })
+    expect(link).toMatchObject({ from: first.key, to: entry.key, label: 'Our breads' })
+    await pick(entry.key, 0)
   }, 30_000)
 
   test('a "home" link opens the cached first screen with no model call', async () => {
@@ -58,71 +73,58 @@ describe('web server', () => {
   })
 
   test('a later screen is told which screens exist, so it can link back to them', async () => {
-    const first = done(await screen({ app: APP })).entry.candidates[0]!.html
-    const action = actions(first)[0]!
-    const second = done(await screen({ app: APP, action })).entry.candidates[0]!.html
-    const next = actions(second).find((a) => a !== action)
+    const first = done(await screen({ app: APP })).entry
+    const action = actions(shown(first))[0]!
+    const second = done(await screen({ app: APP, action })).entry
+    const next = actions(shown(second)).find((a) => a !== action)
     expect(next).toBeTruthy()
-    const third = done(await screen({ app: APP, action: next })).entry.candidates[0]!.html
+    const third = done(await screen({ app: APP, action: next, from: second.key, label: 'Next' })).entry
     // The third screen may link to "home" or the first action; either way it reuses a known prompt.
-    const links = third.match(/data-action="([^"]+)"/g)!.map((m) => m.slice(13, -1))
+    const links = third.proposals!.flatMap((p) => p!.html.match(/data-action="([^"]+)"/g)!.map((m) => m.slice(13, -1)))
     expect(links.some((a) => a === 'home' || a === action)).toBe(true)
+    await pick(third.key, 0)
   }, 60_000)
 
-  test('a click inside a screen is recorded as an arrow on the map', async () => {
+  test('a click to a screen already there is recorded as a link', async () => {
     const first = done(await screen({ app: APP })).entry
-    const action = actions(first.candidates[first.chosen]!.html)[0]!
-    const evs = await screen({ app: APP, action, from: first.key, variant: 1, label: 'Our breads' })
-    expect(done(evs).link).toMatchObject({ from: first.key, variant: 1, to: done(evs).entry.key, label: 'Our breads' })
+    const second = done(await screen({ app: APP, action: actions(shown(first))[0]! })).entry
+    const back = await post('/api/link', { from: second.key, to: first.key, label: 'Home' })
+    expect((await back.json()).link).toMatchObject({ from: second.key, to: first.key, label: 'Home' })
+    expect((await post('/api/link', { from: first.key, to: 'no such screen', label: 'x' })).status).toBe(404)
     const map = await (await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}`, server.url))).json()
     expect(map.root).toBe('a tiny bakery website')
-    expect(map.links.some((l: { label: string }) => l.label === 'Our breads')).toBe(true)
-    const back = await post('/api/link', { from: done(evs).entry.key, variant: 0, to: first.key, label: 'Home' })
-    expect((await back.json()).link).toMatchObject({ from: done(evs).entry.key, variant: 0, to: first.key, label: 'Home' })
-    expect((await post('/api/link', { from: first.key, to: 'no such screen', label: 'x' })).status).toBe(404)
+    expect(map.links.some((l: { label: string }) => l.label === 'Home')).toBe(true)
     const { apps } = await (await fetch(new URL('/api/apps', server.url))).json()
     expect(apps.map((a: { app: string }) => a.app)).toEqual([APP])
   })
 
-  test('regenerate adds one variant, a changed prompt adds one made from it; revisits keep the pick until the user picks again', async () => {
-    const regen = done(await screen({ app: APP, regenerate: true, device: 'desktop' }))
-    expect(regen.variants).toEqual([2])
-    expect(regen.entry.chosen).toBe(0)
-    expect(regen.entry.candidates[2]).toMatchObject({ device: 'desktop', letter: 'C' })
-    const changed = done(await screen({ app: APP, regenerate: true, prompt: 'A tiny bakery website with one big photo of bread' }))
-    expect(changed.variants).toEqual([3])
-    expect(changed.entry.key).toBe('a tiny bakery website')
-    expect(changed.entry.candidates[3]).toMatchObject({ prompt: 'A tiny bakery website with one big photo of bread', letter: 'D' })
-    const before = changed.entry.candidates[2]!.html
-    // A refresh is a new variant with a new name, in the old one's place; the old one is deleted.
-    const refreshed = done(await screen({ app: APP, replace: 2 }))
-    expect(refreshed.variants).toEqual([4])
-    expect(refreshed.entry.candidates[4]).toMatchObject({ letter: 'E', replaces: 2 })
-    expect(refreshed.entry.candidates[4]!.html).not.toBe(before)
-    expect(refreshed.entry.candidates[2]).toMatchObject({ deleted: true, letter: 'C' })
-    expect((await screen({ app: APP, replace: 9 })).map((e) => e.type)).toEqual(['error'])
-    expect((await post('/api/screen', { app: APP, replace: -1 })).status).toBe(400)
-    const res = await post('/api/choose', { key: regen.entry.key, index: 3 })
-    expect((await res.json()).entry.chosen).toBe(3)
-    expect((await post('/api/choose', { key: regen.entry.key, index: 7 })).status).toBe(404)
-    expect(done(await screen({ app: APP })).entry.chosen).toBe(3)
-  }, 30_000)
-
-  test('an Edit adds one variant made by changing another, for its device; a refresh makes the same Edit again', async () => {
+  test('an Edit makes a new version from the screen and the change, for its device; Regenerate one from its prompt; Undo drops them', async () => {
     const first = done(await screen({ app: APP })).entry
-    const n = first.candidates.length
     const change = 'Make the main heading say "Fresh bread daily"'
-    const edited = done(await screen({ app: APP, regenerate: true, device: 'desktop', edit: { variant: 0, change } }))
-    expect(edited.variants).toEqual([n])
-    const c = edited.entry.candidates[n]!
-    expect(c).toMatchObject({ editOf: 0, feedback: change, device: 'phone' })
-    expect(c.html).toContain('Fresh bread daily')
-    const again = done(await screen({ app: APP, replace: n }))
-    expect(again.entry.candidates[again.variants[0]!]).toMatchObject({ editOf: 0, feedback: change, replaces: n })
-    expect(again.entry.candidates[again.variants[0]!]!.html).toContain('Fresh bread daily')
-    expect((await screen({ app: APP, edit: { variant: 99, change } })).map((e) => e.type)).toEqual(['error'])
-    expect((await post('/api/screen', { app: APP, edit: { variant: 0, change: ' ' } })).status).toBe(400)
-    expect((await post('/api/screen', { app: APP, edit: { variant: 0.5, change } })).status).toBe(400)
+    const edited = await stream('/api/revise', { key: first.key, change, device: 'desktop' })
+    expect(edited[0]).toEqual({ type: 'meta', key: first.key, cached: false, variants: 1 })
+    expect(edited.filter((e) => e.type === 'chunk').length).toBeGreaterThan(5)
+    const e1 = done(edited).entry
+    expect(e1.versions).toHaveLength(2)
+    expect(e1.versions[1]).toMatchObject({ feedback: change, device: 'phone' })
+    expect(shown(e1)).toContain('Fresh bread daily')
+    const e2 = done(await stream('/api/revise', { key: first.key })).entry
+    expect(e2.versions).toHaveLength(3)
+    expect(e2.versions[2]!.feedback).toBeUndefined()
+    expect(shown(e2)).not.toBe(shown(e1))
+    expect((await (await post('/api/undo', { key: first.key })).json()).entry.versions).toHaveLength(2)
+    expect((await (await post('/api/undo', { key: first.key })).json()).entry.versions).toHaveLength(1)
+    expect((await post('/api/undo', { key: first.key })).status).toBe(404)
+    expect((await post('/api/revise', { key: first.key, change: ' ' })).status).toBe(400)
+    expect((await post('/api/revise', { key: 'no such screen' })).status).toBe(404)
+  }, 60_000)
+
+  test('a screen whose A OR B is still open cannot be revised', async () => {
+    const first = done(await screen({ app: APP })).entry
+    const open = done(await screen({ app: APP, action: actions(shown(first))[1]!, from: first.key, label: 'x' })).entry
+    expect(open.versions).toEqual([])
+    expect((await post('/api/revise', { key: open.key })).status).toBe(409)
+    expect((await post('/api/undo', { key: open.key })).status).toBe(404)
   }, 30_000)
 
   test('bad input is refused', async () => {
@@ -130,10 +132,9 @@ describe('web server', () => {
     expect((await post('/api/screen', { app: 'x', model: 'toString' })).status).toBe(400)
     expect((await post('/api/screen', { app: '' })).status).toBe(400)
     expect((await post('/api/screen', { app: 'x', device: 'watch' })).status).toBe(400)
-    expect((await post('/api/screen', { app: 'x', prompt: 'x'.repeat(2001) })).status).toBe(400)
-    expect((await post('/api/delete', { key: 'no such screen', index: 0 })).status).toBe(404)
-    expect((await post('/api/screen', { app: 'x', from: 'y', variant: -1 })).status).toBe(400)
-    expect((await post('/api/screen', { app: 'x', from: 'y', variant: 1.5 })).status).toBe(400)
+    expect((await post('/api/screen', { app: 'x', action: 'x'.repeat(501) })).status).toBe(400)
+    expect((await post('/api/delete', { key: 'no such screen' })).status).toBe(404)
+    expect((await post('/api/pick', { key: 'no such screen', index: 0 })).status).toBe(404)
   })
 
   test('the mockup theme and the phone are the defaults, and the stylesheet is served', async () => {
@@ -148,18 +149,18 @@ describe('web server', () => {
   })
 
   test('another web page cannot spend model credits', async () => {
-    expect((await post('/api/screen', { app: APP, regenerate: true }, { Origin: 'https://evil.example' })).status).toBe(403)
-    expect((await post('/api/screen', { app: APP, regenerate: true }, { 'Sec-Fetch-Site': 'cross-site' })).status).toBe(403)
+    expect((await post('/api/screen', { app: 'Other app' }, { Origin: 'https://evil.example' })).status).toBe(403)
+    expect((await post('/api/revise', { key: 'a tiny bakery website' }, { 'Sec-Fetch-Site': 'cross-site' })).status).toBe(403)
     const textPlain = await fetch(new URL('/api/screen', server.url), { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ app: APP }) })
     expect(textPlain.status).toBe(415)
     expect((await post('/api/delete-app', { app: APP }, { Origin: 'https://evil.example' })).status).toBe(403)
   })
 
-  test('a variant, then the whole mockup, can be deleted', async () => {
+  test('a screen, then the whole mockup, can be deleted', async () => {
     const first = done(await screen({ app: APP })).entry
-    const del = await (await post('/api/delete', { key: first.key, index: 3 })).json()
-    expect(del.entry.candidates[3]).toMatchObject({ deleted: true, html: '' })
-    expect(del.entry.chosen).toBe(0)
+    const second = done(await screen({ app: APP, action: actions(shown(first))[0]! })).entry
+    const del = await (await post('/api/delete', { key: second.key })).json()
+    expect(del.removed).toContain(second.key)
     expect(del.entries.map((e: { key: string }) => e.key)).toContain(first.key) // the whole mockup, as /api/map sends it
     expect((await (await post('/api/delete-app', { app: APP })).json()).removed).toBeGreaterThan(1)
     expect((await (await fetch(new URL('/api/apps', server.url))).json()).apps).toEqual([])

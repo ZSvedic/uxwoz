@@ -1,7 +1,7 @@
 // One screen generation: stream the model's fragment, then report what it cost and who served it.
 
-import type { Candidate } from './cache.ts'
-import { extractFragment, screenName } from './frame.ts'
+import type { Version } from './cache.ts'
+import { extractFragment, screenIdea, screenName } from './frame.ts'
 import { DEVICES, type Device } from './frame.ts'
 import { MODELS, type ModelId } from './models.ts'
 import { SYSTEM_PROMPT, WARMUP_REQUEST, screenRequest } from './prompt.ts'
@@ -18,7 +18,7 @@ export interface GenerateOptions {
   model: ModelId
   /** The device to design for; left out of the request when absent. */
   device?: Device
-  /** True for the second variant of a pair: ask for a clearly different design. */
+  /** True for one side of an A OR B: ask for a clearly different design. */
   alternative?: boolean
   /** An Edit: change this screen as asked instead of designing a new one. */
   edit?: { html: string; change: string }
@@ -28,7 +28,7 @@ export interface GenerateOptions {
   log?: (msg: string) => void
 }
 
-export type GenerateEvent = { type: 'chunk'; text: string } | { type: 'done'; candidate: Candidate }
+export type GenerateEvent = { type: 'chunk'; text: string } | { type: 'done'; version: Version }
 
 export async function* generateScreen(o: GenerateOptions): AsyncGenerator<GenerateEvent> {
   const cfg = MODELS[o.model]
@@ -62,7 +62,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
       if (!html.trim()) throw new ProviderError('the model returned an empty screen')
       yield {
         type: 'done',
-        candidate: {
+        version: {
           html,
           model: o.model,
           servedModel: ev.servedModel,
@@ -74,7 +74,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
           finishReason: ev.finishReason,
           ...(o.device && { device: o.device }),
           ...(screenName(html) && { name: screenName(html) }),
-          ...(o.alternative && { alternative: true }),
+          ...(screenIdea(html) && { idea: screenIdea(html) }),
         },
       }
       return

@@ -22,6 +22,15 @@ export function screenName(html: string): string {
   return t.replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim().slice(0, 60)
 }
 
+/** The one-sentence design idea the model gives a screen in <meta name="idea">, or '' if it gave none. */
+export function screenIdea(html: string): string {
+  const tag = html.match(/<meta\s+name=["']idea["'][^>]*>/i)?.[0] ?? ''
+  const t = tag.match(/content=(?:"([^"]*)"|'([^']*)')/i)
+  const s = t?.[1] ?? t?.[2] ?? ''
+  return s.replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ').trim().slice(0, 140)
+}
+
 /**
  * The window height a screen is designed for. A frame grows to fit its whole screen, so its real
  * window is as tall as the screen; vh units would then feed back into the frame's height forever.
@@ -54,17 +63,8 @@ const bootstrap = (final: boolean) => `(() => {
   // What the control says, shown between the two screens it joins.
   const labelOf = (el) => el ? (el.getAttribute('aria-label') || el.textContent || el.value || '').trim().replace(/\\s+/g, ' ') : ''
   window.uxwoz = { go }
-  // Any press in the screen picks this variant; the app ignores it while the screen streams.
+  // Any press in the screen makes it the current one.
   addEventListener('pointerdown', () => parent.postMessage({ uxwoz: 'touch' }, '*'), true)
-  // Holding Alt/Option alone compares the variants of every row, also while a screen has the focus;
-  // not in a text field, and not with another key (Option types characters on a Mac).
-  const peek = (on) => parent.postMessage({ uxwoz: 'peek', on }, '*')
-  addEventListener('keydown', (e) => {
-    if (e.key === 'Alt') peek(!(e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)))
-    else if (e.altKey) peek(false)
-  })
-  addEventListener('keyup', (e) => { if (e.key === 'Alt') peek(false) })
-  addEventListener('blur', () => peek(false))
   document.addEventListener('click', (e) => {
     const el = e.target instanceof Element && e.target.closest('[data-action], a[href]')
     if (!el) return

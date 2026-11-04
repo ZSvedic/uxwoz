@@ -7,43 +7,48 @@
 <link rel="stylesheet" href="./shell.css">
 </head>
 <body>
-<header>
-  <form id="promptForm">
+<header class="toolbar">
+  <div class="tb-left">
     <strong class="logo">UX Woz</strong>
-    <input id="prompt" name="prompt" placeholder="Describe a product, e.g. a coffee shop ordering app" autocomplete="off" required maxlength="2000">
-    <button id="go" type="submit">Generate</button>
-  </form>
-  <div class="pickers">
-    <label>Model <select id="model"></select></label>
-    <label>Device <select id="device" title="What new screens are designed for"></select></label>
-    <label>Theme <select id="theme"></select></label>
-    <span class="zoom" title="Zoom: pinch, or Ctrl/Cmd + scroll">
-      <button id="zoomFit" type="button" title="Fit the whole flow on the page">Fit</button>
-      <input id="zoomRange" type="range" min="10" max="150" step="5" value="100" aria-label="Zoom">
-      <output id="zoomValue" for="zoomRange">100%</output>
-      <button id="zoom100" type="button" title="Back to 100%" disabled>100%</button>
-    </span>
+    <button id="newMockup" type="button" title="Make a new mockup">New mockup</button>
   </div>
-  <div class="examples">Try:
-    <button type="button" class="example">A coffee shop ordering app</button>
-    <button type="button" class="example">A mortgage calculator with a yearly balance chart</button>
-    <button type="button" class="example">A todo list with filters</button>
-    <button type="button" class="example" data-prompt="cute android app for controling Schrodinger 3000, which is an automatic cat litter box (cleans the sand automatically), has automatic water dispenser, dry food dispenser, and wet food dispenser, and a camera to track your cat!!" title="cute android app for controling Schrodinger 3000, which is an automatic cat litter box (cleans the sand automatically), has automatic water dispenser, dry food dispenser, and wet food dispenser, and a camera to track your cat!!">Schrodinger 3000 cat app</button>
-    <button type="button" class="example" data-prompt="A food delivery app: browse restaurants, a restaurant's menu, cart, checkout and live order tracking">Food delivery app</button>
-    <button type="button" class="example" data-prompt="A habit tracker: today's habits, a habit's detail with a streak calendar, add a habit, weekly stats and settings">Habit tracker</button>
-    <select id="history" title="Mockups made before; opening one costs nothing" hidden></select>
-    <button id="startOver" type="button" class="app-tool" title="Delete every screen of this mockup and make its first screen again" hidden>Start over</button>
-    <button id="deleteApp" type="button" class="app-tool" title="Delete every screen of this mockup" hidden>Delete</button>
+  <div class="tb-mid"></div>
+  <div class="tb-right zoom">
+    <button id="zoomOut" type="button" title="Zoom out (⌘−)">−</button>
+    <button id="zoomValue" type="button" title="Zoom">100%</button>
+    <button id="zoomIn" type="button" title="Zoom in (⌘+)">+</button>
+    <button id="fitScreen" type="button" title="Fit screen (⇧2)">⤢</button>
   </div>
 </header>
-<div id="metrics" class="metrics"></div>
-<div id="error" class="error" hidden></div>
 <div class="workspace">
-<section id="stage" class="stage">
-  <p class="empty">Type a product idea above. Each screen comes in two variants, stacked. Click a
-    <span class="go">blue</span> button inside the one you like: that picks it, and the next screen appears below.</p>
-</section>
-<nav id="tree" class="tree" aria-label="All screens"></nav>
+  <main id="stage" class="stage"></main>
+  <form id="generate" class="generate">
+    <h2>What should we mock up?</h2>
+    <textarea id="prompt" name="prompt" rows="2" maxlength="2000" required
+      placeholder="Describe a product, e.g. a coffee shop ordering app"></textarea>
+    <div class="gen-row">
+      <button id="go" type="submit" class="primary">Generate</button>
+      <label>Model <select id="model"></select></label>
+      <label>Device <select id="device" title="What new screens are designed for"></select></label>
+      <label>Theme <select id="theme"></select></label>
+    </div>
+    <div class="gen-list">
+      <h3>Templates</h3>
+      <div id="templates" class="chips">
+        <button type="button" class="example">A coffee shop ordering app</button>
+        <button type="button" class="example">A mortgage calculator with a yearly balance chart</button>
+        <button type="button" class="example">A todo list with filters</button>
+        <button type="button" class="example" data-prompt="cute android app for controling Schrodinger 3000, which is an automatic cat litter box (cleans the sand automatically), has automatic water dispenser, dry food dispenser, and wet food dispenser, and a camera to track your cat!!">Schrodinger 3000 cat app</button>
+        <button type="button" class="example" data-prompt="A food delivery app: browse restaurants, a restaurant's menu, cart, checkout and live order tracking">Food delivery app</button>
+        <button type="button" class="example" data-prompt="A habit tracker: today's habits, a habit's detail with a streak calendar, add a habit, weekly stats and settings">Habit tracker</button>
+      </div>
+    </div>
+    <div class="gen-list" id="recentBox" hidden>
+      <h3>Recent mockups</h3>
+      <div id="recent" class="recent"></div>
+    </div>
+  </form>
+  <div id="status" class="status" hidden><span id="statusText"></span><button id="statusClose" type="button" title="Close" hidden>✕</button></div>
 </div>
 <script type="module" src="./app.ts"></script>
 </body>
