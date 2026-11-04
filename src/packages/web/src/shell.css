@@ -49,7 +49,6 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .menu .item:hover, .menu .item:focus-visible { background: var(--bg); }
 .menu .item > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu .item small, .menu kbd { color: var(--muted); font: inherit; margin-left: auto; white-space: nowrap; }
-.menu-scroll { max-height: 14em; overflow: auto; }
 .menu-foot { display: flex; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
 .menu-foot button { flex: 1; }
 .menu-foot .danger:hover { color: var(--err); border-color: var(--err); }
@@ -69,13 +68,11 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .stage.panning { cursor: grabbing; }
 .stage.panning iframe { pointer-events: none; }
 
-/* The generate panel: large in the middle with no mockup open, else a popover under the project menu. */
+/* The generate panel: in the middle of the canvas, the same with or without a mockup open. */
 .generate { position: absolute; z-index: 15; left: 50%; top: 12vh; transform: translateX(-50%); width: min(680px, calc(100% - 32px));
   display: flex; flex-direction: column; gap: 12px; padding: 20px; background: var(--card); border: 1px solid var(--line);
   border-radius: 12px; box-shadow: var(--shadow); max-height: calc(100% - 24px); overflow: auto; }
-.generate.pop { left: 10px; top: 8px; transform: none; width: min(660px, calc(100% - 20px)); }
 .generate h2 { margin: 0; font-size: 18px; }
-.generate.pop .gen-list { display: none; }
 .generate h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 #prompt { width: 100%; resize: none; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
   font-size: 15px; field-sizing: content; min-height: 3.2em; max-height: 14em; }

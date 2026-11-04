@@ -117,7 +117,6 @@ function views(): ScreenView[] {
 async function draw() {
   canvas.render(views(), !!state.busy)
   generate.hidden = !!state.app && !generate.classList.contains('open')
-  generate.classList.toggle('pop', !!state.app)
   renderDrawer()
   renderToolbar()
   const theme = themeSelect.value
@@ -677,12 +676,10 @@ promptInput.addEventListener('keydown', (e) => {
 })
 
 // A template with a long prompt shows a short name and keeps the full prompt in data-prompt.
-// They show in the generate panel and in the project menu.
 for (const b of document.querySelectorAll<HTMLButtonElement>('.example')) {
   const prompt = b.dataset.prompt ?? b.textContent ?? ''
   b.title = b.dataset.prompt ?? ''
   b.addEventListener('click', () => open(prompt))
-  $('menuTemplates').append(item(b.textContent ?? '', '', () => open(prompt)))
 }
 
 
@@ -720,16 +717,13 @@ addEventListener('keydown', (e: KeyboardEvent) => {
   else if (e.code === 'Digit3') fitWidth()
 })
 
-let recent: { app: string; screens: number }[] = []
-
-/** Fill the Recent lists (in the generate panel and the project menu) with every mockup, newest first. */
+/** Fill the generate panel's Recent list with every mockup, newest first. */
 async function loadRecent() {
   const res = await fetch('/api/apps').catch(() => null)
   if (!res?.ok) return
-  recent = (await res.json() as { apps: { app: string; screens: number }[] }).apps
-  $('recent').replaceChildren(...recent.map((a) => item(a.app, `${a.screens} screen${a.screens === 1 ? '' : 's'}`, () => open(a.app))))
-  $('recentBox').hidden = recent.length === 0
-  renderToolbar()
+  const { apps } = await res.json() as { apps: { app: string; screens: number }[] }
+  $('recent').replaceChildren(...apps.map((a) => item(a.app, `${a.screens} screen${a.screens === 1 ? '' : 's'}`, () => open(a.app))))
+  $('recentBox').hidden = apps.length === 0
 }
 
 /** A row in a list or menu: a label, a note on the right, and what a click does. */
@@ -802,8 +796,6 @@ function renderToolbar() {
   $('projectName').textContent = app ? (app.length > 40 ? app.slice(0, 39) + '…' : app) : 'New mockup'
   $('projectButton').title = app ?? 'Make a new mockup'
   $('menuFoot').hidden = !app
-  $('menuRecentHead').hidden = !recent.length
-  $('menuRecent').replaceChildren(...recent.map((a) => item(a.app, `${a.screens}`, () => open(a.app))))
   const nav = $<HTMLButtonElement>('navButton')
   nav.hidden = !app || !state.entries.size
   const cur = state.current ? state.entries.get(state.current) : undefined

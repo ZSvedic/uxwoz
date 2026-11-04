@@ -41,11 +41,9 @@ one, and the other is gone. After that, the user changes a screen by asking for 
 One bar, 44 px tall, with three parts:
 
 - **Project menu** (left): a button with the mockup's prompt, cut short. Its menu has
-  **New mockup…** (opens the generate panel), **Templates** (example prompts that start a mockup
-  at once), **Recent mockups** (every mockup in the cache, most recently changed first, with its
-  number of screens; the list comes from the server, so it is the same in every browser), and at
-  the bottom **↺ Start over** (deletes every screen and makes the first one again) and **✕ Delete**
-  (deletes every screen). Both ask first.
+  **New mockup…** (opens the generate panel), and, with a mockup open, **↺ Start over** (deletes
+  every screen and makes the first one again) and **✕ Delete** (deletes every screen). Both ask
+  first.
 - **Nav** (middle): names the current screen (*L2 Camera ▾*). Its menu lists every screen as an
   indented tree, each with the control that opened it (*via Camera*), the path to the current
   screen in orange. Choosing one makes it current and scrolls to it.
@@ -60,10 +58,13 @@ Menus close on Esc, on a press outside them, or on a click into a screen.
 
 The prompt box takes a product description (up to 2,000 characters) and grows with it; Enter makes
 the mockup, Shift+Enter adds a line. Under it, the **Model**, **Device** and **Theme** pickers sit
-in one row, and a large **Generate** button below them. With no mockup open, the panel sits large in the middle of the canvas with Templates and
-Recent mockups under it. With one open, **New mockup…** shows it as a popover under the project
-menu; Esc or a press outside closes it. A prompt seen before opens its mockup from the cache, at no
-cost, with the current screen it had last time in this browser. A reload opens the mockup that
+in one row, and a large **Generate** button below them. Under that come **Templates** (example
+prompts that start a mockup at once) and **Recent mockups** (every mockup in the cache, most
+recently changed first, with its number of screens; the list comes from the server, so it is the
+same in every browser). The panel is the same with or without a mockup open: with none it shows on
+its own, and **New mockup…** shows it over the canvas, where Esc or a press outside closes it.
+A prompt seen before opens its mockup from the cache, at no cost, with the current screen it had
+last time in this browser. A reload opens the mockup that
 was open, with its A OR B if one was waiting for a pick; it never starts a new design by itself.
 
 ## Canvas
