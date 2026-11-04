@@ -21,7 +21,28 @@
   </div>
 </header>
 <div class="workspace">
+  <div class="canvas-area">
   <main id="stage" class="stage"></main>
+  <div id="status" class="status" hidden><span id="statusText"></span><button id="statusClose" type="button" title="Close" hidden>✕</button></div>
+  </div>
+  <aside id="drawer" class="drawer" hidden>
+    <div class="drawer-head">
+      <div class="tabs" role="tablist">
+        <button id="tabEdit" type="button" role="tab" data-tab="edit">✎ Edit</button>
+        <button id="tabInfo" type="button" role="tab" data-tab="info">ⓘ Info</button>
+      </div>
+      <button id="drawerClose" type="button" class="close" title="Close (Esc)">✕</button>
+    </div>
+    <p id="drawerName" class="drawer-name"></p>
+    <form id="editPane" class="pane">
+      <label for="change">What should change?</label>
+      <textarea id="change" rows="4" maxlength="1000" placeholder="e.g. Show one level indicator, not four"></textarea>
+      <button id="makeChange" type="submit" class="primary">Make the change</button>
+      <h3>Past changes</h3>
+      <ol id="history" class="history" reversed></ol>
+    </form>
+    <div id="infoPane" class="pane"><dl id="info" class="info"></dl></div>
+  </aside>
   <form id="generate" class="generate">
     <h2>What should we mock up?</h2>
     <textarea id="prompt" name="prompt" rows="2" maxlength="2000" required
@@ -48,7 +69,6 @@
       <div id="recent" class="recent"></div>
     </div>
   </form>
-  <div id="status" class="status" hidden><span id="statusText"></span><button id="statusClose" type="button" title="Close" hidden>✕</button></div>
 </div>
 <script type="module" src="./app.ts"></script>
 </body>

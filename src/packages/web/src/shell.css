@@ -31,6 +31,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 
 /* The workspace: the canvas, the generate panel over it, the drawer at the right. */
 .workspace { flex: 1; min-height: 0; display: flex; position: relative; }
+.canvas-area { flex: 1; min-width: 0; min-height: 0; position: relative; display: flex; }
 .stage { flex: 1; min-width: 0; min-height: 0; position: relative; overflow: auto; outline: none;
   --z: 1; background: var(--bg) radial-gradient(circle, var(--dot) 1.2px, transparent 1.4px) 0 0 / calc(24px * var(--z)) calc(24px * var(--z));
   background-attachment: local; }
@@ -59,7 +60,9 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 /* The status pill at the bottom of the canvas: what is happening, what it cost; errors in red. */
 .status { position: absolute; z-index: 12; left: 50%; bottom: 14px; transform: translateX(-50%); max-width: calc(100% - 32px);
   display: flex; gap: 8px; align-items: center; padding: 6px 8px 6px 14px; border: 1px solid var(--line); border-radius: 999px;
-  background: var(--card); color: var(--muted); box-shadow: var(--shadow); font-variant-numeric: tabular-nums; font-size: 13px; }
+  background: var(--card); color: var(--muted); box-shadow: var(--shadow); font-variant-numeric: tabular-nums; font-size: 13px;
+  white-space: nowrap; }
+.status span { overflow: hidden; text-overflow: ellipsis; }
 .status b { color: var(--fg); font-weight: 600; }
 .status.error { border-color: var(--err); color: var(--err); }
 .status button { padding: 0 6px; border: 0; background: none; color: inherit; }
@@ -110,3 +113,25 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   border-width: calc(1px / var(--z)); font-size: calc(18px / var(--z)); line-height: 1; color: var(--muted); box-shadow: 0 1px 4px rgba(0, 0, 0, .1); }
 .rail .tool:hover:not(:disabled) { color: var(--fg); border-color: var(--accent); }
 .rail .tool[data-tool="delete"]:hover:not(:disabled) { color: var(--err); border-color: var(--err); }
+
+/* The drawer: docked at the right edge for Edit and Info; the canvas gets narrower. */
+.drawer { flex: none; width: 360px; max-width: 100%; display: flex; flex-direction: column; gap: 10px; padding: 10px 14px 14px;
+  border-left: 1px solid var(--line); background: var(--card); overflow: auto; z-index: 14; }
+@media (max-width: 700px) { .drawer { position: absolute; right: 0; top: 0; bottom: 0; box-shadow: var(--shadow); } }
+.drawer-head { display: flex; align-items: center; gap: 8px; }
+.drawer .tabs { flex: 1; display: flex; gap: 4px; }
+.drawer .tabs button { border-color: transparent; background: none; color: var(--muted); font-weight: 600; }
+.drawer .tabs button[aria-selected="true"] { color: var(--fg); background: var(--bg); border-color: var(--line); }
+.drawer .close { border-color: transparent; background: none; color: var(--muted); }
+.drawer-name { margin: 0; font-weight: 600; }
+.pane { display: flex; flex-direction: column; gap: 8px; }
+.pane label { color: var(--muted); }
+.pane textarea { width: 100%; resize: vertical; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.pane .primary { align-self: flex-start; }
+.pane h3 { margin: 10px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.history { margin: 0; padding-left: 1.8em; display: flex; flex-direction: column; gap: 4px; color: var(--muted); }
+.history li.now { color: var(--fg); }
+.history li.now::after { content: " · showing"; color: var(--accent); }
+.info { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
+.info dt { color: var(--muted); }
+.info dd { margin: 0; overflow-wrap: anywhere; }

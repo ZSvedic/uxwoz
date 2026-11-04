@@ -1,5 +1,6 @@
 // The browser side: the generate panel, the canvas of picked screens, a new screen's A OR B
-// (streamed side by side, then picked), click-to-navigate, pickers, recent mockups, the status pill.
+// (streamed side by side, then picked), click-to-navigate, the rail's tools (Edit, Regenerate, Undo,
+// Info, Delete) with the drawer for Edit and Info, pickers, recent mockups, the status pill.
 
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, screenIdea, type Device } from '@uxwoz/core/frame'
 import { normalizePrompt, screenKey } from '@uxwoz/core/keys'
@@ -17,6 +18,8 @@ const zoomValue = $<HTMLButtonElement>('zoomValue')
 const statusBox = $('status')
 const statusText = $('statusText')
 const statusClose = $<HTMLButtonElement>('statusClose')
+const drawer = $('drawer')
+const changeInput = $<HTMLTextAreaElement>('change')
 
 /** One side of a new screen's A OR B while it streams. */
 interface Side { stream: StreamRenderer | null; version: Version | null; error: string | null }
@@ -31,6 +34,10 @@ const state = {
   /** The screen the user last picked, clicked in, or chose in Nav. */
   current: null as string | null,
   making: null as Making | null,
+  /** A picked screen getting a new version: an Edit with `change`, else a Regenerate. */
+  revising: null as { key: string; change: string | null } | null,
+  /** The open drawer tab, if any. It shows the current screen. */
+  drawer: null as 'edit' | 'info' | null,
   busy: null as AbortController | null,
   /** The view before an A OR B was fitted, to go back to after the pick. */
   before: null as View | null,
@@ -50,7 +57,7 @@ const canvas = new Canvas($('stage'), {
   pick,
   cancel: dropChoice,
   focus: (key) => setCurrent(key),
-  tool: () => {},
+  tool: onTool,
   zoomed: (z) => { zoomValue.textContent = `${Math.round(z * 100)}%` },
 })
 
@@ -86,9 +93,11 @@ function views(): ScreenView[] {
   for (const e of state.entries.values()) {
     const v = e.versions.at(-1)
     const making = m?.key === e.key ? m : null
+    const revising = state.revising?.key === e.key ? state.revising : null
     out.push(v ? {
-      key: e.key, parent: e.parent?.key ?? null, current: state.current === e.key, undo: e.versions.length > 1, note: '',
-      cards: [{ id: e.key, width: widthOf(v.device), name: labelOf(e), idea: ideaOf(v), streaming: false }],
+      key: e.key, parent: e.parent?.key ?? null, current: state.current === e.key, undo: e.versions.length > 1,
+      note: revising ? (revising.change ? 'Making the change…' : 'Making a new design…') : '',
+      cards: [{ id: e.key, width: widthOf(v.device), name: labelOf(e), idea: ideaOf(v), streaming: !!revising }],
     } : {
       key: e.key, parent: e.parent?.key ?? null, current: false, undo: false, note: '',
       cards: (e.proposals ?? []).map((p, i) => sideCard(e.key, i, making?.sides[i] ?? null, p, making?.device)),
@@ -106,12 +115,13 @@ async function draw() {
   canvas.render(views(), !!state.busy)
   generate.hidden = !!state.app && !generate.classList.contains('open')
   generate.classList.toggle('pop', !!state.app)
+  renderDrawer()
   const theme = themeSelect.value
   const css = await themeCss(theme)
   if (theme !== themeSelect.value) return // a newer draw shows the newer theme
   for (const e of state.entries.values()) {
     const v = e.versions.at(-1)
-    if (v) canvas.show(e.key, v.html, true, css)
+    if (v) { if (state.revising?.key !== e.key) canvas.show(e.key, v.html, true, css) }
     else e.proposals?.forEach((p, i) => { if (p) canvas.show(`${e.key}#${i}`, p.html, true, css) })
   }
   state.making?.sides.forEach((s, i) => { if (s.version) canvas.show(`${state.making!.key}#${i}`, s.version.html, true, css) })
@@ -395,6 +405,175 @@ function applyMap(map: { entries: CacheEntry[]; links: Link[] }) {
   draw()
 }
 
+// ---- The rail and the drawer --------------------------------------------------------------------
+
+function onTool(key: string, tool: string) {
+  if (!state.entries.get(key)?.versions.length) return
+  setCurrent(key)
+  if (tool === 'edit' || tool === 'info') return openDrawer(tool)
+  if (tool === 'regenerate') return revise(key, null)
+  if (tool === 'undo') return undo(key)
+  if (tool === 'delete') return removeScreen(key)
+}
+
+/** One new version of a screen, streamed into its own frame: an Edit with `change`, else a Regenerate. */
+async function revise(key: string, change: string | null) {
+  const e = state.entries.get(key)
+  if (!e?.versions.length) return
+  if (state.busy) return status('One screen at a time: wait until this one is made.')
+  const ctrl = new AbortController()
+  state.busy = ctrl
+  state.revising = { key, change }
+  const t0 = performance.now()
+  const model = modelSelect.value
+  status(change ? `Making the change with ${modelLabel(model)}…` : `Making a new design with ${modelLabel(model)}…`)
+  draw()
+  try {
+    const css = await themeCss(themeSelect.value)
+    const stream = new StreamRenderer(key, css, () => {})
+    const res = await post('/api/revise', { key, change, model, device: deviceSelect.value }, ctrl.signal)
+    let finished = false
+    try {
+      for await (const ev of readEvents(res)) {
+        if (ev.type === 'chunk') stream.push(ev.text)
+        else if (ev.type === 'error') throw new Error(ev.message)
+        else if (ev.type === 'done') {
+          finished = true
+          stream.cancel()
+          state.entries.set(key, ev.entry)
+          const v = ev.entry.versions.at(-1)!
+          state.spent += v.costUsd ?? 0
+          state.revising = null
+          if (change) changeInput.value = ''
+          status(`${change ? 'Changed' : 'New design'} in <b>${fmtS(performance.now() - t0)}</b> · <b>${v.costEstimated ? '~' : ''}${fmtUsd(v.costUsd ?? 0)}</b>`
+            + ` · ↶ Undo brings the old one back`)
+        }
+      }
+    } finally {
+      stream.cancel()
+    }
+    if (!finished && !ctrl.signal.aborted) throw new Error('the stream ended early')
+  } catch (err) {
+    if (!ctrl.signal.aborted) showError(`Could not ${change ? 'make the change' : 'make a new design'}: ${err instanceof Error ? err.message : err}`)
+  } finally {
+    // After a failure, draw() puts the screen as it was back into its frame.
+    if (state.revising?.key === key) state.revising = null
+    if (state.busy === ctrl) state.busy = null
+    draw().catch((e) => showError(String(e)))
+  }
+}
+
+async function undo(key: string) {
+  if (state.busy) return
+  const res = await post('/api/undo', { key }).catch(() => null)
+  if (!res?.ok) return showError('Nothing to undo')
+  const { entry } = await res.json() as { entry: CacheEntry }
+  state.entries.set(key, entry)
+  status("Back to the version before")
+  draw()
+}
+
+/** The screens a screen's clicks made, and theirs: what a delete takes with it (at most). */
+function below(key: string): CacheEntry[] {
+  const kids = [...state.entries.values()].filter((e) => e.parent?.key === key && e.key !== key)
+  return kids.flatMap((k) => [k, ...below(k.key)])
+}
+
+/** Delete a screen, after asking. Screens only it leads to go too; the first screen takes the mockup. */
+async function removeScreen(key: string) {
+  const e = state.entries.get(key)
+  if (!e || state.busy || !state.app) return
+  const root = screenKey(state.app, null) === key
+  const n = below(key).length
+  const what = root ? `${labelOf(e)}, the first screen? That deletes the whole mockup.`
+    : `${labelOf(e)}${n ? ` and the ${n === 1 ? 'screen' : `${n} screens`} below it` : ''}?`
+  if (!confirm(`Delete ${what}`)) return
+  const res = await post('/api/delete', { key }).catch(() => null)
+  if (!res?.ok) return showError('Could not delete the screen')
+  const map = await res.json() as { removed: string[]; entries: CacheEntry[]; links: Link[] }
+  loadRecent()
+  if (root) return closeMockup('Deleted the mockup.')
+  const parent = e.parent?.key
+  applyMap(map)
+  setCurrent(parent && state.entries.has(parent) ? parent : screenKey(state.app, null))
+  status(`Deleted ${map.removed.length === 1 ? 'one screen' : `${map.removed.length} screens`}`)
+  if (state.current) canvas.reveal(state.current)
+}
+
+function openDrawer(tab: 'edit' | 'info') {
+  state.drawer = tab
+  renderDrawer()
+  if (tab === 'edit') changeInput.focus()
+  // The canvas got narrower: keep the current screen in view beside the drawer.
+  requestAnimationFrame(() => { if (state.current) canvas.reveal(state.current) })
+}
+
+function closeDrawer() {
+  state.drawer = null
+  renderDrawer()
+}
+
+/** The drawer shows the current screen: Edit (the change box and the past changes) or Info. */
+function renderDrawer() {
+  const e = state.current ? state.entries.get(state.current) : undefined
+  const v = e?.versions.at(-1)
+  const open = !!(state.drawer && e && v)
+  if (drawer.hidden === open) {
+    drawer.hidden = !open
+    if (!open && state.current) requestAnimationFrame(() => canvas.reveal(state.current!))
+  }
+  if (!open) return
+  for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === state.drawer))
+  $('editPane').hidden = state.drawer !== 'edit'
+  $('infoPane').hidden = state.drawer !== 'info'
+  $('drawerName').textContent = labelOf(e)
+  $<HTMLButtonElement>('makeChange').disabled = !!state.busy
+  const history = $('history')
+  history.replaceChildren(...e.versions.map((x, i) => {
+    const li = document.createElement('li')
+    li.textContent = i === 0 ? 'The design you picked' : x.feedback ? `Edit: ${x.feedback}` : 'Regenerated'
+    li.classList.toggle('now', i === e.versions.length - 1)
+    return li
+  }).reverse())
+  const parent = e.parent && state.entries.get(e.parent.key)
+  const info: [string, string][] = [
+    ['Name', labelOf(e)],
+    ['Idea', ideaOf(v) || '–'],
+    ['Opened by', parent ? `${e.parent!.label || 'a click'} in ${labelOf(parent)}` : e.action ? '–' : 'the first screen'],
+    ['Version', `${e.versions.length} of ${e.versions.length}${v.feedback ? ` (Edit: ${v.feedback})` : e.versions.length > 1 ? ' (Regenerated)' : ''}`],
+    ['Model', modelLabel(v.model) + (v.servedModel ? ` (served ${v.servedModel})` : '')],
+    ['Device', v.device ? DEVICES[v.device].label : 'from before devices'],
+    ['Made', new Date(v.createdAt).toLocaleString()],
+    ['First text', v.firstChunkMs == null ? '–' : fmtS(v.firstChunkMs)],
+    ['Total time', fmtS(v.totalMs)],
+    ['Cost', v.costUsd == null ? 'unknown' : `${v.costEstimated ? '~' : ''}${fmtUsd(v.costUsd)}${v.costEstimated ? ' (est.)' : ''}`],
+    ['All versions', fmtUsd(e.versions.reduce((t, x) => t + (x.costUsd ?? 0), 0))],
+    ['Finish', v.finishReason ?? '–'],
+    ['Size', `${v.html.length.toLocaleString()} characters`],
+    ['Prompt', e.action ?? e.app],
+  ]
+  $('info').replaceChildren(...info.flatMap(([k, val]) => {
+    const dt = document.createElement('dt'), dd = document.createElement('dd')
+    dt.textContent = k
+    dd.textContent = val
+    return [dt, dd]
+  }))
+}
+
+$('editPane').addEventListener('submit', (ev) => {
+  ev.preventDefault()
+  const change = changeInput.value.trim()
+  if (!change) return changeInput.focus()
+  if (state.current) revise(state.current, change)
+})
+// Enter makes the change; Shift+Enter adds a line.
+changeInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $<HTMLFormElement>('editPane').requestSubmit() }
+})
+for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.addEventListener('click', () => openDrawer(b.dataset.tab as 'edit' | 'info'))
+$('drawerClose').addEventListener('click', closeDrawer)
+addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape' && state.drawer) closeDrawer() })
+
 // ---- Mockups ----------------------------------------------------------------------------------
 
 /** Open a mockup: its screens from the cache, else its first screen as A OR B. */
@@ -428,6 +607,8 @@ function closeMockup(msg: string) {
   state.links = []
   state.current = null
   state.making = null
+  state.revising = null
+  state.drawer = null
   state.before = null
   loadRecent()
   status(msg)
