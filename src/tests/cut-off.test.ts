@@ -25,7 +25,7 @@ test('a reply cut off at the token limit is an error', async () => {
 
 test('the server reports a cut-off screen and caches nothing', async () => {
   const cache = new ScreenCache()
-  const server = createServer({ port: 0, cache, fetch: fakeFetch(halfScreen), env, log: () => {} })
+  const server = createServer({ port: 0, cache, fetch: fakeFetch(halfScreen), env, log: () => {}, plan: async () => ({}) })
   try {
     const res = await fetch(new URL('/api/screen', server.url), {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app: 'Shop' }),
@@ -43,7 +43,7 @@ test('when one side of the A OR B fails, the other is still cached and shown', a
   // The side asked for a different design (the second, here) stops early; the other finishes.
   const fetch: Fetch = async (_url, init) => new Response(String(init?.body).includes(ALTERNATIVE_REQUEST) ? halfScreen : whole)
   const cache = new ScreenCache()
-  const server = createServer({ port: 0, cache, fetch, env, log: () => {}, random: () => 0.9 })
+  const server = createServer({ port: 0, cache, fetch, env, log: () => {}, random: () => 0.9, plan: async () => ({}) })
   try {
     const res = await globalThis.fetch(new URL('/api/screen', server.url), {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app: 'Shop' }),

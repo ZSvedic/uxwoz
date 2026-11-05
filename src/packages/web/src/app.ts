@@ -5,6 +5,7 @@
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
 import { nameWords, normalizePrompt, screenKey, screenRef, wayBack } from '@uxwoz/core/keys'
 import { namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
+import { navNames, type Spec } from '@uxwoz/core/spec'
 import type { CacheEntry, Version } from '@uxwoz/core'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
@@ -30,6 +31,8 @@ const state = {
   app: null as string | null,
   /** Every screen of this mockup, by key, as the server last sent it. */
   entries: new Map<string, CacheEntry>(),
+  /** The mockup's spec, as the server last sent it. */
+  spec: {} as Spec,
   /** Where each screen sits (level, the screen it hangs under), worked out from the screens on every draw. */
   tree: new Map<string, TreeNode>(),
   /** The screen the user last picked, clicked in, or chose in Nav. */
@@ -88,6 +91,18 @@ const labelOf = (e: CacheEntry) => {
 const treeParent = (key: string) => state.tree.get(key)?.parent ?? null
 
 const widthOf = (d: Device | undefined) => (d ? DEVICES[d].width : LEGACY_WIDTH)
+
+/** The name of the screen a key belongs to: stored, from an `@name` key, or home for the first screen. */
+function screenNameOf(key: string): string | undefined {
+  const e = state.entries.get(key)
+  if (e?.name) return e.name
+  if (state.app && key === screenKey(state.app, null)) return 'home'
+  return key.match(/ » @([a-z0-9_-]+)$/)?.[1]
+}
+
+/** Code hides Back on the tab screens of ui.nav: asking the model for that did not work. */
+const HIDE_BACK = '\n[data-ui="back"] { display: none !important; }'
+const cssFor = (key: string, css: string) => (navNames(state.spec).includes(screenNameOf(key) ?? '') ? css + HIDE_BACK : css)
 const ideaOf = (v: Version) => v.idea ?? ''
 
 function sideCard(key: string, index: number, side: Side | null, stored: Version | null, device: Device | undefined): CardView {
@@ -95,7 +110,7 @@ function sideCard(key: string, index: number, side: Side | null, stored: Version
   const id = `${key}#${index}`
   const error = version ? undefined : side ? side.error ?? undefined : state.failed.get(id) ?? 'This design was not finished.'
   return {
-    id, width: widthOf(version?.device ?? device), name: '', idea: version ? ideaOf(version) : '',
+    id, width: widthOf(version?.device ?? device), device: version?.device ?? device, name: '', idea: version ? ideaOf(version) : '',
     side: { index, pickable: !!version }, error, streaming: !version && !error,
   }
 }
@@ -110,7 +125,7 @@ function views(): ScreenView[] {
     out.push(v ? {
       key: e.key, parent: treeParent(e.key), current: state.current === e.key, undo: e.versions.length > 1,
       note: revising ? (revising.change ? 'Making the change…' : 'Making a new design…') : '',
-      cards: [{ id: e.key, width: widthOf(v.device), name: labelOf(e), idea: ideaOf(v), streaming: !!revising }],
+      cards: [{ id: e.key, width: widthOf(v.device), device: v.device, name: labelOf(e), idea: ideaOf(v), streaming: !!revising }],
     } : {
       key: e.key, parent: treeParent(e.key), current: false, undo: false, note: '',
       cards: (e.proposals ?? []).map((p, i) => sideCard(e.key, i, making?.sides[i] ?? null, p, making?.device)),
@@ -125,7 +140,7 @@ function views(): ScreenView[] {
 
 /** Draw every screen and put each stored design in its frame. Streaming frames are left to their streams. */
 async function draw() {
-  state.tree = screenTree([...state.entries.values()])
+  state.tree = screenTree([...state.entries.values()], state.spec)
   canvas.render(views(), !!state.busy)
   generate.hidden = !!state.app && !generate.classList.contains('open')
   renderDrawer()
@@ -135,10 +150,10 @@ async function draw() {
   if (theme !== themeSelect.value) return // a newer draw shows the newer theme
   for (const e of state.entries.values()) {
     const v = e.versions.at(-1)
-    if (v) { if (state.revising?.key !== e.key) canvas.show(e.key, v.html, true, css) }
-    else e.proposals?.forEach((p, i) => { if (p) canvas.show(`${e.key}#${i}`, p.html, true, css) })
+    if (v) { if (state.revising?.key !== e.key) canvas.show(e.key, v.html, true, cssFor(e.key, css)) }
+    else e.proposals?.forEach((p, i) => { if (p) canvas.show(`${e.key}#${i}`, p.html, true, cssFor(e.key, css)) })
   }
-  state.making?.sides.forEach((s, i) => { if (s.version) canvas.show(`${state.making!.key}#${i}`, s.version.html, true, css) })
+  state.making?.sides.forEach((s, i) => { if (s.version) canvas.show(`${state.making!.key}#${i}`, s.version.html, true, cssFor(state.making!.key, css)) })
 }
 
 async function fetchText(url: string): Promise<string> {
@@ -259,7 +274,7 @@ async function openScreen(action: string | null, from: string | null, label: str
         m = { key: ev.key, parent: from, device, sides: [] }
         m.sides = Array.from({ length: ev.variants }, (_, i) => ({
           version: null, error: null,
-          stream: new StreamRenderer(`${ev.key}#${i}`, css),
+          stream: new StreamRenderer(`${ev.key}#${i}`, cssFor(ev.key, css)),
         }))
         state.making = m
         // The view to come back to after the pick; a new mockup's first screen has none.
@@ -267,7 +282,8 @@ async function openScreen(action: string | null, from: string | null, label: str
         await draw()
         canvas.fit(ev.key, { top: true })
         fitted = performance.now()
-      } else if (ev.type === 'chunk') m?.sides[ev.variant]?.stream?.push(ev.text)
+      } else if (ev.type === 'spec') { state.spec = ev.spec; draw() }
+      else if (ev.type === 'chunk') m?.sides[ev.variant]?.stream?.push(ev.text)
       else if (ev.type === 'version' || ev.type === 'failed') {
         const s = m?.sides[ev.variant]
         if (!s) continue
@@ -280,6 +296,7 @@ async function openScreen(action: string | null, from: string | null, label: str
       else if (ev.type === 'done') {
         finished = true
         state.entries.set(ev.entry.key, ev.entry)
+        state.spec = ev.spec
         if (state.making === m) state.making = null
         loadRecent()
         await draw()
@@ -356,8 +373,9 @@ async function pick(key: string, index: number) {
       showError('Could not keep that design')
       return reloadMap()
     }
-    const { entry } = await res.json() as { entry: CacheEntry }
+    const { entry, spec } = await res.json() as { entry: CacheEntry; spec: Spec }
     state.entries.set(key, entry)
+    state.spec = spec
     canvas.rename(`${key}#${index}`, key)
     state.current = key
     saveCurrent()
@@ -473,8 +491,9 @@ async function reloadMap() {
   applyMap(await res.json())
 }
 
-function applyMap(map: { entries: CacheEntry[] }) {
+function applyMap(map: { entries: CacheEntry[]; spec?: Spec }) {
   state.entries = new Map(map.entries.map((e) => [e.key, e]))
+  state.spec = map.spec ?? {}
   if (state.current && !state.entries.has(state.current)) state.current = null
   draw()
 }
@@ -503,7 +522,7 @@ async function revise(key: string, change: string | null) {
   draw()
   try {
     const css = await themeCss(themeSelect.value)
-    const stream = new StreamRenderer(key, css)
+    const stream = new StreamRenderer(key, cssFor(key, css))
     const res = await post('/api/revise', { key, change, model, device: deviceSelect.value }, ctrl.signal)
     let finished = false
     try {
@@ -514,6 +533,7 @@ async function revise(key: string, change: string | null) {
           finished = true
           stream.cancel()
           state.entries.set(key, ev.entry)
+          state.spec = ev.spec
           state.revising = null
           if (change) changeInput.value = ''
           // The new version may be taller or narrower: keep it in view once it has its size.
@@ -538,14 +558,15 @@ async function undo(key: string) {
   if (state.busy) return
   const res = await post('/api/undo', { key }).catch(() => null)
   if (!res?.ok) return showError('Nothing to undo')
-  const { entry } = await res.json() as { entry: CacheEntry }
+  const { entry, spec } = await res.json() as { entry: CacheEntry; spec: Spec }
   state.entries.set(key, entry)
+  state.spec = spec
   draw()
 }
 
 /** How many other screens a delete takes with it: those the first screen would no longer reach. */
 function goesWith(key: string): number {
-  const rest = screenTree([...state.entries.values()].filter((e) => e.key !== key))
+  const rest = screenTree([...state.entries.values()].filter((e) => e.key !== key), state.spec)
   return [...state.tree.keys()].filter((k) => k !== key && state.entries.has(k) && !rest.has(k)).length
 }
 
@@ -621,6 +642,8 @@ function renderDrawer() {
     ['Cost', v.costUsd == null ? 'unknown' : `${v.costEstimated ? '~' : ''}${fmtUsd(v.costUsd)}${v.costEstimated ? ' (est.)' : ''}`],
     ['All versions', fmtUsd(e.versions.reduce((t, x) => t + (x.costUsd ?? 0), 0))],
     ['Finish', v.finishReason ?? '–'],
+    ['Check', v.misses == null ? 'made without a spec' : v.misses.length ? v.misses.join('; ') : 'follows the spec'],
+    ['Spec lines', v.spec?.length ? v.spec.map((l) => `${l.key} = ${l.text}`).join('\n') : '–'],
     ['Size', `${v.html.length.toLocaleString()} characters`],
     ['Prompt', e.action ?? e.app],
   ]
@@ -694,6 +717,7 @@ function closeMockup() {
   store.set('uxwoz:app', '')
   state.app = null
   state.entries = new Map()
+  state.spec = {}
   state.current = null
   resetTrail()
   state.making = null
@@ -882,7 +906,7 @@ function renderToolbar() {
 function renderNav() {
   const menu = $('navMenu')
   const made = [...state.entries.values()]
-  const all = [...made, ...plannedScreens(made)]
+  const all = [...made, ...plannedScreens(made, state.spec)]
   const path = new Set<string>()
   for (let k = state.current; k && !path.has(k); k = treeParent(k)) path.add(k)
   const rows: HTMLElement[] = []
@@ -893,7 +917,7 @@ function renderNav() {
     const via = state.tree.get(e.key)?.label
     const planned = !state.entries.has(e.key)
     const b = planned
-      ? item(labelOf(e), 'not made yet', () => (state.busy ? hint() : openScreen(`@${e.name}`, e.parent!.key, e.parent!.label)))
+      ? item(labelOf(e), 'not made yet', () => (state.busy ? hint() : openScreen(`@${e.name}`, madeParent(e), e.parent!.label)))
       : item(labelOf(e), via ? `via ${via}` : '', () => goTo(e.key))
     b.classList.toggle('planned', planned)
     b.style.setProperty('--depth', String(depth))
@@ -905,6 +929,12 @@ function renderNav() {
   // The first screen first; screens the first screen does not reach after it, as their own trees.
   for (const e of all) if (!treeParent(e.key)) walk(e, 0)
   menu.replaceChildren(...rows)
+}
+
+/** The screen a planned one is opened from: the one it hangs under if that is made, else the first screen (a step of the core flow may hang under a step not made yet). */
+function madeParent(e: CacheEntry): string {
+  const p = e.parent?.key
+  return p && state.entries.get(p)?.versions.length ? p : screenKey(state.app!, null)
 }
 
 /** Make a screen current and bring it into view; an open A OR B is fitted instead. */

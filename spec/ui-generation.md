@@ -32,9 +32,10 @@ iframe. Pico styles the bare elements, so the model writes no CSS.
 - **Rendering:** `<iframe sandbox="allow-scripts allow-forms" srcdoc=...>`. The sandbox keeps
   generated code away from the app; `allow-forms` matters because models often build todo-style
   screens as `<form>`, and both OpenUI and CopilotKit failed the todo task by blocking submit.
-- **Size:** the screen gets a window as wide as its device (390 px phone, 1024 px desktop), but
-  `main` is only as wide as its content and the card shows only that part. The frame is as tall as
-  its content and never scaled. Shrinking a 1280 px screen to fit
+- **Size:** every screen of a device is as wide as the device (390 px phone, 1024 px desktop) and
+  at least one device screen tall (844 px, 768 px); a longer screen grows, and the frame is as tall
+  as its content and never scaled. vh units are pixels of the device's height. This replaced "only
+  as wide as its content": screens of one mockup differed in width, and some did not fill a phone. Shrinking a 1280 px screen to fit
   made 5 px text and broke the sketch theme's thin curved borders into gaps. Text is a fixed 16 px: Pico grows it with the window (up to
   21 px), which made screens look larger than the app around them.
 - **Inline the theme CSS** into the srcdoc. A null-origin frame cannot be relied on to fetch a
@@ -43,6 +44,16 @@ iframe. Pico styles the bare elements, so the model writes no CSS.
   the frame), then once at the end. The script runs on the final build, so controls work only then.
   First visible UI came at 1.1-1.6 s, fully rendered at 3.5-5 s.
 - **Strip only a markdown fence** if a model adds one; never patch the code.
+
+## The spec's markup
+
+With `ui.nav`, `ui.back` or `ui.toggles` in the mockup's spec, the request names one markup for
+each, and our frame CSS gives it its place: the tab bar (`<nav data-ui="tabs">`) sits at the bottom
+of a phone screen and the top of a desktop one, the current tab (`aria-current="page"`) bold and
+underlined; Back (`<a data-ui="back">`) is a bold link; a switch is Pico's
+`<input type="checkbox" role="switch">`. The theme gives them its look (Mockup draws the tab bar's
+line thick). On the tab screens of `ui.nav` the app hides Back with CSS: asking the model not to
+draw it there failed on 20 of 30 tab screens.
 
 ## Themes
 

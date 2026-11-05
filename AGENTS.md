@@ -5,7 +5,7 @@
 | What the user sees, what the system does | [spec/behavior.md](spec/behavior.md) |
 | How a screen is generated: HTML + Pico format, rendering, models | [spec/ui-generation.md](spec/ui-generation.md) |
 | Packages, HTTP API, frame messages, types, env vars, tests | [spec/code-contract.md](spec/code-contract.md) |
-| The LLM prompt | [spec/prompt-screen.md](spec/prompt-screen.md) |
+| The LLM prompts | [spec/prompt-screen.md](spec/prompt-screen.md), [spec/prompt-plan.md](spec/prompt-plan.md) |
 | How to run, test, re-record | [README.md](README.md) |
 | How to write any markdown you add | [process/writing-style.md](process/writing-style.md) |
 | The product idea | [process/uxwoz-product-brief.md](process/uxwoz-product-brief.md) |
@@ -36,15 +36,19 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
   prompt.ts      system prompt + user message: device, ask one side for a different design, an Edit's screen and change
                  (system prompt is a copy of spec/prompt-screen.md; a test keeps them equal)
   providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol)
-  generate.ts    one design: stream, 20 s deadline, cost, name and idea, refuse cut-off replies
+  generate.ts    one design: stream, 20 s deadline, cost, name and idea, spec lines and the check, refuse cut-off replies
+  spec.ts        the spec per mockup: limits, the plan's parse, design lines, pick, Edit and Undo rules,
+                 the request block and its markup, the check (runs in the browser too)
+  plan.ts        the plan call before Home: planner prompt (copy of spec/prompt-plan.md), Sol, 6 s limit
   keys.ts        cache keys: a link by @name, normalize a prompt, "home" means the first screen; which clicks mean Back or Home
-  tree.ts        the tree, worked out: links in each screen, @names, planned screens, shortest-path levels, the tree lines for the model
+  tree.ts        the tree, worked out: links in each screen, @names, planned screens (also the spec's flow and tabs), shortest-path levels, the tree lines for the model
   cache.ts       screen cache: find by name, proposals (the open A OR B) and pick, names, versions and undo, parents,
-                 delete with pruning, migration of old files, JSON file
-  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices; name, idea
+                 the spec per mockup, delete with pruning, migration of old files, JSON file
+  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices and their size;
+                 the spec's tab, Back and switch markup styles; name, idea
 src/packages/web/src/
-  server.ts      Bun.serve: /api/config, /api/screen (NDJSON, A OR B at once), /api/pick, /api/revise, /api/undo,
-                 /api/map, /api/apps, /api/delete, /api/delete-app, /api/warmup, themes
+  server.ts      Bun.serve: /api/config, /api/screen (NDJSON, the plan before Home, A OR B at once), /api/pick,
+                 /api/revise, /api/undo, /api/spec/drop, /api/map, /api/apps, /api/delete, /api/delete-app, /api/warmup, themes
   app.ts         browser: generate panel, A OR B streaming, refit and pick, clicks (@names, Back, Home), rail tools, drawer, toolbar menus, ← → trail, errors
   canvas.ts      browser: the tree layout (packed rows, line lanes), cards and frames, A OR B sides, rail, pan and zoom, fits
   index.html, shell.css   the page around the canvas

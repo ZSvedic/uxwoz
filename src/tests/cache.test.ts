@@ -178,7 +178,7 @@ describe('screen cache', () => {
     screen(cache, 'Cafe', 'Cart', '<h1>Cart</h1>', { key: menu, label: 'Cart' })
     screen(cache, 'Bakery', null, '<h1>Bread</h1>')
     expect(cache.deleteApp('CAFE')).toBe(2)
-    expect(cache.map('Cafe')).toEqual({ root: 'cafe', entries: [] })
+    expect(cache.map('Cafe')).toEqual({ root: 'cafe', entries: [], spec: {} })
     expect(cache.apps().map((a) => a.app)).toEqual(['Bakery'])
   })
 
@@ -197,7 +197,7 @@ describe('screen cache', () => {
     const cache = new ScreenCache(file)
     expect(cache.map('Cafe').entries.map((e) => [e.name, 'level' in e])).toEqual([['home', false], ['your-cart', false], [undefined, false]])
     expect(new ScreenCache(file).map('Cafe')).toEqual(cache.map('Cafe'))
-    expect(JSON.parse(readFileSync(file, 'utf8')).version).toBe(3)
+    expect(JSON.parse(readFileSync(file, 'utf8')).version).toBe(4)
   })
 
   test('a file from before versions is moved aside, and the cache starts empty', () => {

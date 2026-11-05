@@ -32,16 +32,16 @@ export function screenIdea(html: string): string {
 }
 
 /**
- * The window height a screen is designed for. A frame grows to fit its whole screen, so its real
- * window is as tall as the screen; vh units would then feed back into the frame's height forever.
- * Our script converts vh units to pixels of this height instead.
+ * The window height of a screen made before devices. A frame grows to fit its whole screen, so its
+ * real window is as tall as the screen; vh units would then feed back into the frame's height
+ * forever. Our script converts vh units to pixels of the device's height (this one without a device).
  */
 export const VIEWPORT_H = 800
 
-/** The devices a screen can be designed for, and the width of the window it gets: its widest. */
+/** The devices a screen can be designed for: the width of its window, and the least height of a screen. */
 export const DEVICES = {
-  phone: { label: 'Phone', width: 390, request: 'a phone screen, at most 390 px wide' },
-  desktop: { label: 'Desktop', width: 1024, request: 'a desktop browser window, at most 1024 px wide' },
+  phone: { label: 'Phone', width: 390, height: 844, request: 'a phone screen, 390 px wide' },
+  desktop: { label: 'Desktop', width: 1024, height: 768, request: 'a desktop browser window, 1024 px wide' },
 } as const
 export type Device = keyof typeof DEVICES
 export const DEFAULT_DEVICE: Device = 'phone'
@@ -52,7 +52,7 @@ export const isDevice = (v: unknown): v is Device => typeof v === 'string' && Ob
 // Our script, added before the model's markup. It turns clicks on data-action controls (and links)
 // into postMessage calls to the app, and keeps the frame from navigating away. While the screen is
 // still streaming (`final` false), controls do nothing: their handlers are not ready yet.
-const bootstrap = (final: boolean) => `(() => {
+const bootstrap = (final: boolean, vh: number) => `(() => {
   const final = ${final}
   // Only a real click may open a screen, so a screen's script cannot start paid generations by itself.
   const go = (prompt, label) => {
@@ -109,9 +109,9 @@ const bootstrap = (final: boolean) => `(() => {
   addEventListener('DOMContentLoaded', () => {
     if (!document.title) document.title = (document.querySelector('h1,h2')?.textContent || '').trim()
   })
-  // vh, dvh, svh and lvh in the screen's inline styles and <style> elements become pixels of a
-  // ${VIEWPORT_H} px window (see VIEWPORT_H). Run again before each measure, for styles set by script.
-  const vhToPx = (css) => css.replace(/(-?\\d*\\.?\\d+)[dsl]?vh\\b/g, (m, n) => (parseFloat(n) * ${VIEWPORT_H / 100}) + 'px')
+  // vh, dvh, svh and lvh in the screen's inline styles and <style> elements become pixels of the
+  // device's height (see VIEWPORT_H). Run again before each measure, for styles set by script.
+  const vhToPx = (css) => css.replace(/(-?\\d*\\.?\\d+)[dsl]?vh\\b/g, (m, n) => (parseFloat(n) * ${vh / 100}) + 'px')
   const fixVh = () => {
     for (const el of document.querySelectorAll('main [style*="vh"], main[style*="vh"]')) {
       const before = el.getAttribute('style'), after = vhToPx(before)
@@ -123,8 +123,8 @@ const bootstrap = (final: boolean) => `(() => {
     }
   }
   addEventListener('DOMContentLoaded', fixVh)
-  // The frame fits the whole screen, so it never scrolls: it reports the screen's height and width
-  // (main is only as wide as its content), and hands scroll gestures to the page around it.
+  // The frame fits the whole screen, so it never scrolls: it reports the screen's height and width,
+  // and hands scroll gestures to the page around it.
   let last = ''
   const report = () => {
     fixVh()
@@ -158,25 +158,41 @@ main :is(button, [role="button"], input, select):is(${GO}) { background-color: #
 main a:is(${GO}) { text-decoration-line: none !important; }
 main a:is(${GO}):hover { text-decoration-line: underline !important; }`
 
-// Our layout rules, after the theme: the screen is only as wide as its content and never wider than
-// the window (fit-content alone grows past it when the content cannot shrink), with less padding, and the page never scrolls (the frame is as tall as the screen). Pico grows its text with the window
-// (20 px at 1280 px); a fixed 16 px keeps screens in scale with the app around them.
+// Our layout rules, after the theme: every screen of a device is as wide as its window and at least
+// one device screen tall (set per page), with less padding, and the page never scrolls (the frame is
+// as tall as the screen). Pico grows its text with the window (20 px at 1280 px); a fixed 16 px keeps
+// screens in scale with the app around them.
 // Pico turns a <small> right after an input into help text on its own line; after a checkbox or
 // radio in its label it is a count or note, like "All <small>(6)</small>", so it stays inline.
+// The spec's fixed markup: the tabs of ui.nav sit at the bottom of a phone screen and the top of a
+// desktop one; Back of ui.back is a plain bold link. The theme gives them its look.
 const FRAME_CSS = `html, body { overflow: hidden; }
 label > :is([type="checkbox"], [type="radio"]) + small { display: inline; margin: 0 0 0 .25em; }
-body > main { width: fit-content; min-width: 280px; max-width: 100%; margin: 0; padding: 20px 24px; }
+body > main { position: relative; width: 100%; margin: 0; padding: 20px 24px; box-sizing: border-box; }
 @media (max-width: 600px) { body > main { padding: 16px; } }
+body > main:has(nav[data-ui="tabs"]) { padding-bottom: 84px; }
+nav[data-ui="tabs"] { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 6px 8px; display: flex; justify-content: space-around; align-items: stretch; gap: 4px;
+  background: var(--pico-background-color); border-top: 1px solid var(--pico-muted-border-color); }
+nav[data-ui="tabs"] > a { flex: 1 1 0; margin: 0; padding: 10px 4px; text-align: center; font-size: .875rem; line-height: 1.2; border-radius: 8px; }
+nav[data-ui="tabs"] > a[aria-current="page"] { font-weight: 700; box-shadow: inset 0 3px 0 currentColor; }
+html[data-device="desktop"] body > main:has(nav[data-ui="tabs"]) { padding-bottom: 20px; padding-top: 76px; }
+html[data-device="desktop"] nav[data-ui="tabs"] { top: 0; bottom: auto; justify-content: flex-start; padding: 6px 24px; border-top: 0; border-bottom: 1px solid var(--pico-muted-border-color); }
+html[data-device="desktop"] nav[data-ui="tabs"] > a { flex: 0 0 auto; padding: 10px 16px; }
+a[data-ui="back"] { display: inline-block; margin: 0 0 .5rem; font-weight: 600; }
 :root { --pico-font-size: 100%; --pico-spacing: .75rem; --pico-typography-spacing-vertical: .75rem;
   --pico-block-spacing-vertical: .75rem; --pico-block-spacing-horizontal: 1rem;
   --pico-form-element-spacing-vertical: .5rem; --pico-form-element-spacing-horizontal: .75rem; }`
 
-/** The full page for the iframe's srcdoc: theme CSS inlined, our bootstrap, the fragment in <main>. */
-export function framePage(fragment: string, css: string, final: boolean): string {
+/**
+ * The full page for the iframe's srcdoc: theme CSS inlined, our bootstrap, the fragment in <main>,
+ * at least one screen of `device` tall.
+ */
+export function framePage(fragment: string, css: string, final: boolean, device?: Device): string {
   const style = css.replace(/<\/style/gi, '<\\/style')
-  return `<!doctype html><html data-theme="light"><head><meta charset="utf-8">`
+  const h = device ? DEVICES[device].height : 0
+  return `<!doctype html><html data-theme="light"${device ? ` data-device="${device}"` : ''}><head><meta charset="utf-8">`
     + `<meta name="viewport" content="width=device-width, initial-scale=1">`
-    + `<style>${style}</style><style>${FRAME_CSS}\n${NAV_CSS}</style><script>${bootstrap(final)}</script></head>`
+    + `<style>${style}</style><style>${FRAME_CSS}\n${NAV_CSS}${h ? `\nbody > main { min-height: ${h}px; }` : ''}</style><script>${bootstrap(final, h || VIEWPORT_H)}</script></head>`
     + `<body${final ? '' : ' style="cursor:progress"'}><main>${fragment}</main></body></html>`
 }
 

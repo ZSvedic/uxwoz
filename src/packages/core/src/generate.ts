@@ -5,6 +5,7 @@ import { extractFragment, screenIdea, screenName } from './frame.ts'
 import { DEVICES, type Device } from './frame.ts'
 import { MODELS, type ModelId } from './models.ts'
 import { SYSTEM_PROMPT, WARMUP_REQUEST, screenRequest } from './prompt.ts'
+import { checkScreen, specRequest, takeSpecLines, type Spec } from './spec.ts'
 import { ProviderError, streamModel, type Fetch } from './providers.ts'
 
 /** A slower screen is useless, and keep-alive comments can stall a stream, so this is an overall deadline. */
@@ -20,8 +21,9 @@ export interface GenerateOptions {
   device?: Device
   /** True for one side of an A OR B: ask for a clearly different design. */
   alternative?: boolean
-  /** The mockup's spec, sent after the tree; left out of the request when absent. */
-  spec?: string
+  /** The mockup's spec, sent after the tree, and the screen's name, for the check. A string is sent as it is. */
+  spec?: Spec | string
+  name?: string
   /** An Edit: change this screen as asked instead of designing a new one. */
   edit?: { html: string; change: string }
   signal?: AbortSignal
@@ -43,7 +45,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
   try {
     for await (const ev of streamModel({
       model: o.model, system: SYSTEM_PROMPT,
-      user: screenRequest(o.app, o.action, o.existing, { device: o.device && DEVICES[o.device].request, alternative: o.alternative, spec: o.spec, edit: o.edit }),
+      user: screenRequest(o.app, o.action, o.existing, { device: o.device && DEVICES[o.device].request, alternative: o.alternative, spec: typeof o.spec === 'string' ? o.spec : o.spec && specRequest(o.spec), edit: o.edit }),
       signal, fetch: o.fetch, env: o.env,
     })) {
       if (ev.type === 'text') {
@@ -60,8 +62,11 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
       // Only a finished screen may be cached: a stream that stopped early or hit the token limit is an error.
       if (!ev.finishReason) throw new ProviderError('the stream ended before the screen was complete')
       if (ev.finishReason !== 'stop') throw new ProviderError(`the screen was cut off (${ev.finishReason})`)
-      const html = extractFragment(raw)
+      // The spec lines the design proposes come out of the stored screen.
+      const taken = takeSpecLines(extractFragment(raw))
+      const html = taken.html
       if (!html.trim()) throw new ProviderError('the model returned an empty screen')
+      const spec = typeof o.spec === 'object' ? o.spec : null
       const name = screenName(html), idea = screenIdea(html)
       yield {
         type: 'done',
@@ -78,6 +83,8 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
           ...(o.device && { device: o.device }),
           ...(name && { name }),
           ...(idea && { idea }),
+          ...(taken.lines.length && { spec: taken.lines }),
+          ...(spec && { misses: checkScreen(html, spec, o.name) }),
         },
       }
       return

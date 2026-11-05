@@ -3,6 +3,8 @@
 // version and drops the other, and gives the screen its fixed name for links (`@sleep-report`).
 // Edit and Regenerate add versions; Undo drops the newest. Each screen remembers the screen and
 // click that first made it; levels and the tree are worked out from the screens (see tree.ts).
+// Each mockup has a spec (see spec.ts): a pick fills its open rows, an Edit sets rows, Undo takes
+// an Edit's values back.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
@@ -10,6 +12,7 @@ import { canonicalAction, nameWords, normalizePrompt, screenKey, screenRef } fro
 import { screenName, type Device } from './frame.ts'
 import { HOME_NAME, nameFrom, screenTree, treeLines, uniqueName } from './tree.ts'
 import type { ModelId } from './models.ts'
+import { applyEdit, applyPick, dropValues, type Spec, type SpecLine } from './spec.ts'
 
 /** One design of a screen, as the model made it. */
 export interface Version {
@@ -31,6 +34,10 @@ export interface Version {
   idea?: string
   /** The Edit request that made this version. */
   feedback?: string
+  /** The spec lines the design proposed (`<meta name="spec">`), taken out of `html`. */
+  spec?: SpecLine[]
+  /** What the screen misses against the spec it was made with (checkScreen); absent when made without one. */
+  misses?: string[]
 }
 
 /** The screen and click that first made a screen. */
@@ -56,10 +63,12 @@ export interface CacheEntry {
 /** How many designs a new screen offers. */
 export const PROPOSALS = 2
 
-const FORMAT = 3
+const FORMAT = 4
 
 export class ScreenCache {
   private entries = new Map<string, CacheEntry>()
+  /** Each mockup's spec, by its root (the normalized app prompt). */
+  private specs = new Map<string, Spec>()
   /** When each key was last deleted, on a counter, so a design still streaming cannot bring it back. */
   private removed = new Map<string, number>()
   private clock = 0
@@ -69,8 +78,10 @@ export class ScreenCache {
     if (!file || !existsSync(file)) return
     try {
       const data = JSON.parse(readFileSync(file, 'utf8'))
-      if (data?.version === FORMAT || data?.version === 2) {
+      if (data?.version === FORMAT || data?.version === 3 || data?.version === 2) {
         for (const e of data.entries as CacheEntry[]) this.entries.set(e.key, e)
+        // Files from before specs (version 3 and older): every mockup starts with an empty spec.
+        for (const [root, spec] of Object.entries((data.specs ?? {}) as Record<string, Spec>)) this.specs.set(root, spec)
         if (data.version === 2) this.migrate()
       } else {
         // A file from before versions: it stays on disk, and the cache starts empty.
@@ -150,8 +161,43 @@ export class ScreenCache {
     entry.versions = [v]
     delete entry.proposals
     this.name(entry)
+    // The picked design's lines fill open rows; the other design's lines go with it.
+    if (v.spec?.length) applyPick(this.specOf(entry.app), v.spec, key)
     this.save()
     return entry
+  }
+
+  /** A mockup's spec; an empty one when it has none (an old mockup, or a plan that failed). */
+  spec(app: string): Spec {
+    return this.specs.get(normalizePrompt(app)) ?? {}
+  }
+
+  /** True once a mockup has a spec, even an empty one: its plan ran. */
+  hasSpec(app: string): boolean {
+    return this.specs.has(normalizePrompt(app))
+  }
+
+  /** Set a mockup's spec (the plan's). */
+  setSpec(app: string, spec: Spec) {
+    this.specs.set(normalizePrompt(app), spec)
+    this.save()
+  }
+
+  /** Take back the line one Edit set on row `row` (the ✕ in the drawer). Returns the spec, or undefined if there was no such line. */
+  dropLine(key: string, version: number, row: string): Spec | undefined {
+    const entry = this.entries.get(key)
+    if (!entry) return undefined
+    const spec = this.specOf(entry.app)
+    if (!dropValues(spec, key, version, row)) return undefined
+    this.save()
+    return spec
+  }
+
+  private specOf(app: string): Spec {
+    const root = normalizePrompt(app)
+    let s = this.specs.get(root)
+    if (!s) this.specs.set(root, s = {})
+    return s
   }
 
   /** Give a picked screen opened by a plain prompt its fixed name, once: home for the first screen, else from its title. */
@@ -169,6 +215,9 @@ export class ScreenCache {
   addVersion(key: string, version: Version): CacheEntry | undefined {
     const entry = this.entries.get(key)
     if (!entry?.versions.length) return undefined
+    // An Edit's lines set rows at once; a Regenerate's are dropped.
+    if (version.feedback && version.spec?.length) applyEdit(this.specOf(entry.app), version.spec, key, entry.versions.length)
+    else delete version.spec
     entry.versions.push(version)
     this.save()
     return entry
@@ -178,6 +227,8 @@ export class ScreenCache {
   undo(key: string): CacheEntry | undefined {
     const entry = this.entries.get(key)
     if (!entry || entry.versions.length < 2) return undefined
+    // The values the version set go, so the values before count again.
+    dropValues(this.specOf(entry.app), key, entry.versions.length - 1)
     entry.versions.pop()
     this.save()
     return entry
@@ -185,13 +236,13 @@ export class ScreenCache {
 
   /** This mockup's screens as the indented tree the model links to, `self` (a name) marked as the screen being made (see treeLines). */
   existingScreens(app: string, self?: string): string[] {
-    return treeLines(this.mockup(normalizePrompt(app)), undefined, self)
+    return treeLines(this.mockup(normalizePrompt(app)), undefined, self, this.spec(app))
   }
 
   /** One mockup: its screens, oldest first. */
-  map(app: string): { root: string; entries: CacheEntry[] } {
+  map(app: string): { root: string; entries: CacheEntry[]; spec: Spec } {
     const root = normalizePrompt(app)
-    return { root, entries: this.mockup(root) }
+    return { root, entries: this.mockup(root), spec: this.spec(app) }
   }
 
   /** Every mockup once, as first typed, with its number of screens; most recently changed first. */
@@ -243,8 +294,10 @@ export class ScreenCache {
     const root = normalizePrompt(app)
     const gone = this.mockup(root)
     this.tomb(root)
+    // Start over and Delete clear the spec too.
+    const had = this.specs.delete(root)
     for (const e of gone) { this.entries.delete(e.key); this.tomb(e.key) }
-    if (gone.length) this.save()
+    if (gone.length || had) this.save()
     return gone.length
   }
 
@@ -269,7 +322,7 @@ export class ScreenCache {
     mkdirSync(dirname(this.file), { recursive: true })
     // Write a temp file, then rename, so a crash never leaves half a cache file.
     const tmp = `${this.file}.tmp`
-    writeFileSync(tmp, JSON.stringify({ version: FORMAT, entries: [...this.entries.values()] }, null, 1))
+    writeFileSync(tmp, JSON.stringify({ version: FORMAT, entries: [...this.entries.values()], specs: Object.fromEntries(this.specs) }, null, 1))
     renameSync(tmp, this.file)
   }
 }

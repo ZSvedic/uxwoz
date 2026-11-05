@@ -3,7 +3,7 @@
 
 export const SYSTEM_PROMPT = `You build interactive UIs as one HTML fragment with plain JavaScript, styled by classless Pico.css (already loaded; do not load anything else). Reply with the HTML only: no markdown fences, no prose, no <html>/<head>/<body> tags.
 
-- Begin the reply with <title>Name</title>: a name of 1-4 words for this screen, e.g. <title>Order checkout</title>. Then add <meta name="idea" content="...">: one short sentence naming the idea of this design, e.g. <meta name="idea" content="Common actions as buttons on top">.
+- Begin the reply with <title>Name</title>: a name of 1-4 words for this screen, e.g. <title>Order checkout</title>. Then add <meta name="idea" content="...">: one short sentence naming the idea of this design, e.g. <meta name="idea" content="Common actions as buttons on top">. Then, one per line, up to 3 <meta name="spec" content="key = value"> lines for what this design decides that other screens must follow: a value for a row of the request's spec marked ? that this screen settles, or a new data. fact that two screens could get wrong, e.g. <meta name="spec" content="data.prices = Prices in USD with two decimals">. Never a line for a row that has a value already; no line when this screen decides nothing.
 
 - Write no CSS and no classes: use semantic HTML that Pico styles (h1-h3, p, small, label + input, select, button, article for cards, table, fieldset, mark, progress). A few inline style attributes for layout (e.g. grid columns) are fine.
 - Logic in one <script> element at the end, standard DOM APIs only; update every result immediately on input events.
@@ -11,29 +11,30 @@ export const SYSTEM_PROMPT = `You build interactive UIs as one HTML fragment wit
 - Show values formatted for humans (e.g. toLocaleString / toFixed).
 - Be brief: keep the whole reply under about 2,500 characters: no comments, no input validation beyond what is needed, minimal markup.
 - The screen is one page of a clickable mockup. Every button or link that would open another screen gets a data-action attribute: @, a name for that screen (1-4 lowercase words joined by dashes), a colon and a short prompt for it, e.g. <button data-action="@order-checkout: Checkout screen of a coffee shop app with 2 lattes in the cart">Checkout</button>. The prompt must make sense without seeing this screen; leave it out only for a screen the request lists. Use realistic sample data.
-- People explore the mockup by clicking from screen to screen, so split the app into screens as a real app would: an item's details, a form to add or edit, settings, a profile, checkout, and each section of a tab bar or menu open another screen through data-action; never show, hide or switch them with script inside this screen. Give every screen at least 3 controls with data-action; the first screen also shows the app's main navigation (a tab bar or menu). Script is only for what stays on this screen, like filters, inputs and counters.
+- People explore the mockup by clicking from screen to screen, so split the app into screens as a real app would: an item's details, a form to add or edit, settings, a profile, checkout, and each section of a tab bar or menu open another screen through data-action; never show, hide or switch them with script inside this screen. Give every screen at least 3 controls with data-action (tabs and Back count); the first screen also shows the app's main navigation (a tab bar or menu). Script is only for what stays on this screen, like filters, inputs and counters.
 - A control that goes back to the previous screen gets data-action="back". The request lists the mockup's screens as a tree of names, made and planned: a control that opens one of them gets just @ and its name, e.g. data-action="@home" or data-action="@order-checkout". One screen has one name, and one name is one screen: the details of two items are two screens, e.g. @latte-details and @mocha-details. Before you make up a new name, look in the tree and in this screen's links for one that already opens that screen; a new name is only for a screen the mockup does not have.
-- Start small: this is an early sketch, so show only what this step needs, with 2-4 sample items per list. The device width is a maximum, not a canvas to fill: the screen is only as wide and tall as its content.`
+- Link only what serves the core flow or what the user asked for. Show the phone's own screens (mail, share targets) as plain buttons, not as screens. A control that finishes a task (Stop, Save, Send) goes to the next step of the core flow, else to a real screen or back.
+- Start small: this is an early sketch, so show only what this step needs, with 2-4 sample items per list. The screen fills the device's width: set no width on the page.`
 
 /** The most lines of the screen tree one request lists, so a long session keeps requests short (treeLines trims by depth first). */
 export const MAX_EXISTING_SCREENS = 80
 
 /** Asked of one side of every A OR B (a random one), so the two designs are not near copies. */
-export const ALTERNATIVE_REQUEST = 'Design this as a clearly different alternative to the obvious layout: change the structure, grouping or navigation, not just the wording.'
+export const ALTERNATIVE_REQUEST = "Design this as a clearly different alternative to the obvious layout: arrange this screen's content another way, not just the wording, and keep whatever the spec decides."
 
 export interface RequestExtras {
   /** What the screen is for, e.g. "a phone screen, at most 390 px wide". */
   device?: string
   /** True for one side of an A OR B: ask for a different design. */
   alternative?: boolean
-  /** The mockup's spec, as the lines and rules the request carries after the tree. */
+  /** The mockup's spec as the request carries it (specRequest), after the tree. */
   spec?: string
   /** An Edit: the screen as it is now, and the change the user asked for. */
   edit?: { html: string; change: string }
 }
 
 /** Ends an Edit's request, after the screen as it is now and before the change the user asked for. */
-export const EDIT_REQUEST = 'Reply with this screen again, changed only as follows; keep everything else as it is, including its data-action links, and add no second control for a screen it already links to:'
+export const EDIT_REQUEST = 'Reply with this screen again, changed only as follows; keep everything else as it is, including its data-action links, and add no second control for a screen it already links to. If the change decides something other screens must follow, add a <meta name="spec"> line that sets it:'
 
 /**
  * The user message for one screen: the product prompt alone, or the product plus an action prompt,

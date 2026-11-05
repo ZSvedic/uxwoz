@@ -3,8 +3,8 @@
 
 import { join, resolve } from 'node:path'
 import {
-  DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, PROPOSALS, ScreenCache, canonicalAction, generateScreen, isDevice, isModelId,
-  plannedScreens, promptFromLabel, screenKey, screenRef, warmUp, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type Version,
+  DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, PROPOSALS, ScreenCache, canonicalAction, generateScreen, isDevice, isModelId, makePlan,
+  plannedScreens, promptFromLabel, screenKey, screenRef, warmUp, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type Spec, type Version,
 } from '@uxwoz/core'
 import index from './index.html'
 
@@ -17,14 +17,16 @@ const THEME_FILES = new Set(['pico', 'mockup'])
  * One line of a /api/screen or /api/revise NDJSON stream. `meta.variants` is how many designs stream
  * now (2 for a new screen's A OR B, 1 for a revise, 0 for a cache hit); each chunk names its side.
  * `version` says a side finished and is stored, `failed` that it did not. `done` ends a stream that
- * stored something (or a cache hit), `error` one that did not.
+ * stored something (or a cache hit), `error` one that did not. `spec` comes after `meta` for a new
+ * mockup's first screen, once its plan is in (or failed); `done` carries the mockup's spec.
  */
 export type ScreenEvent =
   | { type: 'meta'; key: string; cached: boolean; variants: number }
+  | { type: 'spec'; spec: Spec }
   | { type: 'chunk'; variant: number; text: string }
   | { type: 'version'; variant: number; version: Version }
   | { type: 'failed'; variant: number; message: string }
-  | { type: 'done'; entry: CacheEntry }
+  | { type: 'done'; entry: CacheEntry; spec: Spec }
   | { type: 'error'; message: string }
 
 export interface ServerOptions {
@@ -35,6 +37,8 @@ export interface ServerOptions {
   log?: (msg: string) => void
   /** Picks the side that is asked for a clearly different design; Math.random by default. */
   random?: () => number
+  /** Plans a new mockup before its first screen (makePlan with Sol by default); it throws on an error or a slow reply. */
+  plan?: (app: string, device: Device, signal: AbortSignal) => Promise<Spec>
 }
 
 const json = (data: unknown, status = 200) => Response.json(data, { status })
@@ -100,6 +104,7 @@ export function createServer(opts: ServerOptions = {}) {
   const cache = opts.cache ?? new ScreenCache()
   const log = opts.log ?? ((m: string) => console.warn(m))
   const random = opts.random ?? Math.random
+  const plan = opts.plan ?? ((app: string, device: Device, signal: AbortSignal) => makePlan(app, device, { fetch: opts.fetch, env: opts.env, signal }))
 
   /** A click in screen `from`, on a control labelled `label`. Absent for the first screen. */
   interface Click { from: string; label: string }
@@ -115,7 +120,7 @@ export function createServer(opts: ServerOptions = {}) {
     const key = hit?.key ?? screenKey(app, action)
     if (hit) {
       yield { type: 'meta', key, cached: true, variants: 0 }
-      yield { type: 'done', entry: hit }
+      yield { type: 'done', entry: hit, spec: cache.spec(app) }
       return
     }
     const root = screenKey(app, null)
@@ -134,16 +139,26 @@ export function createServer(opts: ServerOptions = {}) {
     // A screen opened by name alone is made from the planned screen's prompt, else from the words clicked.
     const ref = action && screenRef(action)
     if (ref && !ref.prompt) {
-      const planned = plannedScreens(cache.map(app).entries).find((p) => p.name === ref.name)
+      const planned = plannedScreens(cache.map(app).entries, cache.spec(app)).find((p) => p.name === ref.name)
       action = `@${ref.name}: ${planned?.action ?? promptFromLabel(ref.name, click?.label ?? '')}`
     }
     const prompt = ref ? screenRef(action!)!.prompt : action
     yield { type: 'meta', key, cached: false, variants: PROPOSALS }
+    // A new mockup is planned before its first screen. A plan that fails or is slow leaves an empty
+    // spec, and the first screen goes on without it.
+    if (action == null && !cache.hasSpec(app)) {
+      let spec: Spec = {}
+      try { spec = await plan(app, device, signal) } catch (err) { if (!signal.aborted) log(`plan failed: ${message(err)}`) }
+      if (signal.aborted) return
+      if (!gone()) cache.setSpec(app, spec)
+      yield { type: 'spec', spec }
+    }
     const existing = cache.existingScreens(app, ref ? ref.name : undefined)
+    const name = action == null ? 'home' : ref ? ref.name : undefined
     // One random side asks for a clearly different design, so the side says nothing about which is which.
     const different = Math.min(PROPOSALS - 1, Math.floor(random() * PROPOSALS))
     const streams = Array.from({ length: PROPOSALS }, (_, slot) => tagged(slot, generateScreen({
-      app, action: prompt, existing, model, device, alternative: slot === different,
+      app, action: prompt, existing, model, device, alternative: slot === different, spec: cache.spec(app), name,
       signal, fetch: opts.fetch, env: opts.env, log,
     })))
     const parent = click && { key: click.from, label: click.label || prompt || 'home' }
@@ -168,7 +183,7 @@ export function createServer(opts: ServerOptions = {}) {
     const entry = cache.get(key)
     if (gone()) yield { type: 'error', message: 'this screen was deleted while it was being made' }
     else if (!entry) yield { type: 'error', message: [...new Set(failed)].join('; ') || 'no screen was made' }
-    else yield { type: 'done', entry }
+    else yield { type: 'done', entry, spec: cache.spec(app) }
   }
 
   /** One new version of a picked screen: an Edit with `change`, else a Regenerate from its prompt. */
@@ -180,6 +195,7 @@ export function createServer(opts: ServerOptions = {}) {
       for await (const ev of generateScreen({
         // A revise keeps the device the screen was made for.
         app, action, existing: cache.existingScreens(app, entry.name), model, device: now.device ?? device,
+        spec: cache.spec(app), name: entry.name,
         edit: change ? { html: now.html, change } : undefined,
         signal, fetch: opts.fetch, env: opts.env, log,
       })) {
@@ -189,7 +205,7 @@ export function createServer(opts: ServerOptions = {}) {
         if (signal.aborted) return
         if (!stored) { yield { type: 'error', message: 'this screen was deleted while it was being changed' }; return }
         yield { type: 'version', variant: 0, version }
-        yield { type: 'done', entry: stored }
+        yield { type: 'done', entry: stored, spec: cache.spec(app) }
       }
     } catch (err) {
       if (signal.aborted) return
@@ -250,7 +266,7 @@ export function createServer(opts: ServerOptions = {}) {
           if (refused) return refused
           const b = await req.json().catch(() => null)
           const entry = cache.pick(String(b?.key ?? ''), Number(b?.index))
-          return entry ? json({ entry }) : json({ error: 'no such screen, or no such design to pick' }, 404)
+          return entry ? json({ entry, spec: cache.spec(entry.app) }) : json({ error: 'no such screen, or no such design to pick' }, 404)
         },
       },
       // One new version of a screen: an Edit with `change`, else a Regenerate.
@@ -276,7 +292,17 @@ export function createServer(opts: ServerOptions = {}) {
           if (refused) return refused
           const b = await req.json().catch(() => null)
           const entry = cache.undo(String(b?.key ?? ''))
-          return entry ? json({ entry }) : json({ error: 'no such screen, or nothing to undo' }, 404)
+          return entry ? json({ entry, spec: cache.spec(entry.app) }) : json({ error: 'no such screen, or nothing to undo' }, 404)
+        },
+      },
+      // Take back one line an Edit set: the ✕ beside it in the drawer.
+      '/api/spec/drop': {
+        POST: async (req) => {
+          const refused = refuseForeign(req)
+          if (refused) return refused
+          const b = await req.json().catch(() => null)
+          const spec = cache.dropLine(String(b?.key ?? ''), Number(b?.version), String(b?.row ?? ''))
+          return spec ? json({ spec }) : json({ error: 'no such line' }, 404)
         },
       },
       '/api/map': (req) => {

@@ -100,12 +100,12 @@ hidden when the user branches.
   it.
 - **Live screens**: a picked screen works: controls that open another screen are blue, in both
   themes; everything else keeps the theme's own ink.
-- **A screen is as tall as its content**, so nothing scrolls inside it: scrolling over a screen
-  moves the canvas. A screen sees an 800 px tall window (`100vh` is 800 px), so "full-screen"
-  screens keep a normal size; a screen that still keeps growing with its window stops after four
-  steps.
-- **Size**: a screen is only as wide as its content; the device width is the most it takes, even
-  when its content cannot shrink to fit. The model is told to start small.
+- **A screen is as tall as its content**, and at least one device screen tall (844 px on a phone),
+  so nothing scrolls inside it: scrolling over a screen moves the canvas. `100vh` is one device
+  screen, so "full-screen" screens keep a normal size; a screen that still keeps growing with its
+  window stops after four steps.
+- **Size**: every screen of a device is as wide as the device, so the screens of a mockup line up.
+  The model is told to start small.
 - **Opening a mockup** fits its current screen, and fits it again once the screen has its real
   size. **Fit screen** keeps a tall screen readable and shows its top, like the A OR B fit.
 - **Pan and zoom**: scroll, or drag the empty canvas, to pan. Pinch or Ctrl/Cmd + scroll zooms
@@ -170,9 +170,32 @@ scrolls so the screen stays fully visible beside it. Esc or ✕ closes it. It ha
   indicator, not four*, *Regenerated*, *The design you picked*, the one showing marked.
 - **Info**: name, idea, the click that opened it, what made the version showing (the pick, an Edit
   and its request, or Regenerate), the number of versions, model, device, when it was made, time to
-  first text, total time, cost, cost of all versions, finish reason, size and prompt.
+  first text, total time, cost, cost of all versions, finish reason, **Check** (what the screen
+  misses against the spec it was made with: a tab of `ui.nav` it does not link to, a Back labelled
+  otherwise than `ui.back` says, or a reply that holds the screen twice; *follows the spec* when
+  nothing), the **spec lines** the design proposed, size and prompt.
 
 Choosing another screen while the drawer is open shows that screen in it.
+
+## Spec
+
+Each mockup has a short spec: the decisions every new screen follows, so the screens of one mockup
+agree on navigation, Back and facts ([the spec note](../process/plans/2026-11-05-spec-memory.md)).
+
+- **The plan**: before the first screen, one call to GPT-6.1 Sol writes the core flow (*@home →
+  @recording → @morning-report*) and up to 8 open rows, each a key and the question it settles
+  (*ui.nav ? main navigation*, *data.score ? whether higher means worse*). It takes about 2 s; after
+  6 s, or on an error, the first screen goes on with an empty spec. Start over plans again.
+- **Every request carries the spec** after the tree: filled rows with their value, open rows with
+  their question, and one markup each for the tabs of `ui.nav`, Back and switches.
+- **The core flow and the tabs of `ui.nav` are planned screens**: they are in the tree and in Nav
+  from the start, each flow step under the step before.
+- **Lines from designs**: a design may propose up to three lines (*ui.nav = Tabs: Tonight @home,
+  History @night-history*). The pick fills rows that are still empty with the picked design's
+  lines, and drops the rest; a line over 120 characters is refused. An Edit may set any row; Undo
+  takes its values back. A Regenerate's lines are dropped.
+- **Tab screens have no Back**: the app hides it there.
+- Mockups made before the spec open with an empty one and work as before.
 
 ## Navigation
 
@@ -194,7 +217,8 @@ Only a real click opens a screen.
   it, when someone first opens it. It goes away when no screen links to it any more (after an Edit
   or a delete). Deleting a screen that other screens still link to makes it planned again; the
   screens only it led to go with it.
-- **The tree in each request**: every request lists the mockup's screens, made and planned, as an
+- **The tree in each request**: every request lists the mockup's screens, made and planned (the
+  spec's core flow and tabs among them), as an
   indented tree of names and what each screen is (its prompt), two spaces deeper per level,
   planned ones (and ones whose A OR B is open) marked *not made yet*, the screen being made or
   changed marked *this screen*, at most 80 lines; past that, planned screens are left out first,
@@ -239,7 +263,8 @@ click that first made it; levels are worked out, never stored. Each side of an A
 that was paid for is kept even if the browser leaves. The current screen is remembered per mockup
 in this browser.
 
-A cache file from before names (version 2) gets names for its picked screens when the server loads
+The cache file also holds each mockup's spec (version 4). A file from version 3 loads with empty
+specs. A cache file from before names (version 2) gets names for its picked screens when the server loads
 it, from each screen's title, else its first heading, else its prompt; its stored levels and
 clicks go. A file from before versions is moved aside to `screen-cache.json.before-versions`, and
 the cache starts empty.
@@ -248,8 +273,9 @@ the cache starts empty.
 
 - **Model**: Claude Haiku 5.5 (default), GPT-6 Luna (fast), GPT-6.1 Sol Ultrafast. It applies to the
   next design made; stored screens stay as they are, with their maker in Info.
-- **Device**: Phone (default, at most 390 px wide) or Desktop (at most 1024 px). The model is told
-  which one, and the screen gets a window that wide. It applies to new screens; Edit and Regenerate
+- **Device**: Phone (default, 390 px wide) or Desktop (1024 px). The model is told which one, and
+  every screen is that wide and at least one device screen tall. The plan is told the kind of
+  device, never its width. It applies to new screens; Edit and Regenerate
   keep the screen's own device. While a mockup is open, the picker shows the device of its first
   screen, so its next screens, and Start over, match it; **New mockup…** and closing the mockup
   bring back the saved choice. Screens made before devices existed show at 800 px.

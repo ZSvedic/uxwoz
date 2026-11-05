@@ -5,10 +5,9 @@
 // lines branch at a height of their own in the gap below its row, so lines never cross. A new screen shows as A OR B: two locked
 // previews side by side, with its idea above each; a click on a finished one picks it. Right of
 // each picked screen is a rail of tools, kept at the same size on screen whatever the zoom.
-// Screens show only as wide as their content: the frame keeps the device's width, so the screen's
-// layout never changes, and the part it does not use is cut off.
+// Every screen of a device is as wide as the device and at least one device screen tall.
 
-import { FRAME_SANDBOX, framePage } from '@uxwoz/core/frame'
+import { FRAME_SANDBOX, framePage, type Device } from '@uxwoz/core/frame'
 
 /** Limits on the height a screen may report, so a broken screen cannot make a huge frame. */
 const MIN_SCREEN_H = 160
@@ -58,8 +57,10 @@ const STEPS = [0.1, 0.15, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2]
 export interface CardView {
   /** Unique on the canvas: the screen's key, or `key#0` and `key#1` for the sides of its A OR B. */
   id: string
-  /** Width of the window the screen is designed for: the most it shows. */
+  /** Width of the window the screen is designed for. */
   width: number
+  /** The device it is designed for; absent for screens made before devices. */
+  device?: Device
   /** The bold line above a screen, e.g. "L2 Camera"; '' for a side of an A OR B. */
   name: string
   /** One sentence naming the design idea: under the name, or alone above a side. */
@@ -396,7 +397,7 @@ export class Canvas {
     if (!final && c.used != null) { c.used = null; this.queue() }
     c.shown = { html, final, css }
     c.sized = false
-    c.frame.srcdoc = framePage(html, css, final)
+    c.frame.srcdoc = framePage(html, css, final, c.view?.device)
   }
 
   /** Drop the callback waiting for a card's next load, once its stream is cancelled. */

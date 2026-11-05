@@ -34,7 +34,7 @@ async function* lines(res: Response): AsyncGenerator<ScreenEvent> {
 async function run(both: boolean, between: (cache: ScreenCache, seen: ScreenEvent) => void) {
   const cache = new ScreenCache()
   const { fetch, open } = gated(both)
-  const server = createServer({ port: 0, cache, fetch, env, log: () => {}, random: () => 0.9 })
+  const server = createServer({ port: 0, cache, fetch, env, log: () => {}, random: () => 0.9, plan: async () => ({}) })
   try {
     const res = await globalThis.fetch(new URL('/api/screen', server.url), {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app: 'Shop' }),
