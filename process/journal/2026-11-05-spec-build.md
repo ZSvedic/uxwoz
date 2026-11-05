@@ -150,3 +150,69 @@ a79289c, each with a test in `src/tests/spec-review.test.ts` (numbered as in the
 15. **A cache file from a newer app** is left alone: the app says so and saves nothing.
 
 Nothing was left out. A second critic is reading slice 3.
+
+## Review of slice 3, and three design changes
+
+The second critic's nine findings on slice 3 are fixed in 8d9d342, with tests in
+`src/tests/spec-review-3.test.ts`:
+
+1. Spec values belong to a version's `createdAt`; `/api/spec/drop` takes `at`. A deleted screen's
+   values stay in the spec, untied from it.
+2. A core flow or a `Tabs:` line, from an Edit or a pick, needs the plan's shape or is refused.
+3. The Edit request says its line may replace a row that has a value. A recorded Edit moves Back
+   and Undo brings the old line back.
+4. An Edit's lines that were not taken are kept on the version with why; the drawer lists them.
+5. An Edit is checked against the spec with its own lines in.
+6. A line a later Edit replaced says *(replaced later)* and has no ✕.
+7. A ✕ whose line is gone shows the server's spec; one ✕ runs at a time.
+8. The planned-screen server test asserts without an `if`.
+9. ✕ and Undo are tested through the server with a fake provider.
+
+The note's three changes (866a393):
+
+- **A floor on new screens**: a screen that lists or shows items opens 1 or 2, a form none. The
+  "at least 3 controls" rule is gone.
+- **Stop**: the flow line asks that the control finishing the task opens the next step by its own
+  `data-action`. Five Luna Recording screens from the same spec and tree: 4 of 5 Stops opened the
+  summary themselves; the fifth had no Stop that opened anything. That met the bar of 4, so the
+  flow does not name the control.
+- **A doubled reply keeps its first copy.** Luna doubled all 5 of those Recording replies (screen,
+  `</final>`, junk, screen again); each kept its first copy.
+
+### NiceSnore again: Haiku to 15, Luna to 10
+
+| | Haiku before (9) | Haiku after (12) | Luna before (6) | Luna after (6) |
+|---|---|---|---|---|
+| Screens before the walk ran out of links | 9 | 12 | 6 | 6 |
+| A tab missing or pointing elsewhere | 0 | 1 (Home, made before `ui.nav` was set) | 0 | 2 |
+| Back labelled two ways | no | yes: `‹ Back` on 6, `Back` on 4 | no | no |
+| A wrong tab marked current | 0 | 0 | 0 | 0 |
+| Score read the other way | 0 | 0 | 0 | 0 |
+| Stop opens the morning report | yes | yes | no | yes |
+| A screen opening more than 2 new screens | 1 | 1 (Remedies, 5) | 0 | 0 |
+| The screen written twice | 0 | 0 | 1 | 1 (Home; first copy kept) |
+| Screens with any miss | 1 of 9 | 6 of 12 | 2 of 6 | 3 of 6 |
+| Rows at the end: filled of 9, all from the plan | 9 | 6 | 9 | 9 |
+| Rows that are one screen's content | 0 | 0 | 0 | 0 |
+| Picks that put in a line | 4 of 9 | 3 of 12 | 5 of 6 | 4 of 6 |
+
+Counted by code, then read: tabs, Back labels and the score from the HTML. The 4 Haiku screens
+with the minority Back label carry most of its misses.
+
+What this round shows:
+
+- **The floor helped Haiku only**: 12 screens, not 15; Luna still stopped at 6. Most screens open
+  nothing new; Remedies, a list of 4 remedies, opened 5 (a details screen per item plus a form),
+  so "one screen per item" and the cap of 2 pull against each other.
+- **`ui.back` was filled without a label** (*Back sits top-left as a text link*): the plan's
+  question asks where Back sits, the pick took a line with no label, and screens then chose
+  `‹ Back` or `Back`. The check, which wants the line to start with the label, flagged the `‹`
+  ones. A `ui.back` line could need the same kind of shape check as `Tabs:`.
+- **A fact answered in the wrong row**: Haiku's `ui.colors` line holds the score's direction
+  (*higher means more snoring*), and `data.snore-score` stayed open. Screens still agreed.
+- **Luna's tab bars drop a tab** on 2 of 6 screens; the check caught one, because the other
+  screen linked the missing tab elsewhere.
+- **Stop works for both** in these walks, and 4 of 5 in Luna's separate test.
+
+The mockups are in `temp/screen-cache-spec.json` (port 3001) and `temp/screen-cache-luna.json`
+(port 3002); the previous runs are kept as `screen-cache-spec.run2.json` and `screen-cache-luna.run1.json`.
