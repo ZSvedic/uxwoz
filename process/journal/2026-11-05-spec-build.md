@@ -217,3 +217,38 @@ What this round shows:
 
 The mockups are in `temp/screen-cache-spec.json` (port 3001) and `temp/screen-cache-luna.json`
 (port 3002); the previous runs are kept as `screen-cache-spec.run2.json` and `screen-cache-luna.run1.json`.
+
+## Round C: code draws tabs and Back
+
+Built in 12ad028, after the note changed in a6b93f9:
+
+- **Code draws tabs and Back.** Each time a screen shows, `drawChrome` redraws its tab bar from
+  `ui.nav` (labels, names, the current tab) and Back's label from `ui.back`. A screen with no tab
+  bar gets one; a screen with no Back is left alone. It works on the stored screen plus the spec
+  as it is now, so nothing stored changes and an old screen follows a changed line. The tree counts
+  the drawn tabs as links from every screen. The tab and Back checks are gone. One cost: a change
+  to `ui.nav` or `ui.back` now reloads the frames whose drawn tabs or Back change, the Home pick
+  that fills `ui.nav` included.
+- **Shapes.** `ui.back` starts with its label in double quotes; a `ui.nav` that speaks of tabs
+  without `Tabs:` is refused. The request and the planner ask for that shape.
+- **New kinds of screen.** The check groups new names by their last word when it says what the
+  screen does (details, edit, add…), else by their first word, and flags more than 2 kinds.
+
+| | Haiku before (12) | Haiku after (9) | Luna before (6) | Luna after (6) |
+|---|---|---|---|---|
+| Screens before the walk ran out of links | 12 | 9 | 6 | 6 |
+| A tab missing or pointing elsewhere, as drawn | 1 | 0 | 2 | 0 |
+| Back labelled two ways, off the tabs | yes | yes: `Back` 2, `Settings` 1 | no | no |
+| Stop opens the morning report | yes | yes | yes | yes |
+| More than 2 new kinds of screen | 1 (as screens) | 0 | 0 | 0 |
+| The screen written twice | 0 | 0 | 1 | 0 |
+| Rows filled, of 9 | 6 | 5 | 9 | 9 |
+
+Tab misses are zero by construction. Back is not, for Haiku: its only `ui.back` line came without
+a quoted label (*Back sits top-left*), was refused, and the row stayed open; with no label to draw,
+the screens chose `Back`, `Settings` or none. Luna filled `ui.back` with `"Back", top left`, and
+every Back reads the same. A Back label code could draw while the row is open, or a plan question
+that asks for the quoted label, would close that gap.
+
+The walks still end early (9 and 6). Haiku's floor reached 12 last round and 9 now, so the length
+moves with the screens the walk happens to open, not with the rule.
