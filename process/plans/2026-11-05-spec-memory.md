@@ -111,7 +111,8 @@ Anything code can guarantee stays out of the spec.
 - **Markup.** With `ui.nav`, `ui.back` or `ui.toggles` in the spec, the request names one markup
   for each and the theme styles it. The spec says which tabs; the theme says how tabs look.
 - **Code draws tabs and Back.** Each time a screen shows, the frame redraws its tab bar from
-  `ui.nav` and its Back label from `ui.back`, and hides Back on a tab screen. Every screen then
+  `ui.nav` and its Back label from `ui.back`, and hides Back on a tab screen. Until `ui.back` is set, Back
+  reads `‹ Back`. Every screen then
   has the same tabs and Back, and an old screen follows a changed line at once. Asking the models
   was not enough: Luna dropped a tab on 2 of 6 screens and Haiku wrote Back two ways.
 - **Shapes.** `ui.nav` starts with `Tabs:` when the app has tabs, `ui.back` starts with its label
