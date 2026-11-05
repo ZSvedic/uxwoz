@@ -113,14 +113,15 @@ Anything code can guarantee stays out of the spec.
 - **No Back on tab screens.** Code knows which screens are tabs and hides Back there. Asking the
   model did not work.
 - **A check, no retry.** A finished screen must link to every name in `ui.nav`, carry the Back
-  label of `ui.back` unless it is a tab screen, and hold one screen (Luna sometimes writes the
-  whole screen twice). Misses show in Info.
+  label of `ui.back` unless it is a tab screen, and open no more than 2 new screens. Misses show in
+  Info. When a reply holds the screen twice, as Luna's sometimes do, code keeps the first copy.
 - **Colors.** A line can say what a color means (*red: over budget*). The palette is the theme's.
-- **The flow.** The request for a screen on the core flow names the next step and asks for one
-  control that opens it. A general rule did not get Stop recording to the morning report.
+- **The flow.** The request for a screen on the core flow names the next step and asks that the
+  control that finishes this screen's task opens it, by its own link and not by script. A general rule did not get Stop recording to the morning report.
 - **The current tab.** Code marks it; the model's own mark is removed.
-- **Prompt rules.** A screen opens at most 2 screens the tree does not have, each needed for this
-  screen's task (an item's details, a form). "Only what serves the core flow" ended a mockup at 7
+- **Prompt rules.** Besides tabs, Back and the main path, a screen that lists or shows items
+  opens 1 or 2 screens the tree does not have (an item's details, a form to add or edit). A form
+  or a screen that ends a task opens none. With a cap and no floor, mockups ended at 6 to 9
   screens. Show the phone's own screens (mail, share targets) as plain buttons. A control that finishes a task goes
   to the next step of the core flow, else to a real screen or back. Tabs and Back count toward "at
   least 3 controls with data-action".
