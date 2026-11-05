@@ -630,7 +630,7 @@ function renderDrawer() {
     li.classList.toggle('now', i === e.versions.length - 1)
     // The spec lines this version set, old value beside new; an Edit's have a ✕ that takes them back.
     const set = linesOf(state.spec, e.key, x.createdAt)
-    if (set.length) li.append(specLines(e.key, i, set, !!x.feedback))
+    if (set.length || x.specRefused?.length) li.append(specLines(e.key, x.createdAt, set, !!x.feedback, x.specRefused ?? []))
     return li
   }).reverse())
   const node = state.tree.get(e.key)
@@ -664,25 +664,40 @@ function renderDrawer() {
   }))
 }
 
-/** A version's spec lines in the drawer: key, the value before (struck), the value now, and ✕ for an Edit's. */
-function specLines(key: string, version: number, set: { key: string; text: string; before?: string }[], edit: boolean): HTMLElement {
+/**
+ * A version's spec lines in the drawer: key, the value before (struck), the value now, and ✕ for an
+ * Edit's; a line a later value replaced says so and has no ✕. Then an Edit's lines that were not
+ * taken, and why.
+ */
+function specLines(key: string, at: string, set: { key: string; text: string; before?: string; later: boolean }[], edit: boolean,
+  refused: { line: string; why: string }[]): HTMLElement {
   const ul = document.createElement('ul')
   ul.className = 'set-lines'
+  for (const r of refused) {
+    const li = document.createElement('li')
+    li.className = 'refused'
+    const k = document.createElement('b'), why = document.createElement('span')
+    k.textContent = r.line
+    why.textContent = `not taken: ${r.why}`
+    li.append(k, why)
+    ul.append(li)
+  }
   for (const l of set) {
     const li = document.createElement('li')
     const k = document.createElement('b'), old = document.createElement('s'), now = document.createElement('span')
     k.textContent = l.key
     old.textContent = l.before ?? 'not set'
     old.classList.toggle('none', l.before == null)
-    now.textContent = l.text
+    now.textContent = l.later ? `${l.text} (replaced later)` : l.text
+    li.classList.toggle('later', l.later)
     li.append(k, old, now)
-    if (edit) {
+    if (edit && !l.later) {
       const x = document.createElement('button')
       x.type = 'button'
       x.className = 'drop'
       x.textContent = '✕'
       x.title = 'Take this line back: the value before counts again for new screens'
-      x.addEventListener('click', () => dropLine(key, version, l.key))
+      x.addEventListener('click', () => dropLine(key, at, l.key))
       li.append(x)
     }
     ul.append(li)
@@ -690,12 +705,19 @@ function specLines(key: string, version: number, set: { key: string; text: strin
   return ul
 }
 
-/** Take back one line an Edit set. */
-async function dropLine(key: string, version: number, row: string) {
-  const res = await post('/api/spec/drop', { key, version, row }).catch(() => null)
-  if (!res?.ok) return showError('Could not take the line back')
-  state.spec = (await res.json() as { spec: Spec }).spec
-  draw()
+/** Take back one line an Edit set. One at a time; when the line is gone already (another browser), take the server's copy. */
+let dropping = false
+async function dropLine(key: string, at: string, row: string) {
+  if (dropping) return
+  dropping = true
+  try {
+    const res = await post('/api/spec/drop', { key, at, row }).catch(() => null)
+    if (!res?.ok) { showError('That line was taken back already'); return reloadMap() }
+    state.spec = (await res.json() as { spec: Spec }).spec
+    draw()
+  } finally {
+    dropping = false
+  }
 }
 
 /** How the mockup's plan went, for Info on its first screen. */

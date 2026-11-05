@@ -16,6 +16,8 @@ export interface SpecRow { ask?: string; from?: SpecFrom; values: SpecValue[] }
 export type Spec = Record<string, SpecRow>
 /** A line a design or the plan proposes: `ui.nav = Tabs: …`. */
 export interface SpecLine { key: string; text: string }
+/** A line that was not taken, and why: shown under its Edit in the drawer. */
+export interface SpecRefusal { line: string; why: string }
 
 /** The most characters in a value; a longer line is refused. */
 export const MAX_LINE = 120
@@ -81,12 +83,46 @@ export function knownKey(key: string): string {
   return key
 }
 
-/** One `key = value` line, or null when it is not one or its value is too long (refused). */
-export function parseLine(s: string): SpecLine | null {
+/** Why a `key = value` line is refused, or null when it is a good one. */
+export function lineProblem(s: string): string | null {
   const m = s.trim().match(/^([a-z][a-z0-9.-]*)\s*=\s*(.+)$/)
-  if (!m || !isSpecKey(m[1]!)) return null
+  if (!m) return 'not a key = value line'
+  if (!isSpecKey(m[1]!)) return 'the key is not product., ui. or data. and a name'
   const text = m[2]!.replace(/\s+/g, ' ').trim()
-  return text && text.length <= MAX_LINE && !text.includes('<') ? { key: knownKey(m[1]!), text } : null
+  if (text.length > MAX_LINE) return `longer than ${MAX_LINE} characters`
+  if (text.includes('<')) return 'it holds markup'
+  return null
+}
+
+/** One `key = value` line, or null when it is not one, its value is too long or holds `<` (refused). */
+export function parseLine(s: string): SpecLine | null {
+  if (lineProblem(s)) return null
+  const m = s.trim().match(/^([a-z][a-z0-9.-]*)\s*=\s*(.+)$/)!
+  return { key: knownKey(m[1]!), text: m[2]!.replace(/\s+/g, ' ').trim() }
+}
+
+/** A flow as the plan writes it: `@home → @a → @b`, cut at the first repeated name; null when it names fewer than 2 screens. */
+function flowText(text: string): string | null {
+  const names: string[] = []
+  for (const n of namesIn(text)) { if (names.includes(n)) break; names.push(n) }
+  if (names[0] !== 'home') names.unshift('home')
+  const t = names.map((n) => `@${n}`).join(' → ')
+  return names.length > 1 && t.length <= MAX_LINE ? t : null
+}
+
+/**
+ * The value a line may give its row, or why not: the core flow must name screens from @home (as the
+ * plan writes it), and a `Tabs:` navigation must name at least two tabs by @name. An Edit or a pick
+ * that wrote `product.core-flow = Browse, then pay` would empty the tree of its planned steps.
+ */
+export function shapeOf(line: SpecLine): { text: string } | { why: string } {
+  if (line.key === FLOW_KEY) {
+    const t = flowText(line.text)
+    return t ? { text: t } : { why: 'a core flow names its screens, e.g. @home → @cart' }
+  }
+  if (line.key === 'ui.nav' && /^\s*tabs\s*:/i.test(line.text) && namesIn(line.text).length < 2)
+    return { why: 'a Tabs: line names each tab by its @name' }
+  return { text: line.text }
 }
 
 /** One `<meta name="spec" content="…">` tag, either attribute first; content runs to its closing quote before `>` (or before name=). */
@@ -98,18 +134,21 @@ const SPEC_TAG = /<meta\s+(?:name\s*=\s*["']?spec["']?\s+content\s*=\s*(["'])([^
  * (its line too, when the tag was alone on it). A value with `<` in it is refused. The first
  * MAX_DESIGN_LINES good lines count; `refused` counts the rest that were not lines, too long or repeats.
  */
-export function takeSpecLines(html: string): { html: string; lines: SpecLine[]; refused: number } {
+export function takeSpecLines(html: string): { html: string; lines: SpecLine[]; refused: number; refusals: SpecRefusal[] } {
   const lines: SpecLine[] = []
-  let refused = 0
+  const refusals: SpecRefusal[] = []
   const CUT = '\u0000'
   const marked = html.replace(SPEC_TAG, (_, _q1, a: string | undefined, _q2, b: string | undefined) => {
-    const line = parseLine(decode(a ?? b ?? ''))
-    if (line && lines.length < MAX_DESIGN_LINES && !lines.some((l) => l.key === line.key)) lines.push(line)
-    else refused++
+    const raw = decode(a ?? b ?? '').replace(/\s+/g, ' ').trim()
+    const line = parseLine(raw)
+    if (!line) refusals.push({ line: raw, why: lineProblem(raw)! })
+    else if (lines.some((l) => l.key === line.key)) refusals.push({ line: raw, why: 'a second line for the same row' })
+    else if (lines.length >= MAX_DESIGN_LINES) refusals.push({ line: raw, why: `more than ${MAX_DESIGN_LINES} lines` })
+    else lines.push(line)
     return CUT
   })
   const rest = marked.replace(/^[ \t]*\u0000(?:[ \t]*\u0000)*[ \t]*(?:\n|$)/gm, '').replaceAll(CUT, '')
-  return { html: rest, lines, refused }
+  return { html: rest, lines, refused: refusals.length, refusals }
 }
 
 /** Whether a new key fits the limits: 12 rules, 8 facts, 24 rows. */
@@ -128,8 +167,9 @@ export function applyPick(spec: Spec, lines: SpecLine[], screen: string, at?: st
   const taken: string[] = []
   for (const l of lines.slice(0, MAX_DESIGN_LINES)) {
     const row = spec[l.key]
-    if (!row || row.values.length) continue
-    row.values.push({ text: l.text, from: 'pick', screen, ...(at && { at }) })
+    const shape = shapeOf(l)
+    if (!row || row.values.length || !('text' in shape)) continue
+    row.values.push({ text: shape.text, from: 'pick', screen, ...(at && { at }) })
     taken.push(l.key)
   }
   return taken
@@ -152,13 +192,16 @@ export function wouldTake(spec: Spec, lines: SpecLine[]): boolean[] {
  * value is skipped: an Edit reply often repeats lines it did not change. `at` is the version's
  * createdAt. Returns the keys set.
  */
-export function applyEdit(spec: Spec, lines: SpecLine[], screen: string, at: string): string[] {
+export function applyEdit(spec: Spec, lines: SpecLine[], screen: string, at: string, refused: SpecRefusal[] = []): string[] {
   const taken: string[] = []
   for (const l of lines.slice(0, MAX_DESIGN_LINES)) {
-    if (valueOf(spec, l.key) === l.text) continue
-    if (!spec[l.key] && !fits(spec, l.key)) continue
+    const shape = shapeOf(l)
+    const line = `${l.key} = ${l.text}`
+    if (!('text' in shape)) { refused.push({ line, why: shape.why }); continue }
+    if (valueOf(spec, l.key) === shape.text) { refused.push({ line, why: 'the row has this value already' }); continue }
+    if (!spec[l.key] && !fits(spec, l.key)) { refused.push({ line, why: 'the spec is full' }); continue }
     const r = (spec[l.key] ??= { ...(KNOWN_ROWS[l.key] && { ask: KNOWN_ROWS[l.key] }), from: 'edit', values: [] })
-    r.values.push({ text: l.text, from: 'edit', screen, at })
+    r.values.push({ text: shape.text, from: 'edit', screen, at })
     taken.push(l.key)
   }
   return taken
@@ -182,15 +225,23 @@ export function dropValues(spec: Spec, screen: string, at: string, key?: string)
   return n
 }
 
-/** The lines one version of a screen (by its createdAt) set, with the value each replaced (undefined if the row was open or new). */
-export function linesOf(spec: Spec, screen: string, at: string): { key: string; text: string; before?: string }[] {
-  const out: { key: string; text: string; before?: string }[] = []
+/**
+ * The lines one version of a screen (by its createdAt) set, with the value each replaced (undefined
+ * if the row was open or new), and `later` when a later value has replaced it since.
+ */
+export function linesOf(spec: Spec, screen: string, at: string): { key: string; text: string; before?: string; later: boolean }[] {
+  const out: { key: string; text: string; before?: string; later: boolean }[] = []
   for (const [key, row] of Object.entries(spec)) {
     row.values.forEach((v, i) => {
-      if (v.screen === screen && v.at === at) out.push({ key, text: v.text, before: row.values[i - 1]?.text })
+      if (v.screen === screen && v.at === at) out.push({ key, text: v.text, before: row.values[i - 1]?.text, later: i < row.values.length - 1 })
     })
   }
   return out
+}
+
+/** A deleted screen's values stay in the spec, but no longer belong to it: a remade screen's Undo or ✕ cannot take them back. */
+export function untie(spec: Spec, screen: string) {
+  for (const row of Object.values(spec)) for (const v of row.values) if (v.screen === screen) { delete v.screen; delete v.at }
 }
 
 /**
@@ -205,11 +256,8 @@ export function parsePlan(reply: string): Spec {
     if (!l) continue
     const f = l.match(/^product\.core-flow:?\s*=?\s*(.+)$/)
     if (f && !spec[FLOW_KEY]) {
-      const names: string[] = []
-      for (const n of namesIn(f[1]!)) { if (names.includes(n)) break; names.push(n) }
-      if (names[0] !== 'home') names.unshift('home')
-      const text = names.map((n) => `@${n}`).join(' → ')
-      if (names.length > 1 && text.length <= MAX_LINE) spec[FLOW_KEY] = { ask: 'the main path', from: 'plan', values: [{ text, from: 'plan' }] }
+      const text = flowText(f[1]!)
+      if (text) spec[FLOW_KEY] = { ask: 'the main path', from: 'plan', values: [{ text, from: 'plan' }] }
       continue
     }
     const r = l.match(/^([a-z][a-z0-9.-]*):?\s+\?\s+(.+)$/)
@@ -257,7 +305,7 @@ export function nextStep(spec: Spec, name?: string): string | undefined {
 /** The request's line for a step of the core flow: one control must open the next step. '' for any other screen. */
 export function flowRequest(spec: Spec, name?: string): string {
   const next = nextStep(spec, name)
-  return next ? `This screen is a step of the main path (product.core-flow): one control on it must open @${next}.` : ''
+  return next ? `This screen is a step of the main path (product.core-flow): the control that finishes this screen's task (Stop, Save, Done) opens @${next} itself, with data-action="@${next}"; not a script handler, and not a second link beside it.` : ''
 }
 
 /** The most screens one screen may open that the tree does not have yet. */
@@ -293,6 +341,26 @@ export function checkScreen(html: string, spec: Spec, name?: string, known?: Set
   }
   if (writtenTwice(html)) misses.push('the screen is written twice')
   return misses
+}
+
+/**
+ * The first copy of a reply that holds the screen twice, as Luna's sometimes do: cut where a second
+ * idea, or a second title outside SVG, starts. `cut` says it was cut; Info still notes it.
+ */
+export function firstCopy(html: string): { html: string; cut: boolean } {
+  const starts: number[] = []
+  for (const re of [/<meta\s+name=["']?idea\b/gi, /<title>/gi]) {
+    const all = [...html.matchAll(re)].map((m) => m.index!).filter((i) => re.source.startsWith('<title') ? !insideSvg(html, i) : true)
+    if (all.length > 1) starts.push(all[1]!)
+  }
+  if (!starts.length) return { html, cut: false }
+  return { html: html.slice(0, Math.min(...starts)).trimEnd(), cut: true }
+}
+
+/** True when position `i` of `html` lies inside an <svg> element. */
+function insideSvg(html: string, i: number): boolean {
+  const before = html.slice(0, i)
+  return before.lastIndexOf('<svg') > before.lastIndexOf('</svg>')
 }
 
 /** A reply that holds the screen twice: two ideas, two titles outside SVG, or two tab bars. */

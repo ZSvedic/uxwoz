@@ -71,10 +71,10 @@ can spend model credits.
   is open; `error` if the model fails or the screen was deleted meanwhile.
 - `POST /api/undo {key}`: drop the newest version and the spec values it set; `{entry, spec}`, or
   404 when one or none is left.
-- `POST /api/spec/drop {key, version, row}`: take back the value that version `version` (its index)
-  of screen `key` set on row `row`; the ✕ beside an Edit's line in the drawer calls it. Values are
-  matched by the version's `createdAt`, so a deleted and remade screen never takes another's back.
-  `{spec}`, or 404 if there is no such value.
+- `POST /api/spec/drop {key, at, row}`: take back the value that the version of screen `key` made
+  at `at` (its `createdAt`) set on row `row`; the ✕ beside an Edit's line in the drawer calls it.
+  Not by index: after an Undo and a new Edit, an old ✕ would take back the new line. `{spec}`, or
+  404 if there is no such value.
 - `GET /api/map?app=…`: `{root, entries: CacheEntry[], spec}` for one mockup, oldest first. Levels, the
   tree and planned screens are not stored: `screenTree` and `plannedScreens` in `core/src/tree.ts`
   work them out (server and browser).
@@ -130,7 +130,9 @@ Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | nul
              // <meta name="spec"> lines (taken out of html); misses is what checkScreen found
              // against the spec it was made with (absent for screens made without one). html has
              // prose before <title> cut, and its tab bar's current tab marked by markTab.
-             // plan, on a first screen's designs: { rows, ms, costUsd, error? } of the plan before it
+             // plan, on a first screen's designs: { rows, ms, costUsd, error? } of the plan before it.
+             // specRefused, on an Edit: { line, why }[] for its lines that were not taken.
+             // A reply that held the screen twice keeps its first copy, and misses says so
 Spec       Record<key, { ask?; from?: SpecFrom; values: { text; from: SpecFrom; screen?; version? }[] }>
              // one per mockup; key is product.*, ui.* or data.*; the last value counts; a row with
              // no value is open. SpecFrom is 'plan' | 'pick' | 'edit' | 'user'. screen and at (the

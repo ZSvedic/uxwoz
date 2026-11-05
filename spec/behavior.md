@@ -170,7 +170,11 @@ scrolls so the screen stays fully visible beside it. Esc or ✕ closes it. It ha
   indicator, not four*, *Regenerated*, *The design you picked*, the one showing marked. Under each
   version are the spec lines it set: the row, the value before struck through (*not set* for a new
   row), and the value now. An Edit's lines have a **✕** that takes the line back, so the value
-  before counts again for new screens; **↶ Undo** of an Edit takes all its lines back.
+  before counts again for new screens; **↶ Undo** of an Edit takes all its lines back. A line a
+  later Edit replaced says *(replaced later)* and has no ✕. A ✕ whose line is gone already (another
+  browser) says so and shows the server's spec. An Edit's lines that were not taken are listed
+  struck through with why (*the row has this value already*, *the spec is full*, *longer than 120
+  characters*, *a core flow names its screens*).
 - **Info**: name, idea, the click that opened it, what made the version showing (the pick, an Edit
   and its request, or Regenerate), the number of versions, model, device, when it was made, time to
   first text, total time, cost, cost of all versions, finish reason, **Check** (what the screen
@@ -199,9 +203,13 @@ agree on navigation, Back and facts ([the spec note](../process/plans/2026-11-05
   screen with Next*) gets none, and its `@names` are not tabs.
 - **The core flow and the tabs of `ui.nav` are planned screens**: they are in the tree and in Nav
   from the start, each flow step under the step before. The request for a flow step with a next
-  step asks for one control that opens it (Stop recording opens the morning report).
-- **New screens**: a screen opens at most 2 screens the mockup does not have, each needed for its
-  task (an item's details, a form); the phone's own screens (mail, share targets) are plain buttons.
+  step asks that the control finishing its task (Stop, Save, Done) opens it by its own link, not by
+  script (Stop recording opens the morning report).
+- **New screens**: besides tabs, Back and the main path, a screen that lists or shows items opens 1
+  or 2 screens the mockup does not have (an item's details, a form); a form, or a screen that ends
+  a task, opens none; the phone's own screens (mail, share targets) are plain buttons. The check
+  flags more than 2.
+- **A reply that holds the screen twice** (Luna's sometimes do) keeps its first copy; Info notes it.
 - **Lines from designs**: a design answers an open row only when its screen decides it
   (*ui.nav = Tabs: Tonight @home, History @night-history*); most screens add no line, and code
   keeps 3 at most. A design adds no row of its own, facts included: when designs could, 7 screens
@@ -211,8 +219,10 @@ agree on navigation, Back and facts ([the spec note](../process/plans/2026-11-05
   design's lines and drops the rest, and the other design's lines; a line over 120 characters, or
   with `<` in it, is refused. Each line is one `<meta name="spec">` tag, read up to its closing
   quote; the rest of its text line stays in the screen. An Edit may set any row (the Edit request
-  asks for a line when the change is a rule other screens should follow), and a line that repeats a
-  row's value adds nothing; ✕ in
+  asks for a line when the change is a rule other screens should follow, also one that replaces a
+  row's value), and a line that repeats a row's value adds nothing. A core flow or a `Tabs:` line
+  from an Edit or a pick must have the plan's shape (screens by `@name`), or it is refused. A
+  deleted screen's lines stay in the spec, no longer tied to it. ✕ in
   the drawer or Undo takes its values back. A Regenerate's lines are dropped. A key one letter off
   a known name (`ui.toggle`) counts as the known name.
 - **Tab screens have no Back**: the app hides it there.

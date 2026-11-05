@@ -5,7 +5,7 @@ import { extractFragment, screenIdea, screenName } from './frame.ts'
 import { DEVICES, type Device } from './frame.ts'
 import { MODELS, type ModelId } from './models.ts'
 import { SYSTEM_PROMPT, WARMUP_REQUEST, screenRequest } from './prompt.ts'
-import { checkScreen, cutProse, flowNames, flowRequest, markTab, namesIn, navNames, specRequest, takeSpecLines, type Spec, type SpecLine } from './spec.ts'
+import { applyEdit, checkScreen, cutProse, firstCopy, flowNames, flowRequest, markTab, namesIn, navNames, specRequest, takeSpecLines, type Spec, type SpecLine } from './spec.ts'
 import { ProviderError, streamModel, type Fetch } from './providers.ts'
 
 /** A slower screen is useless, and keep-alive comments can stall a stream, so this is an overall deadline. */
@@ -67,10 +67,19 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
       if (ev.finishReason !== 'stop') throw new ProviderError(`the screen was cut off (${ev.finishReason})`)
       // Prose before the title goes, the spec lines the design proposes come out of the stored
       // screen, and the app marks the current tab.
-      const taken = takeSpecLines(cutProse(extractFragment(raw)))
+      // A reply that holds the screen twice keeps its first copy.
+      const first = firstCopy(cutProse(extractFragment(raw)))
+      const taken = takeSpecLines(first.html)
       const html = typeof o.spec === 'object' ? markTab(taken.html, o.name) : taken.html
       if (!html.trim()) throw new ProviderError('the model returned an empty screen')
-      const spec = typeof o.spec === 'object' ? o.spec : null
+      // An Edit is checked against the spec with its own lines in: the Edit that sets Back is not a Back miss.
+      let spec = typeof o.spec === 'object' ? o.spec : null
+      if (spec && o.edit && taken.lines.length) {
+        spec = JSON.parse(JSON.stringify(spec)) as Spec
+        applyEdit(spec, taken.lines, '', '')
+      }
+      const misses = spec && Object.keys(spec).length ? checkScreen(html, spec, o.name, knownNames(o.existing, spec, taken.lines)) : null
+      if (misses && first.cut) misses.push('the reply held the screen twice; the first copy was kept')
       const name = screenName(html), idea = screenIdea(html)
       yield {
         type: 'done',
@@ -88,8 +97,9 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
           ...(name && { name }),
           ...(idea && { idea }),
           ...(taken.lines.length && { spec: taken.lines }),
+          ...(o.edit && taken.refusals.length && { specRefused: taken.refusals }),
           // A mockup with no spec rows (made before the spec) has nothing to check.
-          ...(spec && Object.keys(spec).length && { misses: checkScreen(html, spec, o.name, knownNames(o.existing, spec, taken.lines)) }),
+          ...(misses && { misses }),
           ...(o.plan && { plan: o.plan }),
         },
       }

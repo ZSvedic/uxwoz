@@ -189,6 +189,8 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .set-lines span { grid-column: 1; }
 .set-lines .drop { grid-column: 2; grid-row: 1 / span 3; align-self: center; padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
 .set-lines .drop:hover { color: var(--err); border-color: var(--err); }
+.set-lines li.later span, .set-lines li.refused span { color: var(--muted); }
+.set-lines li.refused b { font-weight: 400; text-decoration: line-through; color: var(--muted); }
 .info { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
 .info dt { color: var(--muted); }
 .info dd { margin: 0; overflow-wrap: anywhere; }

@@ -1,6 +1,6 @@
 // Feature: the web server streams a new screen's A OR B, keeps the pick, and revises screens (cassette: server).
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { ScreenCache, linksIn, plannedScreens, screenRef, type CacheEntry } from '@uxwoz/core'
+import { ScreenCache, linksIn, plannedScreens, screenRef, valueOf, type CacheEntry } from '@uxwoz/core'
 import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
 import { cassette } from './cassette.ts'
 
@@ -88,10 +88,11 @@ describe('web server', () => {
 
   test('a planned screen opened by its name alone is made from the prompt of the link that planned it', async () => {
     const { entry: first, spec } = done(await screen({ app: APP }))
-    // The last planned screen: one the spec plans, or one a link names; a link's prompt wins over the spec's words.
-    const planned = plannedScreens([first], spec).at(-1)!
-    const link = actions(shown(first)).find((a) => nameOf(a) === planned.name)
-    if (link && screenRef(link)!.prompt) expect(planned.action).toBe(screenRef(link)!.prompt)
+    // A planned screen that a link names with a prompt: the link's prompt wins over the spec's words.
+    const link = actions(shown(first)).find((a) => screenRef(a)!.prompt && plannedScreens([first], spec).some((p) => p.name === nameOf(a)))!
+    expect(link).toBeTruthy()
+    const planned = plannedScreens([first], spec).find((p) => p.name === nameOf(link))!
+    expect(planned.action).toBe(screenRef(link)!.prompt)
     const second = done(await screen({ app: APP, action: `@${planned.name}`, from: first.key, label: 'More' })).entry
     expect(second).toMatchObject({ key: `a tiny bakery website » @${planned.name}`, name: planned.name, action: planned.action })
     await pick(second.key, 0)
@@ -151,6 +152,21 @@ describe('web server', () => {
     expect((await post('/api/undo', { key: first.key })).status).toBe(404)
     expect((await post('/api/revise', { key: first.key, change: ' ' })).status).toBe(400)
     expect((await post('/api/revise', { key: 'no such screen' })).status).toBe(404)
+  }, 60_000)
+
+  test('an Edit that changes a rule with a value sets its line, and Undo brings the old line back', async () => {
+    const { entry: first } = done(await screen({ app: APP }))
+    const set = done(await stream('/api/revise', { key: first.key, change: 'Make Back an arrow alone, ←, at the top left, on every screen' }))
+    const before = valueOf(set.spec, 'ui.back')
+    expect(before).toContain('←')
+    // The second Edit replaces a row that has a value: the Edit request says its line may.
+    const moved = done(await stream('/api/revise', { key: first.key, change: 'Move Back to the top right, on every screen' }))
+    expect(moved.entry.versions.at(-1)!.spec?.map((l) => l.key)).toContain('ui.back')
+    expect(valueOf(moved.spec, 'ui.back')).not.toBe(before)
+    expect(valueOf(moved.spec, 'ui.back')).toMatch(/right/i)
+    const undone = await (await post('/api/undo', { key: first.key })).json()
+    expect(valueOf(undone.spec, 'ui.back')).toBe(before)
+    await post('/api/undo', { key: first.key })
   }, 60_000)
 
   test('a screen whose A OR B is still open cannot be revised', async () => {

@@ -20,7 +20,8 @@ describe('generate a screen', () => {
     test(`${model} streams an HTML fragment with action prompts and a cost`, async () => {
       const { chunks, version: c } = await run(model, null)
       expect(chunks.length).toBeGreaterThan(5)
-      expect(c.html).toContain('<script>')
+      // A screen with no logic has no script; one that has logic keeps it in one <script>.
+      expect((c.html.match(/<script>/g) ?? []).length).toBeLessThanOrEqual(1)
       expect(c.html).not.toContain('```')
       // A link that names its screen and says what it shows, in the markup or set by the screen's script.
       expect(c.html).toMatch(/data-action="@[a-z0-9-]+:\s*[^"]{10,}"|dataset\.action\s*=/)

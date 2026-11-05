@@ -326,7 +326,7 @@ export function createServer(opts: ServerOptions = {}) {
           const refused = refuseForeign(req)
           if (refused) return refused
           const b = await req.json().catch(() => null)
-          const spec = cache.dropLine(String(b?.key ?? ''), Number(b?.version), String(b?.row ?? ''))
+          const spec = cache.dropLine(String(b?.key ?? ''), String(b?.at ?? ''), String(b?.row ?? ''))
           return spec ? json({ spec }) : json({ error: 'no such line' }, 404)
         },
       },

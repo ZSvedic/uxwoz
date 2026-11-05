@@ -105,8 +105,8 @@ describe('Edits and Undo', () => {
     applyEdit(spec, [{ key: 'ui.back', text: '← Back, top left' }, { key: 'ui.toggles', text: 'Switches' }], 'settings', 't2')
     expect(valueOf(spec, 'ui.back')).toBe('← Back, top left')
     expect(linesOf(spec, 'settings', 't2')).toEqual([
-      { key: 'ui.back', text: '← Back, top left', before: '‹ Back, first in the header' },
-      { key: 'ui.toggles', text: 'Switches', before: undefined },
+      { key: 'ui.back', text: '← Back, top left', before: '‹ Back, first in the header', later: false },
+      { key: 'ui.toggles', text: 'Switches', before: undefined, later: false },
     ])
     expect(dropValues(spec, 'settings', 't2')).toBe(2)
     expect(valueOf(spec, 'ui.back')).toBe('‹ Back, first in the header')
@@ -125,10 +125,10 @@ describe('Edits and Undo', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
     const cache = new ScreenCache(file)
     cache.setSpec('Snore', plan())
-    const key = cache.propose('Snore', null, 0, ver('<h1>A</h1>', { spec: [{ key: 'ui.nav', text: 'Tabs: Tonight @home' }] }))!.key
+    const key = cache.propose('Snore', null, 0, ver('<h1>A</h1>', { spec: [{ key: 'ui.nav', text: 'Tabs: Tonight @home, History @history' }] }))!.key
     cache.propose('Snore', null, 1, ver('<h1>B</h1>', { spec: [{ key: 'ui.back', text: '‹ Back' }] }))
     cache.pick(key, 0)
-    expect(valueOf(cache.spec('Snore'), 'ui.nav')).toBe('Tabs: Tonight @home')
+    expect(valueOf(cache.spec('Snore'), 'ui.nav')).toBe('Tabs: Tonight @home, History @history')
     expect(valueOf(cache.spec('Snore'), 'ui.back')).toBeUndefined() // the design not picked
     cache.addVersion(key, ver('<h1>A2</h1>', { createdAt: 't-a2', spec: [{ key: 'ui.back', text: 'Regenerated' }] }))
     expect(cache.get(key)!.versions[1]!.spec).toBeUndefined()
@@ -137,7 +137,7 @@ describe('Edits and Undo', () => {
     expect(valueOf(cache.spec('Snore'), 'ui.nav')).toBe('A drawer')
     expect(valueOf(new ScreenCache(file).spec('Snore'), 'ui.nav')).toBe('A drawer')
     cache.undo(key)
-    expect(valueOf(cache.spec('Snore'), 'ui.nav')).toBe('Tabs: Tonight @home')
+    expect(valueOf(cache.spec('Snore'), 'ui.nav')).toBe('Tabs: Tonight @home, History @history')
     cache.deleteApp('Snore')
     expect(cache.hasSpec('Snore')).toBe(false)
   })
@@ -187,10 +187,10 @@ describe('the request and the check', () => {
 
   test('a step of the core flow is asked for a control to the next step, near the end of the request', () => {
     const spec = plan()
-    expect(flowRequest(spec, 'recording')).toBe('This screen is a step of the main path (product.core-flow): one control on it must open @morning-report.')
+    expect(flowRequest(spec, 'recording')).toBe('This screen is a step of the main path (product.core-flow): the control that finishes this screen\'s task (Stop, Save, Done) opens @morning-report itself, with data-action="@morning-report"; not a script handler, and not a second link beside it.')
     expect(flowRequest(spec, 'morning-report')).toBe('')
     expect(flowRequest(spec, 'settings')).toBe('')
-    expect(screenRequest('Snore', 'Recording', [], { spec: specRequest(spec), device: 'a phone screen', flow: flowRequest(spec, 'recording') })).toEndWith('Design it for a phone screen.\n\nThis screen is a step of the main path (product.core-flow): one control on it must open @morning-report.')
+    expect(screenRequest('Snore', 'Recording', [], { spec: specRequest(spec), device: 'a phone screen', flow: flowRequest(spec, 'recording') })).toEndWith(`Design it for a phone screen.\n\n${flowRequest(spec, 'recording')}`)
   })
 
   test('the check flags a flow step with no control to the next step, and more than 2 new screens', () => {

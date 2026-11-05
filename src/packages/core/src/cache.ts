@@ -12,7 +12,7 @@ import { canonicalAction, nameWords, normalizePrompt, screenKey, screenRef } fro
 import { screenName, type Device } from './frame.ts'
 import { HOME_NAME, nameFrom, screenTree, treeLines, uniqueName } from './tree.ts'
 import type { ModelId } from './models.ts'
-import { applyEdit, applyPick, dropValues, type Spec, type SpecLine } from './spec.ts'
+import { applyEdit, applyPick, dropValues, untie, type Spec, type SpecLine, type SpecRefusal } from './spec.ts'
 
 /** One design of a screen, as the model made it. */
 export interface Version {
@@ -36,6 +36,8 @@ export interface Version {
   feedback?: string
   /** The spec lines the design proposed (`<meta name="spec">`), taken out of `html`. */
   spec?: SpecLine[]
+  /** An Edit's lines that were not taken, and why (shown in the drawer). */
+  specRefused?: SpecRefusal[]
   /** What the screen misses against the spec it was made with (checkScreen); absent when made without one. */
   misses?: string[]
   /** On a first screen's designs: how the plan before it went (its time and cost, or why it failed). */
@@ -197,11 +199,15 @@ export class ScreenCache {
     this.save()
   }
 
-  /** Take back the line that version `version` (its index) of a screen set on row `row` (the ✕ in the drawer). Returns the spec, or undefined if there was no such line. */
-  dropLine(key: string, version: number, row: string): Spec | undefined {
-    const at = this.entries.get(key)?.versions[version]?.createdAt
-    if (!at) return undefined
-    const spec = this.specOf(this.entries.get(key)!.app)
+  /**
+   * Take back the line that the version made at `at` (its createdAt) of a screen set on row `row`
+   * (the ✕ in the drawer). Not by index: after an Undo and a new Edit, a second browser's ✕ for the
+   * first Edit would take back the second. Returns the spec, or undefined if there was no such line.
+   */
+  dropLine(key: string, at: string, row: string): Spec | undefined {
+    const entry = this.entries.get(key)
+    if (!entry?.versions.some((v) => v.createdAt === at)) return undefined
+    const spec = this.specOf(entry.app)
     if (!dropValues(spec, key, at, row)) return undefined
     this.save()
     return spec
@@ -230,8 +236,12 @@ export class ScreenCache {
     const entry = this.entries.get(key)
     if (!entry?.versions.length) return undefined
     // An Edit's lines set rows at once; a Regenerate's are dropped.
-    if (version.feedback && version.spec?.length) applyEdit(this.specOf(entry.app), version.spec, key, version.createdAt)
-    else delete version.spec
+    if (version.feedback) {
+      const refused = [...(version.specRefused ?? [])]
+      if (version.spec?.length) applyEdit(this.specOf(entry.app), version.spec, key, version.createdAt, refused)
+      if (refused.length) version.specRefused = refused
+      else delete version.specRefused
+    } else { delete version.spec; delete version.specRefused }
     entry.versions.push(version)
     this.save()
     return entry
@@ -303,6 +313,9 @@ export class ScreenCache {
       if (e.parent && !this.entries.has(e.parent.key)) e.parent = node?.parent && this.entries.has(node.parent) ? { key: node.parent, label: node.label } : null
     }
     for (const k of removed) this.tomb(k)
+    // Their values stay in the spec, no longer tied to a screen that a remade one could take them back through.
+    const spec = this.specs.get(root)
+    if (spec) for (const k of removed) untie(spec, k)
     this.save()
     return removed
   }
