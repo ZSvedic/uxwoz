@@ -53,6 +53,7 @@ One bar, 44 px tall, with three parts:
   browser: every screen that becomes current is a step, and reaching a screen any other way drops
   the steps ahead. Screens deleted since are skipped. ⌘[ and ⌘] do the same (also while a screen
   has the focus), and so do the mouse's back and forward buttons.
+- **Spec** (right, with a mockup open): opens the spec panel in the drawer (see Spec).
 - **Zoom** (right): **−**, the zoom level, **+** and **⤢ Fit screen**. The level opens a menu: Zoom
   in ⌘+, Zoom out ⌘−, 50%, 100% ⌘0, 200%, Fit all ⇧1, Fit screen ⇧2, Fit screen width ⇧3. The keys
   work anywhere outside a text field (Ctrl in place of ⌘ off a Mac). Under 900 px wide only the
@@ -162,7 +163,8 @@ buttons wait (Info still works).
 ## Drawer
 
 A 360 px panel docked at the right edge, for the current screen. The canvas gets narrower and
-scrolls so the screen stays fully visible beside it. Esc or ✕ closes it. It has two tabs:
+scrolls so the screen stays fully visible beside it. Esc or ✕ closes it. It has three tabs: Edit
+and Info for the current screen, and Spec for the mockup (see Spec):
 
 - **Edit**: *What should change?* Type it and click **Make the change** (or press Enter): the
   model gets this screen and the request, and returns the same screen with only that change, as a
@@ -238,6 +240,24 @@ agree on navigation, Back and facts ([the spec note](../process/plans/2026-11-05
 - **Prose before the title** (*"The request as given contains no change…"*) is cut from the
   stored screen.
 - Mockups made before the spec open with an empty one and work as before.
+- **The review pass**: after every 5 picked screens, GPT-6.1 Sol reads the spec and the tree in
+  the background ([prompt-review.md](prompt-review.md)). It may add up to 3 open rows the mockup
+  turned out to need, within the limits, and suggest up to 3 rewordings or merges of filled
+  lines. A suggestion changes nothing until the user accepts it. It never changes or removes a
+  filled row, never holds a screen up, and a failure only shows in the panel's log.
+- **The spec panel** (the drawer's Spec tab, or **Spec** in the toolbar) is the one place to read
+  and change the spec. It shows how full it is (*11 of 24 lines*), then the review's suggestions
+  with **Accept** and **Dismiss**, then the rows by section (Product, Screens, Facts): an open row
+  with its question (*not decided yet: …*), a filled line with where it came from (*the plan*, *a
+  pick on L1 Home*, *an Edit on …*, *the review pass*, *you*). **Change** (or **Decide** on an open
+  row) writes the user's own line, **✕ line** deletes a row's newest line so the one before counts
+  (or the row is open again), **Delete row** removes it, and **Add a line of your own** adds a row.
+  The user's lines win: no Edit replaces them, and no model changes them. They keep the shapes
+  (`Tabs:`, a quoted Back label, a flow of `@names`). A change to `ui.nav` or `ui.back` redraws
+  every screen's tabs and Back at once. Under that, the review pass's last run: its rows,
+  suggestions, time and cost.
+- **Export**: the panel shows the spec as markdown, with **Copy as markdown** and **Download .md**.
+  Only the spec.
 
 ## Navigation
 

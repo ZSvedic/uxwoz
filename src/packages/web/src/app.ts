@@ -5,8 +5,8 @@
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
 import { nameWords, normalizePrompt, screenKey, screenRef, wayBack } from '@uxwoz/core/keys'
 import { namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
-import { drawChrome, linesOf, navNames, wouldTake, type Spec } from '@uxwoz/core/spec'
-import type { CacheEntry, Version } from '@uxwoz/core'
+import { MAX_ROWS, drawChrome, lineCount, linesOf, navNames, specMarkdown, valueOf, wouldTake, type Spec, type SpecValue } from '@uxwoz/core/spec'
+import type { CacheEntry, SpecReview, Version } from '@uxwoz/core'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
 
@@ -45,7 +45,10 @@ const state = {
   /** A picked screen getting a new version: an Edit with `change`, else a Regenerate. */
   revising: null as { key: string; change: string | null } | null,
   /** The open drawer tab, if any. It shows the current screen. */
-  drawer: null as 'edit' | 'info' | null,
+  drawer: null as 'edit' | 'info' | 'spec' | null,
+  /** What the review pass left: suggestions and its runs; and whether one runs now. */
+  review: { suggestions: [], reviews: [] } as SpecReview,
+  reviewing: false,
   busy: null as AbortController | null,
   /** The view before an A OR B was fitted, to go back to after the pick. */
   before: null as View | null,
@@ -378,9 +381,10 @@ async function pick(key: string, index: number) {
       showError('Could not keep that design')
       return reloadMap()
     }
-    const { entry, spec } = await res.json() as { entry: CacheEntry; spec: Spec }
+    const { entry, spec, reviewing } = await res.json() as { entry: CacheEntry; spec: Spec; reviewing: boolean }
     state.entries.set(key, entry)
     state.spec = spec
+    if (reviewing) watchReview()
     canvas.rename(`${key}#${index}`, key)
     state.current = key
     saveCurrent()
@@ -496,9 +500,11 @@ async function reloadMap() {
   applyMap(await res.json())
 }
 
-function applyMap(map: { entries: CacheEntry[]; spec?: Spec }) {
+function applyMap(map: { entries: CacheEntry[]; spec?: Spec; review?: SpecReview; reviewing?: boolean }) {
   state.entries = new Map(map.entries.map((e) => [e.key, e]))
   state.spec = map.spec ?? {}
+  state.review = map.review ?? { suggestions: [], reviews: [] }
+  state.reviewing = !!map.reviewing
   if (state.current && !state.entries.has(state.current)) state.current = null
   draw()
 }
@@ -595,7 +601,18 @@ async function removeScreen(key: string) {
   if (state.current) canvas.reveal(state.current)
 }
 
-function openDrawer(tab: 'edit' | 'info') {
+/** While a review pass runs in the background, look at the server's copy now and then, so its rows and suggestions show. */
+let reviewTimer: ReturnType<typeof setTimeout> | undefined
+function watchReview(tries = 15) {
+  state.reviewing = true
+  clearTimeout(reviewTimer)
+  reviewTimer = setTimeout(async () => {
+    await reloadMap()
+    if (state.reviewing && tries > 1) watchReview(tries - 1)
+  }, 2000)
+}
+
+function openDrawer(tab: 'edit' | 'info' | 'spec') {
   state.drawer = tab
   renderDrawer()
   if (tab === 'edit') changeInput.focus()
@@ -612,7 +629,9 @@ function closeDrawer() {
 function renderDrawer() {
   const e = state.current ? state.entries.get(state.current) : undefined
   const v = e?.versions.at(-1)
-  const open = !!(state.drawer && e && v)
+  // The spec panel belongs to the mockup, so it opens with no current screen too.
+  const specOpen = state.drawer === 'spec' && !!state.app && state.entries.size > 0
+  const open = specOpen || !!(state.drawer && e && v)
   if (drawer.hidden === open) {
     drawer.hidden = !open
     if (!open && state.current) requestAnimationFrame(() => canvas.reveal(state.current!))
@@ -621,6 +640,9 @@ function renderDrawer() {
   for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === state.drawer))
   $('editPane').hidden = state.drawer !== 'edit'
   $('infoPane').hidden = state.drawer !== 'info'
+  $('specPane').hidden = state.drawer !== 'spec'
+  if (specOpen) { $('drawerName').textContent = 'The spec: what every screen follows'; return renderSpec() }
+  if (!e || !v) return
   $('drawerName').textContent = labelOf(e)
   $<HTMLButtonElement>('makeChange').disabled = !!state.busy
   const history = $('history')
@@ -738,7 +760,123 @@ $('editPane').addEventListener('submit', (ev) => {
 changeInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $<HTMLFormElement>('editPane').requestSubmit() }
 })
-for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.addEventListener('click', () => openDrawer(b.dataset.tab as 'edit' | 'info'))
+for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.addEventListener('click', () => openDrawer(b.dataset.tab as 'edit' | 'info' | 'spec'))
+$('specButton').addEventListener('click', () => (state.drawer === 'spec' ? closeDrawer() : openDrawer('spec')))
+
+// ---- The spec panel --------------------------------------------------------------------------------
+
+const SECTIONS: [string, string][] = [['product.', 'Product'], ['ui.', 'Screens'], ['data.', 'Facts']]
+
+/** Where a line came from, in words: the plan, a pick on which screen, an Edit, the review pass, you. */
+function sourceOf(v: SpecValue): string {
+  const screen = v.screen ? state.entries.get(v.screen) : undefined
+  const on = screen ? ` on ${labelOf(screen)}` : v.screen === undefined && (v.from === 'pick' || v.from === 'edit') ? ' on a deleted screen' : ''
+  return { plan: 'the plan', pick: `a pick${on}`, edit: `an Edit${on}`, user: 'you', review: 'the review pass' }[v.from]
+}
+
+const btn = (text: string, title: string, run: () => void, cls = '') => {
+  const b = document.createElement('button')
+  b.type = 'button'
+  b.textContent = text
+  b.title = title
+  if (cls) b.className = cls
+  b.addEventListener('click', run)
+  return b
+}
+const elText = (tag: string, text: string, cls = '') => { const x = document.createElement(tag); x.textContent = text; if (cls) x.className = cls; return x }
+
+/** The spec panel: how full it is, the review's suggestions, rows by section, the user's line, Export, the review log. */
+function renderSpec() {
+  const spec = state.spec
+  $('specFill').textContent = `${lineCount(spec)} of ${MAX_ROWS} lines` + (state.reviewing ? ' · the review pass is reading it' : '')
+  $('specSuggestions').replaceChildren(...(state.review.suggestions.length ? [elText('h3', 'Suggestions from the review pass')] : []),
+    ...state.review.suggestions.map((s) => {
+      const box = elText('div', '', 'spec-suggestion')
+      box.append(elText('p', s.kind === 'merge' ? `Merge ${s.keys.join(' and ')} into one line:` : `Reword ${s.keys[0]}:`), elText('blockquote', s.text),
+        btn('Accept', 'Make this your line', () => settle(s.id, true), 'primary'), btn('Dismiss', 'Drop this suggestion', () => settle(s.id, false)))
+      return box
+    }))
+  $('specRows').replaceChildren(...SECTIONS.flatMap(([prefix, title]) => {
+    const keys = Object.keys(spec).filter((k) => k.startsWith(prefix))
+    if (!keys.length) return []
+    const ul = elText('ul', '', 'spec-rows')
+    for (const key of keys) {
+      const row = spec[key]!, v = row.values.at(-1)
+      const li = elText('li', '', v ? '' : 'open')
+      const value = v ? elText('span', v.text, 'value') : elText('span', `not decided yet: ${row.ask ?? ''}`, 'value')
+      const source = elText('small', v ? `from ${sourceOf(v)}` : row.from === 'review' ? 'added by the review pass' : 'open since the plan')
+      const tools = elText('div', '', 'tools')
+      tools.append(btn(v ? 'Change' : 'Decide', 'Write your own line for this row', () => editRow(li, key, v?.text ?? '')))
+      if (v) tools.append(btn('✕ line', 'Delete this line: the one before counts again, or the row is open', () => removeSpec(key, 'line')))
+      tools.append(btn('Delete row', 'Delete the whole row', () => removeSpec(key, 'row'), 'danger'))
+      li.append(elText('b', key), value, source, tools)
+      ul.append(li)
+    }
+    return [elText('h3', title), ul]
+  }))
+  $('specMarkdown').textContent = specMarkdown(state.app ?? '', spec)
+  const last = state.review.reviews.at(-1)
+  $('specReviews').textContent = last
+    ? `Review pass after ${last.screens} screens: ${last.error ? `failed (${last.error})` : `${last.added.length} rows added, ${last.suggested} suggestions, ${fmtS(last.ms)}${last.costUsd == null ? '' : `, ~${fmtUsd(last.costUsd)}`}`}. ${state.review.reviews.length === 1 ? 'Its first run.' : `${state.review.reviews.length} runs in all.`}`
+    : 'The review pass reads the spec after every 5 picked screens.'
+}
+
+/** An inline box for the user's own line of a row. */
+function editRow(li: HTMLElement, key: string, text: string) {
+  if (li.querySelector('form')) return
+  const form = document.createElement('form')
+  form.className = 'spec-edit'
+  const input = document.createElement('input')
+  input.value = text
+  input.maxLength = 120
+  form.append(input, btn('Cancel', 'Keep the line as it is', () => renderSpec()))
+  const save = document.createElement('button')
+  save.type = 'submit'
+  save.textContent = 'Save'
+  form.prepend(save)
+  form.insertBefore(input, save)
+  form.addEventListener('submit', (ev) => { ev.preventDefault(); setSpecLine(key, input.value) })
+  li.append(form)
+  input.focus()
+}
+
+async function specCall(url: string, body: object): Promise<{ spec?: Spec; review?: SpecReview } | null> {
+  const res = await post(url, { app: state.app, ...body }).catch(() => null)
+  const b = res ? await res.json().catch(() => ({})) : {}
+  if (!res?.ok) { showError(b.error ?? 'Could not change the spec'); reloadMap(); return null }
+  return b
+}
+
+/** The user's own line: it wins over every model, and a change to ui.nav or ui.back redraws every screen. */
+async function setSpecLine(key: string, text: string) {
+  const b = await specCall('/api/spec/set', { key, text })
+  if (b?.spec) { state.spec = b.spec; draw() }
+}
+async function removeSpec(key: string, what: 'line' | 'row') {
+  if (what === 'row' && !confirm(`Delete the row ${key}?`)) return
+  const b = await specCall('/api/spec/remove', { key, what })
+  if (b?.spec) { state.spec = b.spec; draw() }
+}
+async function settle(id: string, accept: boolean) {
+  const b = await specCall('/api/spec/suggestion', { id, accept })
+  if (b?.spec) { state.spec = b.spec; if (b.review) state.review = b.review; draw() }
+}
+
+$('specAdd').addEventListener('submit', (ev) => {
+  ev.preventDefault()
+  setSpecLine($<HTMLInputElement>('specAddKey').value.trim(), $<HTMLInputElement>('specAddText').value)
+    .then(() => { if (valueOf(state.spec, $<HTMLInputElement>('specAddKey').value.trim())) { $<HTMLInputElement>('specAddKey').value = ''; $<HTMLInputElement>('specAddText').value = '' } })
+})
+$('specCopy').addEventListener('click', () => {
+  navigator.clipboard.writeText(specMarkdown(state.app ?? '', state.spec)).then(() => { $('specCopy').textContent = 'Copied' ; setTimeout(() => { $('specCopy').textContent = 'Copy as markdown' }, 1500) }, () => showError('Could not copy'))
+})
+$('specDownload').addEventListener('click', () => {
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([specMarkdown(state.app ?? '', state.spec)], { type: 'text/markdown' }))
+  a.download = 'spec.md'
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+})
 $('drawerClose').addEventListener('click', closeDrawer)
 addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape' && state.drawer) closeDrawer() })
 
@@ -961,6 +1099,8 @@ function renderToolbar() {
   $('menuFoot').hidden = !app
   const nav = $<HTMLButtonElement>('navButton')
   nav.hidden = !app || !state.entries.size
+  $('specButton').hidden = nav.hidden
+  $('specButton').classList.toggle('on', state.drawer === 'spec')
   const cur = state.current ? state.entries.get(state.current) : undefined
   for (const [id, dir] of [['trailBack', -1], ['trailForward', 1]] as const) {
     const b = $<HTMLButtonElement>(id)

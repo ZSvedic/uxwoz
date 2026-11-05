@@ -75,7 +75,16 @@ can spend model credits.
   at `at` (its `createdAt`) set on row `row`; the ✕ beside an Edit's line in the drawer calls it.
   Not by index: after an Undo and a new Edit, an old ✕ would take back the new line. `{spec}`, or
   404 if there is no such value.
-- `GET /api/map?app=…`: `{root, entries: CacheEntry[], spec}` for one mockup, oldest first. Levels, the
+- `POST /api/spec/set {app, key, text}`: the user's own line for a row (new rows too), `from:
+  user`, in its key's shape and within the limits; `{spec}`, 400 with why, 404 for an unknown mockup.
+- `POST /api/spec/remove {app, key, what: 'line' | 'row'}`: delete a row's newest line, or the row;
+  `{spec}`, or 404.
+- `POST /api/spec/suggestion {app, id, accept}`: accept a review suggestion (it becomes the user's
+  line; a merge also removes its second row) or dismiss it; `{spec, review}`, 400, or 404.
+- `POST /api/pick` also starts the review pass, in the background, after every 5th picked screen
+  of a mockup, and says `reviewing: true` then.
+- `GET /api/map?app=…`: `{root, entries: CacheEntry[], spec, review, reviewing}` for one mockup,
+  oldest first; `review` is `{suggestions, reviews}`. Levels, the
   tree and planned screens are not stored: `screenTree` and `plannedScreens` in `core/src/tree.ts`
   work them out (server and browser).
 - `GET /api/apps`: `{apps: {app, screens, updatedAt}[]}`, every mockup once as first typed,
@@ -138,6 +147,8 @@ Spec       Record<key, { ask?; from?: SpecFrom; values: { text; from: SpecFrom; 
              // one per mockup; key is product.*, ui.* or data.*; the last value counts; a row with
              // no value is open. SpecFrom is 'plan' | 'pick' | 'edit' | 'user'. screen and at (the
              // version's createdAt) say which screen version set a value, so Undo and ✕ can take it back
+Suggestion { id; kind: 'reword' | 'merge'; keys: string[]; text }
+ReviewInfo { at; screens; ms; costUsd; added: string[]; suggested; error? }   // one review run
 SpecLine   { key; text }   // from one <meta name="spec" content="key = value"> tag, either attribute
              // first, read up to its closing quote; a value with < is refused
 TreeNode   { level; parent: key | null; label }
@@ -160,7 +171,7 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 | `OPENAI_API_KEY` | GPT-6 Luna, GPT-6.1 Sol |
 | `PORT` | server port, default 3000 |
 | `UXWOZ_HOST` | listen address, default `127.0.0.1` |
-| `UXWOZ_CACHE_FILE` | screen cache `{version: 4, entries, specs}` (specs by mockup root), default `temp/screen-cache.json` |
+| `UXWOZ_CACHE_FILE` | screen cache `{version: 4, entries, specs, reviews}` (by mockup root), default `temp/screen-cache.json` |
 | `UXWOZ_RECORD` | `1` makes tests call the live APIs and rewrite `cassettes/` |
 
 ## Tests

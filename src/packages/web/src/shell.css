@@ -191,6 +191,26 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .set-lines .drop:hover { color: var(--err); border-color: var(--err); }
 .set-lines li.later span, .set-lines li.refused span { color: var(--muted); }
 .set-lines li.refused b { font-weight: 400; text-decoration: line-through; color: var(--muted); }
+/* The spec panel. */
+.spec-button { font-weight: 600; }
+.spec-button.on { color: var(--accent); border-color: var(--accent); }
+.spec-fill { margin: 0; color: var(--muted); }
+.spec-rows { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.spec-rows li { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-size: 13px; }
+.spec-rows li.open .value { color: var(--muted); font-style: italic; }
+.spec-rows small { color: var(--muted); }
+.spec-rows .tools { display: flex; gap: 6px; margin-top: 4px; }
+.spec-rows .tools button, .spec-suggestion button, .spec-export button, .spec-add button, .spec-edit button { padding: 2px 8px; font-size: 12px; }
+.spec-rows .tools .danger:hover { color: var(--err); border-color: var(--err); }
+.spec-edit { display: flex; gap: 6px; margin-top: 4px; }
+.spec-edit input, .spec-add input { flex: 1; min-width: 0; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--fg); }
+.spec-add { display: flex; flex-wrap: wrap; gap: 6px; }
+.spec-add h3 { flex-basis: 100%; }
+.spec-suggestion { padding: 8px 10px; border: 1px solid var(--accent); border-radius: 8px; font-size: 13px; }
+.spec-suggestion p, .spec-suggestion blockquote { margin: 0 0 6px; }
+.spec-suggestion blockquote { padding-left: 8px; border-left: 2px solid var(--accent); }
+.spec-export pre { max-height: 200px; overflow: auto; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-size: 12px; white-space: pre-wrap; }
+.spec-reviews { margin: 0; color: var(--muted); font-size: 12px; }
 .info { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
 .info dt { color: var(--muted); }
 .info dd { margin: 0; overflow-wrap: anywhere; }

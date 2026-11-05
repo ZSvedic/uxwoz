@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   FLOW_KEY, MAX_LINE, PLANNER_PROMPT, ScreenCache, generateScreen, applyEdit, applyPick, checkScreen, cutProse, dropValues, fallbackSpec, flowRequest, linesOf, makePlan, markTab, parsePlan, screenRequest,
-  backLabelOf, drawChrome, plannedScreens, screenTree, shapeOf, specRequest, takeSpecLines, treeLines, valueOf, wouldTake, type Fetch, type Spec, type Version,
+  backLabelOf, drawChrome, plannedScreens, removeLine, removeRow, screenTree, setUserLine, shapeOf, specMarkdown, specRequest, type SpecRefusal, takeSpecLines, treeLines, valueOf, wouldTake, type Fetch, type Spec, type Version,
 } from '@uxwoz/core'
 import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
 
@@ -286,5 +286,45 @@ describe('shapes, and the drawn tabs in the tree', () => {
     const history = cache.pick(cache.propose('Snore', '@night-history: History', 0, ver('<h1>History</h1>'), { key: details.key, label: 'History' })!.key, 0)!
     // Made from Details (level 3 by its click), but every screen's drawn tab bar links it: level 2, under Home.
     expect(screenTree(cache.map('Snore').entries, spec).get(history.key)).toEqual({ level: 2, parent: home.key, label: 'History' })
+  })
+})
+
+describe('the spec panel: the user\'s lines and Export', () => {
+  test('the user\'s line wins: an Edit cannot replace it; shapes and limits still hold', () => {
+    const spec = plan()
+    expect(setUserLine(spec, 'ui.back', 'Back sits top left')).toBe('a ui.back line starts with its label in double quotes, e.g. "‹ Back", top left')
+    expect(setUserLine(spec, 'ui.back', '"‹ Back", top left')).toBeNull()
+    expect(spec['ui.back']!.values.at(-1)).toEqual({ text: '"‹ Back", top left', from: 'user' })
+    const refused: SpecRefusal[] = []
+    expect(applyEdit(spec, [{ key: 'ui.back', text: '"← Back", top right' }], 'night', 't9', refused)).toEqual([])
+    expect(refused).toEqual([{ line: 'ui.back = "← Back", top right', why: 'you set this row; your line wins' }])
+    expect(setUserLine(spec, 'ui.toggles', 'Switches')).toBeNull() // a row of the user's own
+    expect(setUserLine(spec, 'bad key', 'x')).toBe('not a key = value line')
+  })
+
+  test('deleting a line brings the one before back, or opens the row; deleting a row removes it', () => {
+    const spec = plan()
+    applyPick(spec, [{ key: 'ui.back', text: '"‹ Back", top left' }], 'home')
+    setUserLine(spec, 'ui.back', '"← Back", top right')
+    expect(removeLine(spec, 'ui.back')).toBe(true)
+    expect(valueOf(spec, 'ui.back')).toBe('"‹ Back", top left')
+    expect(removeLine(spec, 'ui.back')).toBe(true)
+    expect(spec['ui.back']).toEqual({ ask: 'how Back looks', from: 'plan', values: [] })
+    setUserLine(spec, 'data.units', 'Minutes')
+    removeLine(spec, 'data.units')
+    expect(spec['data.units']).toBeUndefined() // a row nobody planned goes with its last line
+    expect(removeRow(spec, 'ui.back')).toBe(true)
+    expect(spec['ui.back']).toBeUndefined()
+  })
+
+  test('Export is the spec as markdown, by section, open rows with their question', () => {
+    const spec = plan()
+    applyPick(spec, [{ key: 'ui.nav', text: 'Tabs: Tonight @home, History @night-history' }], 'home')
+    expect(specMarkdown('NiceSnore', spec)).toBe([
+      '# Spec: NiceSnore', '', '4 of 24 lines. Every screen of the mockup follows these.', '',
+      '## Product', '', '- `product.core-flow`: @home → @recording → @morning-report', '',
+      '## Screens', '', '- `ui.nav`: Tabs: Tonight @home, History @night-history', '- `ui.back`: not decided yet (how Back looks)', '',
+      '## Facts', '', '- `data.score`: not decided yet (what the score means)', '',
+    ].join('\n'))
   })
 })
