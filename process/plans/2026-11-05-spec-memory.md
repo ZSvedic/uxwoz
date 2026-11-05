@@ -62,7 +62,9 @@ question it settles and its values, newest last. A row with no value is open.
   questions (what a score means, which units). A design answers an open one and adds none: when
   designs could add facts, 7 screens filled the spec with one screen's content.
 - **A line** is plain text of at most 120 characters; a longer one is refused. The whole spec is at
-  most 24 lines, about 1 KB.
+  most 24 lines, about 1 KB. The limits of 12 rows and 8 facts bind what models add; the user's
+  own lines and an Edit's are bound only by the 24. A row the user deleted stays deleted: the
+  review pass may not add it again.
 - **`@names`** in `ui.nav` and `product.core-flow` are planned screens. The flow is a chain from
   `@home`, each step under the one before. The names in `ui.nav` are tabs only when the line
   starts with `Tabs:`; any other navigation gets no tab markup and no tab check.
