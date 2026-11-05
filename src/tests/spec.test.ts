@@ -102,21 +102,21 @@ describe('Edits and Undo', () => {
   test('an Edit sets any key; Undo of that version brings the value before back, and drops a row it added', () => {
     const spec = plan()
     applyPick(spec, [{ key: 'ui.back', text: '‹ Back, first in the header' }], 'night')
-    applyEdit(spec, [{ key: 'ui.back', text: '← Back, top left' }, { key: 'ui.toggles', text: 'Switches' }], 'settings', 2)
+    applyEdit(spec, [{ key: 'ui.back', text: '← Back, top left' }, { key: 'ui.toggles', text: 'Switches' }], 'settings', 't2')
     expect(valueOf(spec, 'ui.back')).toBe('← Back, top left')
-    expect(linesOf(spec, 'settings', 2)).toEqual([
+    expect(linesOf(spec, 'settings', 't2')).toEqual([
       { key: 'ui.back', text: '← Back, top left', before: '‹ Back, first in the header' },
       { key: 'ui.toggles', text: 'Switches', before: undefined },
     ])
-    expect(dropValues(spec, 'settings', 2)).toBe(2)
+    expect(dropValues(spec, 'settings', 't2')).toBe(2)
     expect(valueOf(spec, 'ui.back')).toBe('‹ Back, first in the header')
     expect(spec['ui.toggles']).toBeUndefined()
   })
 
   test('✕ takes back one line of an Edit and leaves its others', () => {
     const spec = plan()
-    applyEdit(spec, [{ key: 'ui.nav', text: 'Tabs' }, { key: 'data.score', text: 'Higher is better' }], 'home', 1)
-    expect(dropValues(spec, 'home', 1, 'ui.nav')).toBe(1)
+    applyEdit(spec, [{ key: 'ui.nav', text: 'Tabs' }, { key: 'data.score', text: 'Higher is better' }], 'home', 't1')
+    expect(dropValues(spec, 'home', 't1', 'ui.nav')).toBe(1)
     expect(spec['ui.nav']!.values).toEqual([])
     expect(valueOf(spec, 'data.score')).toBe('Higher is better')
   })
@@ -130,10 +130,10 @@ describe('Edits and Undo', () => {
     cache.pick(key, 0)
     expect(valueOf(cache.spec('Snore'), 'ui.nav')).toBe('Tabs: Tonight @home')
     expect(valueOf(cache.spec('Snore'), 'ui.back')).toBeUndefined() // the design not picked
-    cache.addVersion(key, ver('<h1>A2</h1>', { spec: [{ key: 'ui.back', text: 'Regenerated' }] }))
+    cache.addVersion(key, ver('<h1>A2</h1>', { createdAt: 't-a2', spec: [{ key: 'ui.back', text: 'Regenerated' }] }))
     expect(cache.get(key)!.versions[1]!.spec).toBeUndefined()
     expect(valueOf(cache.spec('Snore'), 'ui.back')).toBeUndefined()
-    cache.addVersion(key, ver('<h1>A3</h1>', { feedback: 'use a drawer', spec: [{ key: 'ui.nav', text: 'A drawer' }] }))
+    cache.addVersion(key, ver('<h1>A3</h1>', { createdAt: 't-a3', feedback: 'use a drawer', spec: [{ key: 'ui.nav', text: 'A drawer' }] }))
     expect(valueOf(cache.spec('Snore'), 'ui.nav')).toBe('A drawer')
     expect(valueOf(new ScreenCache(file).spec('Snore'), 'ui.nav')).toBe('A drawer')
     cache.undo(key)

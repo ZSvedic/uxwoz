@@ -63,6 +63,10 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
   // What the control says, shown between the two screens it joins.
   const labelOf = (el) => el ? (el.getAttribute('aria-label') || el.textContent || el.value || '').trim().replace(/\\s+/g, ' ') : ''
   window.uxwoz = { go }
+  // The app says when this screen is a tab of ui.nav (Back is hidden there), without a reload.
+  addEventListener('message', (e) => {
+    if (e.source === parent && e.data && e.data.uxwoz === 'tab') document.documentElement.toggleAttribute('data-tab', !!e.data.on)
+  })
   // Any press in the screen makes it the current one.
   addEventListener('pointerdown', () => parent.postMessage({ uxwoz: 'touch' }, '*'), true)
   // The app's zoom keys, ⌘[ ⌘] and Esc work while a screen has the focus too; the fit keys not in a text field.
@@ -165,20 +169,23 @@ main a:is(${GO}):hover { text-decoration-line: underline !important; }`
 // Pico turns a <small> right after an input into help text on its own line; after a checkbox or
 // radio in its label it is a count or note, like "All <small>(6)</small>", so it stays inline.
 // The spec's fixed markup: the tabs of ui.nav sit at the bottom of a phone screen and the top of a
-// desktop one; Back of ui.back is a plain bold link. The theme gives them its look.
+// desktop one, placed with !important so a model's inline style cannot move them (one Home put its
+// bar mid-screen); Back of ui.back is a plain bold link, hidden on a tab screen. The theme gives them its look.
 const FRAME_CSS = `html, body { overflow: hidden; }
 label > :is([type="checkbox"], [type="radio"]) + small { display: inline; margin: 0 0 0 .25em; }
 body > main { position: relative; width: 100%; margin: 0; padding: 20px 24px; box-sizing: border-box; }
 @media (max-width: 600px) { body > main { padding: 16px; } }
-body > main:has(nav[data-ui="tabs"]) { padding-bottom: 84px; }
-nav[data-ui="tabs"] { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 6px 8px; display: flex; justify-content: space-around; align-items: stretch; gap: 4px;
+body > main:has(nav[data-ui="tabs"]) { padding-bottom: 84px !important; }
+nav[data-ui="tabs"] { position: absolute !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; width: auto !important;
+  margin: 0 !important; padding: 6px 8px; display: flex !important; justify-content: space-around; align-items: stretch; gap: 4px;
   background: var(--pico-background-color); border-top: 1px solid var(--pico-muted-border-color); }
 nav[data-ui="tabs"] > a { flex: 1 1 0; margin: 0; padding: 10px 4px; text-align: center; font-size: .875rem; line-height: 1.2; border-radius: 8px; }
 nav[data-ui="tabs"] > a[aria-current="page"] { font-weight: 700; box-shadow: inset 0 3px 0 currentColor; }
-html[data-device="desktop"] body > main:has(nav[data-ui="tabs"]) { padding-bottom: 20px; padding-top: 76px; }
-html[data-device="desktop"] nav[data-ui="tabs"] { top: 0; bottom: auto; justify-content: flex-start; padding: 6px 24px; border-top: 0; border-bottom: 1px solid var(--pico-muted-border-color); }
+html[data-device="desktop"] body > main:has(nav[data-ui="tabs"]) { padding-bottom: 20px !important; padding-top: 76px !important; }
+html[data-device="desktop"] nav[data-ui="tabs"] { top: 0 !important; bottom: auto !important; justify-content: flex-start; padding: 6px 24px; border-top: 0; border-bottom: 1px solid var(--pico-muted-border-color); }
 html[data-device="desktop"] nav[data-ui="tabs"] > a { flex: 0 0 auto; padding: 10px 16px; }
 a[data-ui="back"] { display: inline-block; margin: 0 0 .5rem; font-weight: 600; }
+html[data-tab] [data-ui="back"] { display: none !important; }
 :root { --pico-font-size: 100%; --pico-spacing: .75rem; --pico-typography-spacing-vertical: .75rem;
   --pico-block-spacing-vertical: .75rem; --pico-block-spacing-horizontal: 1rem;
   --pico-form-element-spacing-vertical: .5rem; --pico-form-element-spacing-horizontal: .75rem; }`
@@ -187,10 +194,10 @@ a[data-ui="back"] { display: inline-block; margin: 0 0 .5rem; font-weight: 600; 
  * The full page for the iframe's srcdoc: theme CSS inlined, our bootstrap, the fragment in <main>,
  * at least one screen of `device` tall.
  */
-export function framePage(fragment: string, css: string, final: boolean, device?: Device): string {
+export function framePage(fragment: string, css: string, final: boolean, device?: Device, tab = false): string {
   const style = css.replace(/<\/style/gi, '<\\/style')
   const h = device ? DEVICES[device].height : 0
-  return `<!doctype html><html data-theme="light"${device ? ` data-device="${device}"` : ''}><head><meta charset="utf-8">`
+  return `<!doctype html><html data-theme="light"${device ? ` data-device="${device}"` : ''}${tab ? ' data-tab' : ''}><head><meta charset="utf-8">`
     + `<meta name="viewport" content="width=device-width, initial-scale=1">`
     + `<style>${style}</style><style>${FRAME_CSS}\n${NAV_CSS}${h ? `\nbody > main { min-height: ${h}px; }` : ''}</style><script>${bootstrap(final, h || VIEWPORT_H)}</script></head>`
     + `<body${final ? '' : ' style="cursor:progress"'}><main>${fragment}</main></body></html>`

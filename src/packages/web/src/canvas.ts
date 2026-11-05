@@ -63,6 +63,8 @@ export interface CardView {
   width: number
   /** The device it is designed for; absent for screens made before devices. */
   device?: Device
+  /** A tab of ui.nav: Back is hidden in it. A change reaches the frame as a message, with no reload. */
+  tab?: boolean
   /** The bold line above a screen, e.g. "L2 Camera"; '' for a side of an A OR B. */
   name: string
   /** One sentence naming the design idea: under the name, or alone above a side. */
@@ -115,6 +117,8 @@ interface Card {
   more: HTMLButtonElement
   /** A side's spec lines. */
   lines: HTMLElement
+  /** Whether the frame was last told it is a tab. */
+  tab: boolean
   note: HTMLElement
   screen: HTMLElement
   frame: HTMLIFrameElement
@@ -353,6 +357,7 @@ export class Canvas {
         const c = this.card(v.id, s.key)
         c.key = s.key
         c.view = v
+        if (c.tab !== !!v.tab) { c.tab = !!v.tab; c.frame.contentWindow?.postMessage({ uxwoz: 'tab', on: c.tab }, '*') }
         if (c.width !== v.width) { c.width = v.width; c.frame.style.width = `${v.width}px` }
         c.el.classList.toggle('side', !!v.side)
         c.el.classList.toggle('pickable', !!v.side?.pickable)
@@ -416,7 +421,7 @@ export class Canvas {
     if (!final && c.used != null) { c.used = null; this.queue() }
     c.shown = { html, final, css }
     c.sized = false
-    c.frame.srcdoc = framePage(html, css, final, c.view?.device)
+    c.frame.srcdoc = framePage(html, css, final, c.view?.device, c.tab)
   }
 
   /** Drop the callback waiting for a card's next load, once its stream is cancelled. */
@@ -624,7 +629,7 @@ export class Canvas {
     })
     root.append(head, screen, error, rail)
     const c: Card = {
-      el: root, name, idea, more, lines, note, screen, frame, shield, error, rail, undo: tools[2]!, tools, key, view: null,
+      el: root, name, idea, more, lines, tab: false, note, screen, frame, shield, error, rail, undo: tools[2]!, tools, key, view: null,
       width: 0, used: null, height: START_H, shown: null, sized: false, onLoad: null, growth: { count: 0, at: 0 }, frozen: false,
     }
     shield.addEventListener('click', () => { if (c.view?.side?.pickable) this.on.pick(c.key, c.view.side.index) })

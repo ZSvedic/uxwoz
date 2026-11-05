@@ -37,19 +37,24 @@ export interface PlanOptions {
   ms?: number
 }
 
+/** A plan and what it took: its spec, the time to the full reply and its cost. */
+export interface PlanResult { spec: Spec; ms: number; costUsd: number | null }
+
 /** The plan for a new mockup: its core flow and open rows. Throws on an error or a slow reply. */
-export async function makePlan(app: string, device: Device, o: PlanOptions = {}): Promise<Spec> {
+export async function makePlan(app: string, device: Device, o: PlanOptions = {}): Promise<PlanResult> {
   const deadline = AbortSignal.timeout(o.ms ?? PLAN_MS)
   const signal = o.signal ? AbortSignal.any([o.signal, deadline]) : deadline
-  let reply = ''
+  const t0 = performance.now()
+  let reply = '', costUsd: number | null = null
   try {
     for await (const ev of streamModel({ model: PLAN_MODEL, system: PLANNER_PROMPT, user: planRequest(app, device), maxTokens: 4000, signal, fetch: o.fetch, env: o.env })) {
-      if (ev.type === 'text') reply += ev.text
-      else if (ev.finishReason !== 'stop') throw new Error(`the plan was cut off (${ev.finishReason ?? 'no end'})`)
+      if (ev.type === 'text') { reply += ev.text; continue }
+      if (ev.finishReason !== 'stop') throw new Error(`the plan was cut off (${ev.finishReason ?? 'no end'})`)
+      costUsd = ev.costUsd
     }
   } catch (err) {
     if (deadline.aborted) throw new Error(`no plan within ${(o.ms ?? PLAN_MS) / 1000} s`)
     throw err
   }
-  return parsePlan(reply)
+  return { spec: parsePlan(reply), ms: Math.round(performance.now() - t0), costUsd }
 }

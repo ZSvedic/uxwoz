@@ -100,9 +100,8 @@ function screenNameOf(key: string): string | undefined {
   return key.match(/ » @([a-z0-9_-]+)$/)?.[1]
 }
 
-/** Code hides Back on the tab screens of ui.nav: asking the model for that did not work. */
-const HIDE_BACK = '\n[data-ui="back"] { display: none !important; }'
-const cssFor = (key: string, css: string) => (navNames(state.spec).includes(screenNameOf(key) ?? '') ? css + HIDE_BACK : css)
+/** Code hides Back on the tab screens of ui.nav (asking the model did not work): the card tells its frame. */
+const isTab = (key: string) => navNames(state.spec).includes(screenNameOf(key) ?? '')
 const ideaOf = (v: Version) => v.idea ?? ''
 
 function sideCard(key: string, index: number, side: Side | null, stored: Version | null, device: Device | undefined): CardView {
@@ -114,7 +113,7 @@ function sideCard(key: string, index: number, side: Side | null, stored: Version
   const take = wouldTake(state.spec, lines)
   return {
     lines: lines.map((l, i) => ({ text: `${l.key} = ${l.text}`, dropped: !take[i] })),
-    id, width: widthOf(version?.device ?? device), device: version?.device ?? device, name: '', idea: version ? ideaOf(version) : '',
+    id, width: widthOf(version?.device ?? device), device: version?.device ?? device, tab: isTab(key), name: '', idea: version ? ideaOf(version) : '',
     side: { index, pickable: !!version }, error, streaming: !version && !error,
   }
 }
@@ -129,7 +128,7 @@ function views(): ScreenView[] {
     out.push(v ? {
       key: e.key, parent: treeParent(e.key), current: state.current === e.key, undo: e.versions.length > 1,
       note: revising ? (revising.change ? 'Making the change…' : 'Making a new design…') : '',
-      cards: [{ id: e.key, width: widthOf(v.device), device: v.device, name: labelOf(e), idea: ideaOf(v), streaming: !!revising }],
+      cards: [{ id: e.key, width: widthOf(v.device), device: v.device, tab: isTab(e.key), name: labelOf(e), idea: ideaOf(v), streaming: !!revising }],
     } : {
       key: e.key, parent: treeParent(e.key), current: false, undo: false, note: '',
       cards: (e.proposals ?? []).map((p, i) => sideCard(e.key, i, making?.sides[i] ?? null, p, making?.device)),
@@ -154,10 +153,10 @@ async function draw() {
   if (theme !== themeSelect.value) return // a newer draw shows the newer theme
   for (const e of state.entries.values()) {
     const v = e.versions.at(-1)
-    if (v) { if (state.revising?.key !== e.key) canvas.show(e.key, v.html, true, cssFor(e.key, css)) }
-    else e.proposals?.forEach((p, i) => { if (p) canvas.show(`${e.key}#${i}`, p.html, true, cssFor(e.key, css)) })
+    if (v) { if (state.revising?.key !== e.key) canvas.show(e.key, v.html, true, css) }
+    else e.proposals?.forEach((p, i) => { if (p) canvas.show(`${e.key}#${i}`, p.html, true, css) })
   }
-  state.making?.sides.forEach((s, i) => { if (s.version) canvas.show(`${state.making!.key}#${i}`, s.version.html, true, cssFor(state.making!.key, css)) })
+  state.making?.sides.forEach((s, i) => { if (s.version) canvas.show(`${state.making!.key}#${i}`, s.version.html, true, css) })
 }
 
 async function fetchText(url: string): Promise<string> {
@@ -278,7 +277,7 @@ async function openScreen(action: string | null, from: string | null, label: str
         m = { key: ev.key, parent: from, device, sides: [] }
         m.sides = Array.from({ length: ev.variants }, (_, i) => ({
           version: null, error: null,
-          stream: new StreamRenderer(`${ev.key}#${i}`, cssFor(ev.key, css)),
+          stream: new StreamRenderer(`${ev.key}#${i}`, css),
         }))
         state.making = m
         // The view to come back to after the pick; a new mockup's first screen has none.
@@ -526,7 +525,7 @@ async function revise(key: string, change: string | null) {
   draw()
   try {
     const css = await themeCss(themeSelect.value)
-    const stream = new StreamRenderer(key, cssFor(key, css))
+    const stream = new StreamRenderer(key, css)
     const res = await post('/api/revise', { key, change, model, device: deviceSelect.value }, ctrl.signal)
     let finished = false
     try {
@@ -630,7 +629,7 @@ function renderDrawer() {
     li.append(what)
     li.classList.toggle('now', i === e.versions.length - 1)
     // The spec lines this version set, old value beside new; an Edit's have a ✕ that takes them back.
-    const set = linesOf(state.spec, e.key, i)
+    const set = linesOf(state.spec, e.key, x.createdAt)
     if (set.length) li.append(specLines(e.key, i, set, !!x.feedback))
     return li
   }).reverse())
@@ -652,6 +651,7 @@ function renderDrawer() {
     ['All versions', fmtUsd(e.versions.reduce((t, x) => t + (x.costUsd ?? 0), 0))],
     ['Finish', v.finishReason ?? '–'],
     ['Check', v.misses == null ? 'made without a spec' : v.misses.length ? v.misses.join('; ') : 'follows the spec'],
+    ...(e.versions[0]?.plan ? [['Plan', planNote(e.versions[0].plan)] as [string, string]] : []),
     ['Spec lines', v.spec?.length ? v.spec.map((l) => `${l.key} = ${l.text}`).join('\n') : '–'],
     ['Size', `${v.html.length.toLocaleString()} characters`],
     ['Prompt', e.action ?? e.app],
@@ -696,6 +696,12 @@ async function dropLine(key: string, version: number, row: string) {
   if (!res?.ok) return showError('Could not take the line back')
   state.spec = (await res.json() as { spec: Spec }).spec
   draw()
+}
+
+/** How the mockup's plan went, for Info on its first screen. */
+function planNote(p: NonNullable<Version['plan']>): string {
+  if (p.error) return `failed (${p.error}); main navigation and Back were left open`
+  return `${p.rows} rows in ${fmtS(p.ms)}${p.costUsd == null ? '' : `, ~${fmtUsd(p.costUsd)}`}`
 }
 
 $('editPane').addEventListener('submit', (ev) => {
@@ -1037,6 +1043,7 @@ modelSelect.addEventListener('change', () => {
 
 async function init() {
   const cfg = await (await fetch('/api/config')).json()
+  if (cfg.warning) showError(cfg.warning)
   for (const m of cfg.models) modelSelect.add(new Option(m.label, m.id))
   for (const t of cfg.themes) themeSelect.add(new Option(t.label, t.id))
   for (const d of cfg.devices) deviceSelect.add(new Option(d.label, d.id))

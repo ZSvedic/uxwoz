@@ -5,8 +5,11 @@
 
 /** Who gave a row its value. */
 export type SpecFrom = 'plan' | 'pick' | 'edit' | 'user'
-/** One value of a row; `screen` and `version` say which screen version set it (a pick or an Edit). */
-export interface SpecValue { text: string; from: SpecFrom; screen?: string; version?: number }
+/**
+ * One value of a row; `screen` and `at` (the version's createdAt) say which screen version set it, a
+ * pick or an Edit. Not its index: a deleted and remade screen reuses indexes.
+ */
+export interface SpecValue { text: string; from: SpecFrom; screen?: string; at?: string }
 /** `ask` is the question the row settles; `from` says who added the row (the plan opens rows with no value). */
 export interface SpecRow { ask?: string; from?: SpecFrom; values: SpecValue[] }
 /** Rows by key, in the order they were added. */
@@ -49,10 +52,26 @@ export const valueOf = (spec: Spec, key: string): string | undefined => spec[key
 export const namesIn = (text: string): string[] => [...text.matchAll(/@([a-z0-9][a-z0-9_-]*)/gi)].map((m) => m[1]!.toLowerCase())
 /** The screens of the core flow, from @home. */
 export const flowNames = (spec: Spec) => namesIn(valueOf(spec, FLOW_KEY) ?? '')
-/** The tab screens, from the value of ui.nav. */
-export const navNames = (spec: Spec) => namesIn(valueOf(spec, 'ui.nav') ?? '')
+/** True when ui.nav's value is a tab bar (`Tabs: …`); any other navigation gets no tab markup and no tab check. */
+export const hasTabs = (spec: Spec) => /^\s*tabs\s*:/i.test(valueOf(spec, 'ui.nav') ?? '')
+/** The tab screens, from the value of ui.nav when it is a tab bar. */
+export const navNames = (spec: Spec) => (hasTabs(spec) ? namesIn(valueOf(spec, 'ui.nav')!) : [])
+/** The label ui.nav gives a tab, e.g. History for @night-history in `Tabs: History @night-history`. */
+export function tabLabel(spec: Spec, name: string): string {
+  const nav = valueOf(spec, 'ui.nav') ?? ''
+  return nav.replace(/^\s*tabs\s*:/i, '').match(new RegExp(`([^,:;@]+?)\\s*\\(?@${name}(?![\\w-])`, 'i'))?.[1]?.trim() ?? ''
+}
 
-const decode = (s: string) => s.replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+const NAMED: Record<string, string> = {
+  quot: '"', apos: "'", lt: '<', gt: '>', amp: '&', nbsp: ' ', lsaquo: '‹', rsaquo: '›', laquo: '«', raquo: '»',
+  larr: '←', rarr: '→', uarr: '↑', darr: '↓', hellip: '…', mdash: '—', ndash: '–', times: '×', middot: '·', bull: '•',
+}
+/** Text from HTML: named entities a model uses, numeric ones, and a no-break space as a space. */
+export const decode = (s: string) => s
+  .replace(/&#x([0-9a-f]+);/gi, (_, h: string) => String.fromCodePoint(parseInt(h, 16)))
+  .replace(/&#(\d+);/g, (_, d: string) => String.fromCodePoint(Number(d)))
+  .replace(/&([a-z]+);/gi, (m, n: string) => NAMED[n.toLowerCase()] ?? m)
+  .replace(/\u00a0/g, ' ')
 
 /** A key as the menu names it: `ui.toggle` is `ui.toggles`, so a model cannot open a second row for a known one. */
 export function knownKey(key: string): string {
@@ -67,23 +86,29 @@ export function parseLine(s: string): SpecLine | null {
   const m = s.trim().match(/^([a-z][a-z0-9.-]*)\s*=\s*(.+)$/)
   if (!m || !isSpecKey(m[1]!)) return null
   const text = m[2]!.replace(/\s+/g, ' ').trim()
-  return text && text.length <= MAX_LINE ? { key: knownKey(m[1]!), text } : null
+  return text && text.length <= MAX_LINE && !text.includes('<') ? { key: knownKey(m[1]!), text } : null
 }
 
+/** One `<meta name="spec" content="…">` tag, either attribute first; content runs to its closing quote before `>` (or before name=). */
+const SPEC_TAG = /<meta\s+(?:name\s*=\s*["']?spec["']?\s+content\s*=\s*(["'])([^\n]*?)\1(?=\s*\/?>)|content\s*=\s*(["'])([^\n]*?)\3\s+name\s*=\s*["']?spec["']?)\s*\/?>/gi
+
 /**
- * Take the `<meta name="spec" content="key = value">` lines out of a reply. Each is read to the end
- * of its line, so a value may hold quotes; the whole line goes from the stored screen. The first
- * MAX_DESIGN_LINES good lines count; `refused` counts the rest that were not lines or too long.
+ * Take the `<meta name="spec" content="key = value">` tags out of a reply. Each tag is read up to its
+ * closing `">`, so a quote inside the value is safe, and only the tag goes from the stored screen
+ * (its line too, when the tag was alone on it). A value with `<` in it is refused. The first
+ * MAX_DESIGN_LINES good lines count; `refused` counts the rest that were not lines, too long or repeats.
  */
 export function takeSpecLines(html: string): { html: string; lines: SpecLine[]; refused: number } {
   const lines: SpecLine[] = []
   let refused = 0
-  const rest = html.replace(/^[ \t]*<meta\s+name=["']?spec["']?\s+content=["']?(.*)$\n?/gim, (_, tail: string) => {
-    const line = parseLine(decode(tail.replace(/["']?\s*\/?>\s*$/, '')))
+  const CUT = '\u0000'
+  const marked = html.replace(SPEC_TAG, (_, _q1, a: string | undefined, _q2, b: string | undefined) => {
+    const line = parseLine(decode(a ?? b ?? ''))
     if (line && lines.length < MAX_DESIGN_LINES && !lines.some((l) => l.key === line.key)) lines.push(line)
     else refused++
-    return ''
+    return CUT
   })
+  const rest = marked.replace(/^[ \t]*\u0000(?:[ \t]*\u0000)*[ \t]*(?:\n|$)/gm, '').replaceAll(CUT, '')
   return { html: rest, lines, refused }
 }
 
@@ -99,12 +124,12 @@ function fits(spec: Spec, key: string): boolean {
  * of its own, `data.` included: new rows come from the plan, an Edit or the user. When designs could
  * add facts, 7 screens filled the spec with one screen's content. Returns the keys set.
  */
-export function applyPick(spec: Spec, lines: SpecLine[], screen: string): string[] {
+export function applyPick(spec: Spec, lines: SpecLine[], screen: string, at?: string): string[] {
   const taken: string[] = []
   for (const l of lines.slice(0, MAX_DESIGN_LINES)) {
     const row = spec[l.key]
     if (!row || row.values.length) continue
-    row.values.push({ text: l.text, from: 'pick', screen, version: 0 })
+    row.values.push({ text: l.text, from: 'pick', screen, ...(at && { at }) })
     taken.push(l.key)
   }
   return taken
@@ -122,13 +147,18 @@ export function wouldTake(spec: Spec, lines: SpecLine[]): boolean[] {
   return lines.map((l, i) => i < MAX_DESIGN_LINES && taken.includes(l.key))
 }
 
-/** Put an Edit's lines in: any key, new ones too, within the limits. Returns the keys set. */
-export function applyEdit(spec: Spec, lines: SpecLine[], screen: string, version: number): string[] {
+/**
+ * Put an Edit's lines in: any key, new ones too, within the limits. A line that repeats a row's
+ * value is skipped: an Edit reply often repeats lines it did not change. `at` is the version's
+ * createdAt. Returns the keys set.
+ */
+export function applyEdit(spec: Spec, lines: SpecLine[], screen: string, at: string): string[] {
   const taken: string[] = []
   for (const l of lines.slice(0, MAX_DESIGN_LINES)) {
+    if (valueOf(spec, l.key) === l.text) continue
     if (!spec[l.key] && !fits(spec, l.key)) continue
     const r = (spec[l.key] ??= { ...(KNOWN_ROWS[l.key] && { ask: KNOWN_ROWS[l.key] }), from: 'edit', values: [] })
-    r.values.push({ text: l.text, from: 'edit', screen, version })
+    r.values.push({ text: l.text, from: 'edit', screen, at })
     taken.push(l.key)
   }
   return taken
@@ -139,11 +169,11 @@ export function applyEdit(spec: Spec, lines: SpecLine[], screen: string, version
  * `key`). The value before counts again; a row an Edit added goes when nothing is left in it.
  * Returns how many values went.
  */
-export function dropValues(spec: Spec, screen: string, version: number, key?: string): number {
+export function dropValues(spec: Spec, screen: string, at: string, key?: string): number {
   let n = 0
   for (const [k, row] of Object.entries(spec)) {
     if (key != null && k !== key) continue
-    const keep = row.values.filter((v) => !(v.from === 'edit' && v.screen === screen && v.version === version))
+    const keep = row.values.filter((v) => !(v.from === 'edit' && v.screen === screen && v.at === at))
     if (keep.length === row.values.length) continue
     n += row.values.length - keep.length
     row.values = keep
@@ -152,12 +182,12 @@ export function dropValues(spec: Spec, screen: string, version: number, key?: st
   return n
 }
 
-/** The lines one version of a screen set, with the value each replaced (undefined if the row was open or new). */
-export function linesOf(spec: Spec, screen: string, version: number): { key: string; text: string; before?: string }[] {
+/** The lines one version of a screen (by its createdAt) set, with the value each replaced (undefined if the row was open or new). */
+export function linesOf(spec: Spec, screen: string, at: string): { key: string; text: string; before?: string }[] {
   const out: { key: string; text: string; before?: string }[] = []
   for (const [key, row] of Object.entries(spec)) {
     row.values.forEach((v, i) => {
-      if (v.screen === screen && v.version === version) out.push({ key, text: v.text, before: row.values[i - 1]?.text })
+      if (v.screen === screen && v.at === at) out.push({ key, text: v.text, before: row.values[i - 1]?.text })
     })
   }
   return out
@@ -195,7 +225,7 @@ export function parsePlan(reply: string): Spec {
 
 /** One markup for each of these rows, styled by the theme: the request names it when the row is in the spec. */
 const MARKUP: Record<string, string> = {
-  'ui.nav': 'Tabs of ui.nav: last on every screen, in this markup, one link per tab with the label and @name ui.nav gives it, exactly; the app marks the current tab: <nav data-ui="tabs"><a data-action="@name">Label</a>…</nav>. A ui.nav line names each tab by its label and @name.',
+  'ui.nav': 'Tabs of ui.nav: last on every screen, in this markup, one link per tab with the label and @name ui.nav gives it, exactly; the app marks the current tab: <nav data-ui="tabs"><a data-action="@name">Label</a>…</nav>. A ui.nav line for a tab bar starts with Tabs: and names each tab by its label and @name; other navigation is written another way and gets no tab bar.',
   'ui.back': 'Back of ui.back: where ui.back says, with its label, in this markup: <a data-ui="back" data-action="back">Label</a>. The tab screens have no Back. A ui.back line starts with the label Back shows, then where it sits.',
   'ui.toggles': 'An on/off setting of ui.toggles, as a switch: <label><input type="checkbox" role="switch"> Label</label>. A plain checkbox only picks items, such as what to include or export.',
 }
@@ -211,7 +241,8 @@ export function specRequest(spec: Spec): string {
     const v = valueOf(spec, k)
     return v != null ? `${k} = ${v}` : `${k} ? ${spec[k]!.ask ?? ''}`.trimEnd()
   })
-  const markup = keys.filter((k) => MARKUP[k]).map((k) => MARKUP[k]!)
+  // The tab markup only while ui.nav is open or says Tabs: other navigation has none.
+  const markup = keys.filter((k) => MARKUP[k] && (k !== 'ui.nav' || valueOf(spec, k) == null || hasTabs(spec))).map((k) => MARKUP[k]!)
   return `The spec of this mockup: decisions every screen follows, one per line; a row with ? is not decided yet.\n${rows.join('\n')}`
     + (markup.length ? `\n\n${markup.join('\n')}` : '')
 }
@@ -248,9 +279,11 @@ export function checkScreen(html: string, spec: Spec, name?: string, known?: Set
   const back = valueOf(spec, 'ui.back')
   const isTab = name != null && tabs.includes(name)
   if (back && !isTab && name !== 'home') {
-    const labels = [...html.matchAll(/<a\b[^>]*data-ui=["']back["'][^>]*>([\s\S]*?)<\/a>/gi)].map((m) => decode(m[1]!.replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim())
+    // Back's label must be how the ui.back line starts: `‹ Back` for `‹ Back, first in the header`.
+    const said = decode(back).replace(/\s+/g, ' ').trim()
+    const labels = [...html.matchAll(/<(a|button)\b[^>]*data-ui=["']back["'][^>]*>([\s\S]*?)<\/\1>/gi)].map((m) => decode(m[2]!.replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim())
     if (!labels.length) misses.push('no Back')
-    else for (const l of labels) if (!l || !back.includes(l)) misses.push(`Back says "${l}"`)
+    else for (const l of labels) if (!l || !said.startsWith(l)) misses.push(`Back says "${l}"`)
   }
   const next = nextStep(spec, name)
   if (next && !linked.has(next)) misses.push(`no link to @${next}, the next step of the core flow`)
@@ -258,8 +291,15 @@ export function checkScreen(html: string, spec: Spec, name?: string, known?: Set
     const fresh = [...linked].filter((n) => n !== 'home' && n !== name && !known.has(n))
     if (fresh.length > MAX_NEW_SCREENS) misses.push(`opens ${fresh.length} new screens (${fresh.map((n) => `@${n}`).join(', ')})`)
   }
-  if ((html.match(/<title>/gi)?.length ?? 0) > 1 || (html.match(/data-ui=["']tabs["']/gi)?.length ?? 0) > 1) misses.push('the screen is written twice')
+  if (writtenTwice(html)) misses.push('the screen is written twice')
   return misses
+}
+
+/** A reply that holds the screen twice: two ideas, two titles outside SVG, or two tab bars. */
+function writtenTwice(html: string): boolean {
+  const outsideSvg = html.replace(/<svg\b[\s\S]*?<\/svg>/gi, '')
+  return (html.match(/<meta\s+name=["']?idea\b/gi)?.length ?? 0) > 1 || (outsideSvg.match(/<title>/gi)?.length ?? 0) > 1
+    || (html.match(/data-ui=["']tabs["']/gi)?.length ?? 0) > 1
 }
 
 /**

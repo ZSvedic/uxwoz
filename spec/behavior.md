@@ -122,7 +122,7 @@ says nothing about which is which.
 
 - **Fit and restore**: before an A OR B shows, the canvas remembers its zoom and scroll, then fits
   both designs to the stage's width, top first. Once both have finished and taken their real size
-  (usually narrower than the device), it fits them again, height included, unless the user has
+  (at least one device screen tall), it fits them again, height included, unless the user has
   scrolled, zoomed, used a fit or chosen a screen in Nav meanwhile; a very tall pair keeps a readable
   zoom and shows its top. After the pick, the zoom and scroll come back, and the picked screen
   scrolls into view. A new mockup's first screen has no view to come back to: it is fitted instead.
@@ -176,7 +176,8 @@ scrolls so the screen stays fully visible beside it. Esc or ✕ closes it. It ha
   first text, total time, cost, cost of all versions, finish reason, **Check** (what the screen
   misses against the spec it was made with: a tab of `ui.nav` it does not link to, a Back labelled
   otherwise than `ui.back` says, no control to the next step of the core flow, more than 2 screens
-  the tree did not have, or a reply that holds the screen twice; *follows the spec* when nothing), the **spec lines** the design proposed, size and prompt.
+  the tree did not have, or a reply that holds the screen twice; *follows the spec* when nothing), the **spec lines** the design proposed, size and prompt. On the first screen, **Plan**: the rows
+  it opened, its time and cost, or why it failed (main navigation and Back were then left open).
 
 Choosing another screen while the drawer is open shows that screen in it.
 
@@ -189,9 +190,13 @@ agree on navigation, Back and facts ([the spec note](../process/plans/2026-11-05
   @recording → @morning-report*) and up to 8 open rows, each a key and the question it settles
   (*ui.nav ? main navigation*, *data.score ? whether higher means worse*). It takes about 2 s; after
   6 s, or on an error, the first screen goes on with `ui.nav` and `ui.back` open, so its screens
-  still agree on navigation and Back. Start over plans again.
+  still agree on navigation and Back. A mockup is planned again as long as it has no first screen
+  (a first try whose designs all failed, or ✕ under the OR); two requests for one new mockup share
+  one plan. Start over plans again.
 - **Every request carries the spec** after the tree: filled rows with their value, open rows with
-  their question, and one markup each for the tabs of `ui.nav`, Back and switches.
+  their question, and one markup each for the tabs of `ui.nav`, Back and switches. The tab markup goes only while
+  `ui.nav` is open or its line starts with `Tabs:`; other navigation (*No tab bar: one step per
+  screen with Next*) gets none, and its `@names` are not tabs.
 - **The core flow and the tabs of `ui.nav` are planned screens**: they are in the tree and in Nav
   from the start, each flow step under the step before. The request for a flow step with a next
   step asks for one control that opens it (Stop recording opens the morning report).
@@ -203,8 +208,11 @@ agree on navigation, Back and facts ([the spec note](../process/plans/2026-11-05
   filled the spec with one screen's content. In an A OR B they show under each side's idea, before the pick, two
   text lines each: in orange with **+** the lines its pick would add, struck through with **–**
   the ones it would drop; hovering shows a line whole. The pick fills open rows with the picked
-  design's lines and drops the rest, and the other design's lines; a line over 120 characters is refused. An Edit may set any row
-  (the Edit request asks for a line when the change is a rule other screens should follow); ✕ in
+  design's lines and drops the rest, and the other design's lines; a line over 120 characters, or
+  with `<` in it, is refused. Each line is one `<meta name="spec">` tag, read up to its closing
+  quote; the rest of its text line stays in the screen. An Edit may set any row (the Edit request
+  asks for a line when the change is a rule other screens should follow), and a line that repeats a
+  row's value adds nothing; ✕ in
   the drawer or Undo takes its values back. A Regenerate's lines are dropped. A key one letter off
   a known name (`ui.toggle`) counts as the known name.
 - **Tab screens have no Back**: the app hides it there.
@@ -281,7 +289,7 @@ that was paid for is kept even if the browser leaves. The current screen is reme
 in this browser.
 
 The cache file also holds each mockup's spec (version 4). A file from version 3 loads with empty
-specs. A cache file from before names (version 2) gets names for its picked screens when the server loads
+specs. A file from a newer app is left as it is: the app says so in the red pill and saves nothing. A cache file from before names (version 2) gets names for its picked screens when the server loads
 it, from each screen's title, else its first heading, else its prompt; its stored levels and
 clicks go. A file from before versions is moved aside to `screen-cache.json.before-versions`, and
 the cache starts empty.

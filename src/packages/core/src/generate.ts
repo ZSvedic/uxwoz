@@ -1,6 +1,6 @@
 // One screen generation: stream the model's fragment, then report what it cost and who served it.
 
-import type { Version } from './cache.ts'
+import type { PlanInfo, Version } from './cache.ts'
 import { extractFragment, screenIdea, screenName } from './frame.ts'
 import { DEVICES, type Device } from './frame.ts'
 import { MODELS, type ModelId } from './models.ts'
@@ -24,6 +24,8 @@ export interface GenerateOptions {
   /** The mockup's spec, sent after the tree, and the screen's name, for the check. A string is sent as it is. */
   spec?: Spec | string
   name?: string
+  /** For a first screen: how the plan went, kept on the version for Info. */
+  plan?: PlanInfo
   /** An Edit: change this screen as asked instead of designing a new one. */
   edit?: { html: string; change: string }
   signal?: AbortSignal
@@ -86,7 +88,9 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
           ...(name && { name }),
           ...(idea && { idea }),
           ...(taken.lines.length && { spec: taken.lines }),
-          ...(spec && { misses: checkScreen(html, spec, o.name, knownNames(o.existing, spec, taken.lines)) }),
+          // A mockup with no spec rows (made before the spec) has nothing to check.
+          ...(spec && Object.keys(spec).length && { misses: checkScreen(html, spec, o.name, knownNames(o.existing, spec, taken.lines)) }),
+          ...(o.plan && { plan: o.plan }),
         },
       }
       return

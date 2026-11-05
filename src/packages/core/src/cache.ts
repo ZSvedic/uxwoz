@@ -38,7 +38,12 @@ export interface Version {
   spec?: SpecLine[]
   /** What the screen misses against the spec it was made with (checkScreen); absent when made without one. */
   misses?: string[]
+  /** On a first screen's designs: how the plan before it went (its time and cost, or why it failed). */
+  plan?: PlanInfo
 }
+
+/** How a mockup's plan went: rows it opened, time and cost, or the error that left the fallback spec. */
+export interface PlanInfo { rows: number; ms: number; costUsd: number | null; error?: string }
 
 /** The screen and click that first made a screen. */
 export interface Parent { key: string; label: string }
@@ -72,12 +77,21 @@ export class ScreenCache {
   /** When each key was last deleted, on a counter, so a design still streaming cannot bring it back. */
   private removed = new Map<string, number>()
   private clock = 0
+  /** Why the cache does not write its file, when it does not: the file is from a newer version of the app. */
+  readonly warning: string | null = null
 
   /** With a file, the cache loads it now and rewrites it after every change. */
   constructor(private file: string | null = null) {
     if (!file || !existsSync(file)) return
     try {
       const data = JSON.parse(readFileSync(file, 'utf8'))
+      if (typeof data?.version === 'number' && data.version > FORMAT) {
+        // A newer app wrote it: leave it alone, and keep this session's screens in memory only.
+        this.warning = `The screen cache ${file} is from a newer version of UX Woz (format ${data.version}); it is left as it is, and nothing made now is saved.`
+        console.warn(this.warning)
+        this.file = null
+        return
+      }
       if (data?.version === FORMAT || data?.version === 3 || data?.version === 2) {
         for (const e of data.entries as CacheEntry[]) this.entries.set(e.key, e)
         // Files from before specs (version 3 and older): every mockup starts with an empty spec.
@@ -162,7 +176,7 @@ export class ScreenCache {
     delete entry.proposals
     this.name(entry)
     // The picked design's lines fill open rows; the other design's lines go with it.
-    if (v.spec?.length) applyPick(this.specOf(entry.app), v.spec, key)
+    if (v.spec?.length) applyPick(this.specOf(entry.app), v.spec, key, v.createdAt)
     this.save()
     return entry
   }
@@ -183,12 +197,12 @@ export class ScreenCache {
     this.save()
   }
 
-  /** Take back the line one Edit set on row `row` (the ✕ in the drawer). Returns the spec, or undefined if there was no such line. */
+  /** Take back the line that version `version` (its index) of a screen set on row `row` (the ✕ in the drawer). Returns the spec, or undefined if there was no such line. */
   dropLine(key: string, version: number, row: string): Spec | undefined {
-    const entry = this.entries.get(key)
-    if (!entry) return undefined
-    const spec = this.specOf(entry.app)
-    if (!dropValues(spec, key, version, row)) return undefined
+    const at = this.entries.get(key)?.versions[version]?.createdAt
+    if (!at) return undefined
+    const spec = this.specOf(this.entries.get(key)!.app)
+    if (!dropValues(spec, key, at, row)) return undefined
     this.save()
     return spec
   }
@@ -216,7 +230,7 @@ export class ScreenCache {
     const entry = this.entries.get(key)
     if (!entry?.versions.length) return undefined
     // An Edit's lines set rows at once; a Regenerate's are dropped.
-    if (version.feedback && version.spec?.length) applyEdit(this.specOf(entry.app), version.spec, key, entry.versions.length)
+    if (version.feedback && version.spec?.length) applyEdit(this.specOf(entry.app), version.spec, key, version.createdAt)
     else delete version.spec
     entry.versions.push(version)
     this.save()
@@ -228,7 +242,7 @@ export class ScreenCache {
     const entry = this.entries.get(key)
     if (!entry || entry.versions.length < 2) return undefined
     // The values the version set go, so the values before count again.
-    dropValues(this.specOf(entry.app), key, entry.versions.length - 1)
+    dropValues(this.specOf(entry.app), key, entry.versions.at(-1)!.createdAt)
     entry.versions.pop()
     this.save()
     return entry
@@ -266,8 +280,12 @@ export class ScreenCache {
   delete(key: string): string[] | undefined {
     const entry = this.entries.get(key)
     // Even an unknown key is marked: an A OR B dropped before its first side finished stays dropped.
+    // A first screen dropped that early takes its plan with it, so the next try plans again.
     this.tomb(key)
-    if (!entry) return undefined
+    if (!entry) {
+      if (!key.includes(' » ') && this.specs.delete(key)) this.save()
+      return undefined
+    }
     const root = normalizePrompt(entry.app)
     if (key === root) {
       const gone = this.mockup(root).map((e) => e.key)

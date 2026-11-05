@@ -38,7 +38,8 @@ come from another origin (`Origin` or `Sec-Fetch-Site: cross-site`, else 403), s
 can spend model credits.
 
 - `GET /api/config`: models (id, label, costEstimated), themes (`mockup`, `clean`), devices (id,
-  label, width), and the default model, theme and device.
+  label, width), and the default model, theme and device; `warning` when the cache file is from a
+  newer app (it is left alone and nothing is saved).
 - `POST /api/screen {app, action?, model?, device?, from?, label?}`: a new screen, as an NDJSON
   stream. `action` is `@name: prompt`, `@name` alone (a screen the mockup has or plans; one with no
   plan is made from the name and `label`), or a plain prompt (links from before names). A screen
@@ -70,8 +71,10 @@ can spend model credits.
   is open; `error` if the model fails or the screen was deleted meanwhile.
 - `POST /api/undo {key}`: drop the newest version and the spec values it set; `{entry, spec}`, or
   404 when one or none is left.
-- `POST /api/spec/drop {key, version, row}`: take back the value that version `version` of screen
-  `key` set on row `row` (the ✕ beside an Edit's line); `{spec}`, or 404 if there is no such value.
+- `POST /api/spec/drop {key, version, row}`: take back the value that version `version` (its index)
+  of screen `key` set on row `row`; the ✕ beside an Edit's line in the drawer calls it. Values are
+  matched by the version's `createdAt`, so a deleted and remade screen never takes another's back.
+  `{spec}`, or 404 if there is no such value.
 - `GET /api/map?app=…`: `{root, entries: CacheEntry[], spec}` for one mockup, oldest first. Levels, the
   tree and planned screens are not stored: `screenTree` and `plannedScreens` in `core/src/tree.ts`
   work them out (server and browser).
@@ -80,8 +83,9 @@ can spend model credits.
 - `POST /api/delete {key}`: delete a screen. Screens the first screen reached before and no longer
   reaches (through the clicks that made screens and the buttons in each screen's newest version) go
   too; a screen whose first click came from a screen that is gone takes the screen that reaches it
-  now as its parent. Deleting the first screen deletes the mockup. `{removed, root, entries}`: the
-  keys removed and the whole mockup as `/api/map` sends it; 404 if unknown.
+  now as its parent. Deleting the first screen deletes the mockup and its spec, even while its A OR
+  B has no finished side. `{removed, root, entries, spec}`: the keys removed and the whole mockup as
+  `/api/map` sends it; 404 if unknown.
 - `POST /api/delete-app {app}`: delete every screen of a mockup; `{removed}`.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
@@ -98,7 +102,7 @@ only from a card's own frame.
 { uxwoz: 'key', key, code, shift, mod } // a zoom key (⌘/Ctrl with + − 0), ⌘[ ⌘], ⇧1-3 outside a text field,
                                      // or Esc: the app handles it as if pressed outside the screen
 { uxwoz: 'size', height, width }     // the screen's size, so the frame fits it (160-8000 px tall;
-                                     // the card shows only `width`, at least 280 px)
+                                     // the card is the device's width; `width` is reported, not used)
 { uxwoz: 'wheel', dx, dy }           // scroll over the screen: dy and dx scroll the canvas
 { uxwoz: 'zoom', dy, x, y }          // Ctrl/Cmd + scroll or a pinch over the screen, at (x, y) in
                                      // the frame: zooms the canvas around that point
@@ -125,12 +129,14 @@ Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | nul
              // feedback is the Edit request that made this version; spec is the design's
              // <meta name="spec"> lines (taken out of html); misses is what checkScreen found
              // against the spec it was made with (absent for screens made without one). html has
-             // prose before <title> cut, and its tab bar's current tab marked by markTab
+             // prose before <title> cut, and its tab bar's current tab marked by markTab.
+             // plan, on a first screen's designs: { rows, ms, costUsd, error? } of the plan before it
 Spec       Record<key, { ask?; from?: SpecFrom; values: { text; from: SpecFrom; screen?; version? }[] }>
              // one per mockup; key is product.*, ui.* or data.*; the last value counts; a row with
-             // no value is open. SpecFrom is 'plan' | 'pick' | 'edit' | 'user'. screen and version
-             // say which screen version set a value, so Undo and ✕ can take it back
-SpecLine   { key; text }
+             // no value is open. SpecFrom is 'plan' | 'pick' | 'edit' | 'user'. screen and at (the
+             // version's createdAt) say which screen version set a value, so Undo and ✕ can take it back
+SpecLine   { key; text }   // from one <meta name="spec" content="key = value"> tag, either attribute
+             // first, read up to its closing quote; a value with < is refused
 TreeNode   { level; parent: key | null; label }
              // from screenTree: level 1 is the first screen, the fewest clicks from it otherwise
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast'

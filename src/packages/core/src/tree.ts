@@ -6,7 +6,7 @@
 
 import type { CacheEntry } from './cache.ts'
 import { nameWords, normalizePrompt, screenKey, screenRef } from './keys.ts'
-import { flowNames, navNames, valueOf, type Spec } from './spec.ts'
+import { flowNames, navNames, tabLabel, type Spec } from './spec.ts'
 
 /** Where a screen sits: its level (1 for the first screen), the screen it hangs under, and the control clicked there. */
 export interface TreeNode { level: number; parent: string | null; label: string }
@@ -102,11 +102,12 @@ export function plannedScreens(entries: CacheEntry[], spec: Spec = {}): CacheEnt
     planned.push({ key: screenKey(first.app, `@${name}`), app: first.app, action: promptFromLabel(name, label), name, parent: { key: parent, label }, versions: [] })
   }
   const root = screenKey(first.app, null)
+  // The spec's screens count once the first screen is picked: until then there is no screen to open them from.
+  if (!entries.some((e) => e.key === root && e.versions.length)) return planned
   const keyOf = (n: string) => (n === HOME_NAME ? root : names.get(n) ?? screenKey(first.app, `@${n}`))
   const flow = flowNames(spec)
   flow.forEach((n, i) => { if (i > 0) add(n, keyOf(flow[i - 1]!), '') })
-  const nav = valueOf(spec, 'ui.nav') ?? ''
-  for (const n of navNames(spec)) add(n, root, nav.match(new RegExp(`([^,:;@]+?)\\s*@${n}\\b`, 'i'))?.[1]?.trim() ?? '')
+  for (const n of navNames(spec)) add(n, root, tabLabel(spec, n))
   return planned
 }
 

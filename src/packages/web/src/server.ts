@@ -4,7 +4,7 @@
 import { join, resolve } from 'node:path'
 import {
   DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, PROPOSALS, ScreenCache, canonicalAction, fallbackSpec, generateScreen, isDevice, isModelId, makePlan,
-  plannedScreens, promptFromLabel, screenKey, screenRef, warmUp, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type Spec, type Version,
+  plannedScreens, promptFromLabel, screenKey, screenRef, warmUp, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type PlanInfo, type PlanResult, type Spec, type Version,
 } from '@uxwoz/core'
 import index from './index.html'
 
@@ -38,7 +38,7 @@ export interface ServerOptions {
   /** Picks the side that is asked for a clearly different design; Math.random by default. */
   random?: () => number
   /** Plans a new mockup before its first screen (makePlan with Sol by default); it throws on an error or a slow reply. */
-  plan?: (app: string, device: Device, signal: AbortSignal) => Promise<Spec>
+  plan?: (app: string, device: Device) => Promise<PlanResult | Spec>
 }
 
 const json = (data: unknown, status = 200) => Response.json(data, { status })
@@ -104,7 +104,28 @@ export function createServer(opts: ServerOptions = {}) {
   const cache = opts.cache ?? new ScreenCache()
   const log = opts.log ?? ((m: string) => console.warn(m))
   const random = opts.random ?? Math.random
-  const plan = opts.plan ?? ((app: string, device: Device, signal: AbortSignal) => makePlan(app, device, { fetch: opts.fetch, env: opts.env, signal }))
+  const plan = opts.plan ?? ((app: string, device: Device) => makePlan(app, device, { fetch: opts.fetch, env: opts.env }))
+  /** Plans running now, by mockup root: a second request for the same new mockup waits for the first plan instead of making its own. */
+  const planning = new Map<string, Promise<{ spec: Spec; info: PlanInfo }>>()
+  const planFor = (app: string, device: Device) => {
+    const root = screenKey(app, null)
+    let p = planning.get(root)
+    if (!p) {
+      p = plan(app, device).then(
+        (r) => {
+          // A spec's keys always hold a dot, so `spec` and `ms` mean a PlanResult.
+          const res = 'spec' in r && 'ms' in r ? r as PlanResult : { spec: r as Spec, ms: 0, costUsd: null }
+          return { spec: res.spec, info: { rows: Object.keys(res.spec).length, ms: res.ms, costUsd: res.costUsd } }
+        },
+        (err) => {
+          log(`plan failed: ${message(err)}`)
+          return { spec: fallbackSpec(), info: { rows: 0, ms: 0, costUsd: null, error: message(err) } }
+        },
+      ).finally(() => planning.delete(root))
+      planning.set(root, p)
+    }
+    return p
+  }
 
   /** A click in screen `from`, on a control labelled `label`. Absent for the first screen. */
   interface Click { from: string; label: string }
@@ -144,21 +165,24 @@ export function createServer(opts: ServerOptions = {}) {
     }
     const prompt = ref ? screenRef(action!)!.prompt : action
     yield { type: 'meta', key, cached: false, variants: PROPOSALS }
-    // A new mockup is planned before its first screen. A plan that fails or is slow does not hold
-    // it up: the spec starts with main navigation and Back open.
-    if (action == null && !cache.hasSpec(app)) {
-      let spec: Spec
-      try { spec = await plan(app, device, signal) } catch (err) { spec = fallbackSpec(); if (!signal.aborted) log(`plan failed: ${message(err)}`) }
+    // A new mockup is planned before its first screen, every time it has no first screen yet (a
+    // first try whose designs all failed plans again). A plan that fails or is slow does not hold it
+    // up: the spec starts with main navigation and Back open, and Info on Home says why.
+    let planInfo: PlanInfo | undefined
+    if (action == null) {
+      const { spec, info } = await planFor(app, device)
       if (signal.aborted) return
-      if (!gone()) cache.setSpec(app, spec)
-      yield { type: 'spec', spec }
+      // Not after a delete meanwhile, and never over a spec a picked first screen has filled.
+      if (!gone() && !cache.get(root)?.versions.length) cache.setSpec(app, spec)
+      planInfo = info
+      yield { type: 'spec', spec: cache.spec(app) }
     }
     const existing = cache.existingScreens(app, ref ? ref.name : undefined)
     const name = action == null ? 'home' : ref ? ref.name : undefined
     // One random side asks for a clearly different design, so the side says nothing about which is which.
     const different = Math.min(PROPOSALS - 1, Math.floor(random() * PROPOSALS))
     const streams = Array.from({ length: PROPOSALS }, (_, slot) => tagged(slot, generateScreen({
-      app, action: prompt, existing, model, device, alternative: slot === different, spec: cache.spec(app), name,
+      app, action: prompt, existing, model, device, alternative: slot === different, spec: cache.spec(app), name, plan: planInfo,
       signal, fetch: opts.fetch, env: opts.env, log,
     })))
     const parent = click && { key: click.from, label: click.label || prompt || 'home' }
@@ -243,6 +267,7 @@ export function createServer(opts: ServerOptions = {}) {
         defaultTheme: 'mockup',
         devices: Object.entries(DEVICES).map(([id, d]) => ({ id, label: d.label, width: d.width })),
         defaultDevice: DEFAULT_DEVICE,
+        ...(cache.warning && { warning: cache.warning }),
       }),
       '/api/screen': {
         POST: async (req) => {
