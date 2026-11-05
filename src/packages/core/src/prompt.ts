@@ -26,6 +26,8 @@ export interface RequestExtras {
   device?: string
   /** True for one side of an A OR B: ask for a different design. */
   alternative?: boolean
+  /** The mockup's spec, as the lines and rules the request carries after the tree. */
+  spec?: string
   /** An Edit: the screen as it is now, and the change the user asked for. */
   edit?: { html: string; change: string }
 }
@@ -37,13 +39,14 @@ export const EDIT_REQUEST = 'Reply with this screen again, changed only as follo
  * The user message for one screen: the product prompt alone, or the product plus an action prompt,
  * then the tree of the mockup's screens, made and planned (lines from treeLines), so links to them
  * use their names.
- * The device and the alternative request follow when given; an Edit ends with the screen as it is
- * now and the change.
+ * The spec, the device and the alternative request follow when given; an Edit ends with the screen
+ * as it is now and the change.
  */
 export function screenRequest(app: string, action: string | null, existing: string[] = [], extras: RequestExtras = {}): string {
   let msg = action ? `This screen belongs to a clickable mockup of: ${app}\n\nShow this screen: ${action}` : app
   const list = existing.slice(0, MAX_EXISTING_SCREENS)
   if (list.length) msg += `\n\nScreens of this mockup, as a tree:\n${list.join('\n')}`
+  if (extras.spec) msg += `\n\n${extras.spec}`
   if (extras.device) msg += `\n\nDesign it for ${extras.device}.`
   if (extras.alternative) msg += `\n\n${ALTERNATIVE_REQUEST}`
   if (extras.edit) msg += `\n\nThe screen as it is now:\n${extras.edit.html}\n\n${EDIT_REQUEST} ${extras.edit.change}`

@@ -47,7 +47,7 @@ cd src && bun run test:record
 
 ```
 spec/        what the app does: behavior, UI generation, code contract, prompts
-src/         the app (bun workspace): packages/core (engine), packages/web (server + page), tests/
+src/         the app (bun workspace): packages/core (engine), packages/web (server + page), tests/, scripts/ (live experiments)
 cassettes/   recorded model replies the tests replay
 benchmarks/  the lite UI generation benchmark (Python) and its data
 process/     product brief, writing style, journal
