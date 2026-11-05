@@ -97,8 +97,9 @@ Anything code can guarantee stays out of the spec.
 - **Size.** Every screen of a device gets the same width (phone 390 px) and at least one device
   screen of height. This reverses the earlier "only as wide as its content".
 - **Markup.** With `ui.nav`, `ui.back` or `ui.toggles` in the spec, the request names one markup
-  for each and the theme styles it. The spec says which tabs; the theme says how tabs look. A tab
-  screen has no Back, and the request says so.
+  for each and the theme styles it. The spec says which tabs; the theme says how tabs look.
+- **No Back on tab screens.** Code knows which screens are tabs and hides Back there. Asking the
+  model did not work.
 - **A check, no retry.** A finished screen must link to every name in `ui.nav`, carry the Back
   label of `ui.back` unless it is a tab screen, and hold one screen (Luna sometimes writes the
   whole screen twice). Misses show in Info.
@@ -113,18 +114,21 @@ Anything code can guarantee stays out of the spec.
 Models following the spec is the risky half and the cheap one to test, so it goes first.
 
 1. **Reading test: done, passed.** Haiku and Luna got NiceSnore's five example lines, written by
-   hand, on 45 screens ([report](../journal/2026-11-05-spec-reading-test.md)). Every line that
-   names a label, a screen or a number held. Three things failed and are fixed above: Luna drew
-   checkboxes for `ui.toggles  Switches` (now a fixed markup), both models put Back on tab
-   screens, and Stop recording reached the morning report 2 times in 5 (the rule for finishing
-   controls was not in the test). Run the test again with the three fixes before step 3.
+   hand, in two runs of 45 and 92 screens ([report](../journal/2026-11-05-spec-reading-test.md)).
+   - Lines that name a label, a screen or a number hold on nearly every screen.
+   - A fixed markup for switches took Luna from 8 screens with wrong checkboxes to none.
+   - Asking for no Back on tab screens failed (Back on 20 of 30), so code hides it.
+   - With the rule for finishing controls, Stop recording reaches the morning report 5 times in 5
+     for Haiku and 3 in 5 for Luna. Still to try: name the control in the flow,
+     `@recording (Stop) → @morning-report`.
 2. **Planner test.** Run the planner on six app prompts (phone app, dashboard, map, game, desktop
    tool, kiosk) and read the checklists. This needs no screens.
 3. Lines from designs, shown at the pick; Edits with their ✕; Undo.
 4. The review pass, the spec panel and Export.
 
-It works when a remade NiceSnore, clicked through 15 screens, has no misses, has a morning report,
-and has a spec a person reads in two minutes; when a dashboard and a map app get rows for their
+It works when a remade NiceSnore, clicked through 15 screens, has a miss on at most 1 screen in 10
+(the second run had about 1 in 7 for Haiku and 1 in 14 for Luna, Back on tab screens left out),
+has a morning report, and has a spec a person reads in two minutes; when a dashboard and a map app get rows for their
 own conventions; and when the first screen comes at most two seconds later than today.
 
 ## Weak spots, accepted
