@@ -100,7 +100,7 @@ Haiku (Home and Recording clicked in the app, the rest by the script) and once w
 | Screens with any miss | 2 of 7 | 1 of 9 | 2 of 6 |
 | Rows in the spec at the end | 12, 3 added by picks | 9, all from the plan | 9, all from the plan |
 | Rows that are one screen's content | 3 | 0 | 0 |
-| Spec lines a picked screen put in | 1 to 3 on all 7 | 1 to 3 on the first 4, then none | 1 to 3 on all 5 after Home |
+| Spec lines a picked screen put in | 1 to 3 on all 7 | 1 to 3 on the first 4, then none | 1 to 3 on 5 of 6 |
 
 Tabs, Back and the score were counted by reading the HTML; the rest by code. "New screens" are
 screens a screen was the first to link to: Haiku's Home 4 (its flow and tabs, not new by the
