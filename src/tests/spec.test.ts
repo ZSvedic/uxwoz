@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  FLOW_KEY, MAX_LINE, PLANNER_PROMPT, ScreenCache, applyEdit, applyPick, checkScreen, cutProse, dropValues, fallbackSpec, flowRequest, linesOf, makePlan, markTab, parsePlan, screenRequest,
+  FLOW_KEY, MAX_LINE, PLANNER_PROMPT, ScreenCache, generateScreen, applyEdit, applyPick, checkScreen, cutProse, dropValues, fallbackSpec, flowRequest, linesOf, makePlan, markTab, parsePlan, screenRequest,
   plannedScreens, specRequest, takeSpecLines, treeLines, valueOf, wouldTake, type Fetch, type Spec, type Version,
 } from '@uxwoz/core'
 import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
@@ -250,4 +250,15 @@ test('a failed plan never blocks the first screen: it starts with main navigatio
 test('spec/prompt-plan.md holds the exact planner prompt', () => {
   const doc = readFileSync(new URL('../../spec/prompt-plan.md', import.meta.url), 'utf8')
   expect(doc.match(/```text\n([\s\S]*?)\n```/)?.[1]).toBe(PLANNER_PROMPT)
+})
+
+test('Home linking its flow steps and the tabs of its own ui.nav line opens no new screens', async () => {
+  const html = '<title>Home</title>\n<meta name="spec" content="ui.nav = Tabs: Home @home, History @history, Remedies @remedy-log">\n'
+    + '<a data-action="@recording">Start</a><a data-action="@history">History</a><a data-action="@remedy-log">Remedies</a><a data-action="@tips: Sleep tips">Tips</a>'
+  const body = `data: ${JSON.stringify({ model: 'anthropic/claude-haiku-5.5', choices: [{ delta: { content: html }, finish_reason: 'stop' }], usage: { cost: 0.001 } })}\n\n`
+  const fetch: Fetch = async () => new Response(body)
+  const spec = parsePlan('product.core-flow @home → @recording → @morning-report\nui.nav ? main navigation')
+  for await (const ev of generateScreen({ app: 'Snore', action: null, model: 'claude-haiku-5.5', spec, name: 'home', fetch, env: { OPENROUTER_API_KEY: 'fake' } })) {
+    if (ev.type === 'done') expect(ev.version.misses).toEqual([])
+  }
 })

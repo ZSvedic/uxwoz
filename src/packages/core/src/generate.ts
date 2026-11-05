@@ -5,7 +5,7 @@ import { extractFragment, screenIdea, screenName } from './frame.ts'
 import { DEVICES, type Device } from './frame.ts'
 import { MODELS, type ModelId } from './models.ts'
 import { SYSTEM_PROMPT, WARMUP_REQUEST, screenRequest } from './prompt.ts'
-import { checkScreen, cutProse, flowRequest, markTab, specRequest, takeSpecLines, type Spec } from './spec.ts'
+import { checkScreen, cutProse, flowNames, flowRequest, markTab, namesIn, navNames, specRequest, takeSpecLines, type Spec, type SpecLine } from './spec.ts'
 import { ProviderError, streamModel, type Fetch } from './providers.ts'
 
 /** A slower screen is useless, and keep-alive comments can stall a stream, so this is an overall deadline. */
@@ -86,7 +86,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
           ...(name && { name }),
           ...(idea && { idea }),
           ...(taken.lines.length && { spec: taken.lines }),
-          ...(spec && { misses: checkScreen(html, spec, o.name, knownNames(o.existing)) }),
+          ...(spec && { misses: checkScreen(html, spec, o.name, knownNames(o.existing, spec, taken.lines)) }),
         },
       }
       return
@@ -98,8 +98,16 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
   }
 }
 
-/** The screen names in the tree lines of a request (`  @sleep-report: …`), home among them. */
-const knownNames = (lines: string[] = []) => new Set(['home', ...lines.map((l) => l.match(/^\s*@([a-z0-9_-]+)/i)?.[1]?.toLowerCase()).filter((n): n is string => !!n)])
+/**
+ * The screens a new screen may link to without opening one the mockup does not plan: the names in
+ * the request's tree (`  @sleep-report: …`), the spec's flow and tabs, and the tabs of the design's
+ * own ui.nav line (Home plans its tabs as it draws them).
+ */
+function knownNames(lines: string[] = [], spec: Spec, own: SpecLine[]): Set<string> {
+  const tree = lines.map((l) => l.match(/^\s*@([a-z0-9_-]+)/i)?.[1]?.toLowerCase()).filter((n): n is string => !!n)
+  const tabs = own.filter((l) => l.key === 'ui.nav').flatMap((l) => namesIn(l.text))
+  return new Set(['home', ...tree, ...flowNames(spec), ...navNames(spec), ...tabs])
+}
 
 /** One short request with the same system prompt, so the provider's prompt cache is warm for the session. */
 export async function warmUp(model: ModelId, opts: { fetch?: Fetch; env?: Record<string, string | undefined> } = {}) {
