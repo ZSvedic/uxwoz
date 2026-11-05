@@ -157,7 +157,17 @@ Models following the spec is the risky half and the cheap one to test, so it goe
    found 24 faults, all fixed. Three remakes of NiceSnore changed the design above: designs only
    fill open rows (the spec stays at 9 rows), Stop recording opens the morning report, and code
    draws tabs and Back. Still short: clicking reaches 12 screens with Haiku and 6 with Luna.
-4. The review pass, the spec panel and Export.
+4. **Review pass, spec panel, Export: built** ([report](../journal/2026-11-05-spec-step4.md)).
+   Two more critics found 28 faults, all fixed; none was a model changing a filled row by itself.
+
+Open after the build, for the next round:
+
+- Clicking reaches 6 to 12 screens, short of 15: most screens open nothing new.
+- The picked Home can itself be a flow step. In the last remake Home was the recording screen,
+  `@recording` stayed planned beside it, and no tab led home.
+- The flow and the tabs can name one screen twice (`@snore-history`, `@sleep-history`).
+- A fact every screen agrees on can stay open: no design wrote the score's line.
+- The review pass reads the tree, so it cannot see two screens that disagree.
 
 It works when a remade NiceSnore, clicked through 15 screens, has a miss on at most 1 screen in 10
 (the second run had about 1 in 7 for Haiku and 1 in 14 for Luna, Back on tab screens left out),
