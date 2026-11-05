@@ -21,13 +21,15 @@ screens) shows the cost:
 
 The user types *NiceSnore: a snore app with recording, score, remedy log*.
 
-1. **Plan.** A strong model writes the main path and the things this app has to decide:
+1. **Plan.** A strong model writes the main path and the things this app has to decide. The rows
+   here are from a real plan in the planner test, shortened:
    ```
    product.core-flow   @home → @recording → @morning-report → @remedy-compare
-   ui.nav              ?  main navigation
-   ui.back             ?  how Back looks and where it sits
-   ui.charts           ?  how a night of snoring is drawn
-   ui.toggles          ?  switches or checkboxes
+   ui.nav              ?  how recording, history and remedy log share navigation
+   ui.back             ?  where Back appears and how it behaves during a recording
+   ui.lists            ?  how nights and remedy entries share row layout
+   ui.colors           ?  which colors mean recording, paused and complete
+   data.score          ?  what the snore score measures and whether higher means worse
    ```
 2. **Pick.** Both Home designs get the plan, and each shows under its idea the lines it would add.
    The user picks A, so A's lines go in. The flow steps and the tabs are planned screens from now on.
@@ -37,8 +39,9 @@ The user types *NiceSnore: a snore app with recording, score, remedy log*.
    ```
 3. **A later pick.** Night details is the first screen with a Back, so its pick fills
    `ui.back  ‹ Back, first in the header`.
-4. **Edit.** On Settings the user types *"use switches, not checkboxes"*. The Edit sets
-   `ui.toggles  Switches`, and the drawer shows that line with a ✕ to take it back.
+4. **Edit.** On Settings the user types *"use switches, not checkboxes"*. The plan has no row for
+   that, so the Edit adds `ui.toggles  Switches`, and the drawer shows the line with a ✕ to take
+   it back.
 
 Every screen made after a line follows it. A dashboard's plan has other rows (`ui.colors`,
 `ui.filters`), a map app's has `ui.map`, a game's `ui.hud`.
@@ -55,7 +58,8 @@ question it settles and its values, newest last. A row with no value is open.
 - **Rows** (`product.`, `ui.`): at most 12, each a rule other screens must match.
 - **Known names**: the planner uses `ui.nav`, `ui.back`, `ui.forms`, `ui.lists`, `ui.toggles`,
   `ui.colors`, `ui.charts`, `ui.map`, `ui.hud` when they fit, and makes up a name when none does.
-- **Facts** (`data.`): free keys, at most 8, for what two screens could get wrong.
+- **Facts** (`data.`): at most 8, for what two screens could get wrong. The plan opens some as
+  questions (what a score means, which units); a design may add others under a new key.
 - **A line** is plain text of at most 120 characters; a longer one is refused. The whole spec is at
   most 24 lines, about 1 KB.
 - **`@names`** in `ui.nav` and `product.core-flow` are planned screens. The flow is a chain from
@@ -69,7 +73,7 @@ A model proposes; a line counts only after the user saw it. No model changes a f
 
 | Who | When | May |
 |---|---|---|
-| The plan (strong model, Sol) | once, before Home | write the core flow and up to 8 open rows |
+| The plan (strong model, Sol) | once, before Home | write the core flow and up to 8 open rows, facts among them |
 | A picked design | each new screen | fill up to 3 open rows or new facts, for what that screen shows |
 | An Edit | the user types a change | set any key, new ones included |
 | The review pass (strong model) | every 5 picked screens, in the background | add open rows; suggest merges and rewording |
@@ -87,8 +91,11 @@ A model proposes; a line counts only after the user saw it. No model changes a f
   (today it asks to change "the structure, grouping or navigation").
 - **Old screens.** A changed line applies to screens made after it. Older ones keep their design
   until the user regenerates them.
-- **Wait.** The plan should cost a cent or two and a second or two before Home. If the wait hurts,
-  the plan runs after the Home pick, from the picked Home.
+- **The plan's input and limits.** The planner gets the app prompt and the kind of device, never
+  its width: size is code's, and a width in the request ends up in the rows. Code keeps the first
+  8 rows, drops a line over 120 characters, and cuts the flow at the first repeated name.
+- **Wait.** The plan takes about 2 seconds before Home (4.6 at worst) and costs about 2 cents. If
+  the wait hurts, the plan runs after the Home pick, from the picked Home.
 
 ## What code does instead
 
@@ -121,8 +128,12 @@ Models following the spec is the risky half and the cheap one to test, so it goe
    - With the rule for finishing controls, Stop recording reaches the morning report 5 times in 5
      for Haiku and 3 in 5 for Luna. Still to try: name the control in the flow,
      `@recording (Stop) → @morning-report`.
-2. **Planner test.** Run the planner on six app prompts (phone app, dashboard, map, game, desktop
-   tool, kiosk) and read the checklists. This needs no screens.
+2. **Planner test: done, passed.** Sol and Haiku each planned six apps three times (phone app,
+   dashboard, map, game, desktop tool, kiosk; [report](../journal/2026-11-05-planner-test.md)).
+   - Every app got rows for its own conventions: what colors mean, map zoom and pins, game chrome.
+   - The plan stays on Sol. Haiku is no faster, fills the menu of known names, and never asked
+     whether a higher snore score is worse; Sol asked it 3 times in 3.
+   - A few rows ask about one screen or about the back end. The user sees them and can delete them.
 3. Lines from designs, shown at the pick; Edits with their ✕; Undo.
 4. The review pass, the spec panel and Export.
 
