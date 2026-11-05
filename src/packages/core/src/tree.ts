@@ -6,7 +6,7 @@
 
 import type { CacheEntry } from './cache.ts'
 import { nameWords, normalizePrompt, screenKey, screenRef } from './keys.ts'
-import { flowNames, navNames, tabLabel, type Spec } from './spec.ts'
+import { drawChrome, flowNames, navNames, tabLabel, type Spec } from './spec.ts'
 
 /** Where a screen sits: its level (1 for the first screen), the screen it hangs under, and the control clicked there. */
 export interface TreeNode { level: number; parent: string | null; label: string }
@@ -95,7 +95,7 @@ export function promptFromLabel(name: string, label: string): string {
 export function plannedScreens(entries: CacheEntry[], spec: Spec = {}): CacheEntry[] {
   const first = entries[0]
   if (!first) return []
-  const planned = linkedScreens(entries)
+  const planned = linkedScreens(entries, spec)
   const names = namesOf(entries)
   const add = (name: string, parent: string, label: string) => {
     if (name === HOME_NAME || names.has(name) || planned.some((p) => p.name === name)) return
@@ -112,14 +112,15 @@ export function plannedScreens(entries: CacheEntry[], spec: Spec = {}): CacheEnt
 }
 
 /** The planned screens that made screens link to (see plannedScreens). */
-function linkedScreens(entries: CacheEntry[]): CacheEntry[] {
+function linkedScreens(entries: CacheEntry[], spec: Spec = {}): CacheEntry[] {
   const first = entries[0]!
   const names = namesOf(entries)
   const planned = new Map<string, CacheEntry>()
   for (const e of entries) {
     const v = e.versions.at(-1)
     if (!v) continue
-    for (const l of linksIn(v.html)) {
+    // The links of the screen as the frame shows it: its tab bar drawn from the spec, not the stored one.
+    for (const l of linksIn(drawChrome(v.html, spec, e.name))) {
       const ref = screenRef(l.action)
       if (!ref || ref.name === HOME_NAME || names.has(ref.name)) continue
       const have = planned.get(ref.name)
@@ -144,7 +145,7 @@ export const screenTree = (made: CacheEntry[], spec: Spec = {}): Map<string, Tre
 
 /** The tree, and every screen in it: the made ones (and open A OR Bs), then the planned ones. */
 function build(made: CacheEntry[], spec: Spec = {}): { tree: Map<string, TreeNode>; entries: CacheEntry[] } {
-  const linked = new Set(made.length ? linkedScreens(made).map((e) => e.key) : [])
+  const linked = new Set(made.length ? linkedScreens(made, spec).map((e) => e.key) : [])
   const entries = [...made, ...plannedScreens(made, spec)]
   const tree = new Map<string, TreeNode>()
   const first = entries[0]
@@ -163,18 +164,14 @@ function build(made: CacheEntry[], spec: Spec = {}): { tree: Map<string, TreeNod
   for (const e of entries) {
     if (e.parent && (madeKeys.has(e.parent.key) || (fromSpec(e) && keys.has(e.parent.key)))) edges.set(e.parent.key, [...(edges.get(e.parent.key) ?? []), { to: e.key, label: e.parent.label }])
   }
-  // The tab bar code draws on every screen (drawChrome) is links too, so the tree knows what the frame shows.
-  const tabs = navNames(spec)
+  // The links of each screen as the frame shows it (drawChrome): its drawn tab bar is links, a stored
+  // bar's stray links are not, so the tree knows exactly what the frame shows.
   for (const e of entries) {
     const v = e.versions.at(-1)
     if (!v) continue
-    for (const l of linksIn(v.html)) {
+    for (const l of linksIn(drawChrome(v.html, spec, e.name))) {
       const to = resolveAction(app, l.action, byName)
       if (to && to !== e.key && keys.has(to)) edges.set(e.key, [...(edges.get(e.key) ?? []), { to, label: l.label }])
-    }
-    for (const t of tabs) {
-      const to = t === HOME_NAME ? root : byName.get(t)
-      if (to && to !== e.key && keys.has(to)) edges.set(e.key, [...(edges.get(e.key) ?? []), { to, label: tabLabel(spec, t) }])
     }
   }
   tree.set(root, { level: 1, parent: null, label: '' })

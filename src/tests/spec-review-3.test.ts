@@ -52,7 +52,7 @@ test('2: an Edit cannot give the flow or a Tabs: navigation a shape the plan wou
   const spec = parsePlan('product.core-flow @home → @cart\nui.nav ? main navigation')
   const refused: SpecRefusal[] = []
   expect(applyEdit(spec, [{ key: 'product.core-flow', text: 'Browse, then pay' }, { key: 'ui.nav', text: 'Tabs: Home only' }], 's', 't', refused)).toEqual([])
-  expect(refused.map((r) => r.why)).toEqual(['a core flow names its screens, e.g. @home → @cart', 'a Tabs: line names each tab by its @name'])
+  expect(refused.map((r) => r.why)).toEqual(['a core flow names its screens, e.g. @home → @cart', 'a Tabs: line names each tab by a label and its @name, e.g. Tabs: Home @home, Cart @cart'])
   expect(valueOf(spec, 'product.core-flow')).toBe('@home → @cart')
   expect(applyEdit(spec, [{ key: 'product.core-flow', text: '@home → @menu → @cart → @menu' }], 's', 't2')).toEqual(['product.core-flow'])
   expect(valueOf(spec, 'product.core-flow')).toBe('@home → @menu → @cart')
@@ -117,7 +117,7 @@ describe('7, 9: ✕ and Undo through the server, with an Edit that sets a line',
 describe('a doubled reply keeps its first copy', () => {
   test('cut at the second idea or title outside SVG', () => {
     const one = '<title>Home</title>\n<meta name="idea" content="a">\n<h1>Home</h1><svg><title>chart</title></svg>'
-    expect(firstCopy(`${one}\n/final\n${one}`)).toEqual({ html: `${one}\n/final`, cut: true })
+    expect(firstCopy(`${one}\n/final\n${one}`)).toEqual({ html: one, cut: true })
     expect(firstCopy(one)).toEqual({ html: one, cut: false })
   })
 

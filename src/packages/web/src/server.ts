@@ -136,10 +136,13 @@ export function createServer(opts: ServerOptions = {}) {
 
   /** Plans running now, by mockup root: a second request for the same new mockup waits for the first plan instead of making its own. */
   const planning = new Map<string, Promise<{ spec: Spec; info: PlanInfo }>>()
-  const planFor = (app: string, device: Device) => {
+  /** The request that started each running plan: the plan is shared until that request's stream ends, its first design stored. */
+  const planOwner = new Map<string, symbol>()
+  const planFor = (app: string, device: Device, owner: symbol) => {
     const root = screenKey(app, null)
     let p = planning.get(root)
     if (!p) {
+      planOwner.set(root, owner)
       p = plan(app, device).then(
         (r) => {
           // A spec's keys always hold a dot, so `spec` and `ms` mean a PlanResult.
@@ -150,7 +153,7 @@ export function createServer(opts: ServerOptions = {}) {
           log(`plan failed: ${message(err)}`)
           return { spec: fallbackSpec(), info: { rows: 0, ms: 0, costUsd: null, error: message(err) } }
         },
-      ).finally(() => planning.delete(root))
+      )
       planning.set(root, p)
     }
     return p
@@ -163,7 +166,21 @@ export function createServer(opts: ServerOptions = {}) {
   const message = (err: unknown) => (err instanceof Error ? err.message : String(err))
 
   /** A new screen: from the cache when it is there (with its open A OR B, if any), else two designs at once. */
+  /**
+   * A new screen, and for a new mockup the plan before it. The plan stays shared until the request
+   * that started it ends (its first design stored, or none): a second request in between waits for
+   * that plan instead of running another and replacing the spec under the first one's designs.
+   */
   async function* screenEvents(r: ScreenRequest, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
+    const owner = Symbol('plan owner'), root = screenKey(r.app, null)
+    try {
+      yield* screenEventsOf(r, signal, owner)
+    } finally {
+      if (planOwner.get(root) === owner) { planning.delete(root); planOwner.delete(root) }
+    }
+  }
+
+  async function* screenEventsOf(r: ScreenRequest, signal: AbortSignal, owner: symbol): AsyncGenerator<ScreenEvent> {
     const { app, model, device, click } = r
     let action = canonicalAction(app, r.action)
     const hit = cache.find(app, action)
@@ -199,7 +216,7 @@ export function createServer(opts: ServerOptions = {}) {
     // up: the spec starts with main navigation and Back open, and Info on Home says why.
     let planInfo: PlanInfo | undefined
     if (action == null) {
-      const { spec, info } = await planFor(app, device)
+      const { spec, info } = await planFor(app, device, owner)
       if (signal.aborted) return
       // Not after a delete meanwhile, and never over a spec a picked first screen has filled.
       if (!gone() && !cache.get(root)?.versions.length) cache.setSpec(app, spec)

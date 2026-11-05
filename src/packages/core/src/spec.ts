@@ -59,11 +59,28 @@ export const flowNames = (spec: Spec) => namesIn(valueOf(spec, FLOW_KEY) ?? '')
 /** True when ui.nav's value is a tab bar (`Tabs: …`); any other navigation gets no tab markup and no tab check. */
 export const hasTabs = (spec: Spec) => /^\s*tabs\s*:/i.test(valueOf(spec, 'ui.nav') ?? '')
 /** The tab screens, from the value of ui.nav when it is a tab bar. */
-export const navNames = (spec: Spec) => (hasTabs(spec) ? namesIn(valueOf(spec, 'ui.nav')!) : [])
+export const navNames = (spec: Spec) => parseTabs(valueOf(spec, 'ui.nav') ?? '')?.map((t) => t.name) ?? []
+
+/**
+ * The tabs of a `Tabs:` line: items split on , / | · ; or •, each one @name and a label on either
+ * side (`Tonight @home`, `@home Tonight`, `Tonight (@home)`). Null when the line is no Tabs: line,
+ * or an item has no label or not exactly one @name: such a line is refused.
+ */
+export function parseTabs(text: string): { name: string; label: string }[] | null {
+  const m = text.match(/^\s*tabs\s*:\s*([\s\S]*)$/i)
+  if (!m) return null
+  const tabs: { name: string; label: string }[] = []
+  for (const item of m[1]!.split(/\s*[,/|·;•]\s*/).map((x) => x.trim()).filter(Boolean)) {
+    const names = namesIn(item)
+    const label = item.replace(/\(?@[a-z0-9][a-z0-9_-]*\)?/gi, '').replace(/[()]/g, '').replace(/\s+/g, ' ').trim()
+    if (names.length !== 1 || !label) return null
+    tabs.push({ name: names[0]!, label })
+  }
+  return tabs.length >= 2 ? tabs : null
+}
 /** The label ui.nav gives a tab, e.g. History for @night-history in `Tabs: History @night-history`. */
 export function tabLabel(spec: Spec, name: string): string {
-  const nav = valueOf(spec, 'ui.nav') ?? ''
-  return nav.replace(/^\s*tabs\s*:/i, '').match(new RegExp(`([^,:;@]+?)\\s*\\(?@${name}(?![\\w-])`, 'i'))?.[1]?.trim() ?? ''
+  return parseTabs(valueOf(spec, 'ui.nav') ?? '')?.find((t) => t.name === name)?.label ?? ''
 }
 
 const NAMED: Record<string, string> = {
@@ -124,11 +141,17 @@ export function shapeOf(line: SpecLine): { text: string } | { why: string } {
   }
   if (line.key === 'ui.nav') {
     const tabs = /^\s*tabs\s*:/i.test(line.text)
-    if (tabs && namesIn(line.text).length < 2) return { why: 'a Tabs: line names each tab by its @name' }
-    if (!tabs && /\btabs?\b/i.test(line.text)) return { why: 'a tab bar starts with Tabs:, e.g. Tabs: Home @home, Cart @cart' }
+    if (tabs && !parseTabs(line.text)) return { why: 'a Tabs: line names each tab by a label and its @name, e.g. Tabs: Home @home, Cart @cart' }
+    if (!tabs && claimsTabs(line.text)) return { why: 'a tab bar starts with Tabs:, e.g. Tabs: Home @home, Cart @cart' }
   }
   if (line.key === 'ui.back' && !backLabelOf(line.text)) return { why: 'a ui.back line starts with its label in double quotes, e.g. "‹ Back", top left' }
   return { text: line.text }
+}
+
+/** True when a navigation line claims a tab bar (`Bottom tabs: …`), not when it says there is none (`No tab bar: …`). */
+function claimsTabs(text: string): boolean {
+  if (!/\btab(s|\s+bar)?\b/i.test(text)) return false
+  return !/\b(no|without|not|never|remove[sd]?|drop(s|ped)?|instead of|replace[sd]?)\b[^.;:]{0,30}\btab/i.test(text)
 }
 
 /** The label a ui.back value gives Back: its opening quoted text, e.g. ‹ Back for `"‹ Back", top left`. */
@@ -148,6 +171,12 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
  */
 export function drawChrome(html: string, spec: Spec, name?: string): string {
   return applyChrome(html, chromeOf(spec, name))
+}
+
+/** True when Back is hidden on the screen `name`: it is a tab, and Home is a tab too (else Back is its only way home). */
+export function hidesBack(spec: Spec, name?: string): boolean {
+  const tabs = navNames(spec)
+  return name != null && tabs.includes('home') && tabs.includes(name)
 }
 
 /** Back's label while ui.back is open (or holds no quoted label): the screens still agree. */
@@ -174,14 +203,31 @@ export function chromeOf(spec: Spec, name?: string): Chrome {
 export function applyChrome(html: string, chrome: Chrome): string {
   let out = html
   if (chrome.bar) {
-    let drawn = false
-    out = out.replace(/<nav\b[^>]*data-ui=["']tabs["'][^>]*>[\s\S]*?<\/nav>/gi, () => (drawn ? '' : ((drawn = true), chrome.bar!)))
-    if (!drawn) {
-      const i = out.search(/<script\b(?![\s\S]*<script\b)/i)
-      out = i >= 0 ? out.slice(0, i) + chrome.bar + '\n' + out.slice(i) : out + '\n' + chrome.bar
-    }
+    const bars = tabBars(out)
+    if (bars.length) {
+      // The first bar becomes the drawn one, the others go (back to front, so the places hold).
+      for (const [s, e] of bars.slice(1).reverse()) out = out.slice(0, s) + out.slice(e)
+      out = out.slice(0, bars[0]![0]) + chrome.bar + out.slice(bars[0]![1])
+    } else out = out + '\n' + chrome.bar
   }
-  return out.replace(/(<(a|button)\b[^>]*data-ui=["']back["'][^>]*>)[\s\S]*?(<\/\2>)/gi, (_, open: string, _t: string, close: string) => open + esc(chrome.back) + close)
+  return out.replace(/(<(a|button)\b[^>]*\bdata-ui\s*=\s*["']?back\b["']?[^>]*>)[\s\S]*?(<\/\2>)/gi, (_, open: string, _t: string, close: string) => open + esc(chrome.back) + close)
+}
+
+/** Where each tab bar sits: any element with data-ui tabs, quoted or not, to its matching closing tag. */
+function tabBars(html: string): [number, number][] {
+  const out: [number, number][] = []
+  for (const m of html.matchAll(/<([a-z][\w-]*)\b[^>]*\bdata-ui\s*=\s*(?:"tabs"|'tabs'|tabs\b)[^>]*>/gi)) {
+    if (out.some(([s, e]) => m.index! >= s && m.index! < e)) continue
+    const same = new RegExp(`<(/?)${m[1]}\\b[^>]*>`, 'gi')
+    same.lastIndex = m.index! + m[0].length
+    let depth = 1, end = html.length
+    for (let t = same.exec(html); t; t = same.exec(html)) {
+      depth += t[1] ? -1 : 1
+      if (!depth) { end = t.index + t[0].length; break }
+    }
+    out.push([m.index!, end])
+  }
+  return out
 }
 
 /** The kind of screen a name is: its last word when that says what the screen does (details, edit, add…), else its first word. */
@@ -232,9 +278,12 @@ export function fits(spec: Spec, key: string): boolean {
 export function applyPick(spec: Spec, lines: SpecLine[], screen: string, at?: string): string[] {
   const taken: string[] = []
   for (const l of lines.slice(0, MAX_DESIGN_LINES)) {
-    const row = spec[l.key]
+    const row = rowOf(spec, l.key)
     const shape = shapeOf(l)
-    if (!row || row.values.length || !('text' in shape)) continue
+    // A row filled before the shape rules, with a value of the wrong shape, counts as open: it is stuck otherwise.
+    const now = row?.values.at(-1)
+    const open = !now || !('text' in shapeOf({ key: l.key, text: now.text }))
+    if (!row || !open || !('text' in shape)) continue
     row.values.push({ text: shape.text, from: 'pick', screen, ...(at && { at }) })
     taken.push(l.key)
   }
@@ -378,6 +427,8 @@ export function flowRequest(spec: Spec, name?: string): string {
 
 /** The most new kinds of screen one screen may open (see kindOf): the details of a list's items are one kind. */
 export const MAX_NEW_SCREENS = 2
+/** The most new screens one screen may open whatever their kinds. */
+export const MAX_NEW_NAMES = 5
 
 /**
  * What a finished screen misses against the spec it was made with: no control for the next step of
@@ -395,6 +446,8 @@ export function checkScreen(html: string, spec: Spec, name?: string, known?: Set
     const fresh = [...linked].filter((n) => n !== 'home' && n !== name && !known.has(n))
     const kinds = [...new Set(fresh.map(kindOf))]
     if (kinds.length > MAX_NEW_SCREENS) misses.push(`opens ${kinds.length} new kinds of screen (${fresh.map((n) => `@${n}`).join(', ')})`)
+    // Seven export-* screens are one kind, and still sprawl.
+    else if (fresh.length > MAX_NEW_NAMES) misses.push(`opens ${fresh.length} new screens (${fresh.map((n) => `@${n}`).join(', ')})`)
   }
   if (writtenTwice(html)) misses.push('the screen is written twice')
   return misses
@@ -405,26 +458,31 @@ export function checkScreen(html: string, spec: Spec, name?: string, known?: Set
  * idea, or a second title outside SVG, starts. `cut` says it was cut; Info still notes it.
  */
 export function firstCopy(html: string): { html: string; cut: boolean } {
-  const starts: number[] = []
-  for (const re of [/<meta\s+name=["']?idea\b/gi, /<title>/gi]) {
-    const all = [...html.matchAll(re)].map((m) => m.index!).filter((i) => re.source.startsWith('<title') ? !insideSvg(html, i) : true)
-    if (all.length > 1) starts.push(all[1]!)
-  }
-  if (!starts.length) return { html, cut: false }
-  return { html: html.slice(0, Math.min(...starts)).trimEnd(), cut: true }
+  const ideas = [...html.matchAll(/<meta\s+name=["']?idea\b/gi)].map((m) => m.index!)
+  const titles = topTitles(html)
+  const at = Math.min(...[ideas[1], titles[1]].filter((x): x is number => x != null))
+  // Never a kept copy that ends inside a script: a title in a script's string is no second copy.
+  if (!Number.isFinite(at) || inside(html, at, 'script')) return { html, cut: false }
+  let kept = html.slice(0, at)
+  // The junk between the copies goes: from a marker like </final> or </assistant>, else after the last tag.
+  const junk = kept.search(/<\/(?:final|assistant|analysis|answer|response|output)>/i)
+  kept = junk >= 0 ? kept.slice(0, junk) : kept.slice(0, kept.lastIndexOf('>') + 1)
+  return { html: kept.trimEnd(), cut: true }
 }
 
-/** True when position `i` of `html` lies inside an <svg> element. */
-function insideSvg(html: string, i: number): boolean {
-  const before = html.slice(0, i)
-  return before.lastIndexOf('<svg') > before.lastIndexOf('</svg>')
+/** The places of <title> tags outside <svg> and <script>: the screen's own titles. */
+const topTitles = (html: string) => [...html.matchAll(/<title>/gi)].map((m) => m.index!).filter((i) => !inside(html, i, 'svg') && !inside(html, i, 'script'))
+
+/** True when position `i` of `html` lies inside an element `tag` (svg, script). */
+function inside(html: string, i: number, tag: string): boolean {
+  const before = html.slice(0, i).toLowerCase()
+  return before.lastIndexOf(`<${tag}`) > before.lastIndexOf(`</${tag}>`)
 }
 
-/** A reply that holds the screen twice: two ideas, two titles outside SVG, or two tab bars. */
+/** A reply that holds the screen twice: two ideas, two of the screen's own titles, or two tab bars (opening tags, not a script's selector). */
 function writtenTwice(html: string): boolean {
-  const outsideSvg = html.replace(/<svg\b[\s\S]*?<\/svg>/gi, '')
-  return (html.match(/<meta\s+name=["']?idea\b/gi)?.length ?? 0) > 1 || (outsideSvg.match(/<title>/gi)?.length ?? 0) > 1
-    || (html.match(/data-ui=["']tabs["']/gi)?.length ?? 0) > 1
+  return (html.match(/<meta\s+name=["']?idea\b/gi)?.length ?? 0) > 1 || topTitles(html).length > 1
+    || (html.match(/<[a-z][\w-]*\b[^>]*\bdata-ui\s*=\s*["']?tabs\b/gi)?.length ?? 0) > 1
 }
 
 /**

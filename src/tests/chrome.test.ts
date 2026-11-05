@@ -39,6 +39,6 @@ describe('a redraw gives what a first build gives', () => {
     const page = framePage(SCREEN, '', true, 'phone', false, chromeOf(s, 'night'))
     expect(page).toContain(`<main>${drawChrome(SCREEN, s, 'night')}</main>`)
     expect(page).toContain("e.data.uxwoz === 'chrome'")
-    expect(page).toContain("navs[0].outerHTML = bar")
+    expect(page).toContain("bars[0].outerHTML = bar")
   })
 })

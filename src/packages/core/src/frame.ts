@@ -71,13 +71,9 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     const main = document.querySelector('main')
     if (!main) return
     if (bar) {
-      const navs = main.querySelectorAll('nav[data-ui="tabs"]')
-      if (navs.length) { navs[0].outerHTML = bar; for (const n of [...navs].slice(1)) n.remove() }
-      else {
-        const scripts = main.querySelectorAll('script'), last = scripts[scripts.length - 1]
-        if (last) last.insertAdjacentHTML('beforebegin', bar + '\\n')
-        else main.insertAdjacentHTML('beforeend', '\\n' + bar)
-      }
+      const bars = [...main.querySelectorAll('[data-ui="tabs"]')].filter((x, i, all) => !all.some((y) => y !== x && y.contains(x)))
+      if (bars.length) { for (const n of bars.slice(1)) n.remove(); bars[0].outerHTML = bar }
+      else main.insertAdjacentHTML('beforeend', '\\n' + bar)
     }
     for (const b of main.querySelectorAll('a[data-ui="back"], button[data-ui="back"]')) b.textContent = back
   }

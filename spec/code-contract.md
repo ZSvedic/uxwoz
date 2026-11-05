@@ -147,7 +147,7 @@ Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | nul
              // plan, on a first screen's designs: { rows, ms, costUsd, error? } of the plan before it.
              // specRefused, on an Edit: { line, why }[] for its lines that were not taken.
              // A reply that held the screen twice keeps its first copy, and misses says so
-Spec       Record<key, { ask?; from?: SpecFrom; values: { text; from: SpecFrom; screen?; version? }[] }>
+Spec       Record<key, { ask?; from?: SpecFrom; values: { text; from: SpecFrom; screen?; at? }[] }>
              // one per mockup; key is product.*, ui.* or data.*; the last value counts; a row with
              // no value is open. SpecFrom is 'plan' | 'pick' | 'edit' | 'user'. screen and at (the
              // version's createdAt) say which screen version set a value, so Undo and ✕ can take it back

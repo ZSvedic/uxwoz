@@ -12,7 +12,7 @@ import { canonicalAction, nameWords, normalizePrompt, screenKey, screenRef } fro
 import { screenName, type Device } from './frame.ts'
 import { HOME_NAME, nameFrom, screenTree, treeLines, uniqueName } from './tree.ts'
 import type { ModelId } from './models.ts'
-import { MAX_ROWS, applyEdit, applyPick, dropValues, fits, removeLine, removeRow, setUserLine, untie, type Spec, type SpecLine, type SpecRefusal } from './spec.ts'
+import { MAX_ROWS, applyEdit, applyPick, dropValues, fits, removeLine, removeRow, setUserLine, untie, type Spec, type SpecLine, type SpecRefusal, type SpecValue } from './spec.ts'
 import { KEPT_ROWS, stillHolds, type ReviewInfo, type Suggestion } from './review.ts'
 
 /**
@@ -109,6 +109,7 @@ export class ScreenCache {
         // Files from before specs (version 3 and older): every mockup starts with an empty spec.
         for (const [root, spec] of Object.entries((data.specs ?? {}) as Record<string, Spec>)) this.specs.set(root, spec)
         for (const [root, r] of Object.entries((data.reviews ?? {}) as Record<string, SpecReview>)) this.reviewsOf.set(root, r)
+        this.migrateValues()
         if (data.version === 2) this.migrate()
       } else {
         // A file from before versions: it stays on disk, and the cache starts empty.
@@ -393,9 +394,11 @@ export class ScreenCache {
       this.deleteApp(entry.app)
       return gone
     }
-    const before = screenTree(this.mockup(root))
+    // The tree as the frame shows it, drawn tabs included, both times: as the browser's confirm counts.
+    const spec = this.specs.get(root) ?? {}
+    const before = screenTree(this.mockup(root), spec)
     this.entries.delete(key)
-    const after = screenTree(this.mockup(root))
+    const after = screenTree(this.mockup(root), spec)
     const removed = [key]
     for (const k of before.keys()) if (!after.has(k) && this.entries.delete(k)) removed.push(k)
     // A screen first made from a screen that is gone now hangs under the one that reaches it.
@@ -405,8 +408,7 @@ export class ScreenCache {
     }
     for (const k of removed) this.tomb(k)
     // Their values stay in the spec, no longer tied to a screen that a remade one could take them back through.
-    const spec = this.specs.get(root)
-    if (spec) for (const k of removed) untie(spec, k)
+    if (this.specs.has(root)) for (const k of removed) untie(spec, k)
     this.save()
     return removed
   }
@@ -431,6 +433,20 @@ export class ScreenCache {
   /** One mockup's screens, oldest first: the order the tree uses for children. */
   private mockup(root: string): CacheEntry[] {
     return [...this.entries.values()].filter((e) => normalizePrompt(e.app) === root)
+  }
+
+  /**
+   * Spec values saved before versions were keyed by createdAt carry `version: n`: they get that
+   * version's createdAt, so Undo, ✕ and the drawer find them again, or lose their tie when it is gone.
+   */
+  private migrateValues() {
+    for (const spec of this.specs.values()) for (const row of Object.values(spec)) for (const v of row.values as (SpecValue & { version?: number })[]) {
+      if (v.version == null) continue
+      const at = v.screen ? this.entries.get(v.screen)?.versions[v.version]?.createdAt : undefined
+      if (at) v.at = at
+      else { delete v.screen; delete v.at }
+      delete v.version
+    }
   }
 
   /** A file from before names: stored levels and recorded clicks go (levels are worked out now), and picked screens get names. */

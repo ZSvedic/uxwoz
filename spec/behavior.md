@@ -211,8 +211,12 @@ agree on navigation, Back and facts ([the spec note](../process/plans/2026-11-05
   or 2 new kinds of screen (an item's details, a form); the details of a list's items are one kind.
   A form, or a screen that ends a task, opens none; the phone's own screens (mail, share targets)
   are plain buttons. The check flags more than 2 kinds, grouping names by their last word when it
-  says what the screen does (details, edit, add…), else by their first word.
-- **A reply that holds the screen twice** (Luna's sometimes do) keeps its first copy; Info notes it.
+  says what the screen does (details, edit, add…), else by their first word; and it flags more than
+  5 new screens whatever their kinds (seven export screens are one kind, and still sprawl).
+- **A reply that holds the screen twice** (Luna's sometimes do) keeps its first copy, ended at its
+  last tag or at a marker like `</final>`, so the junk between the copies goes; Info notes it. A
+  second idea, or a second title outside `<svg>` and `<script>`, starts a second copy; a cut that
+  would end inside a script is not made.
 - **Lines from designs**: a design answers an open row only when its screen decides it
   (*ui.nav = Tabs: Tonight @home, History @night-history*); most screens add no line, and code
   keeps 3 at most. A design adds no row of its own, facts included: when designs could, 7 screens
@@ -230,16 +234,22 @@ agree on navigation, Back and facts ([the spec note](../process/plans/2026-11-05
   a known name (`ui.toggle`) counts as the known name.
 - **Code draws tabs and Back.** Each time a screen shows, the app redraws its tab bar from
   `ui.nav` (labels, names, the current tab marked on a tab screen) and Back's label from
-  `ui.back`, and hides Back on the tab screens. A screen with no tab bar gets one; a screen with
-  no Back is left alone; while `ui.back` is open, Back reads `‹ Back`. Nothing stored changes, so
+  `ui.back`, and hides Back on the tab screens when Home is one of the tabs (else Back is a tab
+  screen's only way home). Any element with `data-ui="tabs"` is the bar; a screen with no tab bar
+  gets one at its end; a screen with no Back is left alone; while `ui.back` is open, Back reads `‹ Back`. Nothing stored changes, so
   an old screen follows a changed line at once. A change redraws the tabs and Back inside each
   frame by a message, so no screen reloads and its script keeps running (a recording timer goes
   on counting); only a tab bar that goes away reloads its screens, to bring back their own markup.
   Asking the models was not enough: Luna dropped a tab on 2 of 6 screens and Haiku wrote Back two
-  ways. The tree counts the drawn tabs as links from every screen.
-- **Shapes**: a tab bar's `ui.nav` starts with `Tabs:`, `ui.back` starts with its label in double
-  quotes (`"‹ Back", top left`), and the core flow is a chain of `@names`; a line of another shape
-  is refused, so the app can always read the tabs and the label.
+  ways. The tree reads each screen as drawn: the drawn tabs are links from every screen, a stored
+  bar's stray links are not, and a delete counts the drawn tabs, as its confirm does.
+- **Shapes**: a tab bar's `ui.nav` starts with `Tabs:`, and each tab is a label and one `@name`,
+  the label on either side, split by `,` `/` `|` `·` `;` or `•` (`Tabs: Tonight @home / History
+  @history`); a line that claims tabs without `Tabs:` is refused, one that says there are none
+  (*No tab bar: …*) is fine. `ui.back` starts with its label in double quotes (`"‹ Back", top
+  left`), and the core flow is a chain of `@names`; a line of another shape is refused, so the app
+  can always read the tabs and the label. A row filled before these rules, with a value of the
+  wrong shape, counts as open for picks.
 - **Prose before the title** (*"The request as given contains no change…"*) is cut from the
   stored screen.
 - Mockups made before the spec open with an empty one and work as before.

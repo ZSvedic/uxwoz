@@ -150,7 +150,7 @@ test('10: the spec\'s planned screens show once the first screen is picked', () 
   const home = cache.propose('Snore', null, 0, ver('<h1>Tonight</h1>'))!
   expect(plannedScreens(cache.map('Snore').entries, spec)).toEqual([])
   cache.pick(home.key, 0)
-  expect(plannedScreens(cache.map('Snore').entries, spec).map((p) => p.name)).toEqual(['recording', 'morning-report', 'night-history'])
+  expect(plannedScreens(cache.map('Snore').entries, spec).map((p) => p.name)).toEqual(['night-history', 'recording', 'morning-report'])
 })
 
 test('11: Undo of an Edit on a remade screen leaves the deleted screen\'s values alone', () => {

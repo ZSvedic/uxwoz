@@ -5,7 +5,7 @@
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
 import { nameWords, normalizePrompt, screenKey, screenRef, wayBack } from '@uxwoz/core/keys'
 import { namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
-import { MAX_ROWS, chromeOf, lineCount, linesOf, navNames, specMarkdown, valueOf, wouldTake, type Spec, type SpecValue } from '@uxwoz/core/spec'
+import { MAX_ROWS, chromeOf, hidesBack, lineCount, linesOf, specMarkdown, valueOf, wouldTake, type Spec, type SpecValue } from '@uxwoz/core/spec'
 import type { CacheEntry, SpecReview, Version } from '@uxwoz/core'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
@@ -104,7 +104,7 @@ function screenNameOf(key: string): string | undefined {
 }
 
 /** Code hides Back on the tab screens of ui.nav (asking the model did not work): the card tells its frame. */
-const isTab = (key: string) => navNames(state.spec).includes(screenNameOf(key) ?? '')
+const isTab = (key: string) => hidesBack(state.spec, screenNameOf(key))
 /** The tabs and Back label code draws on a screen, from the spec as it is now: the frame applies them, and redraws them in place. */
 const chromeFor = (key: string) => chromeOf(state.spec, screenNameOf(key))
 const ideaOf = (v: Version) => v.idea ?? ''

@@ -172,16 +172,17 @@ describe('the request and the check', () => {
     const home = cache.propose('Snore', null, 0, ver('<h1>Tonight</h1>'))!
     cache.pick(home.key, 0)
     const planned = plannedScreens(cache.map('Snore').entries, spec)
+    // The drawn tab bar is Home's links, so History is a planned screen of a link, before the flow's.
     expect(planned.map((p) => [p.name, p.parent!.key, p.action])).toEqual([
+      ['night-history', 'snore', 'The night history screen, opened by "History"'],
       ['recording', 'snore', 'The recording screen'],
       ['morning-report', 'snore » @recording', 'The morning report screen'],
-      ['night-history', 'snore', 'The night history screen, opened by "History"'],
     ])
     expect(treeLines(cache.map('Snore').entries, 80, undefined, spec)).toEqual([
       '@home: the first screen of Snore',
+      '  @night-history: The night history screen, opened by "History" (not made yet)',
       '  @recording: The recording screen (not made yet)',
       '    @morning-report: The morning report screen (not made yet)',
-      '  @night-history: The night history screen, opened by "History" (not made yet)',
     ])
   })
 
@@ -226,7 +227,7 @@ describe('the request and the check', () => {
     expect(drawChrome(`<h1>History</h1>${tabs}<script>x()</script>`, spec, 'night-history')).toBe(`<h1>History</h1>${drawnBar}<script>x()</script>`)
     // A screen with no tab bar gets one, before its script; Back's label is drawn, whatever the model wrote.
     expect(drawChrome('<a data-ui="back" data-action="back">&lsaquo;&nbsp;Settings</a><h1>Night</h1><script>y()</script>', spec, 'night-details'))
-      .toBe('<a data-ui="back" data-action="back">‹ Back</a><h1>Night</h1><nav data-ui="tabs"><a data-action="@home">Tonight</a><a data-action="@night-history">History</a></nav>\n<script>y()</script>')
+      .toBe('<a data-ui="back" data-action="back">‹ Back</a><h1>Night</h1><script>y()</script>\n<nav data-ui="tabs"><a data-action="@home">Tonight</a><a data-action="@night-history">History</a></nav>')
     // A screen with no Back is left alone; with no Tabs: line nothing is drawn.
     expect(drawChrome('<h1>x</h1>', { 'ui.nav': { values: [{ text: 'A drawer menu', from: 'pick' }] } }, 'x')).toBe('<h1>x</h1>')
     expect(checkScreen(`<a data-ui="back" data-action="back">‹ Settings</a><h1>Night</h1>`, spec, 'night-details')).toEqual([])
