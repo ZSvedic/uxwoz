@@ -185,7 +185,7 @@ The note's three changes (866a393):
 |---|---|---|---|---|
 | Screens before the walk ran out of links | 9 | 12 | 6 | 6 |
 | A tab missing or pointing elsewhere | 0 | 1 (Home, made before `ui.nav` was set) | 0 | 2 |
-| Back labelled two ways | no | yes: `‹ Back` on 6, `Back` on 4 | no | no |
+| Back labelled two ways | no | yes, off the tabs: `‹ Back` on 5, `Back` on 3 | no | no |
 | A wrong tab marked current | 0 | 0 | 0 | 0 |
 | Score read the other way | 0 | 0 | 0 | 0 |
 | Stop opens the morning report | yes | yes | no | yes |
@@ -196,8 +196,9 @@ The note's three changes (866a393):
 | Rows that are one screen's content | 0 | 0 | 0 | 0 |
 | Picks that put in a line | 4 of 9 | 3 of 12 | 5 of 6 | 4 of 6 |
 
-Counted by code, then read: tabs, Back labels and the score from the HTML. The 4 Haiku screens
-with the minority Back label carry most of its misses.
+Counted by code, then read: tabs, Back labels and the score from the HTML. Four of Haiku's misses
+are the check flagging `‹ Back` against a `ui.back` line with no label; the fifth `‹ Back` screen
+was made before `ui.back` was set.
 
 What this round shows:
 
