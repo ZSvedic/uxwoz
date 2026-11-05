@@ -38,7 +38,7 @@ The user types *NiceSnore: a snore app with recording, score, remedy log*.
    data.score          Snore score 0-100, higher is better; last night 72
    ```
 3. **A later pick.** Night details is the first screen with a Back, so its pick fills
-   `ui.back  ‹ Back, first in the header`.
+   `ui.back  "‹ Back", top left`.
 4. **Edit.** On Settings the user types *"use switches, not checkboxes"*. The plan has no row for
    that, so the Edit adds `ui.toggles  Switches`, and the drawer shows the line with a ✕ to take
    it back.
@@ -94,7 +94,7 @@ A model proposes; a line counts only after the user saw it. No model changes a f
   follow it, so the request for a different design asks for another layout of this screen's content
   (today it asks to change "the structure, grouping or navigation").
 - **Old screens.** A changed line applies to screens made after it. Older ones keep their design
-  until the user regenerates them.
+  until the user regenerates them, except tabs and Back, which code redraws everywhere.
 - **The plan's input and limits.** The planner gets the app prompt and the kind of device, never
   its width: size is code's, and a width in the request ends up in the rows. Code keeps the first
   8 rows, drops a line over 120 characters, and cuts the flow at the first repeated name.
@@ -110,18 +110,23 @@ Anything code can guarantee stays out of the spec.
   screen of height. This reverses the earlier "only as wide as its content".
 - **Markup.** With `ui.nav`, `ui.back` or `ui.toggles` in the spec, the request names one markup
   for each and the theme styles it. The spec says which tabs; the theme says how tabs look.
-- **No Back on tab screens.** Code knows which screens are tabs and hides Back there. Asking the
-  model did not work.
-- **A check, no retry.** A finished screen must link to every name in `ui.nav`, carry the Back
-  label of `ui.back` unless it is a tab screen, and open no more than 2 new screens. Misses show in
+- **Code draws tabs and Back.** Each time a screen shows, the frame redraws its tab bar from
+  `ui.nav` and its Back label from `ui.back`, and hides Back on a tab screen. Every screen then
+  has the same tabs and Back, and an old screen follows a changed line at once. Asking the models
+  was not enough: Luna dropped a tab on 2 of 6 screens and Haiku wrote Back two ways.
+- **Shapes.** `ui.nav` starts with `Tabs:` when the app has tabs, `ui.back` starts with its label
+  in quotes (`"‹ Back", top left`), and the core flow is a chain of `@names`. Code refuses a line
+  of another shape, so it can always read the tabs and the label.
+- **A check, no retry.** A finished flow screen must link to its next step, and no screen opens
+  more than 2 new kinds of screen. Misses show in
   Info. When a reply holds the screen twice, as Luna's sometimes do, code keeps the first copy.
 - **Colors.** A line can say what a color means (*red: over budget*). The palette is the theme's.
 - **The flow.** The request for a screen on the core flow names the next step and asks that the
   control that finishes this screen's task opens it, by its own link and not by script. A general rule did not get Stop recording to the morning report.
 - **The current tab.** Code marks it; the model's own mark is removed.
 - **Prompt rules.** Besides tabs, Back and the main path, a screen that lists or shows items
-  opens 1 or 2 screens the tree does not have (an item's details, a form to add or edit). A form
-  or a screen that ends a task opens none. With a cap and no floor, mockups ended at 6 to 9
+  opens 1 or 2 new kinds of screen (an item's details, a form to add or edit); the details of a
+  list's items are one kind. A form or a screen that ends a task opens none. With a cap and no floor, mockups ended at 6 to 9
   screens. Show the phone's own screens (mail, share targets) as plain buttons. A control that finishes a task goes
   to the next step of the core flow, else to a real screen or back. Tabs and Back count toward "at
   least 3 controls with data-action".
@@ -145,10 +150,10 @@ Models following the spec is the risky half and the cheap one to test, so it goe
      whether a higher snore score is worse; Sol asked it 3 times in 3.
    - A few rows ask about one screen or about the back end. The user sees them and can delete them.
 3. **In the app: built** ([report](../journal/2026-11-05-spec-build.md)). The plan, the spec in
-   every request, lines shown at the pick, Edits with their ✕ and Undo all work. A remade
-   NiceSnore kept one tab bar and one score. It also showed three faults, changed above: designs
-   filled the spec with one screen's facts, the mockup ended at 7 screens, and Stop still led
-   nowhere.
+   every request, lines shown at the pick, Edits with their ✕ and Undo all work. Two critics
+   found 24 faults, all fixed. Three remakes of NiceSnore changed the design above: designs only
+   fill open rows (the spec stays at 9 rows), Stop recording opens the morning report, and code
+   draws tabs and Back. Still short: clicking reaches 12 screens with Haiku and 6 with Luna.
 4. The review pass, the spec panel and Export.
 
 It works when a remade NiceSnore, clicked through 15 screens, has a miss on at most 1 screen in 10
