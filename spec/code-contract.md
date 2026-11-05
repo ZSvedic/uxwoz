@@ -129,7 +129,8 @@ Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | nul
              // feedback is the Edit request that made this version; spec is the design's
              // <meta name="spec"> lines (taken out of html); misses is what checkScreen found
              // against the spec it was made with (absent for screens made without one). html has
-             // prose before <title> cut, and its tab bar's current tab marked by markTab.
+             // prose before <title> cut. Tabs and Back are as the model wrote them: the app draws
+             // them from the spec at show time (drawChrome), so nothing stored is rewritten.
              // plan, on a first screen's designs: { rows, ms, costUsd, error? } of the plan before it.
              // specRefused, on an Edit: { line, why }[] for its lines that were not taken.
              // A reply that held the screen twice keeps its first copy, and misses says so

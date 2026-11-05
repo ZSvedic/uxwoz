@@ -46,12 +46,14 @@ ui.nav = Tabs: Tonight @home, History @night-history, Settings @settings
 ui.back ? how Back looks and where it sits
 data.score ? what the snore score measures and whether higher means worse
 
-Tabs of ui.nav: last on every screen, in this markup, one link per tab with the label and @name ui.nav gives it, exactly; the app marks the current tab: <nav data-ui="tabs"><a data-action="@name">Label</a>…</nav>. …
-Back of ui.back: where ui.back says, with its label, in this markup: <a data-ui="back" data-action="back">Label</a>. The tab screens have no Back. …
+Tabs of ui.nav: last on every screen, in this markup, one link per tab with the label and @name ui.nav gives it; the app redraws the bar and marks the current tab: <nav data-ui="tabs"><a data-action="@name">Label</a>…</nav>. …
+Back of ui.back: where ui.back says, with its label, in this markup: <a data-ui="back" data-action="back">Label</a>. The app draws its label and hides it on the tab screens. A ui.back line starts with the label Back shows, in double quotes, then where it sits: ui.back = "Label", where.
 ```
 
-The markup text says how to write those rows' lines (tabs by label and `@name`, Back's label
-first) but gives no ready value: an example Back line was copied by every design.
+The markup text says how to write those rows' lines (`Tabs:` and each tab by label and `@name`,
+Back's label first in double quotes) but gives no ready value: an example Back line was copied by
+every design. The model still writes the tab bar and Back, so the screen has a place for them; the
+app redraws both from the spec when it shows the screen.
 
 Up to three lines may follow, each after a blank line: the device; for one side of an A OR B only
 (a random one), a request for a different design; and, for a step of the spec's core flow with a
@@ -100,8 +102,9 @@ to click through; so details, forms, settings and tab-bar sections must be scree
 least three per screen. Links back say `back` (the app goes to the screen one level up), and links
 to a listed screen give its `@name` alone. The name, not the prompt, says which screen a link opens:
 two prompts for one screen are never worded alike, but a short name in front of the model is copied
-exactly, so a screen is made once however many screens link to it. The next sets a floor and a cap on new screens: a screen that lists or shows items opens one or
-two screens the tree does not have, a form or a screen that ends a task none. Left alone, side
+exactly, so a screen is made once however many screens link to it. The next sets a floor and a cap on new kinds of screen: a screen that lists or shows items opens
+one or two, a form or a screen that ends a task none; the details of a list's items are one kind
+(a list of five remedies opening five details screens is one kind). Left alone, side
 branches sprawled (seven export screens); with a cap and no floor, mockups ended at six to nine
 screens. The old rule of at least three links per screen is gone.
 The last keeps a first sketch small: given room, a model fills it, but an early mockup should show
@@ -120,7 +123,7 @@ You build interactive UIs as one HTML fragment with plain JavaScript, styled by 
 - The screen is one page of a clickable mockup. Every button or link that would open another screen gets a data-action attribute: @, a name for that screen (1-4 lowercase words joined by dashes), a colon and a short prompt for it, e.g. <button data-action="@order-checkout: Checkout screen of a coffee shop app with 2 lattes in the cart">Checkout</button>. The prompt must make sense without seeing this screen; leave it out only for a screen the request lists. Use realistic sample data.
 - People explore the mockup by clicking from screen to screen, so split the app into screens as a real app would: an item's details, a form to add or edit, settings, a profile, checkout, and each section of a tab bar or menu open another screen through data-action; never show, hide or switch them with script inside this screen. The first screen also shows the app's main navigation (a tab bar or menu). Script is only for what stays on this screen, like filters, inputs and counters.
 - A control that goes back to the previous screen gets data-action="back". The request lists the mockup's screens as a tree of names, made and planned: a control that opens one of them gets just @ and its name, e.g. data-action="@home" or data-action="@order-checkout". One screen has one name, and one name is one screen: the details of two items are two screens, e.g. @latte-details and @mocha-details. Before you make up a new name, look in the tree and in this screen's links for one that already opens that screen; a new name is only for a screen the mockup does not have.
-- Besides tabs, Back and the main path, a screen that lists or shows items opens 1 or 2 screens the tree does not have (an item's details, a form to add or edit); a form, or a screen that ends a task, opens none. Never the phone's own screens (mail, share targets): show those as plain buttons. A control that finishes a task (Stop, Save, Send) goes to the next step of the core flow, else to a real screen or back.
+- Besides tabs, Back and the main path, a screen that lists or shows items opens 1 or 2 new kinds of screen the tree does not have (an item's details, a form to add or edit); the details of a list's items are one kind. A form, or a screen that ends a task, opens none. Never the phone's own screens (mail, share targets): show those as plain buttons. A control that finishes a task (Stop, Save, Send) goes to the next step of the core flow, else to a real screen or back.
 - Start small: this is an early sketch, so show only what this step needs, with 2-4 sample items per list. The screen fills the device's width: set no width on the page.
 ```
 

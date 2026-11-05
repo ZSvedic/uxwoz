@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  ScreenCache, applyEdit, checkScreen, fallbackSpec, framePage, generateScreen, linesOf, navNames, parsePlan, planRequest,
+  ScreenCache, applyEdit, checkScreen, drawChrome, fallbackSpec, framePage, generateScreen, linesOf, navNames, parsePlan, planRequest,
   plannedScreens, specRequest, tabLabel, takeSpecLines, valueOf, type Fetch, type Spec, type Version,
 } from '@uxwoz/core'
 import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
@@ -136,14 +136,12 @@ describe('5: tabs only when ui.nav says Tabs', () => {
   })
 })
 
-test('6: Back labels with entities pass; a label that is not how ui.back starts misses; a button Back counts', () => {
+test('6: Back\'s label is drawn from ui.back whatever entities the model wrote, on a link or a button', () => {
   const spec = withTabs()
-  spec['ui.back']!.values.push({ text: '‹ Back, first in the header', from: 'pick' })
-  const tabs = '<nav data-ui="tabs"><a data-action="@home">Tonight</a><a data-action="@night-history">History</a></nav>'
-  for (const label of ['&lsaquo; Back', '&#8249; Back', '‹&nbsp;Back', '&#x2039; Back'])
-    expect(checkScreen(`<a data-ui="back" data-action="back">${label}</a>${tabs}`, spec, 'details')).toEqual([])
-  expect(checkScreen(`<a data-ui="back" data-action="back">e</a>${tabs}`, spec, 'details')).toEqual(['Back says "e"'])
-  expect(checkScreen(`<button data-ui="back" data-action="back">‹ Back</button>${tabs}`, spec, 'details')).toEqual([])
+  spec['ui.back']!.values.push({ text: '"‹ Back", first in the header', from: 'pick' })
+  for (const label of ['&lsaquo; Back', '&#8249; Back', '‹&nbsp;Back', 'e'])
+    expect(drawChrome(`<a data-ui="back" data-action="back">${label}</a>`, spec, 'details')).toContain('<a data-ui="back" data-action="back">‹ Back</a>')
+  expect(drawChrome('<button data-ui="back" data-action="back">Back</button>', spec, 'details')).toContain('<button data-ui="back" data-action="back">‹ Back</button>')
 })
 
 test('10: the spec\'s planned screens show once the first screen is picked', () => {

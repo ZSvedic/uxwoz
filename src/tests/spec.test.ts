@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   FLOW_KEY, MAX_LINE, PLANNER_PROMPT, ScreenCache, generateScreen, applyEdit, applyPick, checkScreen, cutProse, dropValues, fallbackSpec, flowRequest, linesOf, makePlan, markTab, parsePlan, screenRequest,
-  plannedScreens, specRequest, takeSpecLines, treeLines, valueOf, wouldTake, type Fetch, type Spec, type Version,
+  backLabelOf, drawChrome, plannedScreens, screenTree, shapeOf, specRequest, takeSpecLines, treeLines, valueOf, wouldTake, type Fetch, type Spec, type Version,
 } from '@uxwoz/core'
 import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
 
@@ -49,7 +49,7 @@ describe('lines from designs', () => {
       '<meta name="spec" content="data.score = Snore score 0-100, "higher" is better">',
       `<meta name="spec" content="data.long = ${'x'.repeat(MAX_LINE + 1)}">`,
       '<meta name="spec" content="not a line">',
-      '<meta name="spec" content="ui.back = ‹ Back">',
+      '<meta name="spec" content="ui.back = &quot;‹ Back&quot;, top left">',
       '<meta name="spec" content="ui.lists = Rows">',
       '<h1>Tonight</h1>',
     ].join('\n')
@@ -57,7 +57,7 @@ describe('lines from designs', () => {
     expect(lines).toEqual([
       { key: 'ui.nav', text: 'Tabs: Tonight @home, History @night-history' },
       { key: 'data.score', text: 'Snore score 0-100, "higher" is better' },
-      { key: 'ui.back', text: '‹ Back' },
+      { key: 'ui.back', text: '"‹ Back", top left' },
     ])
     expect(refused).toBe(3)
     expect(rest).toBe('<title>Home</title>\n<meta name="idea" content="Tabs at the bottom">\n<h1>Tonight</h1>')
@@ -87,8 +87,8 @@ describe('lines from designs', () => {
 
   test('before the pick, the A OR B shows which lines its pick would add and which it would drop', () => {
     const spec = plan()
-    applyPick(spec, [{ key: 'ui.back', text: '‹ Back' }], 'home')
-    expect(wouldTake(spec, [{ key: 'ui.nav', text: 'Tabs' }, { key: 'ui.back', text: '← Back' }, { key: 'ui.menu', text: 'A drawer' }])).toEqual([true, false, false])
+    applyPick(spec, [{ key: 'ui.back', text: '"‹ Back", top left' }], 'home')
+    expect(wouldTake(spec, [{ key: 'ui.nav', text: 'Tabs: A @home, B @b' }, { key: 'ui.back', text: '"← Back", top' }, { key: 'ui.menu', text: 'A drawer' }])).toEqual([true, false, false])
     expect(valueOf(spec, 'ui.nav')).toBeUndefined() // a preview changes nothing
   })
 
@@ -101,21 +101,21 @@ describe('lines from designs', () => {
 describe('Edits and Undo', () => {
   test('an Edit sets any key; Undo of that version brings the value before back, and drops a row it added', () => {
     const spec = plan()
-    applyPick(spec, [{ key: 'ui.back', text: '‹ Back, first in the header' }], 'night')
-    applyEdit(spec, [{ key: 'ui.back', text: '← Back, top left' }, { key: 'ui.toggles', text: 'Switches' }], 'settings', 't2')
-    expect(valueOf(spec, 'ui.back')).toBe('← Back, top left')
+    applyPick(spec, [{ key: 'ui.back', text: '"‹ Back", first in the header' }], 'night')
+    applyEdit(spec, [{ key: 'ui.back', text: '"← Back", top left' }, { key: 'ui.toggles', text: 'Switches' }], 'settings', 't2')
+    expect(valueOf(spec, 'ui.back')).toBe('"← Back", top left')
     expect(linesOf(spec, 'settings', 't2')).toEqual([
-      { key: 'ui.back', text: '← Back, top left', before: '‹ Back, first in the header', later: false },
+      { key: 'ui.back', text: '"← Back", top left', before: '"‹ Back", first in the header', later: false },
       { key: 'ui.toggles', text: 'Switches', before: undefined, later: false },
     ])
     expect(dropValues(spec, 'settings', 't2')).toBe(2)
-    expect(valueOf(spec, 'ui.back')).toBe('‹ Back, first in the header')
+    expect(valueOf(spec, 'ui.back')).toBe('"‹ Back", first in the header')
     expect(spec['ui.toggles']).toBeUndefined()
   })
 
   test('✕ takes back one line of an Edit and leaves its others', () => {
     const spec = plan()
-    applyEdit(spec, [{ key: 'ui.nav', text: 'Tabs' }, { key: 'data.score', text: 'Higher is better' }], 'home', 't1')
+    applyEdit(spec, [{ key: 'ui.nav', text: 'A drawer menu' }, { key: 'data.score', text: 'Higher is better' }], 'home', 't1')
     expect(dropValues(spec, 'home', 't1', 'ui.nav')).toBe(1)
     expect(spec['ui.nav']!.values).toEqual([])
     expect(valueOf(spec, 'data.score')).toBe('Higher is better')
@@ -126,7 +126,7 @@ describe('Edits and Undo', () => {
     const cache = new ScreenCache(file)
     cache.setSpec('Snore', plan())
     const key = cache.propose('Snore', null, 0, ver('<h1>A</h1>', { spec: [{ key: 'ui.nav', text: 'Tabs: Tonight @home, History @history' }] }))!.key
-    cache.propose('Snore', null, 1, ver('<h1>B</h1>', { spec: [{ key: 'ui.back', text: '‹ Back' }] }))
+    cache.propose('Snore', null, 1, ver('<h1>B</h1>', { spec: [{ key: 'ui.back', text: '"‹ Back", top left' }] }))
     cache.pick(key, 0)
     expect(valueOf(cache.spec('Snore'), 'ui.nav')).toBe('Tabs: Tonight @home, History @history')
     expect(valueOf(cache.spec('Snore'), 'ui.back')).toBeUndefined() // the design not picked
@@ -198,9 +198,11 @@ describe('the request and the check', () => {
     expect(checkScreen('<button id="stop">Stop</button>', spec, 'recording')).toEqual(['no link to @morning-report, the next step of the core flow'])
     expect(checkScreen('<button data-action="@morning-report">Stop</button>', spec, 'recording')).toEqual([])
     const known = new Set(['home', 'recording', 'morning-report'])
-    const html = (n: number) => Array.from({ length: n }, (_, i) => `<a data-action="@new-${i}: A new screen">x</a>`).join('') + '<a data-action="@home">Home</a>'
-    expect(checkScreen(html(2), {}, 'settings', known)).toEqual([])
-    expect(checkScreen(html(3), {}, 'settings', known)).toEqual(['opens 3 new screens (@new-0, @new-1, @new-2)'])
+    const html = (names: string[]) => names.map((n) => `<a data-action="@${n}: A new screen">x</a>`).join('') + '<a data-action="@home">Home</a>'
+    // The details of a list's items are one kind: five remedies and a form are two kinds.
+    expect(checkScreen(html(['remedy-side-sleeping', 'remedy-nasal-strip', 'remedy-no-alcohol', 'remedy-extra-pillow', 'remedy-add']), {}, 'remedies', known)).toEqual([])
+    expect(checkScreen(html(['latte-details', 'mocha-details']), {}, 'menu', known)).toEqual([])
+    expect(checkScreen(html(['profile', 'export', 'privacy']), {}, 'settings', known)).toEqual(['opens 3 new kinds of screen (@profile, @export, @privacy)'])
   })
 
   test('the app marks the current tab, and removes the marks the model wrote', () => {
@@ -216,15 +218,18 @@ describe('the request and the check', () => {
     expect(cutProse('<h1>No title</h1>')).toBe('<h1>No title</h1>')
   })
 
-  test('the check finds a missing tab, another Back label and a screen written twice; tab screens need no Back', () => {
+  test('code draws the tab bar from ui.nav and Back from ui.back; the check no longer looks at them', () => {
     const spec = plan()
-    applyPick(spec, [{ key: 'ui.nav', text: 'Tabs: Tonight @home, History @night-history' }, { key: 'ui.back', text: '‹ Back, first in the header' }], 'home')
-    const tabs = '<nav data-ui="tabs"><a data-action="@home">Tonight</a><a data-action="@night-history">History</a></nav>'
-    expect(checkScreen(`<a data-ui="back" data-action="back">‹ Back</a><h1>Night</h1>${tabs}`, spec, 'night-details')).toEqual([])
-    expect(checkScreen('<a data-ui="back" data-action="back">‹ Settings</a><a data-action="@home">Tonight</a>', spec, 'profile'))
-      .toEqual(['no tab for @night-history', 'Back says "‹ Settings"'])
-    expect(checkScreen(`<h1>History</h1>${tabs}`, spec, 'night-history')).toEqual([])
-    expect(checkScreen(`<h1>Night</h1>${tabs}`, spec, 'night-details')).toEqual(['no Back'])
+    applyPick(spec, [{ key: 'ui.nav', text: 'Tabs: Tonight @home, History @night-history' }, { key: 'ui.back', text: '"‹ Back", first in the header' }], 'home')
+    const tabs = '<nav data-ui="tabs" style="position:sticky"><a data-action="@home" aria-current="page">Home</a></nav>'
+    const drawnBar = '<nav data-ui="tabs"><a data-action="@home">Tonight</a><a data-action="@night-history" aria-current="page">History</a></nav>'
+    expect(drawChrome(`<h1>History</h1>${tabs}<script>x()</script>`, spec, 'night-history')).toBe(`<h1>History</h1>${drawnBar}<script>x()</script>`)
+    // A screen with no tab bar gets one, before its script; Back's label is drawn, whatever the model wrote.
+    expect(drawChrome('<a data-ui="back" data-action="back">&lsaquo;&nbsp;Settings</a><h1>Night</h1><script>y()</script>', spec, 'night-details'))
+      .toBe('<a data-ui="back" data-action="back">‹ Back</a><h1>Night</h1><nav data-ui="tabs"><a data-action="@home">Tonight</a><a data-action="@night-history">History</a></nav>\n<script>y()</script>')
+    // A screen with no Back is left alone; with no Tabs: line nothing is drawn.
+    expect(drawChrome('<h1>x</h1>', { 'ui.nav': { values: [{ text: 'A drawer menu', from: 'pick' }] } }, 'x')).toBe('<h1>x</h1>')
+    expect(checkScreen(`<a data-ui="back" data-action="back">‹ Settings</a><h1>Night</h1>`, spec, 'night-details')).toEqual([])
     expect(checkScreen(`<title>A</title>${tabs}<title>A</title>${tabs}`, spec, 'night-history')).toEqual(['the screen is written twice'])
   })
 })
@@ -261,4 +266,25 @@ test('Home linking its flow steps and the tabs of its own ui.nav line opens no n
   for await (const ev of generateScreen({ app: 'Snore', action: null, model: 'claude-haiku-5.5', spec, name: 'home', fetch, env: { OPENROUTER_API_KEY: 'fake' } })) {
     if (ev.type === 'done') expect(ev.version.misses).toEqual([])
   }
+})
+
+describe('shapes, and the drawn tabs in the tree', () => {
+  test('ui.back starts with its label in quotes; a ui.nav that claims tabs starts with Tabs:', () => {
+    expect(shapeOf({ key: 'ui.back', text: '"‹ Back", top left' })).toEqual({ text: '"‹ Back", top left' })
+    expect(shapeOf({ key: 'ui.back', text: 'Back sits top-left as a text link' })).toEqual({ why: 'a ui.back line starts with its label in double quotes, e.g. "‹ Back", top left' })
+    expect(shapeOf({ key: 'ui.nav', text: 'Bottom tabs: Record @recording, History @history' })).toEqual({ why: 'a tab bar starts with Tabs:, e.g. Tabs: Home @home, Cart @cart' })
+    expect(shapeOf({ key: 'ui.nav', text: 'A drawer menu from the top left' })).toEqual({ text: 'A drawer menu from the top left' })
+    expect(backLabelOf('“← Night”, top right')).toBe('← Night')
+  })
+
+  test('a tab the frame draws is a link the tree knows', () => {
+    const cache = new ScreenCache()
+    const spec = parsePlan('ui.nav ? main navigation')
+    applyPick(spec, [{ key: 'ui.nav', text: 'Tabs: Tonight @home, History @night-history' }], 'home')
+    const home = cache.pick(cache.propose('Snore', null, 0, ver('<h1>Tonight</h1><a data-action="@details: A night">x</a>'))!.key, 0)!
+    const details = cache.pick(cache.propose('Snore', '@details: A night', 0, ver('<h1>Night</h1>'), { key: home.key, label: 'x' })!.key, 0)!
+    const history = cache.pick(cache.propose('Snore', '@night-history: History', 0, ver('<h1>History</h1>'), { key: details.key, label: 'History' })!.key, 0)!
+    // Made from Details (level 3 by its click), but every screen's drawn tab bar links it: level 2, under Home.
+    expect(screenTree(cache.map('Snore').entries, spec).get(history.key)).toEqual({ level: 2, parent: home.key, label: 'History' })
+  })
 })

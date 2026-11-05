@@ -33,7 +33,7 @@ export const FLOW_KEY = 'product.core-flow'
 /** The planner's menu of known names, with the question each settles. */
 export const KNOWN_ROWS: Record<string, string> = {
   'ui.nav': 'main navigation',
-  'ui.back': 'how Back looks and where it sits',
+  'ui.back': 'the label Back shows, in quotes, and where it sits',
   'ui.forms': 'how forms and their buttons are laid out',
   'ui.lists': 'how lists and their items look',
   'ui.toggles': 'switches or checkboxes',
@@ -120,9 +120,52 @@ export function shapeOf(line: SpecLine): { text: string } | { why: string } {
     const t = flowText(line.text)
     return t ? { text: t } : { why: 'a core flow names its screens, e.g. @home → @cart' }
   }
-  if (line.key === 'ui.nav' && /^\s*tabs\s*:/i.test(line.text) && namesIn(line.text).length < 2)
-    return { why: 'a Tabs: line names each tab by its @name' }
+  if (line.key === 'ui.nav') {
+    const tabs = /^\s*tabs\s*:/i.test(line.text)
+    if (tabs && namesIn(line.text).length < 2) return { why: 'a Tabs: line names each tab by its @name' }
+    if (!tabs && /\btabs?\b/i.test(line.text)) return { why: 'a tab bar starts with Tabs:, e.g. Tabs: Home @home, Cart @cart' }
+  }
+  if (line.key === 'ui.back' && !backLabelOf(line.text)) return { why: 'a ui.back line starts with its label in double quotes, e.g. "‹ Back", top left' }
   return { text: line.text }
+}
+
+/** The label a ui.back value gives Back: its opening quoted text, e.g. ‹ Back for `"‹ Back", top left`. */
+export function backLabelOf(text: string): string | null {
+  const m = text.match(/^\s*["“]([^"”]{1,30})["”]/)
+  return m && m[1]!.trim() ? m[1]!.trim() : null
+}
+
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+/**
+ * The screen as the frame shows it: code draws its tab bar from ui.nav (labels, names, the current
+ * tab) and Back's label from ui.back. The model writes both in the fixed markup, but asking was not
+ * enough: Luna dropped a tab on 2 of 6 screens and Haiku wrote Back two ways. A screen with no tab
+ * bar gets one; a screen with no Back is left alone. Drawn at show time from the stored screen and
+ * the spec as it is now, so an old screen follows a changed line at once and nothing stored changes.
+ */
+export function drawChrome(html: string, spec: Spec, name?: string): string {
+  let out = html
+  const tabs = navNames(spec)
+  if (tabs.length) {
+    const bar = `<nav data-ui="tabs">${tabs.map((n) => `<a data-action="@${n}"${n === name ? ' aria-current="page"' : ''}>${esc(tabLabel(spec, n) || n)}</a>`).join('')}</nav>`
+    let drawn = false
+    out = out.replace(/<nav\b[^>]*data-ui=["']tabs["'][^>]*>[\s\S]*?<\/nav>/gi, () => (drawn ? '' : ((drawn = true), bar)))
+    if (!drawn) {
+      const i = out.search(/<script\b(?![\s\S]*<script\b)/i)
+      out = i >= 0 ? out.slice(0, i) + bar + '\n' + out.slice(i) : out + '\n' + bar
+    }
+  }
+  const label = backLabelOf(valueOf(spec, 'ui.back') ?? '')
+  if (label) out = out.replace(/(<(a|button)\b[^>]*data-ui=["']back["'][^>]*>)[\s\S]*?(<\/\2>)/gi, (_, open: string, _t: string, close: string) => open + esc(label) + close)
+  return out
+}
+
+/** The kind of screen a name is: its last word when that says what the screen does (details, edit, add…), else its first word. */
+export function kindOf(name: string): string {
+  const words = name.split(/[-_]/)
+  const last = words.at(-1)!
+  return words.length > 1 && /^(details?|edit|add|new|form|settings|list|summary|report|history|view)$/.test(last) ? last : words[0]!
 }
 
 /** One `<meta name="spec" content="…">` tag, either attribute first; content runs to its closing quote before `>` (or before name=). */
@@ -273,8 +316,8 @@ export function parsePlan(reply: string): Spec {
 
 /** One markup for each of these rows, styled by the theme: the request names it when the row is in the spec. */
 const MARKUP: Record<string, string> = {
-  'ui.nav': 'Tabs of ui.nav: last on every screen, in this markup, one link per tab with the label and @name ui.nav gives it, exactly; the app marks the current tab: <nav data-ui="tabs"><a data-action="@name">Label</a>…</nav>. A ui.nav line for a tab bar starts with Tabs: and names each tab by its label and @name; other navigation is written another way and gets no tab bar.',
-  'ui.back': 'Back of ui.back: where ui.back says, with its label, in this markup: <a data-ui="back" data-action="back">Label</a>. The tab screens have no Back. A ui.back line starts with the label Back shows, then where it sits.',
+  'ui.nav': 'Tabs of ui.nav: last on every screen, in this markup, one link per tab with the label and @name ui.nav gives it; the app redraws the bar and marks the current tab: <nav data-ui="tabs"><a data-action="@name">Label</a>…</nav>. A ui.nav line for a tab bar starts with Tabs: and names each tab by its label and @name; other navigation is written another way and gets no tab bar.',
+  'ui.back': 'Back of ui.back: where ui.back says, with its label, in this markup: <a data-ui="back" data-action="back">Label</a>. The app draws its label and hides it on the tab screens. A ui.back line starts with the label Back shows, in double quotes, then where it sits: ui.back = "Label", where.',
   'ui.toggles': 'An on/off setting of ui.toggles, as a switch: <label><input type="checkbox" role="switch"> Label</label>. A plain checkbox only picks items, such as what to include or export.',
 }
 
@@ -308,36 +351,25 @@ export function flowRequest(spec: Spec, name?: string): string {
   return next ? `This screen is a step of the main path (product.core-flow): the control that finishes this screen's task (Stop, Save, Done) opens @${next} itself, with data-action="@${next}"; not a script handler, and not a second link beside it.` : ''
 }
 
-/** The most screens one screen may open that the tree does not have yet. */
+/** The most new kinds of screen one screen may open (see kindOf): the details of a list's items are one kind. */
 export const MAX_NEW_SCREENS = 2
 
 /**
- * What a finished screen misses against the spec it was made with: a tab of ui.nav it does not link
- * to, a Back whose label is not the one ui.back says (tab screens have no Back), no control for the
- * next step of the core flow, more than MAX_NEW_SCREENS screens the tree did not have (`known`: its
- * names), and a reply that holds the screen twice. `name` is the screen's name, when it has one.
+ * What a finished screen misses against the spec it was made with: no control for the next step of
+ * the core flow, more than MAX_NEW_SCREENS new kinds of screen the tree did not have (`known`: its
+ * names), and a reply that holds the screen twice. Tabs and Back are not checked: code draws them.
+ * `name` is the screen's name, when it has one.
  */
 export function checkScreen(html: string, spec: Spec, name?: string, known?: Set<string>): string[] {
   const misses: string[] = []
-  const tabs = navNames(spec)
   const links = [...html.matchAll(/data-action\s*=\s*["']([^"']*)["']/gi)].map((m) => m[1]!.trim())
   const linked = new Set(links.flatMap((a) => namesIn(a.split(':')[0]!)))
-  const missing = tabs.filter((t) => !linked.has(t))
-  if (missing.length) misses.push(`no tab for ${missing.map((t) => `@${t}`).join(', ')}`)
-  const back = valueOf(spec, 'ui.back')
-  const isTab = name != null && tabs.includes(name)
-  if (back && !isTab && name !== 'home') {
-    // Back's label must be how the ui.back line starts: `‹ Back` for `‹ Back, first in the header`.
-    const said = decode(back).replace(/\s+/g, ' ').trim()
-    const labels = [...html.matchAll(/<(a|button)\b[^>]*data-ui=["']back["'][^>]*>([\s\S]*?)<\/\1>/gi)].map((m) => decode(m[2]!.replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim())
-    if (!labels.length) misses.push('no Back')
-    else for (const l of labels) if (!l || !said.startsWith(l)) misses.push(`Back says "${l}"`)
-  }
   const next = nextStep(spec, name)
   if (next && !linked.has(next)) misses.push(`no link to @${next}, the next step of the core flow`)
   if (known) {
     const fresh = [...linked].filter((n) => n !== 'home' && n !== name && !known.has(n))
-    if (fresh.length > MAX_NEW_SCREENS) misses.push(`opens ${fresh.length} new screens (${fresh.map((n) => `@${n}`).join(', ')})`)
+    const kinds = [...new Set(fresh.map(kindOf))]
+    if (kinds.length > MAX_NEW_SCREENS) misses.push(`opens ${kinds.length} new kinds of screen (${fresh.map((n) => `@${n}`).join(', ')})`)
   }
   if (writtenTwice(html)) misses.push('the screen is written twice')
   return misses

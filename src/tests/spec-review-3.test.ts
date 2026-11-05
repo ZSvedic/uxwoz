@@ -68,8 +68,8 @@ test('4: an Edit\'s lines that were not taken are kept on its version, with why'
 
 test('5: an Edit that changes Back is checked against its own Back line', async () => {
   const spec = parsePlan('ui.back ? how Back looks')
-  spec['ui.back']!.values.push({ text: '‹ Back, first in the header', from: 'pick' })
-  const html = '<title>Night</title>\n<meta name="spec" content="ui.back = ← Night, top right">\n<a data-ui="back" data-action="back">← Night</a><h1>Night</h1>'
+  spec['ui.back']!.values.push({ text: '"‹ Back", first in the header', from: 'pick' })
+  const html = '<title>Night</title>\n<meta name="spec" content="ui.back = &quot;← Night&quot;, top right">\n<a data-ui="back" data-action="back">← Night</a><h1>Night</h1>'
   for await (const ev of generateScreen({ app: 'Snore', action: 'Night', model: 'claude-haiku-5.5', spec, name: 'night', edit: { html: '<h1>Night</h1>', change: 'Back top right' },
     fetch: async () => new Response(reply(html)), env })) {
     if (ev.type === 'done') expect(ev.version.misses).toEqual([])
@@ -78,9 +78,9 @@ test('5: an Edit that changes Back is checked against its own Back line', async 
 
 test('6: a line a later Edit replaced says so', () => {
   const spec = parsePlan('ui.back ? how Back looks')
-  applyEdit(spec, [{ key: 'ui.back', text: '‹ Back' }], 'a', 't1')
-  applyEdit(spec, [{ key: 'ui.back', text: '← Back' }], 'b', 't2')
-  expect(linesOf(spec, 'a', 't1')).toEqual([{ key: 'ui.back', text: '‹ Back', before: undefined, later: true }])
+  applyEdit(spec, [{ key: 'ui.back', text: '"‹ Back", top' }], 'a', 't1')
+  applyEdit(spec, [{ key: 'ui.back', text: '"← Back", top' }], 'b', 't2')
+  expect(linesOf(spec, 'a', 't1')).toEqual([{ key: 'ui.back', text: '"‹ Back", top', before: undefined, later: true }])
   expect(linesOf(spec, 'b', 't2')[0]!.later).toBe(false)
 })
 

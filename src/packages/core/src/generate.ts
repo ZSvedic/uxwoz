@@ -5,7 +5,7 @@ import { extractFragment, screenIdea, screenName } from './frame.ts'
 import { DEVICES, type Device } from './frame.ts'
 import { MODELS, type ModelId } from './models.ts'
 import { SYSTEM_PROMPT, WARMUP_REQUEST, screenRequest } from './prompt.ts'
-import { applyEdit, checkScreen, cutProse, firstCopy, flowNames, flowRequest, markTab, namesIn, navNames, specRequest, takeSpecLines, type Spec, type SpecLine } from './spec.ts'
+import { applyEdit, checkScreen, cutProse, firstCopy, flowNames, flowRequest, namesIn, navNames, specRequest, takeSpecLines, type Spec, type SpecLine } from './spec.ts'
 import { ProviderError, streamModel, type Fetch } from './providers.ts'
 
 /** A slower screen is useless, and keep-alive comments can stall a stream, so this is an overall deadline. */
@@ -65,12 +65,12 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
       // Only a finished screen may be cached: a stream that stopped early or hit the token limit is an error.
       if (!ev.finishReason) throw new ProviderError('the stream ended before the screen was complete')
       if (ev.finishReason !== 'stop') throw new ProviderError(`the screen was cut off (${ev.finishReason})`)
-      // Prose before the title goes, the spec lines the design proposes come out of the stored
-      // screen, and the app marks the current tab.
+      // Prose before the title goes, and the spec lines the design proposes come out of the stored
+      // screen. Tabs and Back are drawn at show time (drawChrome), so the stored screen keeps the model's.
       // A reply that holds the screen twice keeps its first copy.
       const first = firstCopy(cutProse(extractFragment(raw)))
       const taken = takeSpecLines(first.html)
-      const html = typeof o.spec === 'object' ? markTab(taken.html, o.name) : taken.html
+      const html = taken.html
       if (!html.trim()) throw new ProviderError('the model returned an empty screen')
       // An Edit is checked against the spec with its own lines in: the Edit that sets Back is not a Back miss.
       let spec = typeof o.spec === 'object' ? o.spec : null

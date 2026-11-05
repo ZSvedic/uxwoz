@@ -163,12 +163,18 @@ function build(made: CacheEntry[], spec: Spec = {}): { tree: Map<string, TreeNod
   for (const e of entries) {
     if (e.parent && (madeKeys.has(e.parent.key) || (fromSpec(e) && keys.has(e.parent.key)))) edges.set(e.parent.key, [...(edges.get(e.parent.key) ?? []), { to: e.key, label: e.parent.label }])
   }
+  // The tab bar code draws on every screen (drawChrome) is links too, so the tree knows what the frame shows.
+  const tabs = navNames(spec)
   for (const e of entries) {
     const v = e.versions.at(-1)
     if (!v) continue
     for (const l of linksIn(v.html)) {
       const to = resolveAction(app, l.action, byName)
       if (to && to !== e.key && keys.has(to)) edges.set(e.key, [...(edges.get(e.key) ?? []), { to, label: l.label }])
+    }
+    for (const t of tabs) {
+      const to = t === HOME_NAME ? root : byName.get(t)
+      if (to && to !== e.key && keys.has(to)) edges.set(e.key, [...(edges.get(e.key) ?? []), { to, label: tabLabel(spec, t) }])
     }
   }
   tree.set(root, { level: 1, parent: null, label: '' })

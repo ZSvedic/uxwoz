@@ -178,9 +178,9 @@ scrolls so the screen stays fully visible beside it. Esc or ✕ closes it. It ha
 - **Info**: name, idea, the click that opened it, what made the version showing (the pick, an Edit
   and its request, or Regenerate), the number of versions, model, device, when it was made, time to
   first text, total time, cost, cost of all versions, finish reason, **Check** (what the screen
-  misses against the spec it was made with: a tab of `ui.nav` it does not link to, a Back labelled
-  otherwise than `ui.back` says, no control to the next step of the core flow, more than 2 screens
-  the tree did not have, or a reply that holds the screen twice; *follows the spec* when nothing), the **spec lines** the design proposed, size and prompt. On the first screen, **Plan**: the rows
+  misses against the spec it was made with: no control to the next step of the core flow, more
+  than 2 new kinds of screen, or a reply that held the screen twice (tabs and Back are drawn by the
+  app, so they are not checked); *follows the spec* when nothing), the **spec lines** the design proposed, size and prompt. On the first screen, **Plan**: the rows
   it opened, its time and cost, or why it failed (main navigation and Back were then left open).
 
 Choosing another screen while the drawer is open shows that screen in it.
@@ -206,9 +206,10 @@ agree on navigation, Back and facts ([the spec note](../process/plans/2026-11-05
   step asks that the control finishing its task (Stop, Save, Done) opens it by its own link, not by
   script (Stop recording opens the morning report).
 - **New screens**: besides tabs, Back and the main path, a screen that lists or shows items opens 1
-  or 2 screens the mockup does not have (an item's details, a form); a form, or a screen that ends
-  a task, opens none; the phone's own screens (mail, share targets) are plain buttons. The check
-  flags more than 2.
+  or 2 new kinds of screen (an item's details, a form); the details of a list's items are one kind.
+  A form, or a screen that ends a task, opens none; the phone's own screens (mail, share targets)
+  are plain buttons. The check flags more than 2 kinds, grouping names by their last word when it
+  says what the screen does (details, edit, add…), else by their first word.
 - **A reply that holds the screen twice** (Luna's sometimes do) keeps its first copy; Info notes it.
 - **Lines from designs**: a design answers an open row only when its screen decides it
   (*ui.nav = Tabs: Tonight @home, History @night-history*); most screens add no line, and code
@@ -225,9 +226,15 @@ agree on navigation, Back and facts ([the spec note](../process/plans/2026-11-05
   deleted screen's lines stay in the spec, no longer tied to it. ✕ in
   the drawer or Undo takes its values back. A Regenerate's lines are dropped. A key one letter off
   a known name (`ui.toggle`) counts as the known name.
-- **Tab screens have no Back**: the app hides it there.
-- **The current tab** is marked by the app: the model's own marks are removed, and on a tab screen
-  its own tab is marked. A screen that is not a tab has none marked.
+- **Code draws tabs and Back.** Each time a screen shows, the app redraws its tab bar from
+  `ui.nav` (labels, names, the current tab marked on a tab screen) and Back's label from
+  `ui.back`, and hides Back on the tab screens. A screen with no tab bar gets one; a screen with
+  no Back is left alone. Nothing stored changes, so an old screen follows a changed line at once.
+  Asking the models was not enough: Luna dropped a tab on 2 of 6 screens and Haiku wrote Back two
+  ways. The tree counts the drawn tabs as links from every screen.
+- **Shapes**: a tab bar's `ui.nav` starts with `Tabs:`, `ui.back` starts with its label in double
+  quotes (`"‹ Back", top left`), and the core flow is a chain of `@names`; a line of another shape
+  is refused, so the app can always read the tabs and the label.
 - **Prose before the title** (*"The request as given contains no change…"*) is cut from the
   stored screen.
 - Mockups made before the spec open with an empty one and work as before.

@@ -19,7 +19,7 @@ Then up to 8 open rows, one per line: a key, a space, ?, a space, and the short 
 ui.nav ? main navigation
 
 - A row is a rule several screens must match, such as how Back looks or what a color means. Never something one screen shows, such as the fields of one form or the content of one page, and never the screen's size: the app fixes that.
-- Use these keys when they fit: ui.nav (main navigation), ui.back (how Back looks and where it sits), ui.forms (how forms and their buttons are laid out), ui.lists (how lists and their items look), ui.toggles (switches or checkboxes), ui.colors (what colors mean), ui.charts (how data is drawn), ui.map (how the map, its pins and zoom work), ui.hud (what stays on screen during play).
+- Use these keys when they fit: ui.nav (main navigation), ui.back (the label Back shows and where it sits), ui.forms (how forms and their buttons are laid out), ui.lists (how lists and their items look), ui.toggles (switches or checkboxes), ui.colors (what colors mean), ui.charts (how data is drawn), ui.map (how the map, its pins and zoom work), ui.hud (what stays on screen during play).
 - Make up a key only when none of these fits: ui. and 1-3 lowercase words joined by dashes, e.g. ui.filters. Never a second name for one listed above.
 - A fact that several screens show and could get wrong, such as what a score means or which units a value uses, is a data. row, e.g. data.units ? which units distances use.
 - A screen name is 1-4 lowercase words joined by dashes.

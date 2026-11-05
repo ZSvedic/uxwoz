@@ -5,7 +5,7 @@
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
 import { nameWords, normalizePrompt, screenKey, screenRef, wayBack } from '@uxwoz/core/keys'
 import { namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
-import { linesOf, navNames, wouldTake, type Spec } from '@uxwoz/core/spec'
+import { drawChrome, linesOf, navNames, wouldTake, type Spec } from '@uxwoz/core/spec'
 import type { CacheEntry, Version } from '@uxwoz/core'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
@@ -102,6 +102,8 @@ function screenNameOf(key: string): string | undefined {
 
 /** Code hides Back on the tab screens of ui.nav (asking the model did not work): the card tells its frame. */
 const isTab = (key: string) => navNames(state.spec).includes(screenNameOf(key) ?? '')
+/** A screen as its frame shows it: the tabs and Back label drawn from the spec as it is now. */
+const drawn = (key: string, html: string) => drawChrome(html, state.spec, screenNameOf(key))
 const ideaOf = (v: Version) => v.idea ?? ''
 
 function sideCard(key: string, index: number, side: Side | null, stored: Version | null, device: Device | undefined): CardView {
@@ -153,10 +155,10 @@ async function draw() {
   if (theme !== themeSelect.value) return // a newer draw shows the newer theme
   for (const e of state.entries.values()) {
     const v = e.versions.at(-1)
-    if (v) { if (state.revising?.key !== e.key) canvas.show(e.key, v.html, true, css) }
-    else e.proposals?.forEach((p, i) => { if (p) canvas.show(`${e.key}#${i}`, p.html, true, css) })
+    if (v) { if (state.revising?.key !== e.key) canvas.show(e.key, drawn(e.key, v.html), true, css) }
+    else e.proposals?.forEach((p, i) => { if (p) canvas.show(`${e.key}#${i}`, drawn(e.key, p.html), true, css) })
   }
-  state.making?.sides.forEach((s, i) => { if (s.version) canvas.show(`${state.making!.key}#${i}`, s.version.html, true, css) })
+  state.making?.sides.forEach((s, i) => { if (s.version) canvas.show(`${state.making!.key}#${i}`, drawn(state.making!.key, s.version.html), true, css) })
 }
 
 async function fetchText(url: string): Promise<string> {
