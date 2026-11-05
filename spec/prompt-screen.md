@@ -46,18 +46,25 @@ ui.nav = Tabs: Tonight @home, History @night-history, Settings @settings
 ui.back ? how Back looks and where it sits
 data.score ? what the snore score measures and whether higher means worse
 
-Tabs of ui.nav: last on every screen, in this markup, … <nav data-ui="tabs"><a data-action="@name">Label</a>…</nav>
-Back of ui.back: where ui.back says, with its label, in this markup: <a data-ui="back" data-action="back">Label</a>. The tab screens have no Back.
+Tabs of ui.nav: last on every screen, in this markup, one link per tab with the label and @name ui.nav gives it, exactly; the app marks the current tab: <nav data-ui="tabs"><a data-action="@name">Label</a>…</nav>. …
+Back of ui.back: where ui.back says, with its label, in this markup: <a data-ui="back" data-action="back">Label</a>. The tab screens have no Back. …
 ```
 
-Two lines may follow, each after a blank line: the device and, for one side of an A OR B only
-(a random one), a request for a different design. Both sides follow the spec, so the different
-design is another layout of the same content:
+The markup text says how to write those rows' lines (tabs by label and `@name`, Back's label
+first) but gives no ready value: an example Back line was copied by every design.
+
+Up to three lines may follow, each after a blank line: the device; for one side of an A OR B only
+(a random one), a request for a different design; and, for a step of the spec's core flow with a
+next step, a line that asks for a control to it. Both sides follow the spec, so the different
+design is another layout of the same content. A general rule for finishing controls did not get
+Stop recording to the morning report; naming the next step for that screen is the fix:
 
 ```
 Design it for a phone screen, 390 px wide.
 
 Design this as a clearly different alternative to the obvious layout: arrange this screen's content another way, not just the wording, and keep whatever the spec decides.
+
+This screen is a step of the main path (product.core-flow): one control on it must open @morning-report.
 ```
 
 A **Regenerate** sends the same request as the screen's first design, with no request for a
@@ -68,7 +75,7 @@ change, with no request for a different design:
 The screen as it is now:
 <title>Litter box details</title> …
 
-Reply with this screen again with one change; keep everything else as it is, including its data-action links, and add no second control for a screen it already links to. If the change is a rule other screens should follow too (how something looks or works, or what a value means), add a <meta name="spec" content="key = value"> line for it after the idea, e.g. <meta name="spec" content="ui.back = ← Back, top left">. The change: Show one level indicator instead of four
+Reply with this screen again with one change; keep everything else as it is, including its data-action links, and add no second control for a screen it already links to. If the change is a rule other screens should follow too (how something looks or works, or what a value means), add a <meta name="spec" content="key = value"> line for it after the idea, e.g. <meta name="spec" content="ui.seat-map = Seats as a grid, taken seats grey">. The change: Show one level indicator instead of four
 ```
 
 They live in the user message, so the system prompt stays the same for every request and the
@@ -78,10 +85,11 @@ provider's prompt cache keeps working.
 
 The first bullet names the screen and its idea: the app shows the name in each screen's label
 (*L2 Order checkout*), and the idea, one sentence about the design, above each side of an A OR B
-and under the name everywhere else. Neither element renders inside the screen. It also asks for up
-to three spec lines (`<meta name="spec" content="key = value">`): what this design decides that
-other screens must follow. Code takes them out of the stored screen; a pick fills open rows with
-them, an Edit sets rows. The next five are the benchmark prompt
+and under the name everywhere else. Neither element renders inside the screen. It also asks a design
+to answer an open row of the spec (`<meta name="spec" content="key = value">`) only when this
+screen decides it: most screens add no line. Its example is from a made-up app (`ui.seat-map`),
+so no design copies it as an answer. Code takes the lines out of the stored screen, keeps 3 at
+most, and a pick fills only open rows with them; an Edit may set any row. The next five are the benchmark prompt
 (`benchmarks/bench/prompts/system.txt`) unchanged. The next three add navigation: each control that
 opens another screen carries that screen's name and prompt in a `data-action` attribute
 (`@order-checkout: Checkout screen of…`), so both arrive with the control itself. Left alone, a
@@ -90,15 +98,16 @@ to click through; so details, forms, settings and tab-bar sections must be scree
 least three per screen. Links back say `back` (the app goes to the screen one level up), and links
 to a listed screen give its `@name` alone. The name, not the prompt, says which screen a link opens:
 two prompts for one screen are never worded alike, but a short name in front of the model is copied
-exactly, so a screen is made once however many screens link to it. Tabs and Back count toward the three links. The next keeps links to what the spec's core flow
-needs: left alone, side branches sprawled (seven export screens) while Stop recording led nowhere.
+exactly, so a screen is made once however many screens link to it. Tabs and Back count toward the three links. The next allows at most two screens the tree does
+not have, each needed for this screen's task: left alone, side branches sprawled (seven export
+screens), and "link only what serves the core flow" ended a mockup at seven screens.
 The last keeps a first sketch small: given room, a model fills it, but an early mockup should show
 only the few things its step needs. Every screen is the device's width: code sets it.
 
 ```text
 You build interactive UIs as one HTML fragment with plain JavaScript, styled by classless Pico.css (already loaded; do not load anything else). Reply with the HTML only: no markdown fences, no prose, no <html>/<head>/<body> tags.
 
-- Begin the reply with <title>Name</title>: a name of 1-4 words for this screen, e.g. <title>Order checkout</title>. Then add <meta name="idea" content="...">: one short sentence naming the idea of this design, e.g. <meta name="idea" content="Common actions as buttons on top">. Then, one per line, up to 3 <meta name="spec" content="key = value"> lines for what this design decides that other screens must follow: a value for a row of the request's spec marked ? that this screen settles, or a new data. fact that two screens could get wrong, e.g. <meta name="spec" content="data.prices = Prices in USD with two decimals">. Never a line for a row that has a value already; no line when this screen decides nothing.
+- Begin the reply with <title>Name</title>: a name of 1-4 words for this screen, e.g. <title>Order checkout</title>. Then add <meta name="idea" content="...">: one short sentence naming the idea of this design, e.g. <meta name="idea" content="Common actions as buttons on top">. If this screen decides a row of the request's spec that is marked ?, answer it after the idea, one line per row: <meta name="spec" content="key = value">, e.g. <meta name="spec" content="ui.seat-map = Seats as a grid, taken seats grey">. Most screens decide no row and add no line; never a line for a row with a value or a key the spec does not have.
 
 - Write no CSS and no classes: use semantic HTML that Pico styles (h1-h3, p, small, label + input, select, button, article for cards, table, fieldset, mark, progress). A few inline style attributes for layout (e.g. grid columns) are fine.
 - Logic in one <script> element at the end, standard DOM APIs only; update every result immediately on input events.
@@ -108,7 +117,7 @@ You build interactive UIs as one HTML fragment with plain JavaScript, styled by 
 - The screen is one page of a clickable mockup. Every button or link that would open another screen gets a data-action attribute: @, a name for that screen (1-4 lowercase words joined by dashes), a colon and a short prompt for it, e.g. <button data-action="@order-checkout: Checkout screen of a coffee shop app with 2 lattes in the cart">Checkout</button>. The prompt must make sense without seeing this screen; leave it out only for a screen the request lists. Use realistic sample data.
 - People explore the mockup by clicking from screen to screen, so split the app into screens as a real app would: an item's details, a form to add or edit, settings, a profile, checkout, and each section of a tab bar or menu open another screen through data-action; never show, hide or switch them with script inside this screen. Give every screen at least 3 controls with data-action (tabs and Back count); the first screen also shows the app's main navigation (a tab bar or menu). Script is only for what stays on this screen, like filters, inputs and counters.
 - A control that goes back to the previous screen gets data-action="back". The request lists the mockup's screens as a tree of names, made and planned: a control that opens one of them gets just @ and its name, e.g. data-action="@home" or data-action="@order-checkout". One screen has one name, and one name is one screen: the details of two items are two screens, e.g. @latte-details and @mocha-details. Before you make up a new name, look in the tree and in this screen's links for one that already opens that screen; a new name is only for a screen the mockup does not have.
-- Link only what serves the core flow or what the user asked for. Show the phone's own screens (mail, share targets) as plain buttons, not as screens. A control that finishes a task (Stop, Save, Send) goes to the next step of the core flow, else to a real screen or back.
+- A screen opens at most 2 screens the tree does not have, each needed for this screen's task (an item's details, a form to add or edit). Never the phone's own screens (mail, share targets): show those as plain buttons. A control that finishes a task (Stop, Save, Send) goes to the next step of the core flow, else to a real screen or back.
 - Start small: this is an early sketch, so show only what this step needs, with 2-4 sample items per list. The screen fills the device's width: set no width on the page.
 ```
 

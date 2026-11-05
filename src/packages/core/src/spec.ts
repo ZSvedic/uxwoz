@@ -95,21 +95,26 @@ function fits(spec: Spec, key: string): boolean {
 }
 
 /**
- * Put a picked design's lines in: a line fills an open row, or adds a known `ui.` name or a `data.`
- * fact the spec does not have. Lines for filled rows and made-up rules are dropped. Returns the keys set.
+ * Put a picked design's lines in: a line fills an open row, and nothing else. A design adds no key
+ * of its own, `data.` included: new rows come from the plan, an Edit or the user. When designs could
+ * add facts, 7 screens filled the spec with one screen's content. Returns the keys set.
  */
 export function applyPick(spec: Spec, lines: SpecLine[], screen: string): string[] {
   const taken: string[] = []
   for (const l of lines.slice(0, MAX_DESIGN_LINES)) {
     const row = spec[l.key]
-    if (row) { if (row.values.length) continue }
-    else if (!(l.key in KNOWN_ROWS || isFact(l.key)) || !fits(spec, l.key)) continue
-    const r = (spec[l.key] ??= { ...(KNOWN_ROWS[l.key] && { ask: KNOWN_ROWS[l.key] }), from: 'pick', values: [] })
-    r.values.push({ text: l.text, from: 'pick', screen, version: 0 })
+    if (!row || row.values.length) continue
+    row.values.push({ text: l.text, from: 'pick', screen, version: 0 })
     taken.push(l.key)
   }
   return taken
 }
+
+/** The spec of a mockup whose plan failed or was slow: main navigation and Back open, so screens still agree on them. */
+export const fallbackSpec = (): Spec => ({
+  'ui.nav': { ask: KNOWN_ROWS['ui.nav'], from: 'plan', values: [] },
+  'ui.back': { ask: KNOWN_ROWS['ui.back'], from: 'plan', values: [] },
+})
 
 /** Which of a design's lines its pick would put in (see applyPick), before the pick: the A OR B shows them. */
 export function wouldTake(spec: Spec, lines: SpecLine[]): boolean[] {
@@ -190,8 +195,8 @@ export function parsePlan(reply: string): Spec {
 
 /** One markup for each of these rows, styled by the theme: the request names it when the row is in the spec. */
 const MARKUP: Record<string, string> = {
-  'ui.nav': 'Tabs of ui.nav: last on every screen, in this markup, one link per tab with its label and @name, and aria-current="page" on this screen\'s own tab: <nav data-ui="tabs"><a data-action="@name">Label</a>…</nav>. A ui.nav line names each tab by its label and @name, e.g. ui.nav = Tabs: Menu @home, Orders @order-list, Profile @profile',
-  'ui.back': 'Back of ui.back: where ui.back says, with its label, in this markup: <a data-ui="back" data-action="back">Label</a>. The tab screens have no Back. A ui.back line starts with the label, e.g. ui.back = ‹ Back, first in the header',
+  'ui.nav': 'Tabs of ui.nav: last on every screen, in this markup, one link per tab with the label and @name ui.nav gives it, exactly; the app marks the current tab: <nav data-ui="tabs"><a data-action="@name">Label</a>…</nav>. A ui.nav line names each tab by its label and @name.',
+  'ui.back': 'Back of ui.back: where ui.back says, with its label, in this markup: <a data-ui="back" data-action="back">Label</a>. The tab screens have no Back. A ui.back line starts with the label Back shows, then where it sits.',
   'ui.toggles': 'An on/off setting of ui.toggles, as a switch: <label><input type="checkbox" role="switch"> Label</label>. A plain checkbox only picks items, such as what to include or export.',
 }
 
@@ -211,12 +216,29 @@ export function specRequest(spec: Spec): string {
     + (markup.length ? `\n\n${markup.join('\n')}` : '')
 }
 
+/** The core flow's step after the screen `name`, when that screen is a step with a next one. */
+export function nextStep(spec: Spec, name?: string): string | undefined {
+  const flow = flowNames(spec)
+  const i = name == null ? -1 : flow.indexOf(name)
+  return i >= 0 ? flow[i + 1] : undefined
+}
+
+/** The request's line for a step of the core flow: one control must open the next step. '' for any other screen. */
+export function flowRequest(spec: Spec, name?: string): string {
+  const next = nextStep(spec, name)
+  return next ? `This screen is a step of the main path (product.core-flow): one control on it must open @${next}.` : ''
+}
+
+/** The most screens one screen may open that the tree does not have yet. */
+export const MAX_NEW_SCREENS = 2
+
 /**
  * What a finished screen misses against the spec it was made with: a tab of ui.nav it does not link
- * to, a Back whose label is not the one ui.back says (tab screens have no Back), and a reply that
- * holds the screen twice. `name` is the screen's name, when it has one.
+ * to, a Back whose label is not the one ui.back says (tab screens have no Back), no control for the
+ * next step of the core flow, more than MAX_NEW_SCREENS screens the tree did not have (`known`: its
+ * names), and a reply that holds the screen twice. `name` is the screen's name, when it has one.
  */
-export function checkScreen(html: string, spec: Spec, name?: string): string[] {
+export function checkScreen(html: string, spec: Spec, name?: string, known?: Set<string>): string[] {
   const misses: string[] = []
   const tabs = navNames(spec)
   const links = [...html.matchAll(/data-action\s*=\s*["']([^"']*)["']/gi)].map((m) => m[1]!.trim())
@@ -230,6 +252,31 @@ export function checkScreen(html: string, spec: Spec, name?: string): string[] {
     if (!labels.length) misses.push('no Back')
     else for (const l of labels) if (!l || !back.includes(l)) misses.push(`Back says "${l}"`)
   }
+  const next = nextStep(spec, name)
+  if (next && !linked.has(next)) misses.push(`no link to @${next}, the next step of the core flow`)
+  if (known) {
+    const fresh = [...linked].filter((n) => n !== 'home' && n !== name && !known.has(n))
+    if (fresh.length > MAX_NEW_SCREENS) misses.push(`opens ${fresh.length} new screens (${fresh.map((n) => `@${n}`).join(', ')})`)
+  }
   if ((html.match(/<title>/gi)?.length ?? 0) > 1 || (html.match(/data-ui=["']tabs["']/gi)?.length ?? 0) > 1) misses.push('the screen is written twice')
   return misses
+}
+
+/**
+ * The app marks the current tab: in the tab bar, the model's own marks go, and the tab that opens
+ * `name` (the screen itself) gets aria-current="page". A screen that is not a tab has none marked.
+ */
+export function markTab(html: string, name?: string): string {
+  return html.replace(/(<nav\b[^>]*data-ui=["']tabs["'][^>]*>)([\s\S]*?)(<\/nav>)/gi, (_, open: string, inner: string, close: string) => {
+    const clean = inner.replace(/\s+aria-current\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    const marked = name == null ? clean : clean.replace(/<(a|button)\b([^>]*\bdata-action\s*=\s*["']@([a-z0-9_-]+)[^"']*["'][^>]*)>/gi,
+      (tag: string, el: string, attrs: string, n: string) => (n.toLowerCase() === name ? `<${el}${attrs} aria-current="page">` : tag))
+    return open + marked + close
+  })
+}
+
+/** Prose a model wrote before `<title>` goes: the reply must begin with the title. Markup before it stays. */
+export function cutProse(html: string): string {
+  const i = html.search(/<title>/i)
+  return i > 0 && !html.slice(0, i).includes('<') ? html.slice(i) : html
 }

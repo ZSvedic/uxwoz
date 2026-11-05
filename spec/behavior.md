@@ -175,8 +175,8 @@ scrolls so the screen stays fully visible beside it. Esc or ✕ closes it. It ha
   and its request, or Regenerate), the number of versions, model, device, when it was made, time to
   first text, total time, cost, cost of all versions, finish reason, **Check** (what the screen
   misses against the spec it was made with: a tab of `ui.nav` it does not link to, a Back labelled
-  otherwise than `ui.back` says, or a reply that holds the screen twice; *follows the spec* when
-  nothing), the **spec lines** the design proposed, size and prompt.
+  otherwise than `ui.back` says, no control to the next step of the core flow, more than 2 screens
+  the tree did not have, or a reply that holds the screen twice; *follows the spec* when nothing), the **spec lines** the design proposed, size and prompt.
 
 Choosing another screen while the drawer is open shows that screen in it.
 
@@ -188,21 +188,30 @@ agree on navigation, Back and facts ([the spec note](../process/plans/2026-11-05
 - **The plan**: before the first screen, one call to GPT-6.1 Sol writes the core flow (*@home →
   @recording → @morning-report*) and up to 8 open rows, each a key and the question it settles
   (*ui.nav ? main navigation*, *data.score ? whether higher means worse*). It takes about 2 s; after
-  6 s, or on an error, the first screen goes on with an empty spec. Start over plans again.
+  6 s, or on an error, the first screen goes on with `ui.nav` and `ui.back` open, so its screens
+  still agree on navigation and Back. Start over plans again.
 - **Every request carries the spec** after the tree: filled rows with their value, open rows with
   their question, and one markup each for the tabs of `ui.nav`, Back and switches.
 - **The core flow and the tabs of `ui.nav` are planned screens**: they are in the tree and in Nav
-  from the start, each flow step under the step before.
-- **Lines from designs**: a design may propose up to three lines (*ui.nav = Tabs: Tonight @home,
-  History @night-history*). In an A OR B they show under each side's idea, before the pick, two
+  from the start, each flow step under the step before. The request for a flow step with a next
+  step asks for one control that opens it (Stop recording opens the morning report).
+- **New screens**: a screen opens at most 2 screens the mockup does not have, each needed for its
+  task (an item's details, a form); the phone's own screens (mail, share targets) are plain buttons.
+- **Lines from designs**: a design answers an open row only when its screen decides it
+  (*ui.nav = Tabs: Tonight @home, History @night-history*); most screens add no line, and code
+  keeps 3 at most. A design adds no row of its own, facts included: when designs could, 7 screens
+  filled the spec with one screen's content. In an A OR B they show under each side's idea, before the pick, two
   text lines each: in orange with **+** the lines its pick would add, struck through with **–**
-  the ones it would drop; hovering shows a line whole. The pick fills rows that are still empty
-  (open rows, a known `ui.` name or a new `data.` fact) with the picked design's lines and drops
-  the rest, and the other design's lines; a line over 120 characters is refused. An Edit may set any row
+  the ones it would drop; hovering shows a line whole. The pick fills open rows with the picked
+  design's lines and drops the rest, and the other design's lines; a line over 120 characters is refused. An Edit may set any row
   (the Edit request asks for a line when the change is a rule other screens should follow); ✕ in
   the drawer or Undo takes its values back. A Regenerate's lines are dropped. A key one letter off
   a known name (`ui.toggle`) counts as the known name.
 - **Tab screens have no Back**: the app hides it there.
+- **The current tab** is marked by the app: the model's own marks are removed, and on a tab screen
+  its own tab is marked. A screen that is not a tab has none marked.
+- **Prose before the title** (*"The request as given contains no change…"*) is cut from the
+  stored screen.
 - Mockups made before the spec open with an empty one and work as before.
 
 ## Navigation

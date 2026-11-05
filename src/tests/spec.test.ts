@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  FLOW_KEY, MAX_LINE, PLANNER_PROMPT, ScreenCache, applyEdit, applyPick, checkScreen, dropValues, linesOf, makePlan, parsePlan,
+  FLOW_KEY, MAX_LINE, PLANNER_PROMPT, ScreenCache, applyEdit, applyPick, checkScreen, cutProse, dropValues, fallbackSpec, flowRequest, linesOf, makePlan, markTab, parsePlan, screenRequest,
   plannedScreens, specRequest, takeSpecLines, treeLines, valueOf, wouldTake, type Fetch, type Spec, type Version,
 } from '@uxwoz/core'
 import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
@@ -78,9 +78,11 @@ describe('lines from designs', () => {
     expect(taken).toEqual(['ui.nav'])
     expect(valueOf(spec, FLOW_KEY)).toBe('@home → @recording → @morning-report')
     expect(spec['ui.menu']).toBeUndefined()
-    // A later pick cannot change a filled row; it may add a known name or a new fact.
-    expect(applyPick(spec, [{ key: 'ui.nav', text: 'A drawer' }, { key: 'ui.toggles', text: 'Switches' }, { key: 'data.units', text: 'Minutes' }], 'settings')).toEqual(['ui.toggles', 'data.units'])
+    // A later pick cannot change a filled row, and adds no key of its own: no known name, no fact.
+    expect(applyPick(spec, [{ key: 'ui.nav', text: 'A drawer' }, { key: 'ui.toggles', text: 'Switches' }, { key: 'data.units', text: 'Minutes' }], 'settings')).toEqual([])
+    expect(applyPick(spec, [{ key: 'data.score', text: 'Higher is better' }], 'night')).toEqual(['data.score'])
     expect(valueOf(spec, 'ui.nav')).toBe('Tabs: Tonight @home, History @night-history')
+    expect(Object.keys(spec)).toEqual([FLOW_KEY, 'ui.nav', 'ui.back', 'data.score'])
   })
 
   test('before the pick, the A OR B shows which lines its pick would add and which it would drop', () => {
@@ -90,10 +92,9 @@ describe('lines from designs', () => {
     expect(valueOf(spec, 'ui.nav')).toBeUndefined() // a preview changes nothing
   })
 
-  test('a pick adds at most 8 facts', () => {
-    const spec: Spec = {}
-    for (let i = 0; i < 4; i++) applyPick(spec, [0, 1, 2].map((j) => ({ key: `data.f${i}-${j}`, text: 'x' })), `s${i}`)
-    expect(Object.keys(spec).length).toBe(8)
+  test('a pick puts in at most 3 lines', () => {
+    const spec = parsePlan(['ui.a ? a', 'ui.b ? b', 'ui.c ? c', 'ui.d ? d'].join('\n'))
+    expect(applyPick(spec, ['a', 'b', 'c', 'd'].map((k) => ({ key: `ui.${k}`, text: k })), 'home')).toEqual(['ui.a', 'ui.b', 'ui.c'])
   })
 })
 
@@ -184,6 +185,37 @@ describe('the request and the check', () => {
     ])
   })
 
+  test('a step of the core flow is asked for a control to the next step, near the end of the request', () => {
+    const spec = plan()
+    expect(flowRequest(spec, 'recording')).toBe('This screen is a step of the main path (product.core-flow): one control on it must open @morning-report.')
+    expect(flowRequest(spec, 'morning-report')).toBe('')
+    expect(flowRequest(spec, 'settings')).toBe('')
+    expect(screenRequest('Snore', 'Recording', [], { spec: specRequest(spec), device: 'a phone screen', flow: flowRequest(spec, 'recording') })).toEndWith('Design it for a phone screen.\n\nThis screen is a step of the main path (product.core-flow): one control on it must open @morning-report.')
+  })
+
+  test('the check flags a flow step with no control to the next step, and more than 2 new screens', () => {
+    const spec = plan()
+    expect(checkScreen('<button id="stop">Stop</button>', spec, 'recording')).toEqual(['no link to @morning-report, the next step of the core flow'])
+    expect(checkScreen('<button data-action="@morning-report">Stop</button>', spec, 'recording')).toEqual([])
+    const known = new Set(['home', 'recording', 'morning-report'])
+    const html = (n: number) => Array.from({ length: n }, (_, i) => `<a data-action="@new-${i}: A new screen">x</a>`).join('') + '<a data-action="@home">Home</a>'
+    expect(checkScreen(html(2), {}, 'settings', known)).toEqual([])
+    expect(checkScreen(html(3), {}, 'settings', known)).toEqual(['opens 3 new screens (@new-0, @new-1, @new-2)'])
+  })
+
+  test('the app marks the current tab, and removes the marks the model wrote', () => {
+    const nav = '<nav data-ui="tabs"><a data-action="@home" aria-current="page">Tonight</a><a data-action="@night-history">History</a></nav>'
+    expect(markTab(nav, 'night-history')).toBe('<nav data-ui="tabs"><a data-action="@home">Tonight</a><a data-action="@night-history" aria-current="page">History</a></nav>')
+    expect(markTab(nav, 'night-details')).toBe('<nav data-ui="tabs"><a data-action="@home">Tonight</a><a data-action="@night-history">History</a></nav>')
+    expect(markTab('<a data-action="@home" aria-current="page">Home</a>', 'x')).toBe('<a data-action="@home" aria-current="page">Home</a>')
+  })
+
+  test('prose before the title is cut; markup before it stays', () => {
+    expect(cutProse('The request has no change, so here it is again.\n\n<title>Home</title><h1>Hi</h1>')).toBe('<title>Home</title><h1>Hi</h1>')
+    expect(cutProse('<style>p{}</style><title>Home</title>')).toBe('<style>p{}</style><title>Home</title>')
+    expect(cutProse('<h1>No title</h1>')).toBe('<h1>No title</h1>')
+  })
+
   test('the check finds a missing tab, another Back label and a screen written twice; tab screens need no Back', () => {
     const spec = plan()
     applyPick(spec, [{ key: 'ui.nav', text: 'Tabs: Tonight @home, History @night-history' }, { key: 'ui.back', text: '‹ Back, first in the header' }], 'home')
@@ -193,11 +225,11 @@ describe('the request and the check', () => {
       .toEqual(['no tab for @night-history', 'Back says "‹ Settings"'])
     expect(checkScreen(`<h1>History</h1>${tabs}`, spec, 'night-history')).toEqual([])
     expect(checkScreen(`<h1>Night</h1>${tabs}`, spec, 'night-details')).toEqual(['no Back'])
-    expect(checkScreen(`<title>A</title>${tabs}<title>A</title>${tabs}`, spec, 'home')).toEqual(['the screen is written twice'])
+    expect(checkScreen(`<title>A</title>${tabs}<title>A</title>${tabs}`, spec, 'night-history')).toEqual(['the screen is written twice'])
   })
 })
 
-test('a failed plan never blocks the first screen: it comes with an empty spec', async () => {
+test('a failed plan never blocks the first screen: it starts with main navigation and Back open', async () => {
   const reply = `data: ${JSON.stringify({ model: 'anthropic/claude-haiku-5.5', choices: [{ delta: { content: '<title>Home</title><h1>Shop</h1>' }, finish_reason: 'stop' }], usage: { cost: 0.001 } })}\n\n`
   const fetch: Fetch = async () => new Response(reply)
   const cache = new ScreenCache()
@@ -206,7 +238,8 @@ test('a failed plan never blocks the first screen: it comes with an empty spec',
     const res = await globalThis.fetch(new URL('/api/screen', server.url), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app: 'Shop' }) })
     const evs = (await res.text()).trim().split('\n').map((l) => JSON.parse(l) as ScreenEvent)
     expect(evs.map((e) => e.type).filter((t) => t !== 'chunk')).toEqual(['meta', 'spec', 'version', 'version', 'done'])
-    expect(evs.find((e) => e.type === 'spec')).toEqual({ type: 'spec', spec: {} })
+    expect(evs.find((e) => e.type === 'spec')).toEqual({ type: 'spec', spec: fallbackSpec() })
+    expect(Object.keys(fallbackSpec())).toEqual(['ui.nav', 'ui.back'])
     expect(cache.hasSpec('Shop')).toBe(true)
     expect(cache.get('shop')!.proposals!.every((p) => p?.misses?.length === 0)).toBe(true)
   } finally {

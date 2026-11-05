@@ -46,8 +46,8 @@ can spend model credits.
   is still open comes back with its `proposals`, at no cost. Otherwise two designs stream at once:
   `meta.variants` is 2 and each `chunk` names its side (`variant` 0 or 1). A new mockup's first
   screen is planned first: after `meta`, the server asks GPT-6.1 Sol for the plan (6 s at most),
-  stores it as the mockup's spec and sends `spec`; a plan that fails or is slow stores an empty
-  spec, and the screen goes on. Every request carries the spec after the tree. One random side is asked
+  stores it as the mockup's spec and sends `spec`; a plan that fails or is slow stores a spec with
+  `ui.nav` and `ui.back` open (`fallbackSpec`), and the screen goes on. Every request carries the spec after the tree. One random side is asked
   for a clearly different design. Each side that finishes is stored at once as that side's
   proposal and sent as `version`; one that fails sends `failed` with its message. The first side to
   finish makes the screen, with the click as its parent (`from`, the key of the screen clicked in,
@@ -124,7 +124,8 @@ Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | nul
              // name comes from the model's <title>, idea from its <meta name="idea">;
              // feedback is the Edit request that made this version; spec is the design's
              // <meta name="spec"> lines (taken out of html); misses is what checkScreen found
-             // against the spec it was made with (absent for screens made without one)
+             // against the spec it was made with (absent for screens made without one). html has
+             // prose before <title> cut, and its tab bar's current tab marked by markTab
 Spec       Record<key, { ask?; from?: SpecFrom; values: { text; from: SpecFrom; screen?; version? }[] }>
              // one per mockup; key is product.*, ui.* or data.*; the last value counts; a row with
              // no value is open. SpecFrom is 'plan' | 'pick' | 'edit' | 'user'. screen and version

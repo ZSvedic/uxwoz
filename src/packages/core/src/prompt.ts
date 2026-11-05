@@ -3,7 +3,7 @@
 
 export const SYSTEM_PROMPT = `You build interactive UIs as one HTML fragment with plain JavaScript, styled by classless Pico.css (already loaded; do not load anything else). Reply with the HTML only: no markdown fences, no prose, no <html>/<head>/<body> tags.
 
-- Begin the reply with <title>Name</title>: a name of 1-4 words for this screen, e.g. <title>Order checkout</title>. Then add <meta name="idea" content="...">: one short sentence naming the idea of this design, e.g. <meta name="idea" content="Common actions as buttons on top">. Then, one per line, up to 3 <meta name="spec" content="key = value"> lines for what this design decides that other screens must follow: a value for a row of the request's spec marked ? that this screen settles, or a new data. fact that two screens could get wrong, e.g. <meta name="spec" content="data.prices = Prices in USD with two decimals">. Never a line for a row that has a value already; no line when this screen decides nothing.
+- Begin the reply with <title>Name</title>: a name of 1-4 words for this screen, e.g. <title>Order checkout</title>. Then add <meta name="idea" content="...">: one short sentence naming the idea of this design, e.g. <meta name="idea" content="Common actions as buttons on top">. If this screen decides a row of the request's spec that is marked ?, answer it after the idea, one line per row: <meta name="spec" content="key = value">, e.g. <meta name="spec" content="ui.seat-map = Seats as a grid, taken seats grey">. Most screens decide no row and add no line; never a line for a row with a value or a key the spec does not have.
 
 - Write no CSS and no classes: use semantic HTML that Pico styles (h1-h3, p, small, label + input, select, button, article for cards, table, fieldset, mark, progress). A few inline style attributes for layout (e.g. grid columns) are fine.
 - Logic in one <script> element at the end, standard DOM APIs only; update every result immediately on input events.
@@ -13,7 +13,7 @@ export const SYSTEM_PROMPT = `You build interactive UIs as one HTML fragment wit
 - The screen is one page of a clickable mockup. Every button or link that would open another screen gets a data-action attribute: @, a name for that screen (1-4 lowercase words joined by dashes), a colon and a short prompt for it, e.g. <button data-action="@order-checkout: Checkout screen of a coffee shop app with 2 lattes in the cart">Checkout</button>. The prompt must make sense without seeing this screen; leave it out only for a screen the request lists. Use realistic sample data.
 - People explore the mockup by clicking from screen to screen, so split the app into screens as a real app would: an item's details, a form to add or edit, settings, a profile, checkout, and each section of a tab bar or menu open another screen through data-action; never show, hide or switch them with script inside this screen. Give every screen at least 3 controls with data-action (tabs and Back count); the first screen also shows the app's main navigation (a tab bar or menu). Script is only for what stays on this screen, like filters, inputs and counters.
 - A control that goes back to the previous screen gets data-action="back". The request lists the mockup's screens as a tree of names, made and planned: a control that opens one of them gets just @ and its name, e.g. data-action="@home" or data-action="@order-checkout". One screen has one name, and one name is one screen: the details of two items are two screens, e.g. @latte-details and @mocha-details. Before you make up a new name, look in the tree and in this screen's links for one that already opens that screen; a new name is only for a screen the mockup does not have.
-- Link only what serves the core flow or what the user asked for. Show the phone's own screens (mail, share targets) as plain buttons, not as screens. A control that finishes a task (Stop, Save, Send) goes to the next step of the core flow, else to a real screen or back.
+- A screen opens at most 2 screens the tree does not have, each needed for this screen's task (an item's details, a form to add or edit). Never the phone's own screens (mail, share targets): show those as plain buttons. A control that finishes a task (Stop, Save, Send) goes to the next step of the core flow, else to a real screen or back.
 - Start small: this is an early sketch, so show only what this step needs, with 2-4 sample items per list. The screen fills the device's width: set no width on the page.`
 
 /** The most lines of the screen tree one request lists, so a long session keeps requests short (treeLines trims by depth first). */
@@ -29,19 +29,21 @@ export interface RequestExtras {
   alternative?: boolean
   /** The mockup's spec as the request carries it (specRequest), after the tree. */
   spec?: string
+  /** For a step of the core flow: the line that asks for a control to the next step (flowRequest). */
+  flow?: string
   /** An Edit: the screen as it is now, and the change the user asked for. */
   edit?: { html: string; change: string }
 }
 
 /** Ends an Edit's request, after the screen as it is now and before the change the user asked for. */
-export const EDIT_REQUEST = 'Reply with this screen again with one change; keep everything else as it is, including its data-action links, and add no second control for a screen it already links to. If the change is a rule other screens should follow too (how something looks or works, or what a value means), add a <meta name="spec" content="key = value"> line for it after the idea, e.g. <meta name="spec" content="ui.back = ← Back, top left">. The change:'
+export const EDIT_REQUEST = 'Reply with this screen again with one change; keep everything else as it is, including its data-action links, and add no second control for a screen it already links to. If the change is a rule other screens should follow too (how something looks or works, or what a value means), add a <meta name="spec" content="key = value"> line for it after the idea, e.g. <meta name="spec" content="ui.seat-map = Seats as a grid, taken seats grey">. The change:'
 
 /**
  * The user message for one screen: the product prompt alone, or the product plus an action prompt,
  * then the tree of the mockup's screens, made and planned (lines from treeLines), so links to them
  * use their names.
- * The spec, the device and the alternative request follow when given; an Edit ends with the screen
- * as it is now and the change.
+ * The spec, the device, the alternative request and the core flow's next step follow when given;
+ * an Edit ends with the screen as it is now and the change.
  */
 export function screenRequest(app: string, action: string | null, existing: string[] = [], extras: RequestExtras = {}): string {
   let msg = action ? `This screen belongs to a clickable mockup of: ${app}\n\nShow this screen: ${action}` : app
@@ -50,6 +52,7 @@ export function screenRequest(app: string, action: string | null, existing: stri
   if (extras.spec) msg += `\n\n${extras.spec}`
   if (extras.device) msg += `\n\nDesign it for ${extras.device}.`
   if (extras.alternative) msg += `\n\n${ALTERNATIVE_REQUEST}`
+  if (extras.flow) msg += `\n\n${extras.flow}`
   if (extras.edit) msg += `\n\nThe screen as it is now:\n${extras.edit.html}\n\n${EDIT_REQUEST} ${extras.edit.change}`
   return msg
 }

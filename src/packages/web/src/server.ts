@@ -3,7 +3,7 @@
 
 import { join, resolve } from 'node:path'
 import {
-  DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, PROPOSALS, ScreenCache, canonicalAction, generateScreen, isDevice, isModelId, makePlan,
+  DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, PROPOSALS, ScreenCache, canonicalAction, fallbackSpec, generateScreen, isDevice, isModelId, makePlan,
   plannedScreens, promptFromLabel, screenKey, screenRef, warmUp, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type Spec, type Version,
 } from '@uxwoz/core'
 import index from './index.html'
@@ -144,11 +144,11 @@ export function createServer(opts: ServerOptions = {}) {
     }
     const prompt = ref ? screenRef(action!)!.prompt : action
     yield { type: 'meta', key, cached: false, variants: PROPOSALS }
-    // A new mockup is planned before its first screen. A plan that fails or is slow leaves an empty
-    // spec, and the first screen goes on without it.
+    // A new mockup is planned before its first screen. A plan that fails or is slow does not hold
+    // it up: the spec starts with main navigation and Back open.
     if (action == null && !cache.hasSpec(app)) {
-      let spec: Spec = {}
-      try { spec = await plan(app, device, signal) } catch (err) { if (!signal.aborted) log(`plan failed: ${message(err)}`) }
+      let spec: Spec
+      try { spec = await plan(app, device, signal) } catch (err) { spec = fallbackSpec(); if (!signal.aborted) log(`plan failed: ${message(err)}`) }
       if (signal.aborted) return
       if (!gone()) cache.setSpec(app, spec)
       yield { type: 'spec', spec }

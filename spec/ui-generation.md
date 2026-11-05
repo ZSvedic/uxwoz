@@ -49,8 +49,8 @@ iframe. Pico styles the bare elements, so the model writes no CSS.
 
 With `ui.nav`, `ui.back` or `ui.toggles` in the mockup's spec, the request names one markup for
 each, and our frame CSS gives it its place: the tab bar (`<nav data-ui="tabs">`) sits at the bottom
-of a phone screen and the top of a desktop one, the current tab (`aria-current="page"`) bold and
-underlined; Back (`<a data-ui="back">`) is a bold link; a switch is Pico's
+of a phone screen and the top of a desktop one, the current tab (`aria-current="page"`, which the app sets on a tab screen's own tab after
+removing the model's marks) bold and underlined; Back (`<a data-ui="back">`) is a bold link; a switch is Pico's
 `<input type="checkbox" role="switch">`. The theme gives them its look (Mockup draws the tab bar's
 line thick). On the tab screens of `ui.nav` the app hides Back with CSS: asking the model not to
 draw it there failed on 20 of 30 tab screens.

@@ -5,7 +5,7 @@ import { extractFragment, screenIdea, screenName } from './frame.ts'
 import { DEVICES, type Device } from './frame.ts'
 import { MODELS, type ModelId } from './models.ts'
 import { SYSTEM_PROMPT, WARMUP_REQUEST, screenRequest } from './prompt.ts'
-import { checkScreen, specRequest, takeSpecLines, type Spec } from './spec.ts'
+import { checkScreen, cutProse, flowRequest, markTab, specRequest, takeSpecLines, type Spec } from './spec.ts'
 import { ProviderError, streamModel, type Fetch } from './providers.ts'
 
 /** A slower screen is useless, and keep-alive comments can stall a stream, so this is an overall deadline. */
@@ -45,7 +45,8 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
   try {
     for await (const ev of streamModel({
       model: o.model, system: SYSTEM_PROMPT,
-      user: screenRequest(o.app, o.action, o.existing, { device: o.device && DEVICES[o.device].request, alternative: o.alternative, spec: typeof o.spec === 'string' ? o.spec : o.spec && specRequest(o.spec), edit: o.edit }),
+      user: screenRequest(o.app, o.action, o.existing, { device: o.device && DEVICES[o.device].request, alternative: o.alternative, spec: typeof o.spec === 'string' ? o.spec : o.spec && specRequest(o.spec),
+        flow: typeof o.spec === 'object' ? flowRequest(o.spec, o.name) : undefined, edit: o.edit }),
       signal, fetch: o.fetch, env: o.env,
     })) {
       if (ev.type === 'text') {
@@ -62,9 +63,10 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
       // Only a finished screen may be cached: a stream that stopped early or hit the token limit is an error.
       if (!ev.finishReason) throw new ProviderError('the stream ended before the screen was complete')
       if (ev.finishReason !== 'stop') throw new ProviderError(`the screen was cut off (${ev.finishReason})`)
-      // The spec lines the design proposes come out of the stored screen.
-      const taken = takeSpecLines(extractFragment(raw))
-      const html = taken.html
+      // Prose before the title goes, the spec lines the design proposes come out of the stored
+      // screen, and the app marks the current tab.
+      const taken = takeSpecLines(cutProse(extractFragment(raw)))
+      const html = typeof o.spec === 'object' ? markTab(taken.html, o.name) : taken.html
       if (!html.trim()) throw new ProviderError('the model returned an empty screen')
       const spec = typeof o.spec === 'object' ? o.spec : null
       const name = screenName(html), idea = screenIdea(html)
@@ -84,7 +86,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
           ...(name && { name }),
           ...(idea && { idea }),
           ...(taken.lines.length && { spec: taken.lines }),
-          ...(spec && { misses: checkScreen(html, spec, o.name) }),
+          ...(spec && { misses: checkScreen(html, spec, o.name, knownNames(o.existing)) }),
         },
       }
       return
@@ -95,6 +97,9 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
     throw err
   }
 }
+
+/** The screen names in the tree lines of a request (`  @sleep-report: …`), home among them. */
+const knownNames = (lines: string[] = []) => new Set(['home', ...lines.map((l) => l.match(/^\s*@([a-z0-9_-]+)/i)?.[1]?.toLowerCase()).filter((n): n is string => !!n)])
 
 /** One short request with the same system prompt, so the provider's prompt cache is warm for the session. */
 export async function warmUp(model: ModelId, opts: { fetch?: Fetch; env?: Record<string, string | undefined> } = {}) {
