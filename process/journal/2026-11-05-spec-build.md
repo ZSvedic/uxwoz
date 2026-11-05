@@ -121,3 +121,32 @@ What the round leaves open:
   tab screen`. Open rows can still be answered badly; the user sees the line before the pick.
 - The Haiku mockup is in `temp/screen-cache-spec.json` (port 3001, the first remake kept as
   `screen-cache-spec.run1.json`), Luna's in `temp/screen-cache-luna.json` (port 3002).
+
+## Review of slices 1 and 2: what was fixed
+
+A critic read the slice commits and confirmed 13 findings, 2 more as plausible. All are fixed in
+a79289c, each with a test in `src/tests/spec-review.test.ts` (numbered as in the review):
+
+1. **The plan runs again** while a mockup has no first screen: a key that was missing no longer
+   leaves a mockup unplanned for good. ✕ under the OR before either side finishes clears the
+   plan. Info on Home shows the plan's rows, time and cost, or why it failed.
+2. **The tab bar's place is `!important`**: one recorded Home's inline style had put it mid-screen.
+3. **Spec tags are read one tag at a time**, either attribute first, the rest of the line kept;
+   a value with `<` is refused. Reading to the end of the line could store a blank screen.
+4. **An Edit line equal to the row's value** adds nothing.
+5. **Tabs only when `ui.nav` starts with `Tabs:`**, and the request now asks for that prefix. The
+   two remakes' `ui.nav` lines had none, so those mockups now count no screen as a tab and show
+   Back on Recording.
+6. **Back labels** decode entities and must be how `ui.back` starts; a `<button>` Back counts.
+7. **One plan per new mockup**, shared by concurrent requests, never stored over a picked Home.
+8. **No reload when a screen becomes a tab**: the frame gets a message instead of new CSS. A
+   tab screen's first build hides Back (seen in the app); the message path was not observed there.
+9. Already gone in the fix round: designs only fill open rows.
+10. **Nav lists the spec's screens** only once Home is picked.
+11. **Edit values are keyed by `createdAt`**, so a remade screen's Undo cannot take another's back.
+12. **"Written twice"** ignores titles inside SVG; no check runs for a mockup with no spec rows.
+13. **Tests** for the planner request and for a delete during the plan wait.
+14. **Docs** match the code on fit sizes, card width, the delete and drop routes, and the plan in Info.
+15. **A cache file from a newer app** is left alone: the app says so and saves nothing.
+
+Nothing was left out. A second critic is reading slice 3.
