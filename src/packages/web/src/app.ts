@@ -5,7 +5,7 @@
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
 import { nameWords, normalizePrompt, screenKey, screenRef, wayBack } from '@uxwoz/core/keys'
 import { namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
-import { navNames, wouldTake, type Spec } from '@uxwoz/core/spec'
+import { linesOf, navNames, wouldTake, type Spec } from '@uxwoz/core/spec'
 import type { CacheEntry, Version } from '@uxwoz/core'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
@@ -625,8 +625,13 @@ function renderDrawer() {
   const history = $('history')
   history.replaceChildren(...e.versions.map((x, i) => {
     const li = document.createElement('li')
-    li.textContent = i === 0 ? 'The design you picked' : x.feedback ? `Edit: ${x.feedback}` : 'Regenerated'
+    const what = document.createElement('span')
+    what.textContent = i === 0 ? 'The design you picked' : x.feedback ? `Edit: ${x.feedback}` : 'Regenerated'
+    li.append(what)
     li.classList.toggle('now', i === e.versions.length - 1)
+    // The spec lines this version set, old value beside new; an Edit's have a ✕ that takes them back.
+    const set = linesOf(state.spec, e.key, i)
+    if (set.length) li.append(specLines(e.key, i, set, !!x.feedback))
     return li
   }).reverse())
   const node = state.tree.get(e.key)
@@ -657,6 +662,40 @@ function renderDrawer() {
     dd.textContent = val
     return [dt, dd]
   }))
+}
+
+/** A version's spec lines in the drawer: key, the value before (struck), the value now, and ✕ for an Edit's. */
+function specLines(key: string, version: number, set: { key: string; text: string; before?: string }[], edit: boolean): HTMLElement {
+  const ul = document.createElement('ul')
+  ul.className = 'set-lines'
+  for (const l of set) {
+    const li = document.createElement('li')
+    const k = document.createElement('b'), old = document.createElement('s'), now = document.createElement('span')
+    k.textContent = l.key
+    old.textContent = l.before ?? 'not set'
+    old.classList.toggle('none', l.before == null)
+    now.textContent = l.text
+    li.append(k, old, now)
+    if (edit) {
+      const x = document.createElement('button')
+      x.type = 'button'
+      x.className = 'drop'
+      x.textContent = '✕'
+      x.title = 'Take this line back: the value before counts again for new screens'
+      x.addEventListener('click', () => dropLine(key, version, l.key))
+      li.append(x)
+    }
+    ul.append(li)
+  }
+  return ul
+}
+
+/** Take back one line an Edit set. */
+async function dropLine(key: string, version: number, row: string) {
+  const res = await post('/api/spec/drop', { key, version, row }).catch(() => null)
+  if (!res?.ok) return showError('Could not take the line back')
+  state.spec = (await res.json() as { spec: Spec }).spec
+  draw()
 }
 
 $('editPane').addEventListener('submit', (ev) => {

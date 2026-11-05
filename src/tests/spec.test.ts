@@ -63,6 +63,11 @@ describe('lines from designs', () => {
     expect(rest).toBe('<title>Home</title>\n<meta name="idea" content="Tabs at the bottom">\n<h1>Tonight</h1>')
   })
 
+  test('a singular or plural of a known name is the known name', () => {
+    expect(takeSpecLines('<meta name="spec" content="ui.toggle = Switches">').lines).toEqual([{ key: 'ui.toggles', text: 'Switches' }])
+    expect(Object.keys(parsePlan('product.core-flow @home → @a\nui.navs ? main navigation'))).toEqual([FLOW_KEY, 'ui.nav'])
+  })
+
   test('a pick fills only rows that are still empty, and drops the rest', () => {
     const spec = plan()
     const taken = applyPick(spec, [

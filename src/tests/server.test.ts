@@ -20,8 +20,9 @@ async function stream(path: string, body: object): Promise<ScreenEvent[]> {
   return (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
 }
 const screen = (body: object) => stream('/api/screen', body)
-/** The links to new screens in a screen (`@name: prompt`), in page order. */
-const actions = (html: string) => linksIn(html).map((l) => l.action).filter((a) => screenRef(a)?.prompt && screenRef(a)!.name !== 'home')
+/** The links to other screens by name in a screen (`@name` or `@name: prompt`), in page order. A screen
+ * the spec plans is linked by its name alone. */
+const actions = (html: string) => linksIn(html).map((l) => l.action).filter((a) => screenRef(a) && screenRef(a)!.name !== 'home')
 const nameOf = (action: string) => screenRef(action)!.name
 const done = (evs: ScreenEvent[]) => evs.find((e) => e.type === 'done') as Extract<ScreenEvent, { type: 'done' }>
 const pick = async (key: string, index: number) => (await (await post('/api/pick', { key, index })).json()).entry as CacheEntry
@@ -57,13 +58,15 @@ describe('web server', () => {
   })
 
   test('a click opens a new screen under its name, with the prompt of its link and the click as its parent', async () => {
-    const first = done(await screen({ app: APP })).entry
+    const { entry: first, spec } = done(await screen({ app: APP }))
     expect(first.name).toBe('home')
     const action = actions(shown(first))[0]!
+    // The link's prompt, or the planned screen's when the link names it alone.
+    const prompt = screenRef(action)!.prompt || plannedScreens([first], spec).find((p) => p.name === nameOf(action))!.action
     const evs = await screen({ app: APP, action, from: first.key, label: 'Our breads' })
     const { entry } = done(evs)
     expect(entry.key).toBe(`a tiny bakery website » @${nameOf(action)}`)
-    expect(entry).toMatchObject({ name: nameOf(action), action: screenRef(action)!.prompt, parent: { key: first.key, label: 'Our breads' } })
+    expect(entry).toMatchObject({ name: nameOf(action), action: prompt, parent: { key: first.key, label: 'Our breads' } })
     expect((await pick(entry.key, 0)).name).toBe(nameOf(action))
   }, 30_000)
 
@@ -84,9 +87,11 @@ describe('web server', () => {
   })
 
   test('a planned screen opened by its name alone is made from the prompt of the link that planned it', async () => {
-    const first = done(await screen({ app: APP })).entry
-    const planned = plannedScreens([first]).at(-1)!
-    expect(planned.action).toBe(screenRef(actions(shown(first)).find((a) => nameOf(a) === planned.name)!)!.prompt)
+    const { entry: first, spec } = done(await screen({ app: APP }))
+    // The last planned screen: one the spec plans, or one a link names; a link's prompt wins over the spec's words.
+    const planned = plannedScreens([first], spec).at(-1)!
+    const link = actions(shown(first)).find((a) => nameOf(a) === planned.name)
+    if (link && screenRef(link)!.prompt) expect(planned.action).toBe(screenRef(link)!.prompt)
     const second = done(await screen({ app: APP, action: `@${planned.name}`, from: first.key, label: 'More' })).entry
     expect(second).toMatchObject({ key: `a tiny bakery website » @${planned.name}`, name: planned.name, action: planned.action })
     await pick(second.key, 0)

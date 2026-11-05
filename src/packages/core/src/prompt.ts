@@ -34,7 +34,7 @@ export interface RequestExtras {
 }
 
 /** Ends an Edit's request, after the screen as it is now and before the change the user asked for. */
-export const EDIT_REQUEST = 'Reply with this screen again, changed only as follows; keep everything else as it is, including its data-action links, and add no second control for a screen it already links to. If the change decides something other screens must follow, add a <meta name="spec"> line that sets it:'
+export const EDIT_REQUEST = 'Reply with this screen again with one change; keep everything else as it is, including its data-action links, and add no second control for a screen it already links to. If the change is a rule other screens should follow too (how something looks or works, or what a value means), add a <meta name="spec" content="key = value"> line for it after the idea, e.g. <meta name="spec" content="ui.back = ← Back, top left">. The change:'
 
 /**
  * The user message for one screen: the product prompt alone, or the product plus an action prompt,

@@ -54,12 +54,20 @@ export const navNames = (spec: Spec) => namesIn(valueOf(spec, 'ui.nav') ?? '')
 
 const decode = (s: string) => s.replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
 
+/** A key as the menu names it: `ui.toggle` is `ui.toggles`, so a model cannot open a second row for a known one. */
+export function knownKey(key: string): string {
+  if (KNOWN_ROWS[key]) return key
+  if (KNOWN_ROWS[`${key}s`]) return `${key}s`
+  if (key.endsWith('s') && KNOWN_ROWS[key.slice(0, -1)]) return key.slice(0, -1)
+  return key
+}
+
 /** One `key = value` line, or null when it is not one or its value is too long (refused). */
 export function parseLine(s: string): SpecLine | null {
   const m = s.trim().match(/^([a-z][a-z0-9.-]*)\s*=\s*(.+)$/)
   if (!m || !isSpecKey(m[1]!)) return null
   const text = m[2]!.replace(/\s+/g, ' ').trim()
-  return text && text.length <= MAX_LINE ? { key: m[1]!, text } : null
+  return text && text.length <= MAX_LINE ? { key: knownKey(m[1]!), text } : null
 }
 
 /**
@@ -170,10 +178,11 @@ export function parsePlan(reply: string): Spec {
       continue
     }
     const r = l.match(/^([a-z][a-z0-9.-]*):?\s+\?\s+(.+)$/)
-    if (!r || !isSpecKey(r[1]!) || r[1] === FLOW_KEY || spec[r[1]!] || rows >= MAX_PLAN_ROWS) continue
+    const key = r && knownKey(r[1]!)
+    if (!r || !key || !isSpecKey(key) || key === FLOW_KEY || spec[key] || rows >= MAX_PLAN_ROWS) continue
     const ask = r[2]!.trim()
     if (ask.length > MAX_LINE) continue
-    spec[r[1]!] = { ask, from: 'plan', values: [] }
+    spec[key] = { ask, from: 'plan', values: [] }
     rows++
   }
   return spec

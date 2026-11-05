@@ -68,7 +68,7 @@ change, with no request for a different design:
 The screen as it is now:
 <title>Litter box details</title> …
 
-Reply with this screen again, changed only as follows; keep everything else as it is, including its data-action links, and add no second control for a screen it already links to. If the change decides something other screens must follow, add a <meta name="spec"> line that sets it: Show one level indicator instead of four
+Reply with this screen again with one change; keep everything else as it is, including its data-action links, and add no second control for a screen it already links to. If the change is a rule other screens should follow too (how something looks or works, or what a value means), add a <meta name="spec" content="key = value"> line for it after the idea, e.g. <meta name="spec" content="ui.back = ← Back, top left">. The change: Show one level indicator instead of four
 ```
 
 They live in the user message, so the system prompt stays the same for every request and the

@@ -167,7 +167,10 @@ scrolls so the screen stays fully visible beside it. Esc or ✕ closes it. It ha
 - **Edit**: *What should change?* Type it and click **Make the change** (or press Enter): the
   model gets this screen and the request, and returns the same screen with only that change, as a
   new version in place. **Past changes** lists the versions, newest first: *Edit: show one level
-  indicator, not four*, *Regenerated*, *The design you picked*, the one showing marked.
+  indicator, not four*, *Regenerated*, *The design you picked*, the one showing marked. Under each
+  version are the spec lines it set: the row, the value before struck through (*not set* for a new
+  row), and the value now. An Edit's lines have a **✕** that takes the line back, so the value
+  before counts again for new screens; **↶ Undo** of an Edit takes all its lines back.
 - **Info**: name, idea, the click that opened it, what made the version showing (the pick, an Edit
   and its request, or Regenerate), the number of versions, model, device, when it was made, time to
   first text, total time, cost, cost of all versions, finish reason, **Check** (what the screen
@@ -195,8 +198,10 @@ agree on navigation, Back and facts ([the spec note](../process/plans/2026-11-05
   text lines each: in orange with **+** the lines its pick would add, struck through with **–**
   the ones it would drop; hovering shows a line whole. The pick fills rows that are still empty
   (open rows, a known `ui.` name or a new `data.` fact) with the picked design's lines and drops
-  the rest, and the other design's lines; a line over 120 characters is refused. An Edit may set any row; Undo
-  takes its values back. A Regenerate's lines are dropped.
+  the rest, and the other design's lines; a line over 120 characters is refused. An Edit may set any row
+  (the Edit request asks for a line when the change is a rule other screens should follow); ✕ in
+  the drawer or Undo takes its values back. A Regenerate's lines are dropped. A key one letter off
+  a known name (`ui.toggle`) counts as the known name.
 - **Tab screens have no Back**: the app hides it there.
 - Mockups made before the spec open with an empty one and work as before.
 

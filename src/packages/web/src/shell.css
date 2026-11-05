@@ -179,7 +179,16 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .pane h3 { margin: 10px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .history { margin: 0; padding-left: 1.8em; display: flex; flex-direction: column; gap: 4px; color: var(--muted); }
 .history li.now { color: var(--fg); }
-.history li.now::after { content: " · showing"; color: var(--accent); }
+.history li.now > span::after { content: " · showing"; color: var(--accent); }
+/* The spec lines a version set: key, the value before struck through, the value now, and ✕ for an Edit's. */
+.set-lines { margin: 4px 0 2px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.set-lines li { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+.set-lines b { grid-column: 1; font-weight: 600; }
+.set-lines s { grid-column: 1; color: var(--muted); }
+.set-lines s.none { text-decoration: none; font-style: italic; }
+.set-lines span { grid-column: 1; }
+.set-lines .drop { grid-column: 2; grid-row: 1 / span 3; align-self: center; padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+.set-lines .drop:hover { color: var(--err); border-color: var(--err); }
 .info { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
 .info dt { color: var(--muted); }
 .info dd { margin: 0; overflow-wrap: anywhere; }
