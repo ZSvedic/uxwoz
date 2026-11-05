@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   FLOW_KEY, MAX_LINE, PLANNER_PROMPT, ScreenCache, applyEdit, applyPick, checkScreen, dropValues, linesOf, makePlan, parsePlan,
-  plannedScreens, specRequest, takeSpecLines, treeLines, valueOf, type Fetch, type Spec, type Version,
+  plannedScreens, specRequest, takeSpecLines, treeLines, valueOf, wouldTake, type Fetch, type Spec, type Version,
 } from '@uxwoz/core'
 import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
 
@@ -76,6 +76,13 @@ describe('lines from designs', () => {
     // A later pick cannot change a filled row; it may add a known name or a new fact.
     expect(applyPick(spec, [{ key: 'ui.nav', text: 'A drawer' }, { key: 'ui.toggles', text: 'Switches' }, { key: 'data.units', text: 'Minutes' }], 'settings')).toEqual(['ui.toggles', 'data.units'])
     expect(valueOf(spec, 'ui.nav')).toBe('Tabs: Tonight @home, History @night-history')
+  })
+
+  test('before the pick, the A OR B shows which lines its pick would add and which it would drop', () => {
+    const spec = plan()
+    applyPick(spec, [{ key: 'ui.back', text: '‹ Back' }], 'home')
+    expect(wouldTake(spec, [{ key: 'ui.nav', text: 'Tabs' }, { key: 'ui.back', text: '← Back' }, { key: 'ui.menu', text: 'A drawer' }])).toEqual([true, false, false])
+    expect(valueOf(spec, 'ui.nav')).toBeUndefined() // a preview changes nothing
   })
 
   test('a pick adds at most 8 facts', () => {

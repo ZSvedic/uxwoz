@@ -103,6 +103,12 @@ export function applyPick(spec: Spec, lines: SpecLine[], screen: string): string
   return taken
 }
 
+/** Which of a design's lines its pick would put in (see applyPick), before the pick: the A OR B shows them. */
+export function wouldTake(spec: Spec, lines: SpecLine[]): boolean[] {
+  const taken = applyPick(JSON.parse(JSON.stringify(spec)) as Spec, lines, '')
+  return lines.map((l, i) => i < MAX_DESIGN_LINES && taken.includes(l.key))
+}
+
 /** Put an Edit's lines in: any key, new ones too, within the limits. Returns the keys set. */
 export function applyEdit(spec: Spec, lines: SpecLine[], screen: string, version: number): string[] {
   const taken: string[] = []

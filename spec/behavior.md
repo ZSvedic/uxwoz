@@ -191,8 +191,11 @@ agree on navigation, Back and facts ([the spec note](../process/plans/2026-11-05
 - **The core flow and the tabs of `ui.nav` are planned screens**: they are in the tree and in Nav
   from the start, each flow step under the step before.
 - **Lines from designs**: a design may propose up to three lines (*ui.nav = Tabs: Tonight @home,
-  History @night-history*). The pick fills rows that are still empty with the picked design's
-  lines, and drops the rest; a line over 120 characters is refused. An Edit may set any row; Undo
+  History @night-history*). In an A OR B they show under each side's idea, before the pick, two
+  text lines each: in orange with **+** the lines its pick would add, struck through with **–**
+  the ones it would drop; hovering shows a line whole. The pick fills rows that are still empty
+  (open rows, a known `ui.` name or a new `data.` fact) with the picked design's lines and drops
+  the rest, and the other design's lines; a line over 120 characters is refused. An Edit may set any row; Undo
   takes its values back. A Regenerate's lines are dropped.
 - **Tab screens have no Back**: the app hides it there.
 - Mockups made before the spec open with an empty one and work as before.

@@ -5,7 +5,7 @@
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
 import { nameWords, normalizePrompt, screenKey, screenRef, wayBack } from '@uxwoz/core/keys'
 import { namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
-import { navNames, type Spec } from '@uxwoz/core/spec'
+import { navNames, wouldTake, type Spec } from '@uxwoz/core/spec'
 import type { CacheEntry, Version } from '@uxwoz/core'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
@@ -109,7 +109,11 @@ function sideCard(key: string, index: number, side: Side | null, stored: Version
   const version = stored ?? side?.version ?? null
   const id = `${key}#${index}`
   const error = version ? undefined : side ? side.error ?? undefined : state.failed.get(id) ?? 'This design was not finished.'
+  // The lines its pick would add to the spec, and the ones it would drop, shown before the pick.
+  const lines = version?.spec ?? []
+  const take = wouldTake(state.spec, lines)
   return {
+    lines: lines.map((l, i) => ({ text: `${l.key} = ${l.text}`, dropped: !take[i] })),
     id, width: widthOf(version?.device ?? device), device: version?.device ?? device, name: '', idea: version ? ideaOf(version) : '',
     side: { index, pickable: !!version }, error, streaming: !version && !error,
   }

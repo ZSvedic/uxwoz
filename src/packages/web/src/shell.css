@@ -125,6 +125,13 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .card .more { flex: none; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
 .card .more:hover { text-decoration: underline; }
 .card .note { color: var(--accent); font-weight: 600; }
+/* A side's spec lines under its idea, one line each: those its pick would add, and those it would drop. */
+.card .head > .spec-lines { margin: calc(4px / var(--z)) 0 0; padding: 0; list-style: none; white-space: normal; }
+.card .spec-lines li { max-height: calc(34px / var(--z)); line-height: calc(16px / var(--z)); font-size: calc(12px / var(--z));
+  margin-bottom: calc(2px / var(--z)); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--accent); }
+.card .spec-lines li::before { content: "+ "; }
+.card .spec-lines li.dropped { color: var(--muted); text-decoration: line-through; }
+.card .spec-lines li.dropped::before { content: "– "; }
 .card.streaming .screen { opacity: .8; }
 /* A side of an A OR B: its idea above in larger type, and a shield over the frame that takes the click. */
 .card.side .head > * { white-space: normal; }
