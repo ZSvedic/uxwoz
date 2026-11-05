@@ -13,10 +13,14 @@ import { screenName, type Device } from './frame.ts'
 import { HOME_NAME, nameFrom, screenTree, treeLines, uniqueName } from './tree.ts'
 import type { ModelId } from './models.ts'
 import { MAX_ROWS, applyEdit, applyPick, dropValues, fits, removeLine, removeRow, setUserLine, untie, type Spec, type SpecLine, type SpecRefusal } from './spec.ts'
-import type { ReviewInfo, Suggestion } from './review.ts'
+import { KEPT_ROWS, stillHolds, type ReviewInfo, type Suggestion } from './review.ts'
 
-/** What the review pass left for a mockup: suggestions waiting for the user, and a log of its runs. */
-export interface SpecReview { suggestions: Suggestion[]; reviews: ReviewInfo[] }
+/**
+ * What the review pass left for a mockup: suggestions waiting for the user, a log of its runs, the
+ * highest count of picked screens it has read (so one count is read once), and the rows the user
+ * deleted (so no review adds them again).
+ */
+export interface SpecReview { suggestions: Suggestion[]; reviews: ReviewInfo[]; lastCount?: number; deleted?: string[] }
 
 /** One design of a screen, as the model made it. */
 export interface Version {
@@ -208,7 +212,16 @@ export class ScreenCache {
 
   /** A mockup's review suggestions and runs. */
   review(app: string): SpecReview {
-    return this.reviewsOf.get(normalizePrompt(app)) ?? { suggestions: [], reviews: [] }
+    const r = this.reviewsOf.get(normalizePrompt(app)) ?? { suggestions: [], reviews: [] }
+    // A suggestion made against values that changed since (the user's line, a deleted row) is stale and does not show.
+    const spec = this.spec(app)
+    return { ...r, suggestions: r.suggestions.filter((s) => stillHolds(spec, s)) }
+  }
+
+  /** True when a mockup with this many picked screens is due a review: it has a spec, and that count was not read yet. */
+  dueReview(app: string, picked: number, every: number): boolean {
+    if (!picked || picked % every || !Object.keys(this.spec(app)).length) return false
+    return picked > (this.review(app).lastCount ?? 0)
   }
 
   /**
@@ -217,25 +230,40 @@ export class ScreenCache {
    */
   addReview(app: string, adds: { key: string; ask: string }[], suggestions: Suggestion[], info: ReviewInfo) {
     const spec = this.specOf(app)
-    const added = adds.filter((a) => !spec[a.key] && Object.keys(spec).length < MAX_ROWS && fits(spec, a.key)).map((a) => { spec[a.key] = { ask: a.ask, from: 'review', values: [] }; return a.key })
     const r = this.review(app)
-    this.reviewsOf.set(normalizePrompt(app), { suggestions: [...r.suggestions, ...suggestions], reviews: [...r.reviews, { ...info, added }] })
+    const added = adds.filter((a) => !Object.hasOwn(spec, a.key) && !r.deleted?.includes(a.key) && Object.keys(spec).length < MAX_ROWS && fits(spec, a.key))
+      .map((a) => { spec[a.key] = { ask: a.ask, from: 'review', values: [] }; return a.key })
+    // A new run replaces the suggestions the user has not settled, so they do not pile up.
+    const fresh = suggestions.filter((s) => stillHolds(spec, s))
+    this.reviewsOf.set(normalizePrompt(app), {
+      ...r, suggestions: fresh, reviews: [...r.reviews, { ...info, added, suggested: fresh.length }], lastCount: Math.max(r.lastCount ?? 0, info.screens),
+    })
     this.save()
   }
 
   /** The user's own line for a row. Returns why it was refused, or null. */
   setLine(app: string, key: string, text: string): string | null {
     const why = setUserLine(this.specOf(app), key, text)
-    if (!why) this.save()
-    return why
+    if (why) return why
+    // A row the user writes again is no longer one they deleted.
+    const r = this.reviewsOf.get(normalizePrompt(app))
+    if (r?.deleted?.length) r.deleted = r.deleted.filter((k) => k !== key.trim())
+    this.save()
+    return null
   }
 
   /** Delete a row's newest line (`line`) or the whole row. False when there was nothing to delete. */
   remove(app: string, key: string, what: 'line' | 'row'): boolean {
     const spec = this.specOf(app)
     const done = what === 'row' ? removeRow(spec, key) : removeLine(spec, key)
-    if (done) this.save()
-    return done
+    if (!done) return false
+    // A row the user deleted stays deleted: no review adds it again.
+    if (what === 'row' || !Object.hasOwn(spec, key)) {
+      const root = normalizePrompt(app), r = this.reviewsOf.get(root) ?? { suggestions: [], reviews: [] }
+      this.reviewsOf.set(root, { ...r, deleted: [...new Set([...(r.deleted ?? []), key])] })
+    }
+    this.save()
+    return true
   }
 
   /**
@@ -243,16 +271,21 @@ export class ScreenCache {
    * dismiss it. Returns why accepting failed, or null; undefined when there is no such suggestion.
    */
   settle(app: string, id: string, accept: boolean): string | null | undefined {
-    const r = this.review(app)
-    const s = r.suggestions.find((x) => x.id === id)
-    if (!s) return undefined
+    const root = normalizePrompt(app)
+    const r = this.reviewsOf.get(root)
+    const s = r?.suggestions.find((x) => x.id === id)
+    if (!r || !s) return undefined
+    const spec = this.specOf(app)
+    const drop = () => this.reviewsOf.set(root, { ...r, suggestions: r.suggestions.filter((x) => x.id !== id) })
     let why: string | null = null
-    if (accept) {
-      const spec = this.specOf(app)
+    // A suggestion made against values that changed since would put an old decision over a newer one.
+    if (accept && !stillHolds(spec, s)) why = 'the rows changed since this suggestion; it was dropped'
+    else if (accept && s.kind === 'merge' && KEPT_ROWS.includes(s.keys[1]!)) why = `a merge may not remove ${s.keys[1]}`
+    else if (accept) {
       why = setUserLine(spec, s.keys[0]!, s.text)
       if (!why && s.kind === 'merge') removeRow(spec, s.keys[1]!)
     }
-    if (!why) this.reviewsOf.set(normalizePrompt(app), { ...r, suggestions: r.suggestions.filter((x) => x.id !== id) })
+    if (!why || !stillHolds(spec, s)) drop()
     this.save()
     return why
   }

@@ -247,20 +247,30 @@ agree on navigation, Back and facts ([the spec note](../process/plans/2026-11-05
   the background ([prompt-review.md](prompt-review.md)). It may add up to 3 open rows the mockup
   turned out to need, within the limits, and suggest up to 3 rewordings or merges of filled
   lines. A suggestion changes nothing until the user accepts it. It never changes or removes a
-  filled row, never holds a screen up, and a failure only shows in the panel's log.
+  filled row, never holds a screen up, and a failure only shows in the panel's log. Each count of
+  picks is read once (a delete and a new pick do not start a second review at 5), a new run
+  replaces the suggestions not settled yet, a run that ends after Start over or Delete is dropped,
+  and a mockup from before the spec is never reviewed. The review never adds a row the user
+  deleted. A merge may not remove the core flow, `ui.nav` or `ui.back`.
 - **The spec panel** (the drawer's Spec tab, or **Spec** in the toolbar) is the one place to read
   and change the spec. It shows how full it is (*11 of 24 lines*), then the review's suggestions
-  with **Accept** and **Dismiss**, then the rows by section (Product, Screens, Facts): an open row
+  with **Accept** and **Dismiss** (each shows the rows' values now, and a merge says which row
+  goes; a suggestion whose rows changed since is stale and does not show, and Accept refuses it),
+  then the rows by section (Product, Screens, Facts): an open row
   with its question (*not decided yet: …*), a filled line with where it came from (*the plan*, *a
   pick on L1 Home*, *an Edit on …*, *the review pass*, *you*). **Change** (or **Decide** on an open
   row) writes the user's own line, **✕ line** deletes a row's newest line so the one before counts
   (or the row is open again), **Delete row** removes it, and **Add a line of your own** adds a row.
   The user's lines win: no Edit replaces them, and no model changes them. They keep the shapes
-  (`Tabs:`, a quoted Back label, a flow of `@names`). A change to `ui.nav` or `ui.back` redraws
+  (`Tabs:`, a quoted Back label, a flow of `@names`), and the key must be `product.`, `ui.` or
+  `data.` and a name. Saving a line unchanged changes nothing. The caps of 12 rules and 8 facts
+  bind what models add (the plan, the review pass); the user's lines and an Edit's are bound only
+  by the 24 lines the panel counts. A Change box stays open with what was typed while the panel
+  redraws, and a refused line keeps its text. A change to `ui.nav` or `ui.back` redraws
   every screen's tabs and Back at once. Under that, the review pass's last run: its rows,
   suggestions, time and cost.
 - **Export**: the panel shows the spec as markdown, with **Copy as markdown** and **Download .md**.
-  Only the spec.
+  Only the spec: the prompt's first line as its heading, keys and values code-quoted.
 
 ## Navigation
 

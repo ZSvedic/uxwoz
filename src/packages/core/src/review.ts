@@ -5,7 +5,7 @@
 
 import type { ModelId } from './models.ts'
 import { streamModel, type Fetch } from './providers.ts'
-import { MAX_LINE, fits, isSpecKey, knownKey, shapeOf, valueOf, type Spec } from './spec.ts'
+import { FLOW_KEY, MAX_LINE, fits, isSpecKey, knownKey, shapeOf, valueOf, type Spec } from './spec.ts'
 
 export const REVIEW_MODEL: ModelId = 'gpt-6.1-sol-ultrafast'
 /** A review runs after this many picked screens, and after each further this many. */
@@ -24,25 +24,35 @@ export const REVIEW_PROMPT = `You review the spec of a clickable mockup: the sho
 
 Never change what a row decides, never remove a row, and never ask about one screen's content. Each line is at most 120 characters.`
 
-/** A suggestion the user may accept or dismiss: a clearer line for a row, or two rows as one. */
-export interface Suggestion { id: string; kind: 'reword' | 'merge'; keys: string[]; text: string }
+/**
+ * A suggestion the user may accept or dismiss: a clearer line for a row, or two rows as one.
+ * `against` holds the rows' values it was made against: when either changes, it is stale and goes.
+ */
+export interface Suggestion { id: string; kind: 'reword' | 'merge'; keys: string[]; text: string; against: string[] }
+
+/** Rows a merge may not remove: tabs, Back and the flow are drawn and planned from them. */
+export const KEPT_ROWS = [FLOW_KEY, 'ui.nav', 'ui.back']
+
+/** True while the rows a suggestion was made against still hold the same values. */
+export const stillHolds = (spec: Spec, s: Suggestion) => s.keys.every((k, i) => valueOf(spec, k) === s.against[i])
 /** What one review did, for the spec panel. */
 export interface ReviewInfo { at: string; screens: number; ms: number; costUsd: number | null; added: string[]; suggested: number; error?: string }
 
-/** The review's request: the app, the spec with who set each line, and the tree. */
-export function reviewRequest(app: string, spec: Spec, tree: string[]): string {
+/** The review's request: the app, the spec with who set each line, the tree, and rows the user deleted. */
+export function reviewRequest(app: string, spec: Spec, tree: string[], deleted: string[] = []): string {
   const rows = Object.entries(spec).map(([k, r]) => {
     const v = r.values.at(-1)
     return v ? `${k} = ${v.text} (set by ${v.from === 'user' ? 'the user' : `a ${v.from}`})` : `${k} ? ${r.ask ?? ''}`.trimEnd()
   })
   return `The app: ${app}\n\nThe spec:\n${rows.join('\n') || '(empty)'}\n\nThe screens, as a tree:\n${tree.join('\n') || '(none)'}`
+    + (deleted.length ? `\n\nRows the user deleted; never add them again: ${deleted.join(', ')}` : '')
 }
 
 /**
  * The review's reply, checked: rows to add (keys the spec does not have, questions of at most 120
  * characters, within the limits) and suggestions (for filled rows only, in the shape their key needs).
  */
-export function parseReview(reply: string, spec: Spec, idPrefix = ''): { adds: { key: string; ask: string }[]; suggestions: Suggestion[] } {
+export function parseReview(reply: string, spec: Spec, idPrefix = '', deleted: string[] = []): { adds: { key: string; ask: string }[]; suggestions: Suggestion[] } {
   const adds: { key: string; ask: string }[] = []
   const suggestions: Suggestion[] = []
   const room: Spec = JSON.parse(JSON.stringify(spec))
@@ -51,7 +61,7 @@ export function parseReview(reply: string, spec: Spec, idPrefix = ''): { adds: {
     const add = l.match(/^add\s+([a-z][a-z0-9.-]*)\s+\?\s+(.+)$/i)
     if (add) {
       const key = knownKey(add[1]!.toLowerCase()), ask = add[2]!.trim()
-      if (adds.length < MAX_REVIEW_ADDS && isSpecKey(key) && !room[key] && ask.length <= MAX_LINE && !ask.includes('<') && fits(room, key)) {
+      if (adds.length < MAX_REVIEW_ADDS && isSpecKey(key) && !Object.hasOwn(room, key) && !deleted.includes(key) && ask.length <= MAX_LINE && !ask.includes('<') && fits(room, key)) {
         room[key] = { ask, from: 'review', values: [] }
         adds.push({ key, ask })
       }
@@ -62,26 +72,29 @@ export function parseReview(reply: string, spec: Spec, idPrefix = ''): { adds: {
     const kind = sug[1]!.toLowerCase() as Suggestion['kind']
     const keys = sug[2]!.split(',').map((k) => knownKey(k.trim().toLowerCase())).filter(Boolean)
     const text = sug[3]!.replace(/\s+/g, ' ').trim()
-    if ((kind === 'reword' ? keys.length !== 1 : keys.length !== 2 || keys[0] === keys[1]) || keys.some((k) => valueOf(spec, k) == null)) continue
-    if (text.length > MAX_LINE || text.includes('<') || text === valueOf(spec, keys[0]!)) continue
+    if ((kind === 'reword' ? keys.length !== 1 : keys.length !== 2 || keys[0] === keys[1]) || !keys.every(isSpecKey) || keys.some((k) => valueOf(spec, k) == null)) continue
+    if (kind === 'merge' && KEPT_ROWS.includes(keys[1]!)) continue
+    if (text.length > MAX_LINE || text.includes('<')) continue
     const shape = shapeOf({ key: keys[0]!, text })
-    if (!('text' in shape)) continue
-    suggestions.push({ id: `${idPrefix}${suggestions.length}`, kind, keys, text: shape.text })
+    // Compared after shaping, so a reword that comes out as the line it rewords is no suggestion.
+    if (!('text' in shape) || (kind === 'reword' && shape.text === valueOf(spec, keys[0]!))) continue
+    if (suggestions.some((x) => x.kind === kind && x.keys.join() === keys.join() && x.text === shape.text)) continue
+    suggestions.push({ id: `${idPrefix}${suggestions.length}`, kind, keys, text: shape.text, against: keys.map((k) => valueOf(spec, k)!) })
   }
   return { adds, suggestions }
 }
 
-export interface ReviewOptions { fetch?: Fetch; env?: Record<string, string | undefined>; ms?: number; idPrefix?: string }
+export interface ReviewOptions { fetch?: Fetch; env?: Record<string, string | undefined>; ms?: number; idPrefix?: string; deleted?: string[] }
 
 /** One review of a mockup's spec. Throws on an error or a slow reply. */
 export async function makeReview(app: string, spec: Spec, tree: string[], o: ReviewOptions = {}) {
   const t0 = performance.now()
   let reply = '', costUsd: number | null = null
   const signal = AbortSignal.timeout(o.ms ?? REVIEW_MS)
-  for await (const ev of streamModel({ model: REVIEW_MODEL, system: REVIEW_PROMPT, user: reviewRequest(app, spec, tree), maxTokens: 4000, signal, fetch: o.fetch, env: o.env })) {
+  for await (const ev of streamModel({ model: REVIEW_MODEL, system: REVIEW_PROMPT, user: reviewRequest(app, spec, tree, o.deleted), maxTokens: 4000, signal, fetch: o.fetch, env: o.env })) {
     if (ev.type === 'text') { reply += ev.text; continue }
     if (ev.finishReason !== 'stop') throw new Error(`the review was cut off (${ev.finishReason ?? 'no end'})`)
     costUsd = ev.costUsd
   }
-  return { ...parseReview(reply, spec, o.idPrefix), ms: Math.round(performance.now() - t0), costUsd }
+  return { ...parseReview(reply, spec, o.idPrefix, o.deleted), ms: Math.round(performance.now() - t0), costUsd }
 }

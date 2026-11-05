@@ -3,7 +3,7 @@
 
 import { join, resolve } from 'node:path'
 import {
-  DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, PROPOSALS, REVIEW_EVERY, ScreenCache, canonicalAction, fallbackSpec, generateScreen, isDevice, isModelId, makePlan, makeReview,
+  DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, PROPOSALS, REVIEW_EVERY, ScreenCache, canonicalAction, fallbackSpec, generateScreen, isDevice, isModelId, isSpecKey, makePlan, makeReview,
   plannedScreens, promptFromLabel, screenKey, screenRef, warmUp, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type PlanInfo, type PlanResult, type Spec, type Version,
 } from '@uxwoz/core'
 import index from './index.html'
@@ -38,7 +38,7 @@ export interface ServerOptions {
   /** Picks the side that is asked for a clearly different design; Math.random by default. */
   random?: () => number
   /** Reviews a mockup's spec after every REVIEW_EVERY picked screens (makeReview with Sol by default); it throws on an error. */
-  review?: (app: string, spec: Spec, tree: string[]) => ReturnType<typeof makeReview>
+  review?: (app: string, spec: Spec, tree: string[], deleted: string[]) => ReturnType<typeof makeReview>
   /** Plans a new mockup before its first screen (makePlan with Sol by default); it throws on an error or a slow reply. */
   plan?: (app: string, device: Device) => Promise<PlanResult | Spec>
 }
@@ -107,7 +107,7 @@ export function createServer(opts: ServerOptions = {}) {
   const log = opts.log ?? ((m: string) => console.warn(m))
   const random = opts.random ?? Math.random
   const plan = opts.plan ?? ((app: string, device: Device) => makePlan(app, device, { fetch: opts.fetch, env: opts.env }))
-  const review = opts.review ?? ((app: string, spec: Spec, tree: string[]) => makeReview(app, spec, tree, { fetch: opts.fetch, env: opts.env, idPrefix: `${Date.now().toString(36)}-` }))
+  const review = opts.review ?? ((app: string, spec: Spec, tree: string[], deleted: string[]) => makeReview(app, spec, tree, { fetch: opts.fetch, env: opts.env, deleted, idPrefix: `${Date.now().toString(36)}-` }))
   /** Mockups whose review is running now, by root. */
   const reviewing = new Set<string>()
   /**
@@ -117,14 +117,17 @@ export function createServer(opts: ServerOptions = {}) {
   function maybeReview(app: string) {
     const root = screenKey(app, null)
     const picked = cache.map(app).entries.filter((e) => e.versions.length).length
-    if (!picked || picked % REVIEW_EVERY || reviewing.has(root)) return
+    // Not for a mockup from before the spec (it stays as it was), and each count of picks once.
+    if (reviewing.has(root) || !cache.dueReview(app, picked, REVIEW_EVERY)) return
     reviewing.add(root)
-    const at = new Date().toISOString(), t0 = performance.now()
-    review(app, cache.spec(app), cache.existingScreens(app))
-      .then((r) => { if (cache.get(root)) cache.addReview(app, r.adds, r.suggestions, { at, screens: picked, ms: r.ms, costUsd: r.costUsd, added: [], suggested: r.suggestions.length }) })
+    const at = new Date().toISOString(), t0 = performance.now(), since = cache.now()
+    // A review that finishes after a delete or Start over belongs to a mockup that is gone.
+    const gone = () => cache.removedSince(root, since) || !cache.get(root)
+    review(app, cache.spec(app), cache.existingScreens(app), cache.review(app).deleted ?? [])
+      .then((r) => { if (!gone()) cache.addReview(app, r.adds, r.suggestions, { at, screens: picked, ms: r.ms, costUsd: r.costUsd, added: [], suggested: r.suggestions.length }) })
       .catch((err) => {
         log(`review failed: ${message(err)}`)
-        if (cache.get(root)) cache.addReview(app, [], [], { at, screens: picked, ms: Math.round(performance.now() - t0), costUsd: null, added: [], suggested: 0, error: message(err) })
+        if (!gone()) cache.addReview(app, [], [], { at, screens: picked, ms: Math.round(performance.now() - t0), costUsd: null, added: [], suggested: 0, error: message(err) })
       })
       .finally(() => reviewing.delete(root))
   }
@@ -381,8 +384,8 @@ export function createServer(opts: ServerOptions = {}) {
           if (refused) return refused
           const b = await req.json().catch(() => null)
           const app = typeof b?.app === 'string' ? b.app.trim() : ''
-          const what = b?.what === 'row' ? 'row' : 'line'
-          if (!app || !cache.remove(app, String(b?.key ?? ''), what)) return json({ error: 'no such line' }, 404)
+          const what = b?.what === 'row' ? 'row' : 'line', key = String(b?.key ?? '')
+          if (!app || !isSpecKey(key) || !cache.remove(app, key, what)) return json({ error: 'no such line' }, 404)
           return json({ spec: cache.spec(app) })
         },
       },

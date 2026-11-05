@@ -37,7 +37,7 @@ test('Sol reviews a spec: open rows it adds are new keys, and its suggestions ar
   expect(r.costUsd).toBeGreaterThan(0)
 }, 30_000)
 
-describe('the review never touches a filled row', () => {
+describe('the review\'s reply is checked against the spec', () => {
   test('an add for a filled or known key, a reword of an open row, or a bad shape is dropped', () => {
     const r = parseReview([
       'add ui.nav ? main navigation',
@@ -51,8 +51,7 @@ describe('the review never touches a filled row', () => {
     ].join('\n'), SPEC, 'x')
     expect(r.adds).toEqual([{ key: 'data.units', ask: 'which units durations use' }])
     expect(r.suggestions).toEqual([
-      { id: 'x0', kind: 'reword', keys: ['ui.back'], text: '"‹ Back", top left of every screen but the tabs' },
-      { id: 'x1', kind: 'merge', keys: ['ui.colors', 'ui.back'], text: '"Back", and colors' },
+      { id: 'x0', kind: 'reword', keys: ['ui.back'], text: '"‹ Back", top left of every screen but the tabs', against: ['"‹ Back", top left'] },
     ])
   })
 })

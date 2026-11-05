@@ -290,7 +290,7 @@ describe('shapes, and the drawn tabs in the tree', () => {
 })
 
 describe('the spec panel: the user\'s lines and Export', () => {
-  test('the user\'s line wins: an Edit cannot replace it; shapes and limits still hold', () => {
+  test('the user\'s line wins: an Edit cannot replace it; shapes and the key still hold', () => {
     const spec = plan()
     expect(setUserLine(spec, 'ui.back', 'Back sits top left')).toBe('a ui.back line starts with its label in double quotes, e.g. "‹ Back", top left')
     expect(setUserLine(spec, 'ui.back', '"‹ Back", top left')).toBeNull()
@@ -299,7 +299,11 @@ describe('the spec panel: the user\'s lines and Export', () => {
     expect(applyEdit(spec, [{ key: 'ui.back', text: '"← Back", top right' }], 'night', 't9', refused)).toEqual([])
     expect(refused).toEqual([{ line: 'ui.back = "← Back", top right', why: 'you set this row; your line wins' }])
     expect(setUserLine(spec, 'ui.toggles', 'Switches')).toBeNull() // a row of the user's own
-    expect(setUserLine(spec, 'bad key', 'x')).toBe('not a key = value line')
+    const badKey = 'a key is product., ui. or data. and lowercase words joined by dashes, e.g. ui.dark-mode'
+    for (const key of ['bad key', 'UI.Dark', 'ui.dark mode', 'ui.toggles = Switches', 'ui.x\nui.y']) expect(setUserLine(spec, key, 'x')).toBe(badKey)
+    expect(setUserLine(spec, 'ui.forms', '  ')).toBe('the line is empty')
+    expect(setUserLine(spec, 'ui.forms', 'x'.repeat(121))).toBe('longer than 120 characters')
+    expect(setUserLine(spec, 'ui.forms', '<b>x</b>')).toBe('it holds markup')
   })
 
   test('deleting a line brings the one before back, or opens the row; deleting a row removes it', () => {
@@ -320,11 +324,11 @@ describe('the spec panel: the user\'s lines and Export', () => {
   test('Export is the spec as markdown, by section, open rows with their question', () => {
     const spec = plan()
     applyPick(spec, [{ key: 'ui.nav', text: 'Tabs: Tonight @home, History @night-history' }], 'home')
-    expect(specMarkdown('NiceSnore', spec)).toBe([
+    expect(specMarkdown('NiceSnore\n## a second line of the prompt', spec)).toBe([
       '# Spec: NiceSnore', '', '4 of 24 lines. Every screen of the mockup follows these.', '',
-      '## Product', '', '- `product.core-flow`: @home → @recording → @morning-report', '',
-      '## Screens', '', '- `ui.nav`: Tabs: Tonight @home, History @night-history', '- `ui.back`: not decided yet (how Back looks)', '',
-      '## Facts', '', '- `data.score`: not decided yet (what the score means)', '',
+      '## Product', '', '- `product.core-flow`: `@home → @recording → @morning-report`', '',
+      '## Screens', '', '- `ui.nav`: `Tabs: Tonight @home, History @night-history`', '- `ui.back`: not decided yet (`how Back looks`)', '',
+      '## Facts', '', '- `data.score`: not decided yet (`what the score means`)', '',
     ].join('\n'))
   })
 })

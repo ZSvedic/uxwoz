@@ -253,8 +253,12 @@ async function* readEvents(res: Response): AsyncGenerator<ScreenEvent> {
   }
 }
 
-const post = (url: string, body: object, signal?: AbortSignal) =>
-  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal })
+/** Counts POSTs as they start and end: a map fetched across one may be older than what this page already shows. */
+let changes = 0
+const post = async (url: string, body: object, signal?: AbortSignal) => {
+  changes++
+  try { return await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal }) } finally { changes++ }
+}
 
 // ---- Screens ----------------------------------------------------------------------------------
 
@@ -495,9 +499,12 @@ function walkTrail(dir: 1 | -1) {
 async function reloadMap() {
   const app = state.app
   if (!app) return
+  const before = changes
   const res = await fetch(`/api/map?app=${encodeURIComponent(app)}`).catch(() => null)
-  if (!res?.ok || state.app !== app) return
-  applyMap(await res.json())
+  const map = res?.ok ? await res.json() : null
+  // A change made here while the map was on its way is newer than the map: keep it.
+  if (!map || state.app !== app || changes !== before) return
+  applyMap(map)
 }
 
 function applyMap(map: { entries: CacheEntry[]; spec?: Spec; review?: SpecReview; reviewing?: boolean }) {
@@ -506,6 +513,8 @@ function applyMap(map: { entries: CacheEntry[]; spec?: Spec; review?: SpecReview
   state.review = map.review ?? { suggestions: [], reviews: [] }
   state.reviewing = !!map.reviewing
   if (state.current && !state.entries.has(state.current)) state.current = null
+  // A page opened while a review runs watches it too.
+  if (state.reviewing && !reviewTimer) watchReview()
   draw()
 }
 
@@ -607,8 +616,9 @@ function watchReview(tries = 15) {
   state.reviewing = true
   clearTimeout(reviewTimer)
   reviewTimer = setTimeout(async () => {
+    reviewTimer = undefined
     await reloadMap()
-    if (state.reviewing && tries > 1) watchReview(tries - 1)
+    if (state.reviewing && tries > 1 && !reviewTimer) watchReview(tries - 1)
   }, 2000)
 }
 
@@ -792,8 +802,12 @@ function renderSpec() {
   $('specSuggestions').replaceChildren(...(state.review.suggestions.length ? [elText('h3', 'Suggestions from the review pass')] : []),
     ...state.review.suggestions.map((s) => {
       const box = elText('div', '', 'spec-suggestion')
-      box.append(elText('p', s.kind === 'merge' ? `Merge ${s.keys.join(' and ')} into one line:` : `Reword ${s.keys[0]}:`), elText('blockquote', s.text),
-        btn('Accept', 'Make this your line', () => settle(s.id, true), 'primary'), btn('Dismiss', 'Drop this suggestion', () => settle(s.id, false)))
+      // What is there now, so the user sees what Accept replaces, and for a merge which row goes.
+      const now = s.keys.map((k) => elText('p', `${k} now: ${valueOf(state.spec, k) ?? 'not set'}`, 'now'))
+      box.append(elText('p', s.kind === 'merge' ? `Merge ${s.keys[0]} and ${s.keys[1]} into one line for ${s.keys[0]}; ${s.keys[1]} goes:` : `Reword ${s.keys[0]}:`),
+        ...now, elText('blockquote', s.text),
+        btn('Accept', s.kind === 'merge' ? `Make this your line for ${s.keys[0]}, and delete ${s.keys[1]}` : 'Make this your line', () => settle(s.id, true), 'primary'),
+        btn('Dismiss', 'Drop this suggestion', () => settle(s.id, false)))
       return box
     }))
   $('specRows').replaceChildren(...SECTIONS.flatMap(([prefix, title]) => {
@@ -810,6 +824,8 @@ function renderSpec() {
       if (v) tools.append(btn('✕ line', 'Delete this line: the one before counts again, or the row is open', () => removeSpec(key, 'line')))
       tools.append(btn('Delete row', 'Delete the whole row', () => removeSpec(key, 'row'), 'danger'))
       li.append(elText('b', key), value, source, tools)
+      // A Change box that is open stays open, with what the user typed, whatever redraws the panel.
+      if (specEditing?.key === key) editRow(li, key, specEditing.text)
       ul.append(li)
     }
     return [elText('h3', title), ul]
@@ -821,36 +837,51 @@ function renderSpec() {
     : 'The review pass reads the spec after every 5 picked screens.'
 }
 
+/** The row whose Change box is open, and what is typed in it. */
+let specEditing: { key: string; text: string; focused: boolean } | null = null
+
 /** An inline box for the user's own line of a row. */
 function editRow(li: HTMLElement, key: string, text: string) {
   if (li.querySelector('form')) return
+  const focused = specEditing?.key === key ? specEditing.focused : true
+  specEditing = { key, text, focused }
   const form = document.createElement('form')
   form.className = 'spec-edit'
   const input = document.createElement('input')
   input.value = text
   input.maxLength = 120
-  form.append(input, btn('Cancel', 'Keep the line as it is', () => renderSpec()))
+  input.addEventListener('input', () => { if (specEditing?.key === key) specEditing.text = input.value })
+  input.addEventListener('focus', () => { if (specEditing?.key === key) specEditing.focused = true })
+  input.addEventListener('blur', () => { if (specEditing?.key === key) specEditing.focused = false })
+  form.append(input, btn('Cancel', 'Keep the line as it is', () => { specEditing = null; renderSpec() }))
   const save = document.createElement('button')
   save.type = 'submit'
   save.textContent = 'Save'
   form.prepend(save)
   form.insertBefore(input, save)
-  form.addEventListener('submit', (ev) => { ev.preventDefault(); setSpecLine(key, input.value) })
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault()
+    setSpecLine(key, input.value).then((ok) => { if (ok && specEditing?.key === key) { specEditing = null; renderSpec() } })
+  })
   li.append(form)
-  input.focus()
+  if (focused) { input.focus(); input.setSelectionRange(input.value.length, input.value.length) }
 }
 
 async function specCall(url: string, body: object): Promise<{ spec?: Spec; review?: SpecReview } | null> {
   const res = await post(url, { app: state.app, ...body }).catch(() => null)
   const b = res ? await res.json().catch(() => ({})) : {}
-  if (!res?.ok) { showError(b.error ?? 'Could not change the spec'); reloadMap(); return null }
+  if (!res?.ok) { showError(`Not saved: ${b.error ?? 'could not change the spec'}`); reloadMap(); return null }
   return b
 }
 
 /** The user's own line: it wins over every model, and a change to ui.nav or ui.back redraws every screen. */
-async function setSpecLine(key: string, text: string) {
+async function setSpecLine(key: string, text: string): Promise<boolean> {
   const b = await specCall('/api/spec/set', { key, text })
-  if (b?.spec) { state.spec = b.spec; draw() }
+  if (!b?.spec) return false
+  if (specEditing?.key === key) specEditing = null
+  state.spec = b.spec
+  draw()
+  return true
 }
 async function removeSpec(key: string, what: 'line' | 'row') {
   if (what === 'row' && !confirm(`Delete the row ${key}?`)) return
@@ -864,8 +895,9 @@ async function settle(id: string, accept: boolean) {
 
 $('specAdd').addEventListener('submit', (ev) => {
   ev.preventDefault()
+  // The form clears only when the line was taken; a refused one keeps what was typed.
   setSpecLine($<HTMLInputElement>('specAddKey').value.trim(), $<HTMLInputElement>('specAddText').value)
-    .then(() => { if (valueOf(state.spec, $<HTMLInputElement>('specAddKey').value.trim())) { $<HTMLInputElement>('specAddKey').value = ''; $<HTMLInputElement>('specAddText').value = '' } })
+    .then((ok) => { if (ok) { $<HTMLInputElement>('specAddKey').value = ''; $<HTMLInputElement>('specAddText').value = '' } })
 })
 $('specCopy').addEventListener('click', () => {
   navigator.clipboard.writeText(specMarkdown(state.app ?? '', state.spec)).then(() => { $('specCopy').textContent = 'Copied' ; setTimeout(() => { $('specCopy').textContent = 'Copy as markdown' }, 1500) }, () => showError('Could not copy'))

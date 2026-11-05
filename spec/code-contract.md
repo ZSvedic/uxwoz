@@ -84,7 +84,8 @@ can spend model credits.
 - `POST /api/pick` also starts the review pass, in the background, after every 5th picked screen
   of a mockup, and says `reviewing: true` then.
 - `GET /api/map?app=…`: `{root, entries: CacheEntry[], spec, review, reviewing}` for one mockup,
-  oldest first; `review` is `{suggestions, reviews}`. Levels, the
+  oldest first; `review` is `{suggestions, reviews, lastCount?, deleted?}`, its suggestions only
+  those that still hold. Levels, the
   tree and planned screens are not stored: `screenTree` and `plannedScreens` in `core/src/tree.ts`
   work them out (server and browser).
 - `GET /api/apps`: `{apps: {app, screens, updatedAt}[]}`, every mockup once as first typed,
@@ -150,7 +151,8 @@ Spec       Record<key, { ask?; from?: SpecFrom; values: { text; from: SpecFrom; 
              // one per mockup; key is product.*, ui.* or data.*; the last value counts; a row with
              // no value is open. SpecFrom is 'plan' | 'pick' | 'edit' | 'user'. screen and at (the
              // version's createdAt) say which screen version set a value, so Undo and ✕ can take it back
-Suggestion { id; kind: 'reword' | 'merge'; keys: string[]; text }
+Suggestion { id; kind: 'reword' | 'merge'; keys: string[]; text; against: string[] }
+           // against: the rows' values it was made against; when one changes, it is stale
 ReviewInfo { at; screens; ms; costUsd; added: string[]; suggested; error? }   // one review run
 SpecLine   { key; text }   // from one <meta name="spec" content="key = value"> tag, either attribute
              // first, read up to its closing quote; a value with < is refused

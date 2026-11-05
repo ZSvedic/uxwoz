@@ -208,6 +208,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .spec-add h3 { flex-basis: 100%; }
 .spec-suggestion { padding: 8px 10px; border: 1px solid var(--accent); border-radius: 8px; font-size: 13px; }
 .spec-suggestion p, .spec-suggestion blockquote { margin: 0 0 6px; }
+.spec-suggestion p.now { color: var(--muted); font-size: 12px; margin-bottom: 2px; }
 .spec-suggestion blockquote { padding-left: 8px; border-left: 2px solid var(--accent); }
 .spec-export pre { max-height: 200px; overflow: auto; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-size: 12px; white-space: pre-wrap; }
 .spec-reviews { margin: 0; color: var(--muted); font-size: 12px; }

@@ -48,7 +48,9 @@ export const isSpecKey = (k: string) => KEY.test(k)
 const isFact = (k: string) => k.startsWith('data.')
 
 /** The value a row has now, or undefined while it is open. */
-export const valueOf = (spec: Spec, key: string): string | undefined => spec[key]?.values.at(-1)?.text
+export const valueOf = (spec: Spec, key: string): string | undefined => rowOf(spec, key)?.values.at(-1)?.text
+/** A row, read as the spec's own key only: `constructor` or `__proto__` is no row. */
+export const rowOf = (spec: Spec, key: string): SpecRow | undefined => (Object.hasOwn(spec, key) ? spec[key] : undefined)
 
 /** The `@names` in a line, in order: `@home → @recording` gives home, recording. */
 export const namesIn = (text: string): string[] => [...text.matchAll(/@([a-z0-9][a-z0-9_-]*)/gi)].map((m) => m[1]!.toLowerCase())
@@ -264,7 +266,8 @@ export function applyEdit(spec: Spec, lines: SpecLine[], screen: string, at: str
     if (!('text' in shape)) { refused.push({ line, why: shape.why }); continue }
     if (valueOf(spec, l.key) === shape.text) { refused.push({ line, why: 'the row has this value already' }); continue }
     if (spec[l.key]?.values.at(-1)?.from === 'user') { refused.push({ line, why: 'you set this row; your line wins' }); continue }
-    if (!spec[l.key] && !fits(spec, l.key)) { refused.push({ line, why: 'the spec is full' }); continue }
+    // The caps of 12 rules and 8 facts bind what models add; an Edit, like the user, only the 24 lines.
+    if (!spec[l.key] && lineCount(spec) >= MAX_ROWS) { refused.push({ line, why: `the spec is full: ${MAX_ROWS} lines` }); continue }
     const r = (spec[l.key] ??= { ...(KNOWN_ROWS[l.key] && { ask: KNOWN_ROWS[l.key] }), from: 'edit', values: [] })
     r.values.push({ text: shape.text, from: 'edit', screen, at })
     taken.push(l.key)
@@ -453,12 +456,17 @@ export const lineCount = (spec: Spec) => Object.keys(spec).length
  */
 export function setUserLine(spec: Spec, key: string, text: string): string | null {
   key = knownKey(key.trim())
+  if (!isSpecKey(key)) return 'a key is product., ui. or data. and lowercase words joined by dashes, e.g. ui.dark-mode'
   const raw = text.replace(/\s+/g, ' ').trim()
-  const problem = lineProblem(`${key} = ${raw}`)
-  if (problem) return problem
+  if (!raw) return 'the line is empty'
+  if (raw.length > MAX_LINE) return `longer than ${MAX_LINE} characters`
+  if (raw.includes('<')) return 'it holds markup'
   const shape = shapeOf({ key, text: raw })
   if (!('text' in shape)) return shape.why
-  if (!spec[key] && !fits(spec, key)) return 'the spec is full'
+  // Saving a line unchanged changes nothing: a model's line stays the model's.
+  if (valueOf(spec, key) === shape.text) return null
+  // The user, like an Edit, is bound only by the 24 lines in all; the caps of 12 and 8 bind the models.
+  if (!rowOf(spec, key) && lineCount(spec) >= MAX_ROWS) return `the spec is full: ${MAX_ROWS} lines`
   const r = (spec[key] ??= { ...(KNOWN_ROWS[key] && { ask: KNOWN_ROWS[key] }), from: 'user', values: [] })
   r.values.push({ text: shape.text, from: 'user' })
   return null
@@ -466,7 +474,7 @@ export function setUserLine(spec: Spec, key: string, text: string): string | nul
 
 /** Delete a row's newest line, so the one before counts (or the row is open again). A row nobody planned goes with its last line. */
 export function removeLine(spec: Spec, key: string): boolean {
-  const row = spec[key]
+  const row = rowOf(spec, key)
   if (!row?.values.length) return false
   row.values.pop()
   if (!row.values.length && row.ask == null) delete spec[key]
@@ -475,7 +483,7 @@ export function removeLine(spec: Spec, key: string): boolean {
 
 /** Delete a whole row. */
 export function removeRow(spec: Spec, key: string): boolean {
-  if (!spec[key]) return false
+  if (!rowOf(spec, key)) return false
   delete spec[key]
   return true
 }
@@ -483,14 +491,17 @@ export function removeRow(spec: Spec, key: string): boolean {
 /** The spec as markdown, for Export: rows by section, open ones with their question. */
 export function specMarkdown(app: string, spec: Spec): string {
   const sections: [string, string][] = [['product.', 'Product'], ['ui.', 'Screens'], ['data.', 'Facts']]
-  const out = [`# Spec: ${app}`, '', `${lineCount(spec)} of ${MAX_ROWS} lines. Every screen of the mockup follows these.`]
+  // Code-quoted, so a value's own markdown or a prompt's second line cannot add headings or items.
+  const code = (t: string) => (t.includes('`') ? `\`\` ${t} \`\`` : `\`${t}\``)
+  const title = app.split('\n')[0]!.trim()
+  const out = [`# Spec: ${title}`, '', `${lineCount(spec)} of ${MAX_ROWS} lines. Every screen of the mockup follows these.`]
   for (const [prefix, title] of sections) {
     const keys = Object.keys(spec).filter((k) => k.startsWith(prefix))
     if (!keys.length) continue
     out.push('', `## ${title}`, '')
     for (const k of keys) {
       const v = valueOf(spec, k)
-      out.push(v != null ? `- \`${k}\`: ${v}` : `- \`${k}\`: not decided yet (${spec[k]!.ask ?? 'open'})`)
+      out.push(v != null ? `- ${code(k)}: ${code(v)}` : `- ${code(k)}: not decided yet (${code(spec[k]!.ask ?? 'open')})`)
     }
   }
   return out.join('\n') + '\n'
