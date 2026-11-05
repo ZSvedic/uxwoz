@@ -68,3 +68,56 @@ dashboard on Desktop was also checked: tabs on top, full width, fitted after the
 - **Prose before `<title>`** goes into the stored screen; nothing strips it yet.
 - The remade NiceSnore is in `temp/screen-cache-spec.json` (the second dev server, port 3001).
   `temp/screen-cache.backup-2026-11-05-before-spec.json` backs up the main cache from before.
+
+## Fix round, after the note took the findings
+
+The note changed in 38aa71c; commits a303940 and b90121f build it. NiceSnore was remade with
+Haiku (Home and Recording clicked in the app, the rest by the script) and once with Luna.
+
+- **Designs only fill open rows.** No key of its own, `data.` included. The prompt says a design
+  answers an open row only when its screen decides it; code keeps 3 at most. A failed plan
+  leaves `ui.nav` and `ui.back` open.
+- **At most 2 new screens per screen**, each for this screen's task. The check counts them; the
+  flow, the spec's tabs and a design's own `ui.nav` tabs are not new (b90121f: Home was flagged
+  for linking its own tabs).
+- **The flow step.** A screen of the core flow with a next step gets a line of its own: one
+  control must open `@next`. The check flags a flow step with no link to it.
+- **The current tab** is marked by code, the model's marks removed. The cause of Recording's tab
+  opening `@record` was ours: the markup text asked for `aria-current` on "this screen's own tab",
+  and Recording took the Record tab for its own and pointed it at itself.
+- **Prose before `<title>`** is cut. **The examples** in the prompt and the Edit request are from
+  a made-up app (`ui.seat-map`); the ready Back line is gone.
+
+| | Before: Haiku, 7 screens | After: Haiku, 9 screens | After: Luna, 6 screens |
+|---|---|---|---|
+| A tab missing or pointing elsewhere | 1 | 0 | 0 |
+| Back missing or labelled otherwise, off the tabs | 1 | 0 | 0 |
+| A wrong tab marked current | 1 | 0 | 0 |
+| Score read the other way | 0 | 0 | 0 |
+| Stop recording opens the morning report | no | yes | no: a script button |
+| A screen opening more than 2 new screens | not checked | 1 (Remedy log, 4) | 0 |
+| The screen written twice | 0 | 0 | 1 (Home) |
+| Screens with any miss | 2 of 7 | 1 of 9 | 2 of 6 |
+| Rows in the spec at the end | 12, 3 added by picks | 9, all from the plan | 9, all from the plan |
+| Rows that are one screen's content | 3 | 0 | 0 |
+| Spec lines a picked screen put in | 1 to 3 on all 7 | 1 to 3 on the first 4, then none | 1 to 3 on all 5 after Home |
+
+Tabs, Back and the score were counted by reading the HTML; the rest by code. "New screens" are
+screens a screen was the first to link to: Haiku's Home 4 (its flow and tabs, not new by the
+rule), Remedy log 4, the rest 0; Luna's Remedy log 1, the rest 0.
+
+What the round leaves open:
+
+- **The walks still end early**: 9 screens for Haiku, 6 for Luna, against the note's 15. Screens
+  now link almost only to screens the mockup has; the cap of 2 does not invite new ones. Reaching
+  15 by clicking needs a nudge for 1 or 2 new screens on screens that have none, or a different
+  goal.
+- **Luna's Stop is still a script button.** Its Recording links the summary with another control,
+  so the flow check passes: code cannot tell which control is Stop. Naming the control in the
+  flow line (`@recording (Stop) → …`) is still untried.
+- **Luna wrote Home twice** (1 of 6, against 3 of 21 in the reading test); the check shows it, and
+  nothing repairs it.
+- **Lines that describe a screen**: Recording's other design proposed `ui.back = No Back on this
+  tab screen`. Open rows can still be answered badly; the user sees the line before the pick.
+- The Haiku mockup is in `temp/screen-cache-spec.json` (port 3001, the first remake kept as
+  `screen-cache-spec.run1.json`), Luna's in `temp/screen-cache-luna.json` (port 3002).
