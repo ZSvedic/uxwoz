@@ -64,7 +64,8 @@ question it settles and its values, newest last. A row with no value is open.
 - **A line** is plain text of at most 120 characters; a longer one is refused. The whole spec is at
   most 24 lines, about 1 KB.
 - **`@names`** in `ui.nav` and `product.core-flow` are planned screens. The flow is a chain from
-  `@home`, each step under the one before.
+  `@home`, each step under the one before. The names in `ui.nav` are tabs only when the line
+  starts with `Tabs:`; any other navigation gets no tab markup and no tab check.
 - **Undo** of an Edit removes the values it added, so the value before counts again. Deleting a
   screen leaves the spec alone. Start over and Delete clear it.
 
@@ -81,8 +82,9 @@ A model proposes; a line counts only after the user saw it. No model changes a f
 | The user | any time, in the spec panel | add, change or delete anything; accept a suggestion |
 
 - **Reply.** A design writes its lines after its name and idea, one per line:
-  `<meta name="spec" content="ui.nav = Tabs: ...">`. Code reads each to the end of the line and
-  takes them out of the stored screen.
+  `<meta name="spec" content="ui.nav = Tabs: ...">`. Code reads each tag up to its closing `">`, so a
+  quote inside the text is safe, and takes the tag out of the stored screen. It refuses a value
+  with `<` in it. (Reading to the end of the line swallowed whatever followed on that line.)
 - **Request.** The spec goes in the user message after the tree, open rows with their questions.
 - **Shown.** A design's lines sit under its idea before the pick. An Edit's lines sit in the
   drawer, old value beside new, with a ✕. The panel lists open rows (*Map zoom: not decided yet*).
