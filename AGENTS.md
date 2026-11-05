@@ -50,7 +50,7 @@ src/packages/web/src/
   index.html, shell.css   the page around the canvas
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
-src/scripts/                 live experiments, run by hand: spec-reading-test.ts (spec note, build step 1)
+src/scripts/                 live experiments, run by hand: spec-reading-test.ts and planner-test.ts (spec note, build steps 1 and 2)
 ```
 
 ## Do not read (large or generated)
