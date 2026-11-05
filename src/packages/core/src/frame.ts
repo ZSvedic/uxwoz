@@ -1,6 +1,8 @@
 // Turns the model's HTML fragment into the srcdoc page for the sandboxed iframe.
 // Runs in the browser as well as on the server, so it uses no Node or Bun APIs.
 
+import { applyChrome, type Chrome } from './spec.ts'
+
 /**
  * Remove a markdown fence (and prose around a fenced block) if the model added one.
  * The code itself is never changed, so failures stay the model's.
@@ -63,9 +65,26 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
   // What the control says, shown between the two screens it joins.
   const labelOf = (el) => el ? (el.getAttribute('aria-label') || el.textContent || el.value || '').trim().replace(/\\s+/g, ' ') : ''
   window.uxwoz = { go }
-  // The app says when this screen is a tab of ui.nav (Back is hidden there), without a reload.
+  // The app says when this screen is a tab of ui.nav (Back is hidden there), and redraws its tabs and
+  // Back's label when the spec changes (as applyChrome does for the first build), without a reload.
+  const redraw = (bar, back) => {
+    const main = document.querySelector('main')
+    if (!main) return
+    if (bar) {
+      const navs = main.querySelectorAll('nav[data-ui="tabs"]')
+      if (navs.length) { navs[0].outerHTML = bar; for (const n of [...navs].slice(1)) n.remove() }
+      else {
+        const scripts = main.querySelectorAll('script'), last = scripts[scripts.length - 1]
+        if (last) last.insertAdjacentHTML('beforebegin', bar + '\\n')
+        else main.insertAdjacentHTML('beforeend', '\\n' + bar)
+      }
+    }
+    for (const b of main.querySelectorAll('a[data-ui="back"], button[data-ui="back"]')) b.textContent = back
+  }
   addEventListener('message', (e) => {
-    if (e.source === parent && e.data && e.data.uxwoz === 'tab') document.documentElement.toggleAttribute('data-tab', !!e.data.on)
+    if (e.source !== parent || !e.data) return
+    if (e.data.uxwoz === 'tab') document.documentElement.toggleAttribute('data-tab', !!e.data.on)
+    if (e.data.uxwoz === 'chrome' && typeof e.data.back === 'string') redraw(e.data.bar, e.data.back)
   })
   // Any press in the screen makes it the current one.
   addEventListener('pointerdown', () => parent.postMessage({ uxwoz: 'touch' }, '*'), true)
@@ -194,7 +213,8 @@ html[data-tab] [data-ui="back"] { display: none !important; }
  * The full page for the iframe's srcdoc: theme CSS inlined, our bootstrap, the fragment in <main>,
  * at least one screen of `device` tall.
  */
-export function framePage(fragment: string, css: string, final: boolean, device?: Device, tab = false): string {
+export function framePage(fragment: string, css: string, final: boolean, device?: Device, tab = false, chrome?: Chrome): string {
+  if (chrome) fragment = applyChrome(fragment, chrome)
   const style = css.replace(/<\/style/gi, '<\\/style')
   const h = device ? DEVICES[device].height : 0
   return `<!doctype html><html data-theme="light"${device ? ` data-device="${device}"` : ''}${tab ? ' data-tab' : ''}><head><meta charset="utf-8">`

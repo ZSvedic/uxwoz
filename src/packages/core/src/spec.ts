@@ -145,20 +145,41 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
  * the spec as it is now, so an old screen follows a changed line at once and nothing stored changes.
  */
 export function drawChrome(html: string, spec: Spec, name?: string): string {
-  let out = html
+  return applyChrome(html, chromeOf(spec, name))
+}
+
+/** Back's label while ui.back is open (or holds no quoted label): the screens still agree. */
+export const DEFAULT_BACK = '‹ Back'
+
+/** What code draws on a screen: its tab bar (null when ui.nav is no tab bar) and Back's label. */
+export interface Chrome { bar: string | null; back: string }
+
+/** The tab bar and Back label for the screen `name`, from the spec as it is now. */
+export function chromeOf(spec: Spec, name?: string): Chrome {
   const tabs = navNames(spec)
-  if (tabs.length) {
-    const bar = `<nav data-ui="tabs">${tabs.map((n) => `<a data-action="@${n}"${n === name ? ' aria-current="page"' : ''}>${esc(tabLabel(spec, n) || n)}</a>`).join('')}</nav>`
+  const bar = tabs.length
+    ? `<nav data-ui="tabs">${tabs.map((n) => `<a data-action="@${n}"${n === name ? ' aria-current="page"' : ''}>${esc(tabLabel(spec, n) || n)}</a>`).join('')}</nav>`
+    : null
+  return { bar, back: backLabelOf(valueOf(spec, 'ui.back') ?? '') ?? DEFAULT_BACK }
+}
+
+/**
+ * Apply chrome to a screen's HTML: the first tab bar becomes `bar` and any other goes (with no tab
+ * bar, `bar` goes before the last script, else at the end); every Back link or button gets the label.
+ * The frame's script does the same in place when the spec changes (redraw in frame.ts), so a first
+ * build and a redraw give the same screen, with no reload.
+ */
+export function applyChrome(html: string, chrome: Chrome): string {
+  let out = html
+  if (chrome.bar) {
     let drawn = false
-    out = out.replace(/<nav\b[^>]*data-ui=["']tabs["'][^>]*>[\s\S]*?<\/nav>/gi, () => (drawn ? '' : ((drawn = true), bar)))
+    out = out.replace(/<nav\b[^>]*data-ui=["']tabs["'][^>]*>[\s\S]*?<\/nav>/gi, () => (drawn ? '' : ((drawn = true), chrome.bar!)))
     if (!drawn) {
       const i = out.search(/<script\b(?![\s\S]*<script\b)/i)
-      out = i >= 0 ? out.slice(0, i) + bar + '\n' + out.slice(i) : out + '\n' + bar
+      out = i >= 0 ? out.slice(0, i) + chrome.bar + '\n' + out.slice(i) : out + '\n' + chrome.bar
     }
   }
-  const label = backLabelOf(valueOf(spec, 'ui.back') ?? '')
-  if (label) out = out.replace(/(<(a|button)\b[^>]*data-ui=["']back["'][^>]*>)[\s\S]*?(<\/\2>)/gi, (_, open: string, _t: string, close: string) => open + esc(label) + close)
-  return out
+  return out.replace(/(<(a|button)\b[^>]*data-ui=["']back["'][^>]*>)[\s\S]*?(<\/\2>)/gi, (_, open: string, _t: string, close: string) => open + esc(chrome.back) + close)
 }
 
 /** The kind of screen a name is: its last word when that says what the screen does (details, edit, add…), else its first word. */

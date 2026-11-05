@@ -231,7 +231,10 @@ agree on navigation, Back and facts ([the spec note](../process/plans/2026-11-05
 - **Code draws tabs and Back.** Each time a screen shows, the app redraws its tab bar from
   `ui.nav` (labels, names, the current tab marked on a tab screen) and Back's label from
   `ui.back`, and hides Back on the tab screens. A screen with no tab bar gets one; a screen with
-  no Back is left alone. Nothing stored changes, so an old screen follows a changed line at once.
+  no Back is left alone; while `ui.back` is open, Back reads `‹ Back`. Nothing stored changes, so
+  an old screen follows a changed line at once. A change redraws the tabs and Back inside each
+  frame by a message, so no screen reloads and its script keeps running (a recording timer goes
+  on counting); only a tab bar that goes away reloads its screens, to bring back their own markup.
   Asking the models was not enough: Luna dropped a tab on 2 of 6 screens and Haiku wrote Back two
   ways. The tree counts the drawn tabs as links from every screen.
 - **Shapes**: a tab bar's `ui.nav` starts with `Tabs:`, `ui.back` starts with its label in double

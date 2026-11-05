@@ -51,8 +51,9 @@ With `ui.nav`, `ui.back` or `ui.toggles` in the mockup's spec, the request names
 each, and our frame CSS gives it its place: the tab bar (`<nav data-ui="tabs">`) sits at the bottom
 of a phone screen and the top of a desktop one, the current tab (`aria-current="page"`) bold and underlined; Back (`<a data-ui="back">`) is a bold link; a switch is Pico's
 `<input type="checkbox" role="switch">`. The theme gives them its look (Mockup draws the tab bar's
-line thick). The app redraws the tab bar from `ui.nav` and Back's label from `ui.back` each time a
-screen shows (`drawChrome`), and hides Back on the tab screens with CSS: asking the model not to
+line thick). The app draws the tab bar from `ui.nav` and Back's label from `ui.back` (`‹ Back` while the row
+is open) when it builds a screen's page (`chromeOf`, `applyChrome`), and on a spec change our
+frame script redraws them in place from a message, the same way, with no reload; and hides Back on the tab screens with CSS: asking the model not to
 draw it there failed on 20 of 30 tab screens, and asking it for the same tabs failed on 2 of 6.
 
 ## Themes

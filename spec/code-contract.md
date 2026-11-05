@@ -103,7 +103,10 @@ can spend model credits.
 ## Frame messages
 
 The script we add to every screen talks to the app with `postMessage`; the app accepts a message
-only from a card's own frame.
+only from a card's own frame. The app sends a frame two messages, accepted only from its parent:
+`{ uxwoz: 'tab', on }` (this screen is a tab of `ui.nav`: hide Back) and
+`{ uxwoz: 'chrome', bar, back }` (redraw the tab bar and Back's label in place, as `applyChrome`
+does for the first build).
 
 ```ts
 { uxwoz: 'action', prompt, label }   // a click on a control with an action prompt (ignored on a side of an A OR B)

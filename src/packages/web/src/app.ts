@@ -5,7 +5,7 @@
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
 import { nameWords, normalizePrompt, screenKey, screenRef, wayBack } from '@uxwoz/core/keys'
 import { namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
-import { MAX_ROWS, drawChrome, lineCount, linesOf, navNames, specMarkdown, valueOf, wouldTake, type Spec, type SpecValue } from '@uxwoz/core/spec'
+import { MAX_ROWS, chromeOf, lineCount, linesOf, navNames, specMarkdown, valueOf, wouldTake, type Spec, type SpecValue } from '@uxwoz/core/spec'
 import type { CacheEntry, SpecReview, Version } from '@uxwoz/core'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
@@ -105,8 +105,8 @@ function screenNameOf(key: string): string | undefined {
 
 /** Code hides Back on the tab screens of ui.nav (asking the model did not work): the card tells its frame. */
 const isTab = (key: string) => navNames(state.spec).includes(screenNameOf(key) ?? '')
-/** A screen as its frame shows it: the tabs and Back label drawn from the spec as it is now. */
-const drawn = (key: string, html: string) => drawChrome(html, state.spec, screenNameOf(key))
+/** The tabs and Back label code draws on a screen, from the spec as it is now: the frame applies them, and redraws them in place. */
+const chromeFor = (key: string) => chromeOf(state.spec, screenNameOf(key))
 const ideaOf = (v: Version) => v.idea ?? ''
 
 function sideCard(key: string, index: number, side: Side | null, stored: Version | null, device: Device | undefined): CardView {
@@ -118,7 +118,7 @@ function sideCard(key: string, index: number, side: Side | null, stored: Version
   const take = wouldTake(state.spec, lines)
   return {
     lines: lines.map((l, i) => ({ text: `${l.key} = ${l.text}`, dropped: !take[i] })),
-    id, width: widthOf(version?.device ?? device), device: version?.device ?? device, tab: isTab(key), name: '', idea: version ? ideaOf(version) : '',
+    id, width: widthOf(version?.device ?? device), device: version?.device ?? device, tab: isTab(key), chrome: chromeFor(key), name: '', idea: version ? ideaOf(version) : '',
     side: { index, pickable: !!version }, error, streaming: !version && !error,
   }
 }
@@ -133,7 +133,7 @@ function views(): ScreenView[] {
     out.push(v ? {
       key: e.key, parent: treeParent(e.key), current: state.current === e.key, undo: e.versions.length > 1,
       note: revising ? (revising.change ? 'Making the change…' : 'Making a new design…') : '',
-      cards: [{ id: e.key, width: widthOf(v.device), device: v.device, tab: isTab(e.key), name: labelOf(e), idea: ideaOf(v), streaming: !!revising }],
+      cards: [{ id: e.key, width: widthOf(v.device), device: v.device, tab: isTab(e.key), chrome: chromeFor(e.key), name: labelOf(e), idea: ideaOf(v), streaming: !!revising }],
     } : {
       key: e.key, parent: treeParent(e.key), current: false, undo: false, note: '',
       cards: (e.proposals ?? []).map((p, i) => sideCard(e.key, i, making?.sides[i] ?? null, p, making?.device)),
@@ -158,10 +158,10 @@ async function draw() {
   if (theme !== themeSelect.value) return // a newer draw shows the newer theme
   for (const e of state.entries.values()) {
     const v = e.versions.at(-1)
-    if (v) { if (state.revising?.key !== e.key) canvas.show(e.key, drawn(e.key, v.html), true, css) }
-    else e.proposals?.forEach((p, i) => { if (p) canvas.show(`${e.key}#${i}`, drawn(e.key, p.html), true, css) })
+    if (v) { if (state.revising?.key !== e.key) canvas.show(e.key, v.html, true, css) }
+    else e.proposals?.forEach((p, i) => { if (p) canvas.show(`${e.key}#${i}`, p.html, true, css) })
   }
-  state.making?.sides.forEach((s, i) => { if (s.version) canvas.show(`${state.making!.key}#${i}`, drawn(state.making!.key, s.version.html), true, css) })
+  state.making?.sides.forEach((s, i) => { if (s.version) canvas.show(`${state.making!.key}#${i}`, s.version.html, true, css) })
 }
 
 async function fetchText(url: string): Promise<string> {
