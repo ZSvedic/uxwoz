@@ -96,24 +96,28 @@ Anything code can guarantee stays out of the spec.
 
 - **Size.** Every screen of a device gets the same width (phone 390 px) and at least one device
   screen of height. This reverses the earlier "only as wide as its content".
-- **Markup.** With `ui.nav` or `ui.back` in the spec, the prompt names one markup for each and the
-  theme styles it. The spec says which tabs; the theme says how tabs look.
-- **A check, no retry.** A finished screen must link to every name in `ui.nav` and carry the Back
-  label of `ui.back`. Misses show in Info.
+- **Markup.** With `ui.nav`, `ui.back` or `ui.toggles` in the spec, the request names one markup
+  for each and the theme styles it. The spec says which tabs; the theme says how tabs look. A tab
+  screen has no Back, and the request says so.
+- **A check, no retry.** A finished screen must link to every name in `ui.nav`, carry the Back
+  label of `ui.back` unless it is a tab screen, and hold one screen (Luna sometimes writes the
+  whole screen twice). Misses show in Info.
 - **Colors.** A line can say what a color means (*red: over budget*). The palette is the theme's.
 - **Prompt rules.** Link only what serves the core flow or what the user asked for. Show the
   phone's own screens (mail, share targets) as plain buttons. A control that finishes a task goes
-  to a real screen or back. Tabs and Back count toward "at least 3 controls with data-action".
+  to the next step of the core flow, else to a real screen or back. Tabs and Back count toward "at
+  least 3 controls with data-action".
 
 ## Build order
 
 Models following the spec is the risky half and the cheap one to test, so it goes first.
 
-1. **Reading test.** Write NiceSnore's spec by hand: the five filled lines of the example. Send it
-   with every request and add the size and markup rules. Make 15 screens each with Haiku and Luna,
-   and count per model the screens that miss a tab, write Back another way, use checkboxes or read
-   the score the wrong way. Report the counts in a journal entry. If a model does not follow five
-   hand-written lines, stop and rethink.
+1. **Reading test: done, passed.** Haiku and Luna got NiceSnore's five example lines, written by
+   hand, on 45 screens ([report](../journal/2026-11-05-spec-reading-test.md)). Every line that
+   names a label, a screen or a number held. Three things failed and are fixed above: Luna drew
+   checkboxes for `ui.toggles  Switches` (now a fixed markup), both models put Back on tab
+   screens, and Stop recording reached the morning report 2 times in 5 (the rule for finishing
+   controls was not in the test). Run the test again with the three fixes before step 3.
 2. **Planner test.** Run the planner on six app prompts (phone app, dashboard, map, game, desktop
    tool, kiosk) and read the checklists. This needs no screens.
 3. Lines from designs, shown at the pick; Edits with their ✕; Undo.
