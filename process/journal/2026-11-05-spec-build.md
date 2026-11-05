@@ -252,3 +252,34 @@ that asks for the quoted label, would close that gap.
 
 The walks still end early (9 and 6). Haiku's floor reached 12 last round and 9 now, so the length
 moves with the screens the walk happens to open, not with the rule.
+
+## Review of the fix rounds and round C
+
+The last critic read 12ad028 and the rounds before it; round D had covered none of its points.
+All 14 are fixed in ced228a, with tests in `src/tests/spec-review-5.test.ts`:
+
+1. **The doubled-reply cut** starts only at a second idea, or a second title outside `<svg>` and
+   `<script>`, and never ends inside a script. Two stored screens with a chart script would have
+   been cut mid-script at their next Edit.
+2. **A delete builds its tree with the spec**, so a screen reached only by a drawn tab stays.
+3. **`ui.nav` may say there is no tab bar** (*No tab bar: one step per screen*); only a line
+   that claims tabs without `Tabs:` is refused.
+4. **The kept copy ends at its last tag**, or at a marker like `</final>` or `</assistant>`, so
+   the junk between the copies goes.
+5. **Back is hidden on tab screens only when Home is a tab**: Luna's `Tabs: Record @recording, …`
+   had left Home unreachable.
+6. **Tabs parse as a label and one `@name`**, the label on either side, split by `,` `/` `|`
+   `·` `;` or `•`; a `Tabs:` line that does not parse is refused.
+7. **The tree reads each screen as drawn**, so a stored bar's stray links plan nothing; this also
+   replaced the separate tab-edge loop.
+8. **A plan stays shared until the request that started it ends**, so a second request between
+   the plan and the first design waits for it instead of replacing the spec.
+9. **Values saved with a version index** get that version's `createdAt` on load, or lose their tie.
+10. **More than 5 new screens** is flagged whatever their kinds.
+11. **"Written twice" counts tab-bar tags**, not a script's selector that names the bar.
+12. **A test fails for each mutation** the critic found unguarded, but one: the "never over a
+    picked Home" guard in the plan's store. With the plan shared until its first design is stored
+    (8), no request can reach it after a pick, so no test can fail without it; it stays as a guard.
+13. **Any element with `data-ui` tabs**, quoted or not, is the bar; a missing bar goes at the end
+    of the screen, never into a container.
+14. **A row filled before the shape rules** counts as open for picks, so it is no longer stuck.
