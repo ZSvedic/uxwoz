@@ -178,7 +178,7 @@ describe('screen cache', () => {
     screen(cache, 'Cafe', 'Cart', '<h1>Cart</h1>', { key: menu, label: 'Cart' })
     screen(cache, 'Bakery', null, '<h1>Bread</h1>')
     expect(cache.deleteApp('CAFE')).toBe(2)
-    expect(cache.map('Cafe')).toEqual({ root: 'cafe', entries: [], spec: {} })
+    expect(cache.map('Cafe')).toEqual({ root: 'cafe', entries: [], spec: {}, review: { suggestions: [], reviews: [] } })
     expect(cache.apps().map((a) => a.app)).toEqual(['Bakery'])
   })
 

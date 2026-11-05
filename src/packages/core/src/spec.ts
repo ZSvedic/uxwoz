@@ -4,7 +4,7 @@
 // values back. Runs in the browser as well as on the server, so it uses no Node or Bun APIs.
 
 /** Who gave a row its value. */
-export type SpecFrom = 'plan' | 'pick' | 'edit' | 'user'
+export type SpecFrom = 'plan' | 'pick' | 'edit' | 'user' | 'review'
 /**
  * One value of a row; `screen` and `at` (the version's createdAt) say which screen version set it, a
  * pick or an Edit. Not its index: a deleted and remade screen reuses indexes.
@@ -195,7 +195,7 @@ export function takeSpecLines(html: string): { html: string; lines: SpecLine[]; 
 }
 
 /** Whether a new key fits the limits: 12 rules, 8 facts, 24 rows. */
-function fits(spec: Spec, key: string): boolean {
+export function fits(spec: Spec, key: string): boolean {
   const keys = Object.keys(spec)
   if (keys.length >= MAX_ROWS) return false
   return isFact(key) ? keys.filter(isFact).length < MAX_FACTS : keys.filter((k) => !isFact(k)).length < MAX_RULES
@@ -242,6 +242,7 @@ export function applyEdit(spec: Spec, lines: SpecLine[], screen: string, at: str
     const line = `${l.key} = ${l.text}`
     if (!('text' in shape)) { refused.push({ line, why: shape.why }); continue }
     if (valueOf(spec, l.key) === shape.text) { refused.push({ line, why: 'the row has this value already' }); continue }
+    if (spec[l.key]?.values.at(-1)?.from === 'user') { refused.push({ line, why: 'you set this row; your line wins' }); continue }
     if (!spec[l.key] && !fits(spec, l.key)) { refused.push({ line, why: 'the spec is full' }); continue }
     const r = (spec[l.key] ??= { ...(KNOWN_ROWS[l.key] && { ask: KNOWN_ROWS[l.key] }), from: 'edit', values: [] })
     r.values.push({ text: shape.text, from: 'edit', screen, at })
@@ -419,4 +420,57 @@ export function markTab(html: string, name?: string): string {
 export function cutProse(html: string): string {
   const i = html.search(/<title>/i)
   return i > 0 && !html.slice(0, i).includes('<') ? html.slice(i) : html
+}
+
+/** How many lines the spec holds, one per row, against MAX_ROWS: the panel shows *9 of 24 lines*. */
+export const lineCount = (spec: Spec) => Object.keys(spec).length
+
+/**
+ * The user's own line for a row (`from: user`), new rows included, within the limits and in the
+ * shape its key needs. A user line wins: an Edit cannot replace it, and no model changes it.
+ * Returns why it was refused, or null when set.
+ */
+export function setUserLine(spec: Spec, key: string, text: string): string | null {
+  key = knownKey(key.trim())
+  const raw = text.replace(/\s+/g, ' ').trim()
+  const problem = lineProblem(`${key} = ${raw}`)
+  if (problem) return problem
+  const shape = shapeOf({ key, text: raw })
+  if (!('text' in shape)) return shape.why
+  if (!spec[key] && !fits(spec, key)) return 'the spec is full'
+  const r = (spec[key] ??= { ...(KNOWN_ROWS[key] && { ask: KNOWN_ROWS[key] }), from: 'user', values: [] })
+  r.values.push({ text: shape.text, from: 'user' })
+  return null
+}
+
+/** Delete a row's newest line, so the one before counts (or the row is open again). A row nobody planned goes with its last line. */
+export function removeLine(spec: Spec, key: string): boolean {
+  const row = spec[key]
+  if (!row?.values.length) return false
+  row.values.pop()
+  if (!row.values.length && row.ask == null) delete spec[key]
+  return true
+}
+
+/** Delete a whole row. */
+export function removeRow(spec: Spec, key: string): boolean {
+  if (!spec[key]) return false
+  delete spec[key]
+  return true
+}
+
+/** The spec as markdown, for Export: rows by section, open ones with their question. */
+export function specMarkdown(app: string, spec: Spec): string {
+  const sections: [string, string][] = [['product.', 'Product'], ['ui.', 'Screens'], ['data.', 'Facts']]
+  const out = [`# Spec: ${app}`, '', `${lineCount(spec)} of ${MAX_ROWS} lines. Every screen of the mockup follows these.`]
+  for (const [prefix, title] of sections) {
+    const keys = Object.keys(spec).filter((k) => k.startsWith(prefix))
+    if (!keys.length) continue
+    out.push('', `## ${title}`, '')
+    for (const k of keys) {
+      const v = valueOf(spec, k)
+      out.push(v != null ? `- \`${k}\`: ${v}` : `- \`${k}\`: not decided yet (${spec[k]!.ask ?? 'open'})`)
+    }
+  }
+  return out.join('\n') + '\n'
 }

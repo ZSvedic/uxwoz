@@ -11,7 +11,7 @@ const post = (path: string, body: object, headers: Record<string, string> = {}) 
   fetch(new URL(path, server.url), { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) })
 
 // The second side always asks for the different design, so the recorded requests replay.
-beforeAll(() => { server = createServer({ port: 0, cache: new ScreenCache(), fetch: tape.fetch, env: tape.env, log: () => {}, random: () => 0.9 }) })
+beforeAll(() => { server = createServer({ port: 0, cache: new ScreenCache(), fetch: tape.fetch, env: tape.env, log: () => {}, random: () => 0.9, review: async () => ({ adds: [], suggestions: [], ms: 0, costUsd: null }) }) })
 afterAll(() => { server.stop(true); tape.save() })
 
 async function stream(path: string, body: object): Promise<ScreenEvent[]> {

@@ -12,7 +12,11 @@ import { canonicalAction, nameWords, normalizePrompt, screenKey, screenRef } fro
 import { screenName, type Device } from './frame.ts'
 import { HOME_NAME, nameFrom, screenTree, treeLines, uniqueName } from './tree.ts'
 import type { ModelId } from './models.ts'
-import { applyEdit, applyPick, dropValues, untie, type Spec, type SpecLine, type SpecRefusal } from './spec.ts'
+import { MAX_ROWS, applyEdit, applyPick, dropValues, fits, removeLine, removeRow, setUserLine, untie, type Spec, type SpecLine, type SpecRefusal } from './spec.ts'
+import type { ReviewInfo, Suggestion } from './review.ts'
+
+/** What the review pass left for a mockup: suggestions waiting for the user, and a log of its runs. */
+export interface SpecReview { suggestions: Suggestion[]; reviews: ReviewInfo[] }
 
 /** One design of a screen, as the model made it. */
 export interface Version {
@@ -76,6 +80,8 @@ export class ScreenCache {
   private entries = new Map<string, CacheEntry>()
   /** Each mockup's spec, by its root (the normalized app prompt). */
   private specs = new Map<string, Spec>()
+  /** Each mockup's review suggestions and runs, by its root. */
+  private reviewsOf = new Map<string, SpecReview>()
   /** When each key was last deleted, on a counter, so a design still streaming cannot bring it back. */
   private removed = new Map<string, number>()
   private clock = 0
@@ -98,6 +104,7 @@ export class ScreenCache {
         for (const e of data.entries as CacheEntry[]) this.entries.set(e.key, e)
         // Files from before specs (version 3 and older): every mockup starts with an empty spec.
         for (const [root, spec] of Object.entries((data.specs ?? {}) as Record<string, Spec>)) this.specs.set(root, spec)
+        for (const [root, r] of Object.entries((data.reviews ?? {}) as Record<string, SpecReview>)) this.reviewsOf.set(root, r)
         if (data.version === 2) this.migrate()
       } else {
         // A file from before versions: it stays on disk, and the cache starts empty.
@@ -199,6 +206,57 @@ export class ScreenCache {
     this.save()
   }
 
+  /** A mockup's review suggestions and runs. */
+  review(app: string): SpecReview {
+    return this.reviewsOf.get(normalizePrompt(app)) ?? { suggestions: [], reviews: [] }
+  }
+
+  /**
+   * Store one review: its new open rows go in (only keys the spec still does not have, within the
+   * limits), its suggestions wait for the user, and its run is logged. A filled row is never touched.
+   */
+  addReview(app: string, adds: { key: string; ask: string }[], suggestions: Suggestion[], info: ReviewInfo) {
+    const spec = this.specOf(app)
+    const added = adds.filter((a) => !spec[a.key] && Object.keys(spec).length < MAX_ROWS && fits(spec, a.key)).map((a) => { spec[a.key] = { ask: a.ask, from: 'review', values: [] }; return a.key })
+    const r = this.review(app)
+    this.reviewsOf.set(normalizePrompt(app), { suggestions: [...r.suggestions, ...suggestions], reviews: [...r.reviews, { ...info, added }] })
+    this.save()
+  }
+
+  /** The user's own line for a row. Returns why it was refused, or null. */
+  setLine(app: string, key: string, text: string): string | null {
+    const why = setUserLine(this.specOf(app), key, text)
+    if (!why) this.save()
+    return why
+  }
+
+  /** Delete a row's newest line (`line`) or the whole row. False when there was nothing to delete. */
+  remove(app: string, key: string, what: 'line' | 'row'): boolean {
+    const spec = this.specOf(app)
+    const done = what === 'row' ? removeRow(spec, key) : removeLine(spec, key)
+    if (done) this.save()
+    return done
+  }
+
+  /**
+   * Accept a review suggestion (it becomes the user's line; a merge also removes its second row) or
+   * dismiss it. Returns why accepting failed, or null; undefined when there is no such suggestion.
+   */
+  settle(app: string, id: string, accept: boolean): string | null | undefined {
+    const r = this.review(app)
+    const s = r.suggestions.find((x) => x.id === id)
+    if (!s) return undefined
+    let why: string | null = null
+    if (accept) {
+      const spec = this.specOf(app)
+      why = setUserLine(spec, s.keys[0]!, s.text)
+      if (!why && s.kind === 'merge') removeRow(spec, s.keys[1]!)
+    }
+    if (!why) this.reviewsOf.set(normalizePrompt(app), { ...r, suggestions: r.suggestions.filter((x) => x.id !== id) })
+    this.save()
+    return why
+  }
+
   /**
    * Take back the line that the version made at `at` (its createdAt) of a screen set on row `row`
    * (the ✕ in the drawer). Not by index: after an Undo and a new Edit, a second browser's ✕ for the
@@ -264,9 +322,9 @@ export class ScreenCache {
   }
 
   /** One mockup: its screens, oldest first. */
-  map(app: string): { root: string; entries: CacheEntry[]; spec: Spec } {
+  map(app: string): { root: string; entries: CacheEntry[]; spec: Spec; review: SpecReview } {
     const root = normalizePrompt(app)
-    return { root, entries: this.mockup(root), spec: this.spec(app) }
+    return { root, entries: this.mockup(root), spec: this.spec(app), review: this.review(app) }
   }
 
   /** Every mockup once, as first typed, with its number of screens; most recently changed first. */
@@ -293,7 +351,7 @@ export class ScreenCache {
     // A first screen dropped that early takes its plan with it, so the next try plans again.
     this.tomb(key)
     if (!entry) {
-      if (!key.includes(' » ') && this.specs.delete(key)) this.save()
+      if (!key.includes(' » ') && this.specs.delete(key)) { this.reviewsOf.delete(key); this.save() }
       return undefined
     }
     const root = normalizePrompt(entry.app)
@@ -325,8 +383,9 @@ export class ScreenCache {
     const root = normalizePrompt(app)
     const gone = this.mockup(root)
     this.tomb(root)
-    // Start over and Delete clear the spec too.
+    // Start over and Delete clear the spec too, and what the review pass left.
     const had = this.specs.delete(root)
+    this.reviewsOf.delete(root)
     for (const e of gone) { this.entries.delete(e.key); this.tomb(e.key) }
     if (gone.length || had) this.save()
     return gone.length
@@ -353,7 +412,7 @@ export class ScreenCache {
     mkdirSync(dirname(this.file), { recursive: true })
     // Write a temp file, then rename, so a crash never leaves half a cache file.
     const tmp = `${this.file}.tmp`
-    writeFileSync(tmp, JSON.stringify({ version: FORMAT, entries: [...this.entries.values()], specs: Object.fromEntries(this.specs) }, null, 1))
+    writeFileSync(tmp, JSON.stringify({ version: FORMAT, entries: [...this.entries.values()], specs: Object.fromEntries(this.specs), reviews: Object.fromEntries(this.reviewsOf) }, null, 1))
     renameSync(tmp, this.file)
   }
 }

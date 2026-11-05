@@ -3,7 +3,7 @@
 
 import { join, resolve } from 'node:path'
 import {
-  DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, PROPOSALS, ScreenCache, canonicalAction, fallbackSpec, generateScreen, isDevice, isModelId, makePlan,
+  DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, PROPOSALS, REVIEW_EVERY, ScreenCache, canonicalAction, fallbackSpec, generateScreen, isDevice, isModelId, makePlan, makeReview,
   plannedScreens, promptFromLabel, screenKey, screenRef, warmUp, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type PlanInfo, type PlanResult, type Spec, type Version,
 } from '@uxwoz/core'
 import index from './index.html'
@@ -37,6 +37,8 @@ export interface ServerOptions {
   log?: (msg: string) => void
   /** Picks the side that is asked for a clearly different design; Math.random by default. */
   random?: () => number
+  /** Reviews a mockup's spec after every REVIEW_EVERY picked screens (makeReview with Sol by default); it throws on an error. */
+  review?: (app: string, spec: Spec, tree: string[]) => ReturnType<typeof makeReview>
   /** Plans a new mockup before its first screen (makePlan with Sol by default); it throws on an error or a slow reply. */
   plan?: (app: string, device: Device) => Promise<PlanResult | Spec>
 }
@@ -105,6 +107,30 @@ export function createServer(opts: ServerOptions = {}) {
   const log = opts.log ?? ((m: string) => console.warn(m))
   const random = opts.random ?? Math.random
   const plan = opts.plan ?? ((app: string, device: Device) => makePlan(app, device, { fetch: opts.fetch, env: opts.env }))
+  const review = opts.review ?? ((app: string, spec: Spec, tree: string[]) => makeReview(app, spec, tree, { fetch: opts.fetch, env: opts.env, idPrefix: `${Date.now().toString(36)}-` }))
+  /** Mockups whose review is running now, by root. */
+  const reviewing = new Set<string>()
+  /**
+   * After every REVIEW_EVERY picked screens, review the mockup's spec in the background: it never
+   * blocks a screen, and a failure only logs (and shows in the panel's log).
+   */
+  function maybeReview(app: string) {
+    const root = screenKey(app, null)
+    const picked = cache.map(app).entries.filter((e) => e.versions.length).length
+    if (!picked || picked % REVIEW_EVERY || reviewing.has(root)) return
+    reviewing.add(root)
+    const at = new Date().toISOString(), t0 = performance.now()
+    review(app, cache.spec(app), cache.existingScreens(app))
+      .then((r) => { if (cache.get(root)) cache.addReview(app, r.adds, r.suggestions, { at, screens: picked, ms: r.ms, costUsd: r.costUsd, added: [], suggested: r.suggestions.length }) })
+      .catch((err) => {
+        log(`review failed: ${message(err)}`)
+        if (cache.get(root)) cache.addReview(app, [], [], { at, screens: picked, ms: Math.round(performance.now() - t0), costUsd: null, added: [], suggested: 0, error: message(err) })
+      })
+      .finally(() => reviewing.delete(root))
+  }
+  /** True while a mockup's review runs, so the browser knows to look again. */
+  const isReviewing = (app: string) => reviewing.has(screenKey(app, null))
+
   /** Plans running now, by mockup root: a second request for the same new mockup waits for the first plan instead of making its own. */
   const planning = new Map<string, Promise<{ spec: Spec; info: PlanInfo }>>()
   const planFor = (app: string, device: Device) => {
@@ -291,7 +317,9 @@ export function createServer(opts: ServerOptions = {}) {
           if (refused) return refused
           const b = await req.json().catch(() => null)
           const entry = cache.pick(String(b?.key ?? ''), Number(b?.index))
-          return entry ? json({ entry, spec: cache.spec(entry.app) }) : json({ error: 'no such screen, or no such design to pick' }, 404)
+          if (!entry) return json({ error: 'no such screen, or no such design to pick' }, 404)
+          maybeReview(entry.app)
+          return json({ entry, spec: cache.spec(entry.app), reviewing: isReviewing(entry.app) })
         },
       },
       // One new version of a screen: an Edit with `change`, else a Regenerate.
@@ -333,7 +361,42 @@ export function createServer(opts: ServerOptions = {}) {
       '/api/map': (req) => {
         const app = new URL(req.url).searchParams.get('app')?.trim() ?? ''
         if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
-        return json(cache.map(app))
+        return json({ ...cache.map(app), reviewing: isReviewing(app) })
+      },
+      // The user's own line for a row, or deleting a row's newest line or the whole row: the spec panel.
+      '/api/spec/set': {
+        POST: async (req) => {
+          const refused = refuseForeign(req)
+          if (refused) return refused
+          const b = await req.json().catch(() => null)
+          const app = typeof b?.app === 'string' ? b.app.trim() : ''
+          if (!app || !cache.get(screenKey(app, null))) return json({ error: 'no such mockup' }, 404)
+          const why = cache.setLine(app, String(b?.key ?? ''), String(b?.text ?? ''))
+          return why ? json({ error: why }, 400) : json({ spec: cache.spec(app) })
+        },
+      },
+      '/api/spec/remove': {
+        POST: async (req) => {
+          const refused = refuseForeign(req)
+          if (refused) return refused
+          const b = await req.json().catch(() => null)
+          const app = typeof b?.app === 'string' ? b.app.trim() : ''
+          const what = b?.what === 'row' ? 'row' : 'line'
+          if (!app || !cache.remove(app, String(b?.key ?? ''), what)) return json({ error: 'no such line' }, 404)
+          return json({ spec: cache.spec(app) })
+        },
+      },
+      // Accept or dismiss a suggestion of the review pass.
+      '/api/spec/suggestion': {
+        POST: async (req) => {
+          const refused = refuseForeign(req)
+          if (refused) return refused
+          const b = await req.json().catch(() => null)
+          const app = typeof b?.app === 'string' ? b.app.trim() : ''
+          const why = app ? cache.settle(app, String(b?.id ?? ''), b?.accept === true) : undefined
+          if (why === undefined) return json({ error: 'no such suggestion' }, 404)
+          return why ? json({ error: why }, 400) : json({ spec: cache.spec(app), review: cache.review(app) })
+        },
       },
       '/api/apps': () => json({ apps: cache.apps() }),
       // Delete a screen and the screens only it reaches; the first screen takes the mockup with it.
