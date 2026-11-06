@@ -21,6 +21,22 @@ review. The spec code stays in the app until build step 2 of the plan.
   model too little is wrong, and sending it every screen is wrong too.
 - Rows of one list open one screen: nobody draws the same screen three times for other data.
 
+## Second round, the same day
+
+The user read the manual and asked for changes, all made:
+
+- The title is "Lean UI canvas manual", and it names what it borrows: a wireflow, a design
+  system's component library, and an architect's sheet (legend, general notes, schedules,
+  revision block).
+- Everything has an ID of 1 to 4 lowercase words. Rules have IDs too: numbers shift when a rule
+  is added or deleted.
+- The boxes have limits, a rule that does not fit a screen is skipped, and filing reads a box
+  before it adds to it.
+- The removal of the spec feature is a build step of its own, with
+  [a list and a check](../plans/2026-11-06-cleanup.md): code agents add and rarely delete.
+- Mid-priced models for the fixer are named with prices: GPT-6.1 Terra and Gemini 3.8 Flash.
+- Data is one box that holds several small tables.
+
 ## Decisions I made in the plan, for the user to confirm
 
 - I read "a table for states" as the sample data table.
