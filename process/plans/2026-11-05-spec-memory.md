@@ -1,5 +1,8 @@
 # Design note: a spec that grows one decision at a time
 
+**Replaced on 2026-11-06** by [the paper canvas plan](2026-11-06-paper-canvas.md): the spec, its
+panel and the code for tabs and Back go. This note stays as the record of what was built.
+
 This note proposes the shared state every new screen is made from: a short spec per mockup that
 records what the user decided. It owns what the spec holds, who may write to it and what code
 checks. It does not plan the code step by step, and the reasons behind each choice are in
