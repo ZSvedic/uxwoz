@@ -89,17 +89,18 @@ All three were measured on 2026-10-22/23 with the lite benchmark (`benchmarks/`)
   (6x the $2 / $10 standard price).
 - **All three** got the mortgage and todo screens right every time. The small models' one
   weakness is placing the BMI scale marker in the right category.
-- **GPT-6.1 Terra** files each decision, in the background: OpenAI Responses API `gpt-6.1-terra`,
-  standard tier, `reasoning: {effort: "low"}`, $1 in, $0.05 cached, $5 out per million tokens (an
-  estimate from tokens), a 60 s deadline. It was the only model to pass the paper test's filing
-  part ([report](../process/journal/2026-11-07-paper-test.md)); a filing took 1 to 5 s and $0.001
-  to $0.004 on NiceSnore. It is never offered as a screen model.
+- **GPT-6.1 Terra** files each decision and is the fixer, in the background: OpenAI Responses API
+  `gpt-6.1-terra`, standard tier, `reasoning: {effort: "low"}`, $1 in, $0.05 cached, $5 out per
+  million tokens (an estimate from tokens), a 60 s deadline. It was the only model to pass the
+  paper test's filing and fixing parts ([report](../process/journal/2026-11-07-paper-test.md)); a
+  filing took 1 to 5 s and $0.001 to $0.004 on NiceSnore, a visit 5 to 9 s and $0.003 to $0.009.
+  It is never offered as a screen model.
 
 ## Calling the models
 
 - Stop a request at 20 s: a slower screen is useless, and keep-alive comments can stall a stream
   forever, so use an overall deadline, not a read timeout.
-- Read the served model and tier from the response and log substitutions.
+- Read the served model from the response; Info shows it.
 - Send one short warm-up request with the same system prompt before a session: prompt caching
   makes the following screens faster.
 

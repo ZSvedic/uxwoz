@@ -6,7 +6,7 @@
 
 You need [bun](https://bun.sh) and a root `.env` with `OPENROUTER_API_KEY` (Claude Haiku, the
 default) and `OPENAI_API_KEY` (the two GPT models, and GPT-6.1 Terra, which files every decision
-into the boxes). All `bun` commands run from `src/`.
+into the boxes and tidies them as the fixer). All `bun` commands run from `src/`.
 
 ```bash
 cd src && bun install && bun run dev
@@ -20,8 +20,10 @@ its right: ✎ Edit, ↻ Regenerate, ↶ Undo, ⓘ Info, ✕ Delete. `PORT=3001 
 Left of the first screen are three boxes that every model call reads: **Components** (parts that
 look the same on every screen that has them; screens paste them by ID), **Rules** and **Data**.
 After each pick or Edit, filing adds what the decision settled, in the background. Edit a rule or a
-table cell by clicking it; the toolbar's Components, Rules and Data buttons move the view to each
-box, and **Export the boxes** in the project menu writes them as markdown.
+table cell by clicking it; the toolbar's Components, Rules, Data and Notes buttons move the view to
+each box, and **Export the boxes** in the project menu writes them as markdown. Every 5 picks the
+fixer visits: it merges doubles, removes what no screen needs and redraws up to 5 screens, and the
+fourth box, **Fixer's notes**, lists each change with an Undo. **Visit now** asks for a visit at once.
 
 Generated screens are cached in `temp/screen-cache.json`. To make a mockup again from scratch,
 open it and choose **Start over** in the project menu (top left); **Delete** removes it. To clear the whole cache, stop the server,

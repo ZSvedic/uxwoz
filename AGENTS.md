@@ -36,29 +36,34 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
   prompt.ts      system prompt (the canvas manual verbatim + how to reply) and the user messages: the paper
                  (titles, lines, boxes), then Draw, Edit or File (a copy of spec/prompt-screen.md; a test keeps them equal)
   providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol, Terra)
-  generate.ts    one design: stream, 20 s deadline, cost, name and idea, keep the first copy of a doubled reply,
-                 cut prose before the title, refuse cut-off replies
-  filing.ts      filing: number a screen's parts, ask Terra, parse its lines, apply them to the boxes with refusals
+  generate.ts    one design: stream, 20 s deadline, cost, name and idea, refuse cut-off replies
+  filing.ts      filing: number a screen's parts, ask Terra (also for the fixer), parse its lines, apply them to
+                 the boxes with refusals
+  fixer.ts       the fixer's visit: the paper and the screens new since the last one, parse its lines, apply them
+                 with refusals and an Undo per change; the redraws are left to the server
   keys.ts        cache keys: a link by @name, normalize a prompt, "home" means the first screen, `back`; box limits and IDs
   tree.ts        the tree, worked out: links in each screen (components pasted), @names, planned screens,
                  shortest-path levels, the titles and lines of the paper
-  cache.ts       screen cache: find by name, proposals (the open A OR B) and pick, names, versions and undo, parents,
-                 delete with pruning, the boxes (components as entries, rules, tables, limits, IDs), migration, JSON file
+  cache.ts       screen cache: find by name, proposals (the open A OR B) and pick, versions and undo, parents,
+                 delete with pruning, the boxes (components as entries, rules, tables, limits, IDs), the fixer's
+                 notes and their Undo, JSON file
   frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices and their size;
                  name, idea; paste by ID and the current link
 src/packages/web/src/
   server.ts      Bun.serve: /api/config, /api/screen (NDJSON, A OR B at once), /api/pick, /api/revise, /api/undo,
-                 /api/map (wait=1 for filing), /api/apps, /api/delete, /api/delete-app, /api/box, /api/warmup, themes;
-                 filing in the background, one per mockup, a click waits for it
+                 /api/map (wait=1 for filing and a visit), /api/visit, /api/apps, /api/delete, /api/delete-app,
+                 /api/box (also undo), /api/warmup, themes; filing and visits in one chain per mockup, a click
+                 waits for it; a visit every 5 picks, its redraws as Edits
   app.ts         browser: generate panel, A OR B streaming, refit and pick, clicks (@names, back), rail tools, drawer
                  (Edit, Info), the boxes' data and filing's result, toolbar menus and box buttons, ← → trail, errors
   canvas.ts      browser: the boxes column, the tree layout (packed rows, line lanes), cards and frames, A OR B sides,
                  rail, pan and zoom, fits
-  boxes.ts       browser: the Components, Rules and Data boxes, editing in place, Export as markdown
+  boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes, editing in place, Undo, Export
   index.html, shell.css   the page around the canvas
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
-src/scripts/                 live experiments, run by hand: paper-*.ts (the paper test, build step 1 of the paper canvas plan)
+src/scripts/                 live experiments, run by hand: paper-*.ts (the paper test, build step 1 of the paper canvas plan),
+                             fixer-reply.ts (Terra's raw reply to a visit of a cache file)
 ```
 
 ## Do not read (large or generated)

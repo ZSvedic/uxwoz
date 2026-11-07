@@ -18,16 +18,16 @@ POST /api/screen  {"app": "A coffee shop ordering app", "action": null, "model":
 {"type":"done","entry":{...CacheEntry, "versions":[], "proposals":[{...}, {...}]}}
 
 POST /api/pick  {"key": "a coffee shop ordering app", "index": 1}
-{"entry":{...CacheEntry, "versions":[{...the second proposal}]}, "filing":true}
+{"entry":{...CacheEntry, "versions":[{...the second proposal}]}, "filing":true, "visiting":false}
 
-GET /api/map?app=A%20coffee%20shop%20ordering%20app&wait=1      (answers once filing is done)
-{"root":"a coffee shop ordering app","entries":[...],"boxes":{...Boxes},"filing":false}
+GET /api/map?app=A%20coffee%20shop%20ordering%20app&wait=1      (answers once filing and a visit are done)
+{"root":"a coffee shop ordering app","entries":[...],"boxes":{...Boxes},"filing":false,"visiting":false}
 ```
 
 ## Packages
 
 - `@uxwoz/core` (`src/packages/core`): models, prompt, provider streaming, screen cache with the
-  boxes, filing, cache keys, frame page (with paste by ID and the current link) and devices. `frame.ts`, `keys.ts` and `tree.ts` run in the browser too, so they use
+  boxes, filing, the fixer, cache keys, frame page (with paste by ID and the current link) and devices. `frame.ts`, `keys.ts` and `tree.ts` run in the browser too, so they use
   no Node or Bun APIs.
 - `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`,
   `canvas.ts`, `boxes.ts`, `shell.css`, bundled by Bun's HTML import), and the themes in `themes/`.
@@ -60,14 +60,26 @@ can spend model credits.
   a first screen gets `error` before any model call. A closed browser connection aborts the model
   calls; a side that already finished is still stored.
 - `POST /api/pick {key, index}`: keep proposal `index` as the screen's first version and drop the
-  other; `{entry, filing: true}`, as filing starts in the background (see below); 404 if the screen
-  has no open A OR B or that side has not finished.
+  other; `{entry, filing: true, visiting}`, as filing starts in the background (see below), and on
+  every 5th pick of the mockup (`VISIT_EVERY`, counted in `boxes.picks`) a visit after it; 404 if
+  the screen has no open A OR B or that side has not finished.
 - **Filing** runs after a pick and after a screen's Edit (whose `done` event has `filing: true`), on
   the background model GPT-6.1 Terra, one filing per mockup at a time. It applies the reply's lines
   to the boxes (`applyFiling` in `core/src/filing.ts`) and refuses, in the server log and in
   `boxes.filed.refused`, a bad or used ID, a line over 120 characters, a full box, a part that is
   not there. A new screen or a revise waits for a running filing at most 5 s (`fileWaitMs`) before
   its model calls, after its `meta` event.
+- **A visit** of the fixer (`visitPaper` and `applyVisit` in `core/src/fixer.ts`) takes its turn in
+  the same chain, so filing and the fixer never change the boxes at once. Terra reads the paper and
+  the screens whose newest version is newer than the last visit, parts numbered. Its lines are
+  applied with refusals in `visits[].refused`: no such entry, an entry `by: 'user'`, two IDs of
+  different boxes, a used ID, a part not there, more than 5 redraws (`MAX_REDRAWS`), a screen with
+  an open A OR B. A merge removes the newer entry of the two. The reply is dropped when a screen,
+  component or the mockup was deleted, or a newer visit asked for, after the visit began. Redraws
+  then run at once, as `/api/revise` Edits on the screen's own model that start no filing; their
+  versions have `by: 'fixer'`. Start over and deleting the mockup stop them.
+- `POST /api/visit {app}`: a visit now, unless one runs; the mockup as `/api/map` sends it, with
+  `visiting: true`; 404 for a mockup with no picked first screen.
 - `POST /api/revise {key, change?, model?, device?}`: one new version of a picked screen or a
   component (a component takes `change` only, else 400), streamed
   like `/api/screen` with one side (`meta.variants` 1, then `chunk`*, `version`, `done`). With
@@ -77,9 +89,9 @@ can spend model credits.
   devices). 400 on a bad `change`, model or device, 404 for an unknown screen, 409 while its A OR B
   is open; `error` if the model fails or the screen was deleted meanwhile.
 - `POST /api/undo {key}`: drop the newest version; `{entry}`, or 404 when one or none is left.
-- `GET /api/map?app=…[&wait=1]`: `{root, entries: CacheEntry[], boxes: Boxes, filing}` for one
-  mockup, oldest first, components included; with `wait=1` once its running filing has finished (at
-  most a minute). Levels, the
+- `GET /api/map?app=…[&wait=1]`: `{root, entries: CacheEntry[], boxes: Boxes, filing, visiting}`
+  for one mockup, oldest first, components included; with `wait=1` once its running filing and
+  visit, redraws included, have finished (at most a minute). Levels, the
   tree and planned screens are not stored: `screenTree` and `plannedScreens` in `core/src/tree.ts`
   work them out (server and browser).
 - `GET /api/apps`: `{apps: {app, screens, updatedAt}[]}`, every mockup once as first typed,
@@ -93,8 +105,10 @@ can spend model credits.
   number of screens.
 - `POST /api/box {app, op, box, id?, text?, columns?, rows?}`: the user's box edits. `op` `add`,
   `set` or `delete` on `box` `rules` (`text`) or `data` (`columns`, `rows`); a new entry's ID comes
-  from `text` (the sentence, or the table's name). `op: 'seen', box` (also `components`) clears the
-  new marks. The whole mockup as `/api/map` sends it; 400 with `{error}` for a refused edit, 404 for
+  from `text` (the sentence, or the table's name). `op: 'seen', box, ids?` (also `components`, and
+  `notes` with visits by `at`) clears the new marks. `op: 'undo', at, i` undoes change `i` of the
+  visit that began at `at` (`undoChange`); 400 when it was undone, its version is gone or its box is
+  full. The whole mockup as `/api/map` sends it; 400 with `{error}` for a refused edit, 404 for
   a mockup with no first screen. A component is deleted with `/api/delete`, changed with
   `/api/revise`, undone with `/api/undo`.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
@@ -134,19 +148,24 @@ CacheEntry { key; app; action: string | null; name?: string; parent: { key; labe
              // A component has kind: 'component', its ID as name, where it belongs as action,
              // the screen it was taken from as parent, and by, at, seen (as Mark); its key is
              // normalize(app) + ' » #' + ID. It is in no tree; its links count where it is pasted.
-Mark       { by: 'filing' | 'user'; at; seen }   // who last wrote an entry, when, and whether its box was looked at since
+Mark       { by: 'filing' | 'fixer' | 'user'; at; seen }   // who last wrote an entry, when, and whether its box was looked at since
 Boxes      { rules: (Mark & { id; text })[]; data: (Mark & { id; columns: string[]; rows: string[][] })[];
              gone: { components, rules, data: string[] }   // IDs used and deleted, never used again
-             filed?: { at; screen; ms; costUsd; added; changed; refused; error? } }   // the last filing
+             filed?: { at; screen; ms; costUsd; added; changed; refused; error? }   // the last filing
+             visits?: Visit[]; picks?: number }   // the fixer's last 20 visits, oldest first; picks so far
+Visit      { at; ms; costUsd; screens; changes: Change[]; refused: string[]; error?; seen }
+Change     { text; note?; undo?: Undo; undone? }   // text says what changed: "merged a into b"
+Undo       { put: box; entry; index } | { drop: box; id } | { key; createdAt }
+           // put a removed entry (a component's whole CacheEntry) back; delete an added one; drop a redraw's version
 Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
              costEstimated; firstChunkMs; totalMs; finishReason; device?: Device;
-             name?; idea?; feedback? }
+             name?; idea?; feedback?; by?: 'fixer' }
              // name comes from the model's <title>, idea from its <meta name="idea">;
-             // feedback is the Edit request that made this version
+             // feedback is the Edit request that made this version, by: 'fixer' when a visit asked
 TreeNode   { level; parent: key | null; label }
              // from screenTree: level 1 is the first screen, the fewest clicks from it otherwise
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast' | 'gpt-6.1-terra'
-           // Terra is the background model (filing): never a screen model, never in /api/config
+           // Terra is the background model (filing, the fixer): never a screen model, never in /api/config
 Device     'phone' (390 × 844 px) | 'desktop' (1024 × 768 px): every screen is that wide and at
            least that tall
 key        normalize(app) for the first screen, normalize(app) + ' » @' + name for any other
@@ -161,7 +180,7 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 | Var | Use |
 |---|---|
 | `OPENROUTER_API_KEY` | Claude Haiku 5.5 |
-| `OPENAI_API_KEY` | GPT-6 Luna, GPT-6.1 Sol, GPT-6.1 Terra (filing) |
+| `OPENAI_API_KEY` | GPT-6 Luna, GPT-6.1 Sol, GPT-6.1 Terra (filing, the fixer) |
 | `PORT` | server port, default 3000 |
 | `UXWOZ_HOST` | listen address, default `127.0.0.1` |
 | `UXWOZ_CACHE_FILE` | screen cache `{version: 5, entries, boxes}`, default `temp/screen-cache.json` |
@@ -172,4 +191,4 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 `bun test` runs `src/tests/*.test.ts`. Model calls go through `tests/cassette.ts`, which replays
 `cassettes/<test file name>.json` keyed by a hash of URL and request body; `tests/no-network.ts` makes any
 other non-localhost call throw. A test file that calls models has a cassette of the same name;
-`cut-off.test.ts`, `races.test.ts` and `boxes.test.ts` use a fake provider instead.
+`cut-off.test.ts`, `races.test.ts`, `boxes.test.ts` and `fixer.test.ts` use a fake provider instead.
