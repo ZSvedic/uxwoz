@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { ALTERNATIVE_REQUEST, ScreenCache, drawRequest, editRequest, isBack, nameFrom, normalizePrompt, paperText, screenIdea, screenKey, screenTree, type Paper, type Version } from '@uxwoz/core'
 
 const ver = (html: string, createdAt = '2026-10-23T00:00:00Z'): Version => ({
@@ -175,7 +175,7 @@ describe('screen cache', () => {
       const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
       writeFileSync(file, JSON.stringify(data))
       expect(new ScreenCache(file).size).toBe(0)
-      expect(existsSync(`${file}.before-names`)).toBe(true)
+      expect(readdirSync(dirname(file)).some((f) => f.includes('.corrupt-'))).toBe(true)
     }
   })
 
@@ -189,7 +189,7 @@ describe('screen cache', () => {
     expect(readFileSync(file, 'utf8')).toBe(text)
   })
 
-  test('format 3 and 4 files load with empty boxes; the spec feature\'s fields go at the next save', () => {
+  test('format 3 and 4 files load with empty boxes; the spec feature\'s boxes go at the next save', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
     const entry = { key: 'cafe', app: 'Cafe', action: null, name: 'home', parent: null, versions: [{ ...ver('<h1>Menu</h1>'), spec: {}, misses: [], plan: 'x' }] }
     for (const version of [3, 4]) {
@@ -200,8 +200,6 @@ describe('screen cache', () => {
       screen(cache, 'Cafe', 'Cart', '<h1>Cart</h1>', { key: 'cafe', label: 'Cart' })
       const saved = JSON.parse(readFileSync(file, 'utf8'))
       expect(Object.keys(saved)).toEqual(['version', 'entries', 'boxes'])
-      expect(Object.keys(saved.entries[0].versions[0])).not.toContain('spec')
-      expect(Object.keys(saved.entries[0].versions[0])).not.toContain('plan')
     }
   })
 

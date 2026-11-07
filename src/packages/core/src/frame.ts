@@ -31,11 +31,7 @@ export function screenIdea(html: string): string {
     .replace(/\s+/g, ' ').trim().slice(0, 140)
 }
 
-/**
- * The window height of a screen made before devices. A frame grows to fit its whole screen, so its
- * real window is as tall as the screen; vh units would then feed back into the frame's height
- * forever. Our script converts vh units to pixels of the device's height (this one without a device).
- */
+/** The window height of a screen made before devices; our script turns vh units into pixels of it, as a frame grows with its screen. */
 export const VIEWPORT_H = 800
 
 /** The devices a screen can be designed for: the width of its window, and the least height of a screen. */
@@ -62,8 +58,6 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
   }
   // What the control says, shown between the two screens it joins.
   const labelOf = (el) => el ? (el.getAttribute('aria-label') || el.textContent || el.value || '').trim().replace(/\\s+/g, ' ') : ''
-  window.uxwoz = { go }
-  // Any press in the screen makes it the current one.
   addEventListener('pointerdown', () => parent.postMessage({ uxwoz: 'touch' }, '*'), true)
   // The app's zoom keys, ⌘[ ⌘] and Esc work while a screen has the focus too; the fit keys not in a text field.
   addEventListener('keydown', (e) => {
@@ -96,11 +90,7 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
   }, true)
   // A sandboxed form submit would blank the frame; the model's own handlers run first.
   window.addEventListener('submit', (e) => e.preventDefault())
-  addEventListener('DOMContentLoaded', () => {
-    if (!document.title) document.title = (document.querySelector('h1,h2')?.textContent || '').trim()
-  })
-  // vh, dvh, svh and lvh in the screen's inline styles and <style> elements become pixels of the
-  // device's height (see VIEWPORT_H). Run again before each measure, for styles set by script.
+  // vh units become pixels of the device's height (see VIEWPORT_H), again before each measure.
   const vhToPx = (css) => css.replace(/(-?\\d*\\.?\\d+)[dsl]?vh\\b/g, (m, n) => (parseFloat(n) * ${vh / 100}) + 'px')
   const fixVh = () => {
     for (const el of document.querySelectorAll('main [style*="vh"], main[style*="vh"]')) {
@@ -113,8 +103,7 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     }
   }
   addEventListener('DOMContentLoaded', fixVh)
-  // The frame fits the whole screen, so it never scrolls: it reports the screen's height and width,
-  // and hands scroll gestures to the page around it.
+  // The frame never scrolls: it reports the screen's size and hands scroll gestures on.
   let last = ''
   const report = () => {
     fixVh()
@@ -149,14 +138,9 @@ main a:is(${GO}) { text-decoration-line: none !important; }
 main a:is(${GO}):hover { text-decoration-line: underline !important; }
 main [aria-current="page"] { font-weight: 700 !important; text-decoration-line: underline !important; text-underline-offset: .25em; }`
 
-// Our layout rules, after the theme: every screen of a device is as wide as its window and at least
-// one device screen tall (set per page), with less padding, and the page never scrolls (the frame is
-// as tall as the screen). Pico grows its text with the window (20 px at 1280 px); a fixed 16 px keeps
+// Our layout rules, after the theme. Pico grows its text with the window; a fixed 16 px keeps
 // screens in scale with the app around them.
-// Pico turns a <small> right after an input into help text on its own line; after a checkbox or
-// radio in its label it is a count or note, like "All <small>(6)</small>", so it stays inline.
 const FRAME_CSS = `html, body { overflow: hidden; }
-label > :is([type="checkbox"], [type="radio"]) + small { display: inline; margin: 0 0 0 .25em; }
 body > main { width: 100%; margin: 0; padding: 20px 24px; box-sizing: border-box; }
 @media (max-width: 600px) { body > main { padding: 16px; } }
 :root { --pico-font-size: 100%; --pico-spacing: .75rem; --pico-typography-spacing-vertical: .75rem;

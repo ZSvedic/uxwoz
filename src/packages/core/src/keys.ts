@@ -6,9 +6,6 @@ export function normalizePrompt(s: string): string {
   return s.normalize('NFKC').toLowerCase().replace(/»/g, '>').replace(/\s+/g, ' ').trim().replace(/[\s.!?;:,]+$/, '')
 }
 
-/** The action prompt that means "the first screen" (the model writes `@home`, which means the same). */
-export const HOME_ACTION = 'home'
-
 /**
  * A link by name: `@sleep-report` for a screen the mockup has (made or planned), or
  * `@sleep-report: what the screen shows` for one it does not have yet. Null for a plain prompt.
@@ -22,7 +19,7 @@ export function screenRef(action: string): { name: string; prompt: string } | nu
 export const nameWords = (name: string) => name.replace(/[-_]+/g, ' ')
 
 /** The action as stored: null for the first screen, whether asked for as no action, "home" or "@home". */
-export const canonicalAction = (action: string | null): string | null => (!action?.trim() || normalizePrompt(action) === HOME_ACTION || screenRef(action)?.name === HOME_ACTION ? null : action)
+export const canonicalAction = (action: string | null): string | null => (!action?.trim() || normalizePrompt(action) === 'home' || screenRef(action)?.name === 'home' ? null : action)
 
 /** The cache key: the normalized product prompt, plus `@name` for a screen opened by name. */
 export function screenKey(app: string, action: string | null): string {

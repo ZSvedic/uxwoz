@@ -1,8 +1,6 @@
-// The tree of a mockup's screens, worked out from the screens themselves: a screen's level is the
-// fewest clicks from the first screen, following the buttons in each screen's newest version and the
-// click that first made each screen. A link names its screen (`@sleep-report`), so a screen exists
-// as a planned screen from the moment a picked screen links to it, before anyone opens it. Nothing
-// here is stored, so an Edit, an Undo or a delete moves screens at once. Runs in the browser as well as on the server, so it uses no Node or Bun APIs.
+// The tree of a mockup, worked out and never stored: a level is the fewest clicks from the first
+// screen, through each screen's links and the click that made it. A name linked to before any
+// screen has it is a planned screen. Runs in the browser too: no Node or Bun APIs.
 
 import type { CacheEntry } from './cache.ts'
 import { OPEN_TAG, VOID, pasteComponents } from './frame.ts'
@@ -75,13 +73,6 @@ export function uniqueName(name: string, taken: Set<string>): string {
   return n
 }
 
-/** The screen a link opens if the mockup has it: by `@name` (`@home` is the first screen). Null for `back`, a new screen, and words with no `@`. */
-export function resolveAction(action: string, byName: Map<string, string>): string | null {
-  const ref = screenRef(action)
-  return ref ? byName.get(ref.name) ?? null : null
-}
-
-/** Every screen of one mockup (all from the same app) by name. */
 export const namesOf = (entries: CacheEntry[]) => new Map(entries.filter((e) => e.name && !isComponent(e)).map((e) => [e.name!, e.key]))
 
 /** What a screen opened by `@name` alone shows, when no link says: its name in words, and the words of the control clicked. */
@@ -118,18 +109,10 @@ export function plannedScreens(all: CacheEntry[]): CacheEntry[] {
   return [...planned.values()]
 }
 
-/**
- * The tree of one mockup, planned screens included. Edges are the click that first made each screen
- * and every control in a picked screen's newest version that opens a screen the mockup has. A screen
- * hangs under the screen the click that made it came from when that is on a shortest path, else
- * under the first other one that is. Screens the first screen does not reach are left out.
- */
+/** The tree, planned screens included: a screen hangs under the screen whose click made it when that is on a shortest path. */
 export const screenTree = (made: CacheEntry[]): Map<string, TreeNode> => build(made).tree
 
-/**
- * The tree, every screen in it (the made ones and open A OR Bs, then the planned ones), and every
- * link between two of them. Components are no screens: their links count where they are pasted.
- */
+/** The tree, its screens (made and open, then planned) and the links between them; a component's links count where it is pasted. */
 function build(all: CacheEntry[]): { tree: Map<string, TreeNode>; entries: CacheEntry[]; links: [string, string][] } {
   const made = all.filter((e) => !isComponent(e)), components = componentsOf(all)
   const entries = [...made, ...plannedScreens(all)]
@@ -152,7 +135,8 @@ function build(all: CacheEntry[]): { tree: Map<string, TreeNode>; entries: Cache
   for (const e of entries) {
     if (!e.versions.length) continue
     for (const l of linksIn(shownHtml(e, components))) {
-      const to = resolveAction(l.action, byName)
+      // A link opens a screen the mockup has by its `@name`; back, words with no `@` and new screens open none.
+      const to = byName.get(screenRef(l.action)?.name ?? '')
       if (!to || to === e.key || !keys.has(to)) continue
       edges.set(e.key, [...(edges.get(e.key) ?? []), { to, label: l.label }])
       if (!links.some(([f, t]) => f === e.key && t === to)) links.push([e.key, to])

@@ -8,7 +8,6 @@ export type Fetch = (input: string, init?: RequestInit) => Promise<Response>
 export interface FinalEvent {
   type: 'final'
   servedModel: string | null
-  servedTier: string | null
   finishReason: string | null
   inputTokens: number | null
   cachedInputTokens: number | null
@@ -27,6 +26,8 @@ export interface StreamOptions {
   fetch?: Fetch
   env?: Record<string, string | undefined>
 }
+
+const noFinal = (): FinalEvent => ({ type: 'final', servedModel: null, finishReason: null, inputTokens: null, cachedInputTokens: null, outputTokens: null, costUsd: null })
 
 export class ProviderError extends Error {}
 
@@ -84,10 +85,7 @@ async function* streamOpenRouter(cfg: ModelConfig, o: StreamOptions, f: Fetch, e
     'HTTP-Referer': 'http://localhost/uxwoz',
     'X-Title': 'uxwoz',
   }, o.signal)
-  const final: FinalEvent = {
-    type: 'final', servedModel: null, servedTier: null, finishReason: null,
-    inputTokens: null, cachedInputTokens: null, outputTokens: null, costUsd: null,
-  }
+  const final = noFinal()
   for await (const data of sseData(stream)) {
     if (data === '[DONE]') break
     const chunk = JSON.parse(data)
@@ -123,10 +121,7 @@ async function* streamOpenAI(cfg: ModelConfig, o: StreamOptions, f: Fetch, env: 
   const stream = await post(f, 'https://api.openai.com/v1/responses', body, {
     Authorization: `Bearer ${key(env, 'OPENAI_API_KEY')}`,
   }, o.signal)
-  const final: FinalEvent = {
-    type: 'final', servedModel: null, servedTier: null, finishReason: null,
-    inputTokens: null, cachedInputTokens: null, outputTokens: null, costUsd: null,
-  }
+  const final = noFinal()
   for await (const data of sseData(stream)) {
     if (data === '[DONE]') break
     const ev = JSON.parse(data)
@@ -136,7 +131,6 @@ async function* streamOpenAI(cfg: ModelConfig, o: StreamOptions, f: Fetch, env: 
       const r = ev.response
       const u = r.usage ?? {}
       final.servedModel = r.model ?? null
-      final.servedTier = r.service_tier ?? null
       final.finishReason = ev.type === 'response.completed' ? 'stop' : (r.incomplete_details?.reason ?? 'incomplete')
       final.inputTokens = u.input_tokens ?? null
       final.cachedInputTokens = u.input_tokens_details?.cached_tokens ?? null

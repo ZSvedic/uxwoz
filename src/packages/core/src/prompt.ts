@@ -111,11 +111,11 @@ wrong screen. When unsure, draw the simple thing and move on.
 
 # How to reply
 
-Every request holds the paper as text: the app and its device, the screens' titles and lines, and the three boxes in full. Then it asks for one job: draw a screen, change a screen or a component, or file a decision.
+Every request holds the paper as text: the app and its device, the screens' titles and lines, and the three boxes in full; an entry marked (by the user) was written by the user by hand. Then it asks for one job: draw a screen, change a screen or a component, file a decision, or visit as the fixer.
 
 ## Drawing or changing
 
-Every job but filing gets HTML. Reply with one variant only, as one HTML fragment with plain JavaScript, styled by classless Pico.css (already loaded; do not load anything else). The app asks for each of the two variants in a request of its own. No markdown fences, no prose, no <html>/<head>/<body> tags.
+Drawing and changing get HTML; filing and a visit get plain lines. Reply with one variant only, as one HTML fragment with plain JavaScript, styled by classless Pico.css (already loaded; do not load anything else). The app asks for each of the two variants in a request of its own. No markdown fences, no prose, no <html>/<head>/<body> tags.
 
 - Begin a screen with <title>Name</title>: a name of 1-4 words, e.g. <title>Night details</title>. Then add <meta name="idea" content="...">: one short sentence naming the idea of this variant, e.g. <meta name="idea" content="Nights as a list, newest first">. A component has neither.
 - Write no CSS and no classes: use semantic HTML that Pico styles (h1-h3, p, small, label + input, select, button, article for cards, table, fieldset, mark, progress). A few inline style attributes for layout (e.g. grid columns) are fine.
@@ -138,7 +138,18 @@ table ID: column | column | ...
 change table ID: column | column | ...
 row ID: value | value | ...
 nothing
-The parts of the chosen variant carry numbers, like data-part="7": name a part by its number. A table's rows follow it, and a changed table takes the rows that follow it.`
+The parts of the chosen variant carry numbers, like data-part="7": name a part by its number. A table's rows follow it, and a changed table takes the rows that follow it.
+
+## Visiting
+
+A visit ends with "Visit the paper as the overnight fixer." Reply to it with plain lines, one change per line, no markdown and no prose, in these forms only:
+merge ID into ID
+remove ID
+add rule ID: one sentence
+add component ID from screen-id part N: where it belongs
+redraw screen-id: one sentence that says what to change
+note: why, for the change above it
+The parts of each screen carry numbers, like data-part="7": name a part by its screen and its number. Every text after a colon is at most 120 characters. A visit redraws at most 5 screens: pick the ones that matter most.`
 
 /** Asked of one side of every A OR B (a random one), so the two designs are not near copies. */
 export const ALTERNATIVE_REQUEST = "Design this as a clearly different alternative to the obvious layout: arrange this screen's content another way, not just the wording."
@@ -151,15 +162,16 @@ export interface Paper {
   titles: string[]
   /** `id -> id`: a control on the first screen opens the second. */
   lines: string[]
-  components: { id: string; where: string; html: string }[]
-  rules: { id: string; text: string }[]
-  data: { id: string; columns: string[]; rows: string[][] }[]
+  components: { id: string; where: string; html: string; by?: string }[]
+  rules: { id: string; text: string; by?: string }[]
+  data: { id: string; columns: string[]; rows: string[][]; by?: string }[]
 }
 
 /** A screen or component as a request shows it: its ID, its one line, its stored HTML. */
 export interface Shown { id: string; line: string; html: string }
 
 const list = (xs: string[], sep = '\n') => (xs.length ? xs.join(sep) : '(none)')
+const byUser = (x: { by?: string }) => (x.by === 'user' ? ' (by the user)' : '')
 
 export function paperText(p: Paper): string {
   return [
@@ -168,10 +180,10 @@ export function paperText(p: Paper): string {
     '', 'Screens, the first screen first (id: what it is for):', list(p.titles),
     '', 'Lines (a control on the first screen opens the second):', list(p.lines),
     '', `Components (${p.components.length} of ${LIMITS.components}), each with its ID, where it belongs, and its HTML:`,
-    list(p.components.map((c) => `${c.id}: ${c.where}\n${c.html}`)),
-    '', `Rules (${p.rules.length} of ${LIMITS.rules}):`, list(p.rules.map((r) => `${r.id}: ${r.text}`)),
+    list(p.components.map((c) => `${c.id}: ${c.where}${byUser(c)}\n${c.html}`)),
+    '', `Rules (${p.rules.length} of ${LIMITS.rules}):`, list(p.rules.map((r) => `${r.id}: ${r.text}${byUser(r)}`)),
     '', `Data (${p.data.length} of ${LIMITS.data} tables):`,
-    list(p.data.map((t) => [t.id, ...[t.columns, ...t.rows].map((r) => r.join(' | '))].join('\n')), '\n\n'),
+    list(p.data.map((t) => [t.id + byUser(t), ...[t.columns, ...t.rows].map((r) => r.join(' | '))].join('\n')), '\n\n'),
   ].join('\n')
 }
 
@@ -197,5 +209,9 @@ export function fileRequest(p: Paper, screen: Shown, decision: { other: string }
   return `${paperText(p)}\n\nThe decision, on the screen ${screen.id} (${screen.line}).\n`
     + `${'change' in decision ? 'The screen after the change' : 'The user picked this variant'}:\n${screen.html}\n\n${second}\n\nFile what this decision settles.`
 }
+
+/** A fixer's visit: the screens added or changed since the last one (all on the first), parts numbered. */
+export const visitRequest = (p: Paper, screens: Shown[]) => `${paperText(p)}\n\nThe screens added or changed since your last visit, ${screens.length} of them:\n\n`
+  + `${screens.map((s) => `--- ${s.id} (${s.line})\n${s.html}`).join('\n\n') || '(none)'}\n\nVisit the paper as the overnight fixer.`
 
 export const WARMUP_REQUEST = 'Reply with OK.'

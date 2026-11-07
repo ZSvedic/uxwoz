@@ -5,10 +5,10 @@
 
 import { refuseLine, type Boxes, type ScreenCache, type Version } from './cache.ts'
 import { LIMITS, normalizePrompt } from './keys.ts'
-import { elementEnd } from './frame.ts'
+import { elementEnd, type Device } from './frame.ts'
 import { FILING_MODEL, MODELS } from './models.ts'
 import { SYSTEM_PROMPT, fileRequest } from './prompt.ts'
-import { ProviderError, streamModel, type Fetch } from './providers.ts'
+import { ProviderError, streamModel, type Fetch, type FinalEvent } from './providers.ts'
 import { HOME_LINE, HOME_NAME } from './tree.ts'
 
 /** Filing runs in the background, so it may take longer than a screen. */
@@ -30,6 +30,19 @@ export function numberParts(html: string): string {
 }
 
 const unnumber = (html: string) => html.replace(/ data-part="\d+"/g, '')
+
+/** Where part N of a numbered screen starts and ends, or null when it has none. */
+function partAt(numbered: string, n: number): { start: number; end: number } | null {
+  const start = numbered.search(new RegExp(`<[a-z][\\w-]*\\s+data-part="${n}"[\\s>/]`, 'i'))
+  const end = start < 0 ? -1 : elementEnd(numbered, start)
+  return end < 0 ? null : { start, end }
+}
+
+/** The outer HTML of part N of a numbered screen, numbers gone; null when it has none. */
+export function partOf(numbered: string, n: number): string | null {
+  const p = partAt(numbered, n)
+  return p && unnumber(numbered.slice(p.start, p.end))
+}
 
 export interface FilingLine { kind: 'component' | 'rule' | 'table' | 'row' | 'nothing' | 'bad'; change: boolean; id: string; part: number | null; text: string; line: string }
 
@@ -82,9 +95,9 @@ export function applyFiling(cache: ScreenCache, app: string, key: string, filedH
       continue
     }
     // A component: the outer HTML of part N.
-    const start = numbered.search(new RegExp(`<[a-z][\\w-]*\\s+data-part="${l.part}"[\\s>/]`, 'i'))
-    const end = start < 0 ? -1 : elementEnd(numbered, start)
-    if (end < 0) { refuse(l.line, `the screen has no part ${l.part}`); continue }
+    const p = partAt(numbered, l.part!)
+    if (!p) { refuse(l.line, `the screen has no part ${l.part}`); continue }
+    const { start, end } = p
     if (cuts.some((c) => start < c.end && end > c.start)) { refuse(l.line, `part ${l.part} overlaps a part filed above`); continue }
     const version: Version = { ...made, html: unnumber(numbered.slice(start, end)) }
     let why: string | null = null
@@ -123,27 +136,35 @@ export interface FileOptions {
 
 /** File one decision: ask the filing model, apply its lines, note the run in the boxes. Null when the screen or its mockup went meanwhile. */
 export async function fileDecision(o: FileOptions): Promise<FilingRun | null> {
-  const log = o.log ?? ((m) => console.warn(m))
   const entry = o.cache.get(o.key), v = entry?.versions.at(-1)
   if (!entry || !v) return null
   const { app } = entry
   const since = o.cache.now(), filedHtml = v.html, t0 = performance.now()
   const user = fileRequest(o.cache.paper(app, v.device), { id: entry.name ?? HOME_NAME, line: entry.action ?? HOME_LINE, html: numberParts(filedHtml) }, o.decision)
-  let reply = '', final = null
-  for await (const ev of streamModel({ model: FILING_MODEL, system: SYSTEM_PROMPT, user, maxTokens: 4000, signal: AbortSignal.timeout(FILING_DEADLINE_MS), fetch: o.fetch, env: o.env })) {
-    if (ev.type === 'text') reply += ev.text
-    else final = ev
-  }
-  if (final?.finishReason !== 'stop') throw new ProviderError(`filing was cut off (${final?.finishReason ?? 'no end'})`)
+  const { reply, final } = await askBackground(user, o)
   // A screen deleted, or a mockup deleted or started over, meanwhile gets nothing back.
   if (o.cache.removedSince(normalizePrompt(app), since) || o.cache.removedSince(o.key, since)) return null
-  const createdAt = new Date().toISOString()
-  const filed = applyFiling(o.cache, app, o.key, filedHtml, reply, {
-    model: FILING_MODEL, servedModel: final.servedModel, createdAt, costUsd: null, costEstimated: MODELS[FILING_MODEL].costEstimated,
-    firstChunkMs: null, totalMs: 0, finishReason: 'stop', device: v.device,
-  })
-  for (const r of filed.refused) log(`filing refused ${r}`)
-  const run: FilingRun = { ...filed, at: createdAt, screen: entry.name ?? HOME_NAME, ms: Math.round(performance.now() - t0), costUsd: final.costUsd }
+  const made = backgroundVersion(final.servedModel, v.device)
+  const filed = applyFiling(o.cache, app, o.key, filedHtml, reply, made)
+  for (const r of filed.refused) (o.log ?? console.warn)(`filing refused ${r}`)
+  const run: FilingRun = { ...filed, at: made.createdAt, screen: entry.name ?? HOME_NAME, ms: Math.round(performance.now() - t0), costUsd: final.costUsd }
   o.cache.noteFiling(app, run)
   return run
 }
+
+/** Ask the background model once, with the system prompt; its whole reply and its final event. A cut-off reply is an error. */
+export async function askBackground(user: string, o: { fetch?: Fetch; env?: Record<string, string | undefined> }, maxTokens = 4000) {
+  let reply = '', final: FinalEvent | null = null
+  for await (const ev of streamModel({ model: FILING_MODEL, system: SYSTEM_PROMPT, user, maxTokens, signal: AbortSignal.timeout(FILING_DEADLINE_MS), fetch: o.fetch, env: o.env })) {
+    if (ev.type === 'text') reply += ev.text
+    else final = ev
+  }
+  if (final?.finishReason !== 'stop') throw new ProviderError(`the reply was cut off (${final?.finishReason ?? 'no end'})`)
+  return { reply, final }
+}
+
+/** A version the background model made (a component taken from a screen), without its HTML. */
+export const backgroundVersion = (servedModel: string | null, device?: Device): Omit<Version, 'html'> => ({
+  model: FILING_MODEL, servedModel, createdAt: new Date().toISOString(), costUsd: null, costEstimated: MODELS[FILING_MODEL].costEstimated,
+  firstChunkMs: null, totalMs: 0, finishReason: 'stop', device,
+})

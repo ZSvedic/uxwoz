@@ -50,6 +50,11 @@ The jobs, each after the paper:
 - **File**: *The decision, on the screen history (...).* Then the chosen variant with its block
   elements numbered (`data-part="N"`), and the other variant, or after an Edit the typed change. It
   ends with *File what this decision settles.*
+- **Visit**: *The screens added or changed since your last visit, N of them:* and each one as
+  `--- id (its line)` with its parts numbered (every screen on the first visit). It ends with
+  *Visit the paper as the overnight fixer.*
+
+An entry the user wrote carries *(by the user)* in the paper, so the fixer leaves it alone.
 
 The paper and the job live in the user message, so the system prompt stays the same for every call
 and the providers' prompt cache keeps working.
@@ -59,7 +64,9 @@ and the providers' prompt cache keeps working.
 The manual comes first, as it is in
 [process/plans/2026-11-06-canvas-manual.md](../process/plans/2026-11-06-canvas-manual.md). How to
 reply follows: the HTML and Pico rules kept from the benchmark prompt, links by `@id`, the paste
-markup, and the filing lines the paper test settled. Code sets every screen to the device's width.
+markup, and the filing and visit lines the paper test settled. The visit's last two sentences
+came from the app: without them Terra asked for 11 redraws on a real paper, and wrote lines over
+the 120 characters code takes. Code sets every screen to the device's width.
 
 ```text
 # Lean UI canvas manual
@@ -167,11 +174,11 @@ wrong screen. When unsure, draw the simple thing and move on.
 
 # How to reply
 
-Every request holds the paper as text: the app and its device, the screens' titles and lines, and the three boxes in full. Then it asks for one job: draw a screen, change a screen or a component, or file a decision.
+Every request holds the paper as text: the app and its device, the screens' titles and lines, and the three boxes in full; an entry marked (by the user) was written by the user by hand. Then it asks for one job: draw a screen, change a screen or a component, file a decision, or visit as the fixer.
 
 ## Drawing or changing
 
-Every job but filing gets HTML. Reply with one variant only, as one HTML fragment with plain JavaScript, styled by classless Pico.css (already loaded; do not load anything else). The app asks for each of the two variants in a request of its own. No markdown fences, no prose, no <html>/<head>/<body> tags.
+Drawing and changing get HTML; filing and a visit get plain lines. Reply with one variant only, as one HTML fragment with plain JavaScript, styled by classless Pico.css (already loaded; do not load anything else). The app asks for each of the two variants in a request of its own. No markdown fences, no prose, no <html>/<head>/<body> tags.
 
 - Begin a screen with <title>Name</title>: a name of 1-4 words, e.g. <title>Night details</title>. Then add <meta name="idea" content="...">: one short sentence naming the idea of this variant, e.g. <meta name="idea" content="Nights as a list, newest first">. A component has neither.
 - Write no CSS and no classes: use semantic HTML that Pico styles (h1-h3, p, small, label + input, select, button, article for cards, table, fieldset, mark, progress). A few inline style attributes for layout (e.g. grid columns) are fine.
@@ -195,6 +202,17 @@ change table ID: column | column | ...
 row ID: value | value | ...
 nothing
 The parts of the chosen variant carry numbers, like data-part="7": name a part by its number. A table's rows follow it, and a changed table takes the rows that follow it.
+
+## Visiting
+
+A visit ends with "Visit the paper as the overnight fixer." Reply to it with plain lines, one change per line, no markdown and no prose, in these forms only:
+merge ID into ID
+remove ID
+add rule ID: one sentence
+add component ID from screen-id part N: where it belongs
+redraw screen-id: one sentence that says what to change
+note: why, for the change above it
+The parts of each screen carry numbers, like data-part="7": name a part by its screen and its number. Every text after a colon is at most 120 characters. A visit redraws at most 5 screens: pick the ones that matter most.
 ```
 
 ## Changing it

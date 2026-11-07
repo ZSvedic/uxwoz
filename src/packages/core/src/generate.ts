@@ -19,14 +19,12 @@ export interface GenerateOptions {
   signal?: AbortSignal
   fetch?: Fetch
   env?: Record<string, string | undefined>
-  log?: (msg: string) => void
 }
 
 export type GenerateEvent = { type: 'chunk'; text: string } | { type: 'done'; version: Version }
 
 export async function* generateScreen(o: GenerateOptions): AsyncGenerator<GenerateEvent> {
   const cfg = MODELS[o.model]
-  const log = o.log ?? ((m) => console.warn(m))
   const deadline = AbortSignal.timeout(DEADLINE_MS)
   const signal = o.signal ? AbortSignal.any([o.signal, deadline]) : deadline
   const t0 = performance.now()
@@ -42,11 +40,6 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
         yield { type: 'chunk', text: ev.text }
         continue
       }
-      // Served names may carry a snapshot suffix (gpt-6-luna-2026-10-01), so compare the prefix.
-      if (ev.servedModel && !ev.servedModel.startsWith(cfg.model))
-        log(`model substituted: asked ${cfg.model}, served ${ev.servedModel}`)
-      if (cfg.serviceTier && ev.servedTier && ev.servedTier !== cfg.serviceTier)
-        log(`tier substituted: asked ${cfg.serviceTier}, served ${ev.servedTier}`)
       // Only a finished screen may be cached: a stream that stopped early or hit the token limit is an error.
       if (!ev.finishReason) throw new ProviderError('the stream ended before the screen was complete')
       if (ev.finishReason !== 'stop') throw new ProviderError(`the screen was cut off (${ev.finishReason})`)

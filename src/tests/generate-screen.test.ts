@@ -10,7 +10,7 @@ const paper = { app: 'A coffee shop ordering app', device: 'phone' as const, tit
 
 async function run(model: ModelId, target: { id: string; line: string }) {
   const chunks: string[] = []
-  for await (const ev of generateScreen({ user: drawRequest(paper, target, null), model, device: 'phone', fetch: tape.fetch, env: tape.env, log: () => {} })) {
+  for await (const ev of generateScreen({ user: drawRequest(paper, target, null), model, device: 'phone', fetch: tape.fetch, env: tape.env })) {
     if (ev.type === 'chunk') chunks.push(ev.text)
     else return { chunks, version: ev.version }
   }
