@@ -8,7 +8,6 @@
 // Every screen of a device is as wide as the device and at least one device screen tall.
 
 import { FRAME_SANDBOX, framePage, type Device } from '@uxwoz/core/frame'
-import type { Chrome } from '@uxwoz/core/spec'
 
 /** Limits on the height a screen may report, so a broken screen cannot make a huge frame. */
 const MIN_SCREEN_H = 160
@@ -43,8 +42,6 @@ const LANE = 14
 /** The height of the name and idea above a screen, and of the idea above a side, in pixels on screen. */
 const LABEL_H = 62
 const IDEA_H = 76
-/** The room one spec line under a side's idea takes (two lines of text at most), in pixels on screen. */
-const LINE_H = 34
 /** Zoomed out further than this, a screen shows only its name (see .surface.far), which needs less room. */
 const FAR = 0.5
 const NAME_H = 26
@@ -64,16 +61,10 @@ export interface CardView {
   width: number
   /** The device it is designed for; absent for screens made before devices. */
   device?: Device
-  /** A tab of ui.nav: Back is hidden in it. A change reaches the frame as a message, with no reload. */
-  tab?: boolean
-  /** The tab bar and Back label code draws (chromeOf). A change reaches the frame as a message too. */
-  chrome?: Chrome
   /** The bold line above a screen, e.g. "L2 Camera"; '' for a side of an A OR B. */
   name: string
   /** One sentence naming the design idea: under the name, or alone above a side. */
   idea: string
-  /** A side's spec lines, under its idea; `dropped` for one its pick would not put in. */
-  lines?: { text: string; dropped: boolean }[]
   /** For a side of an A OR B: which one, and whether it may be picked (it finished). */
   side?: { index: number; pickable: boolean }
   /** Why a side failed; it shows instead of the screen. */
@@ -118,13 +109,6 @@ interface Card {
   idea: HTMLElement
   /** Shows an idea longer than two lines in full. */
   more: HTMLButtonElement
-  /** A side's spec lines. */
-  lines: HTMLElement
-  /** Whether the frame was last told it is a tab. */
-  tab: boolean
-  /** The chrome the frame was last told, and the one its page was built with, as JSON. */
-  chrome: string
-  builtChrome: string
   note: HTMLElement
   screen: HTMLElement
   frame: HTMLIFrameElement
@@ -279,15 +263,8 @@ export class Canvas {
     const b = this.boxes.get(key)
     if (!b) return undefined
     const choice = !!this.screens.find((s) => s.key === key)?.cards[0]?.side
-    const above = this.above(key) / this.z
+    const above = (choice ? IDEA_H : labelH(this.z)) / this.z
     return { x: b.x, y: b.y - above, w: b.w + (choice ? 0 : RAIL_W / this.z), h: b.h + above }
-  }
-
-  /** The room above a screen for its name and idea, or a side's idea and spec lines, in pixels on screen. */
-  private above(key: string): number {
-    const s = this.screens.find((x) => x.key === key)
-    if (!s?.cards[0]?.side) return labelH(this.z)
-    return IDEA_H + Math.max(0, ...s.cards.map((c) => c.lines?.length ?? 0)) * LINE_H
   }
 
   /**
@@ -363,8 +340,6 @@ export class Canvas {
         const c = this.card(v.id, s.key)
         c.key = s.key
         c.view = v
-        if (c.tab !== !!v.tab) { c.tab = !!v.tab; c.frame.contentWindow?.postMessage({ uxwoz: 'tab', on: c.tab }, '*') }
-        this.updateChrome(c, v.chrome)
         if (c.width !== v.width) { c.width = v.width; c.frame.style.width = `${v.width}px` }
         c.el.classList.toggle('side', !!v.side)
         c.el.classList.toggle('pickable', !!v.side?.pickable)
@@ -378,12 +353,6 @@ export class Canvas {
         if (c.idea.title !== v.idea) { c.el.querySelector('.head')!.classList.remove('open'); c.more.textContent = 'more' }
         c.idea.textContent = v.idea || (v.side ? (v.streaming ? 'Making a design…' : v.error ? '' : 'A design') : '')
         c.idea.title = v.idea
-        c.lines.replaceChildren(...(v.lines ?? []).map((l) => {
-          const li = el('li', l.dropped ? 'dropped' : '', l.text)
-          li.title = l.dropped ? `${l.text}\nDropped at the pick: the spec has this row already, or has no room` : `${l.text}\nPicking this design adds this line to the spec`
-          return li
-        }))
-        c.lines.hidden = !v.lines?.length
         c.note.textContent = v.side ? '' : s.note
         c.note.hidden = !c.note.textContent
         // While a screen is being changed, the note takes the idea's line, so the names keep their room.
@@ -428,23 +397,7 @@ export class Canvas {
     if (!final && c.used != null) { c.used = null; this.queue() }
     c.shown = { html, final, css }
     c.sized = false
-    c.builtChrome = c.chrome
-    c.frame.srcdoc = framePage(html, css, final, c.view?.device, c.tab, c.chrome ? JSON.parse(c.chrome) ?? undefined : undefined)
-  }
-
-  /**
-   * A spec change redraws a frame's tabs and Back in place, by message, so the screen does not
-   * reload and its script keeps running. Only a tab bar that goes away needs a new build, to bring
-   * back the model's own markup.
-   */
-  private updateChrome(c: Card, chrome: Chrome | undefined) {
-    const next = JSON.stringify(chrome ?? null)
-    if (next === c.chrome) return
-    const before = c.chrome ? JSON.parse(c.chrome) as Chrome | null : null
-    c.chrome = next
-    if (!c.shown) return
-    if (before?.bar && !chrome?.bar) { const s = c.shown; c.shown = null; this.show(c.view!.id, s.html, s.final, s.css); return }
-    if (chrome) c.frame.contentWindow?.postMessage({ uxwoz: 'chrome', bar: chrome.bar, back: chrome.back }, '*')
+    c.frame.srcdoc = framePage(html, css, final, c.view?.device)
   }
 
   /** Drop the callback waiting for a card's next load, once its stream is cancelled. */
@@ -532,7 +485,7 @@ export class Canvas {
     })
     // Each row holds the names above its screens, which keep their size on screen.
     const rowH = rows.map((row) => Math.max(...row.map((k) => sizes.get(k)!.h)))
-    const above = (d: number) => Math.max(...rows[d]!.map((k) => this.above(k))) / z
+    const above = (d: number) => (rows[d]!.some((k) => sizes.get(k)!.parts.length > 1) ? IDEA_H : labelH(z)) / z
     const rowY: number[] = []
     let y = PAD
     for (let d = 0; d < rows.length; d++) {
@@ -601,7 +554,8 @@ export class Canvas {
       for (const k of list) {
         const b = this.boxes.get(k)
         if (!b) continue
-        const x1 = a.x + LINE_X, y1 = a.y + a.h, x2 = b.x + (Math.abs(b.x - a.x) < 1 ? LINE_X : ENTRY_X), y2 = b.y - this.above(k) / z - 6 / z
+        const choice = this.screens.find((s) => s.key === k)!.cards.length > 1
+        const x1 = a.x + LINE_X, y1 = a.y + a.h, x2 = b.x + (Math.abs(b.x - a.x) < 1 ? LINE_X : ENTRY_X), y2 = b.y - (choice ? IDEA_H : labelH(z)) / z - 6 / z
         const lane = Math.max(LANE / z, 10) * (this.lanes.get(p) ?? 0)
         const mid = Math.min((this.rowBottom.get(p) ?? y1) + GAP_Y / 2 + lane, y2 - 1)
         parts.push(svgEl('path', { d: elbow(x1, y1, x2, mid, y2), class: 'line' }))
@@ -627,9 +581,7 @@ export class Canvas {
     const ideaRow = el('div', 'idea-row')
     ideaRow.append(idea, more)
     const note = el('span', 'note')
-    const lines = el('ul', 'spec-lines')
-    lines.hidden = true
-    head.append(name, ideaRow, lines, note)
+    head.append(name, ideaRow, note)
     const screen = el('div', 'screen')
     const frame = document.createElement('iframe')
     frame.setAttribute('sandbox', FRAME_SANDBOX)
@@ -652,7 +604,7 @@ export class Canvas {
     })
     root.append(head, screen, error, rail)
     const c: Card = {
-      el: root, name, idea, more, lines, tab: false, chrome: '', builtChrome: '', note, screen, frame, shield, error, rail, undo: tools[2]!, tools, key, view: null,
+      el: root, name, idea, more, note, screen, frame, shield, error, rail, undo: tools[2]!, tools, key, view: null,
       width: 0, used: null, height: START_H, shown: null, sized: false, onLoad: null, growth: { count: 0, at: 0 }, frozen: false,
     }
     shield.addEventListener('click', () => { if (c.view?.side?.pickable) this.on.pick(c.key, c.view.side.index) })
@@ -663,9 +615,6 @@ export class Canvas {
   }
 
   private loaded(c: Card) {
-    // A redraw sent while the page was still loading went to the old one: send it again.
-    const chrome = c.chrome && c.chrome !== c.builtChrome ? JSON.parse(c.chrome) as Chrome | null : null
-    if (chrome) c.frame.contentWindow?.postMessage({ uxwoz: 'chrome', bar: chrome.bar, back: chrome.back }, '*')
     const cb = c.onLoad
     c.onLoad = null
     cb?.()

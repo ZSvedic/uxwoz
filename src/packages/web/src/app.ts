@@ -5,8 +5,7 @@
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
 import { nameWords, normalizePrompt, screenKey, screenRef, wayBack } from '@uxwoz/core/keys'
 import { namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
-import { MAX_ROWS, chromeOf, hidesBack, lineCount, linesOf, specMarkdown, valueOf, wouldTake, type Spec, type SpecValue } from '@uxwoz/core/spec'
-import type { CacheEntry, SpecReview, Version } from '@uxwoz/core'
+import type { CacheEntry, Version } from '@uxwoz/core'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
 
@@ -31,8 +30,6 @@ const state = {
   app: null as string | null,
   /** Every screen of this mockup, by key, as the server last sent it. */
   entries: new Map<string, CacheEntry>(),
-  /** The mockup's spec, as the server last sent it. */
-  spec: {} as Spec,
   /** Where each screen sits (level, the screen it hangs under), worked out from the screens on every draw. */
   tree: new Map<string, TreeNode>(),
   /** The screen the user last picked, clicked in, or chose in Nav. */
@@ -45,10 +42,7 @@ const state = {
   /** A picked screen getting a new version: an Edit with `change`, else a Regenerate. */
   revising: null as { key: string; change: string | null } | null,
   /** The open drawer tab, if any. It shows the current screen. */
-  drawer: null as 'edit' | 'info' | 'spec' | null,
-  /** What the review pass left: suggestions and its runs; and whether one runs now. */
-  review: { suggestions: [], reviews: [] } as SpecReview,
-  reviewing: false,
+  drawer: null as 'edit' | 'info' | null,
   busy: null as AbortController | null,
   /** The view before an A OR B was fitted, to go back to after the pick. */
   before: null as View | null,
@@ -94,31 +88,14 @@ const labelOf = (e: CacheEntry) => {
 const treeParent = (key: string) => state.tree.get(key)?.parent ?? null
 
 const widthOf = (d: Device | undefined) => (d ? DEVICES[d].width : LEGACY_WIDTH)
-
-/** The name of the screen a key belongs to: stored, from an `@name` key, or home for the first screen. */
-function screenNameOf(key: string): string | undefined {
-  const e = state.entries.get(key)
-  if (e?.name) return e.name
-  if (state.app && key === screenKey(state.app, null)) return 'home'
-  return key.match(/ » @([a-z0-9_-]+)$/)?.[1]
-}
-
-/** Code hides Back on the tab screens of ui.nav (asking the model did not work): the card tells its frame. */
-const isTab = (key: string) => hidesBack(state.spec, screenNameOf(key))
-/** The tabs and Back label code draws on a screen, from the spec as it is now: the frame applies them, and redraws them in place. */
-const chromeFor = (key: string) => chromeOf(state.spec, screenNameOf(key))
 const ideaOf = (v: Version) => v.idea ?? ''
 
 function sideCard(key: string, index: number, side: Side | null, stored: Version | null, device: Device | undefined): CardView {
   const version = stored ?? side?.version ?? null
   const id = `${key}#${index}`
   const error = version ? undefined : side ? side.error ?? undefined : state.failed.get(id) ?? 'This design was not finished.'
-  // The lines its pick would add to the spec, and the ones it would drop, shown before the pick.
-  const lines = version?.spec ?? []
-  const take = wouldTake(state.spec, lines)
   return {
-    lines: lines.map((l, i) => ({ text: `${l.key} = ${l.text}`, dropped: !take[i] })),
-    id, width: widthOf(version?.device ?? device), device: version?.device ?? device, tab: isTab(key), chrome: chromeFor(key), name: '', idea: version ? ideaOf(version) : '',
+    id, width: widthOf(version?.device ?? device), device: version?.device ?? device, name: '', idea: version ? ideaOf(version) : '',
     side: { index, pickable: !!version }, error, streaming: !version && !error,
   }
 }
@@ -133,7 +110,7 @@ function views(): ScreenView[] {
     out.push(v ? {
       key: e.key, parent: treeParent(e.key), current: state.current === e.key, undo: e.versions.length > 1,
       note: revising ? (revising.change ? 'Making the change…' : 'Making a new design…') : '',
-      cards: [{ id: e.key, width: widthOf(v.device), device: v.device, tab: isTab(e.key), chrome: chromeFor(e.key), name: labelOf(e), idea: ideaOf(v), streaming: !!revising }],
+      cards: [{ id: e.key, width: widthOf(v.device), device: v.device, name: labelOf(e), idea: ideaOf(v), streaming: !!revising }],
     } : {
       key: e.key, parent: treeParent(e.key), current: false, undo: false, note: '',
       cards: (e.proposals ?? []).map((p, i) => sideCard(e.key, i, making?.sides[i] ?? null, p, making?.device)),
@@ -148,7 +125,7 @@ function views(): ScreenView[] {
 
 /** Draw every screen and put each stored design in its frame. Streaming frames are left to their streams. */
 async function draw() {
-  state.tree = screenTree([...state.entries.values()], state.spec)
+  state.tree = screenTree([...state.entries.values()])
   canvas.render(views(), !!state.busy)
   generate.hidden = !!state.app && !generate.classList.contains('open')
   renderDrawer()
@@ -253,12 +230,8 @@ async function* readEvents(res: Response): AsyncGenerator<ScreenEvent> {
   }
 }
 
-/** Counts POSTs as they start and end: a map fetched across one may be older than what this page already shows. */
-let changes = 0
-const post = async (url: string, body: object, signal?: AbortSignal) => {
-  changes++
-  try { return await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal }) } finally { changes++ }
-}
+const post = (url: string, body: object, signal?: AbortSignal) =>
+  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal })
 
 // ---- Screens ----------------------------------------------------------------------------------
 
@@ -294,8 +267,7 @@ async function openScreen(action: string | null, from: string | null, label: str
         await draw()
         canvas.fit(ev.key, { top: true })
         fitted = performance.now()
-      } else if (ev.type === 'spec') { state.spec = ev.spec; draw() }
-      else if (ev.type === 'chunk') m?.sides[ev.variant]?.stream?.push(ev.text)
+      } else if (ev.type === 'chunk') m?.sides[ev.variant]?.stream?.push(ev.text)
       else if (ev.type === 'version' || ev.type === 'failed') {
         const s = m?.sides[ev.variant]
         if (!s) continue
@@ -308,7 +280,6 @@ async function openScreen(action: string | null, from: string | null, label: str
       else if (ev.type === 'done') {
         finished = true
         state.entries.set(ev.entry.key, ev.entry)
-        state.spec = ev.spec
         if (state.making === m) state.making = null
         loadRecent()
         await draw()
@@ -385,10 +356,8 @@ async function pick(key: string, index: number) {
       showError('Could not keep that design')
       return reloadMap()
     }
-    const { entry, spec, reviewing } = await res.json() as { entry: CacheEntry; spec: Spec; reviewing: boolean }
+    const { entry } = await res.json() as { entry: CacheEntry }
     state.entries.set(key, entry)
-    state.spec = spec
-    if (reviewing) watchReview()
     canvas.rename(`${key}#${index}`, key)
     state.current = key
     saveCurrent()
@@ -499,22 +468,14 @@ function walkTrail(dir: 1 | -1) {
 async function reloadMap() {
   const app = state.app
   if (!app) return
-  const before = changes
   const res = await fetch(`/api/map?app=${encodeURIComponent(app)}`).catch(() => null)
-  const map = res?.ok ? await res.json() : null
-  // A change made here while the map was on its way is newer than the map: keep it.
-  if (!map || state.app !== app || changes !== before) return
-  applyMap(map)
+  if (!res?.ok || state.app !== app) return
+  applyMap(await res.json())
 }
 
-function applyMap(map: { entries: CacheEntry[]; spec?: Spec; review?: SpecReview; reviewing?: boolean }) {
+function applyMap(map: { entries: CacheEntry[] }) {
   state.entries = new Map(map.entries.map((e) => [e.key, e]))
-  state.spec = map.spec ?? {}
-  state.review = map.review ?? { suggestions: [], reviews: [] }
-  state.reviewing = !!map.reviewing
   if (state.current && !state.entries.has(state.current)) state.current = null
-  // A page opened while a review runs watches it too.
-  if (state.reviewing && !reviewTimer) watchReview()
   draw()
 }
 
@@ -553,7 +514,6 @@ async function revise(key: string, change: string | null) {
           finished = true
           stream.cancel()
           state.entries.set(key, ev.entry)
-          state.spec = ev.spec
           state.revising = null
           if (change) changeInput.value = ''
           // The new version may be taller or narrower: keep it in view once it has its size.
@@ -578,15 +538,14 @@ async function undo(key: string) {
   if (state.busy) return
   const res = await post('/api/undo', { key }).catch(() => null)
   if (!res?.ok) return showError('Nothing to undo')
-  const { entry, spec } = await res.json() as { entry: CacheEntry; spec: Spec }
+  const { entry } = await res.json() as { entry: CacheEntry }
   state.entries.set(key, entry)
-  state.spec = spec
   draw()
 }
 
 /** How many other screens a delete takes with it: those the first screen would no longer reach. */
 function goesWith(key: string): number {
-  const rest = screenTree([...state.entries.values()].filter((e) => e.key !== key), state.spec)
+  const rest = screenTree([...state.entries.values()].filter((e) => e.key !== key))
   return [...state.tree.keys()].filter((k) => k !== key && state.entries.has(k) && !rest.has(k)).length
 }
 
@@ -610,19 +569,7 @@ async function removeScreen(key: string) {
   if (state.current) canvas.reveal(state.current)
 }
 
-/** While a review pass runs in the background, look at the server's copy now and then, so its rows and suggestions show. */
-let reviewTimer: ReturnType<typeof setTimeout> | undefined
-function watchReview(tries = 15) {
-  state.reviewing = true
-  clearTimeout(reviewTimer)
-  reviewTimer = setTimeout(async () => {
-    reviewTimer = undefined
-    await reloadMap()
-    if (state.reviewing && tries > 1 && !reviewTimer) watchReview(tries - 1)
-  }, 2000)
-}
-
-function openDrawer(tab: 'edit' | 'info' | 'spec') {
+function openDrawer(tab: 'edit' | 'info') {
   state.drawer = tab
   renderDrawer()
   if (tab === 'edit') changeInput.focus()
@@ -639,9 +586,7 @@ function closeDrawer() {
 function renderDrawer() {
   const e = state.current ? state.entries.get(state.current) : undefined
   const v = e?.versions.at(-1)
-  // The spec panel belongs to the mockup, so it opens with no current screen too.
-  const specOpen = state.drawer === 'spec' && !!state.app && state.entries.size > 0
-  const open = specOpen || !!(state.drawer && e && v)
+  const open = !!(state.drawer && e && v)
   if (drawer.hidden === open) {
     drawer.hidden = !open
     if (!open && state.current) requestAnimationFrame(() => canvas.reveal(state.current!))
@@ -650,21 +595,13 @@ function renderDrawer() {
   for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === state.drawer))
   $('editPane').hidden = state.drawer !== 'edit'
   $('infoPane').hidden = state.drawer !== 'info'
-  $('specPane').hidden = state.drawer !== 'spec'
-  if (specOpen) { $('drawerName').textContent = 'The spec: what every screen follows'; return renderSpec() }
-  if (!e || !v) return
   $('drawerName').textContent = labelOf(e)
   $<HTMLButtonElement>('makeChange').disabled = !!state.busy
   const history = $('history')
   history.replaceChildren(...e.versions.map((x, i) => {
     const li = document.createElement('li')
-    const what = document.createElement('span')
-    what.textContent = i === 0 ? 'The design you picked' : x.feedback ? `Edit: ${x.feedback}` : 'Regenerated'
-    li.append(what)
+    li.textContent = i === 0 ? 'The design you picked' : x.feedback ? `Edit: ${x.feedback}` : 'Regenerated'
     li.classList.toggle('now', i === e.versions.length - 1)
-    // The spec lines this version set, old value beside new; an Edit's have a ✕ that takes them back.
-    const set = linesOf(state.spec, e.key, x.createdAt)
-    if (set.length || x.specRefused?.length) li.append(specLines(e.key, x.createdAt, set, !!x.feedback, x.specRefused ?? []))
     return li
   }).reverse())
   const node = state.tree.get(e.key)
@@ -684,9 +621,6 @@ function renderDrawer() {
     ['Cost', v.costUsd == null ? 'unknown' : `${v.costEstimated ? '~' : ''}${fmtUsd(v.costUsd)}${v.costEstimated ? ' (est.)' : ''}`],
     ['All versions', fmtUsd(e.versions.reduce((t, x) => t + (x.costUsd ?? 0), 0))],
     ['Finish', v.finishReason ?? '–'],
-    ['Check', v.misses == null ? 'made without a spec' : v.misses.length ? v.misses.join('; ') : 'follows the spec'],
-    ...(e.versions[0]?.plan ? [['Plan', planNote(e.versions[0].plan)] as [string, string]] : []),
-    ['Spec lines', v.spec?.length ? v.spec.map((l) => `${l.key} = ${l.text}`).join('\n') : '–'],
     ['Size', `${v.html.length.toLocaleString()} characters`],
     ['Prompt', e.action ?? e.app],
   ]
@@ -696,68 +630,6 @@ function renderDrawer() {
     dd.textContent = val
     return [dt, dd]
   }))
-}
-
-/**
- * A version's spec lines in the drawer: key, the value before (struck), the value now, and ✕ for an
- * Edit's; a line a later value replaced says so and has no ✕. Then an Edit's lines that were not
- * taken, and why.
- */
-function specLines(key: string, at: string, set: { key: string; text: string; before?: string; later: boolean }[], edit: boolean,
-  refused: { line: string; why: string }[]): HTMLElement {
-  const ul = document.createElement('ul')
-  ul.className = 'set-lines'
-  for (const r of refused) {
-    const li = document.createElement('li')
-    li.className = 'refused'
-    const k = document.createElement('b'), why = document.createElement('span')
-    k.textContent = r.line
-    why.textContent = `not taken: ${r.why}`
-    li.append(k, why)
-    ul.append(li)
-  }
-  for (const l of set) {
-    const li = document.createElement('li')
-    const k = document.createElement('b'), old = document.createElement('s'), now = document.createElement('span')
-    k.textContent = l.key
-    old.textContent = l.before ?? 'not set'
-    old.classList.toggle('none', l.before == null)
-    now.textContent = l.later ? `${l.text} (replaced later)` : l.text
-    li.classList.toggle('later', l.later)
-    li.append(k, old, now)
-    if (edit && !l.later) {
-      const x = document.createElement('button')
-      x.type = 'button'
-      x.className = 'drop'
-      x.textContent = '✕'
-      x.title = 'Take this line back: the value before counts again for new screens'
-      x.addEventListener('click', () => dropLine(key, at, l.key))
-      li.append(x)
-    }
-    ul.append(li)
-  }
-  return ul
-}
-
-/** Take back one line an Edit set. One at a time; when the line is gone already (another browser), take the server's copy. */
-let dropping = false
-async function dropLine(key: string, at: string, row: string) {
-  if (dropping) return
-  dropping = true
-  try {
-    const res = await post('/api/spec/drop', { key, at, row }).catch(() => null)
-    if (!res?.ok) { showError('That line was taken back already'); return reloadMap() }
-    state.spec = (await res.json() as { spec: Spec }).spec
-    draw()
-  } finally {
-    dropping = false
-  }
-}
-
-/** How the mockup's plan went, for Info on its first screen. */
-function planNote(p: NonNullable<Version['plan']>): string {
-  if (p.error) return `failed (${p.error}); main navigation and Back were left open`
-  return `${p.rows} rows in ${fmtS(p.ms)}${p.costUsd == null ? '' : `, ~${fmtUsd(p.costUsd)}`}`
 }
 
 $('editPane').addEventListener('submit', (ev) => {
@@ -770,145 +642,7 @@ $('editPane').addEventListener('submit', (ev) => {
 changeInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $<HTMLFormElement>('editPane').requestSubmit() }
 })
-for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.addEventListener('click', () => openDrawer(b.dataset.tab as 'edit' | 'info' | 'spec'))
-$('specButton').addEventListener('click', () => (state.drawer === 'spec' ? closeDrawer() : openDrawer('spec')))
-
-// ---- The spec panel --------------------------------------------------------------------------------
-
-const SECTIONS: [string, string][] = [['product.', 'Product'], ['ui.', 'Screens'], ['data.', 'Facts']]
-
-/** Where a line came from, in words: the plan, a pick on which screen, an Edit, the review pass, you. */
-function sourceOf(v: SpecValue): string {
-  const screen = v.screen ? state.entries.get(v.screen) : undefined
-  const on = screen ? ` on ${labelOf(screen)}` : v.screen === undefined && (v.from === 'pick' || v.from === 'edit') ? ' on a deleted screen' : ''
-  return { plan: 'the plan', pick: `a pick${on}`, edit: `an Edit${on}`, user: 'you', review: 'the review pass' }[v.from]
-}
-
-const btn = (text: string, title: string, run: () => void, cls = '') => {
-  const b = document.createElement('button')
-  b.type = 'button'
-  b.textContent = text
-  b.title = title
-  if (cls) b.className = cls
-  b.addEventListener('click', run)
-  return b
-}
-const elText = (tag: string, text: string, cls = '') => { const x = document.createElement(tag); x.textContent = text; if (cls) x.className = cls; return x }
-
-/** The spec panel: how full it is, the review's suggestions, rows by section, the user's line, Export, the review log. */
-function renderSpec() {
-  const spec = state.spec
-  $('specFill').textContent = `${lineCount(spec)} of ${MAX_ROWS} lines` + (state.reviewing ? ' · the review pass is reading it' : '')
-  $('specSuggestions').replaceChildren(...(state.review.suggestions.length ? [elText('h3', 'Suggestions from the review pass')] : []),
-    ...state.review.suggestions.map((s) => {
-      const box = elText('div', '', 'spec-suggestion')
-      // What is there now, so the user sees what Accept replaces, and for a merge which row goes.
-      const now = s.keys.map((k) => elText('p', `${k} now: ${valueOf(state.spec, k) ?? 'not set'}`, 'now'))
-      box.append(elText('p', s.kind === 'merge' ? `Merge ${s.keys[0]} and ${s.keys[1]} into one line for ${s.keys[0]}; ${s.keys[1]} goes:` : `Reword ${s.keys[0]}:`),
-        ...now, elText('blockquote', s.text),
-        btn('Accept', s.kind === 'merge' ? `Make this your line for ${s.keys[0]}, and delete ${s.keys[1]}` : 'Make this your line', () => settle(s.id, true), 'primary'),
-        btn('Dismiss', 'Drop this suggestion', () => settle(s.id, false)))
-      return box
-    }))
-  $('specRows').replaceChildren(...SECTIONS.flatMap(([prefix, title]) => {
-    const keys = Object.keys(spec).filter((k) => k.startsWith(prefix))
-    if (!keys.length) return []
-    const ul = elText('ul', '', 'spec-rows')
-    for (const key of keys) {
-      const row = spec[key]!, v = row.values.at(-1)
-      const li = elText('li', '', v ? '' : 'open')
-      const value = v ? elText('span', v.text, 'value') : elText('span', `not decided yet: ${row.ask ?? ''}`, 'value')
-      const source = elText('small', v ? `from ${sourceOf(v)}` : row.from === 'review' ? 'added by the review pass' : 'open since the plan')
-      const tools = elText('div', '', 'tools')
-      tools.append(btn(v ? 'Change' : 'Decide', 'Write your own line for this row', () => editRow(li, key, v?.text ?? '')))
-      if (v) tools.append(btn('✕ line', 'Delete this line: the one before counts again, or the row is open', () => removeSpec(key, 'line')))
-      tools.append(btn('Delete row', 'Delete the whole row', () => removeSpec(key, 'row'), 'danger'))
-      li.append(elText('b', key), value, source, tools)
-      // A Change box that is open stays open, with what the user typed, whatever redraws the panel.
-      if (specEditing?.key === key) editRow(li, key, specEditing.text)
-      ul.append(li)
-    }
-    return [elText('h3', title), ul]
-  }))
-  $('specMarkdown').textContent = specMarkdown(state.app ?? '', spec)
-  const last = state.review.reviews.at(-1)
-  $('specReviews').textContent = last
-    ? `Review pass after ${last.screens} screens: ${last.error ? `failed (${last.error})` : `${last.added.length} rows added, ${last.suggested} suggestions, ${fmtS(last.ms)}${last.costUsd == null ? '' : `, ~${fmtUsd(last.costUsd)}`}`}. ${state.review.reviews.length === 1 ? 'Its first run.' : `${state.review.reviews.length} runs in all.`}`
-    : 'The review pass reads the spec after every 5 picked screens.'
-}
-
-/** The row whose Change box is open, and what is typed in it. */
-let specEditing: { key: string; text: string; focused: boolean } | null = null
-
-/** An inline box for the user's own line of a row. */
-function editRow(li: HTMLElement, key: string, text: string) {
-  if (li.querySelector('form')) return
-  const focused = specEditing?.key === key ? specEditing.focused : true
-  specEditing = { key, text, focused }
-  const form = document.createElement('form')
-  form.className = 'spec-edit'
-  const input = document.createElement('input')
-  input.value = text
-  input.maxLength = 120
-  input.addEventListener('input', () => { if (specEditing?.key === key) specEditing.text = input.value })
-  input.addEventListener('focus', () => { if (specEditing?.key === key) specEditing.focused = true })
-  input.addEventListener('blur', () => { if (specEditing?.key === key) specEditing.focused = false })
-  form.append(input, btn('Cancel', 'Keep the line as it is', () => { specEditing = null; renderSpec() }))
-  const save = document.createElement('button')
-  save.type = 'submit'
-  save.textContent = 'Save'
-  form.prepend(save)
-  form.insertBefore(input, save)
-  form.addEventListener('submit', (ev) => {
-    ev.preventDefault()
-    setSpecLine(key, input.value).then((ok) => { if (ok && specEditing?.key === key) { specEditing = null; renderSpec() } })
-  })
-  li.append(form)
-  if (focused) { input.focus(); input.setSelectionRange(input.value.length, input.value.length) }
-}
-
-async function specCall(url: string, body: object): Promise<{ spec?: Spec; review?: SpecReview } | null> {
-  const res = await post(url, { app: state.app, ...body }).catch(() => null)
-  const b = res ? await res.json().catch(() => ({})) : {}
-  if (!res?.ok) { showError(`Not saved: ${b.error ?? 'could not change the spec'}`); reloadMap(); return null }
-  return b
-}
-
-/** The user's own line: it wins over every model, and a change to ui.nav or ui.back redraws every screen. */
-async function setSpecLine(key: string, text: string): Promise<boolean> {
-  const b = await specCall('/api/spec/set', { key, text })
-  if (!b?.spec) return false
-  if (specEditing?.key === key) specEditing = null
-  state.spec = b.spec
-  draw()
-  return true
-}
-async function removeSpec(key: string, what: 'line' | 'row') {
-  if (what === 'row' && !confirm(`Delete the row ${key}?`)) return
-  const b = await specCall('/api/spec/remove', { key, what })
-  if (b?.spec) { state.spec = b.spec; draw() }
-}
-async function settle(id: string, accept: boolean) {
-  const b = await specCall('/api/spec/suggestion', { id, accept })
-  if (b?.spec) { state.spec = b.spec; if (b.review) state.review = b.review; draw() }
-}
-
-$('specAdd').addEventListener('submit', (ev) => {
-  ev.preventDefault()
-  // The form clears only when the line was taken; a refused one keeps what was typed.
-  setSpecLine($<HTMLInputElement>('specAddKey').value.trim(), $<HTMLInputElement>('specAddText').value)
-    .then((ok) => { if (ok) { $<HTMLInputElement>('specAddKey').value = ''; $<HTMLInputElement>('specAddText').value = '' } })
-})
-$('specCopy').addEventListener('click', () => {
-  navigator.clipboard.writeText(specMarkdown(state.app ?? '', state.spec)).then(() => { $('specCopy').textContent = 'Copied' ; setTimeout(() => { $('specCopy').textContent = 'Copy as markdown' }, 1500) }, () => showError('Could not copy'))
-})
-$('specDownload').addEventListener('click', () => {
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(new Blob([specMarkdown(state.app ?? '', state.spec)], { type: 'text/markdown' }))
-  a.download = 'spec.md'
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
-})
+for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.addEventListener('click', () => openDrawer(b.dataset.tab as 'edit' | 'info'))
 $('drawerClose').addEventListener('click', closeDrawer)
 addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape' && state.drawer) closeDrawer() })
 
@@ -960,7 +694,6 @@ function closeMockup() {
   store.set('uxwoz:app', '')
   state.app = null
   state.entries = new Map()
-  state.spec = {}
   state.current = null
   resetTrail()
   state.making = null
@@ -1131,8 +864,6 @@ function renderToolbar() {
   $('menuFoot').hidden = !app
   const nav = $<HTMLButtonElement>('navButton')
   nav.hidden = !app || !state.entries.size
-  $('specButton').hidden = nav.hidden
-  $('specButton').classList.toggle('on', state.drawer === 'spec')
   const cur = state.current ? state.entries.get(state.current) : undefined
   for (const [id, dir] of [['trailBack', -1], ['trailForward', 1]] as const) {
     const b = $<HTMLButtonElement>(id)
@@ -1151,7 +882,7 @@ function renderToolbar() {
 function renderNav() {
   const menu = $('navMenu')
   const made = [...state.entries.values()]
-  const all = [...made, ...plannedScreens(made, state.spec)]
+  const all = [...made, ...plannedScreens(made)]
   const path = new Set<string>()
   for (let k = state.current; k && !path.has(k); k = treeParent(k)) path.add(k)
   const rows: HTMLElement[] = []
@@ -1162,7 +893,7 @@ function renderNav() {
     const via = state.tree.get(e.key)?.label
     const planned = !state.entries.has(e.key)
     const b = planned
-      ? item(labelOf(e), 'not made yet', () => (state.busy ? hint() : openScreen(`@${e.name}`, madeParent(e), e.parent!.label)))
+      ? item(labelOf(e), 'not made yet', () => (state.busy ? hint() : openScreen(`@${e.name}`, e.parent!.key, e.parent!.label)))
       : item(labelOf(e), via ? `via ${via}` : '', () => goTo(e.key))
     b.classList.toggle('planned', planned)
     b.style.setProperty('--depth', String(depth))
@@ -1174,12 +905,6 @@ function renderNav() {
   // The first screen first; screens the first screen does not reach after it, as their own trees.
   for (const e of all) if (!treeParent(e.key)) walk(e, 0)
   menu.replaceChildren(...rows)
-}
-
-/** The screen a planned one is opened from: the one it hangs under if that is made, else the first screen (a step of the core flow may hang under a step not made yet). */
-function madeParent(e: CacheEntry): string {
-  const p = e.parent?.key
-  return p && state.entries.get(p)?.versions.length ? p : screenKey(state.app!, null)
 }
 
 /** Make a screen current and bring it into view; an open A OR B is fitted instead. */

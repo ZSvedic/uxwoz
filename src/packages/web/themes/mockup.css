@@ -75,6 +75,3 @@ progress { border-radius: var(--sk-wobble); }
 hr { border-top: 2px dashed var(--sk-ink); }
 h1, h2, h3 { font-weight: 700; }
 a { color: var(--sk-ink); text-decoration: underline wavy; }
-/* The spec's tab bar: a thick line over it (under it on a desktop), like the rest of the sketch. Our frame CSS comes after the theme, so these need !important. */
-nav[data-ui="tabs"] { border-top: 2px solid var(--sk-ink) !important; background: var(--sk-paper); }
-html[data-device="desktop"] nav[data-ui="tabs"] { border-top: 0 !important; border-bottom: 2px solid var(--sk-ink) !important; }

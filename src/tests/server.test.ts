@@ -1,6 +1,6 @@
 // Feature: the web server streams a new screen's A OR B, keeps the pick, and revises screens (cassette: server).
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { ScreenCache, linksIn, plannedScreens, screenRef, valueOf, type CacheEntry } from '@uxwoz/core'
+import { ScreenCache, linksIn, plannedScreens, screenRef, type CacheEntry } from '@uxwoz/core'
 import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
 import { cassette } from './cassette.ts'
 
@@ -11,7 +11,7 @@ const post = (path: string, body: object, headers: Record<string, string> = {}) 
   fetch(new URL(path, server.url), { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) })
 
 // The second side always asks for the different design, so the recorded requests replay.
-beforeAll(() => { server = createServer({ port: 0, cache: new ScreenCache(), fetch: tape.fetch, env: tape.env, log: () => {}, random: () => 0.9, review: async () => ({ adds: [], suggestions: [], ms: 0, costUsd: null }) }) })
+beforeAll(() => { server = createServer({ port: 0, cache: new ScreenCache(), fetch: tape.fetch, env: tape.env, log: () => {}, random: () => 0.9 }) })
 afterAll(() => { server.stop(true); tape.save() })
 
 async function stream(path: string, body: object): Promise<ScreenEvent[]> {
@@ -20,9 +20,8 @@ async function stream(path: string, body: object): Promise<ScreenEvent[]> {
   return (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
 }
 const screen = (body: object) => stream('/api/screen', body)
-/** The links to other screens by name in a screen (`@name` or `@name: prompt`), in page order. A screen
- * the spec plans is linked by its name alone. */
-const actions = (html: string) => linksIn(html).map((l) => l.action).filter((a) => screenRef(a) && screenRef(a)!.name !== 'home')
+/** The links to new screens in a screen (`@name: prompt`), in page order. */
+const actions = (html: string) => linksIn(html).map((l) => l.action).filter((a) => screenRef(a)?.prompt && screenRef(a)!.name !== 'home')
 const nameOf = (action: string) => screenRef(action)!.name
 const done = (evs: ScreenEvent[]) => evs.find((e) => e.type === 'done') as Extract<ScreenEvent, { type: 'done' }>
 const pick = async (key: string, index: number) => (await (await post('/api/pick', { key, index })).json()).entry as CacheEntry
@@ -58,15 +57,13 @@ describe('web server', () => {
   })
 
   test('a click opens a new screen under its name, with the prompt of its link and the click as its parent', async () => {
-    const { entry: first, spec } = done(await screen({ app: APP }))
+    const first = done(await screen({ app: APP })).entry
     expect(first.name).toBe('home')
     const action = actions(shown(first))[0]!
-    // The link's prompt, or the planned screen's when the link names it alone.
-    const prompt = screenRef(action)!.prompt || plannedScreens([first], spec).find((p) => p.name === nameOf(action))!.action
     const evs = await screen({ app: APP, action, from: first.key, label: 'Our breads' })
     const { entry } = done(evs)
     expect(entry.key).toBe(`a tiny bakery website » @${nameOf(action)}`)
-    expect(entry).toMatchObject({ name: nameOf(action), action: prompt, parent: { key: first.key, label: 'Our breads' } })
+    expect(entry).toMatchObject({ name: nameOf(action), action: screenRef(action)!.prompt, parent: { key: first.key, label: 'Our breads' } })
     expect((await pick(entry.key, 0)).name).toBe(nameOf(action))
   }, 30_000)
 
@@ -87,12 +84,9 @@ describe('web server', () => {
   })
 
   test('a planned screen opened by its name alone is made from the prompt of the link that planned it', async () => {
-    const { entry: first, spec } = done(await screen({ app: APP }))
-    // A planned screen that a link names with a prompt: the link's prompt wins over the spec's words.
-    const link = actions(shown(first)).find((a) => screenRef(a)!.prompt && plannedScreens([first], spec).some((p) => p.name === nameOf(a)))!
-    expect(link).toBeTruthy()
-    const planned = plannedScreens([first], spec).find((p) => p.name === nameOf(link))!
-    expect(planned.action).toBe(screenRef(link)!.prompt)
+    const first = done(await screen({ app: APP })).entry
+    const planned = plannedScreens([first]).at(-1)!
+    expect(planned.action).toBe(screenRef(actions(shown(first)).find((a) => nameOf(a) === planned.name)!)!.prompt)
     const second = done(await screen({ app: APP, action: `@${planned.name}`, from: first.key, label: 'More' })).entry
     expect(second).toMatchObject({ key: `a tiny bakery website » @${planned.name}`, name: planned.name, action: planned.action })
     await pick(second.key, 0)
@@ -152,21 +146,6 @@ describe('web server', () => {
     expect((await post('/api/undo', { key: first.key })).status).toBe(404)
     expect((await post('/api/revise', { key: first.key, change: ' ' })).status).toBe(400)
     expect((await post('/api/revise', { key: 'no such screen' })).status).toBe(404)
-  }, 60_000)
-
-  test('an Edit that changes a rule with a value sets its line, and Undo brings the old line back', async () => {
-    const { entry: first } = done(await screen({ app: APP }))
-    const set = done(await stream('/api/revise', { key: first.key, change: 'Make Back an arrow alone, ←, at the top left, on every screen' }))
-    const before = valueOf(set.spec, 'ui.back')
-    expect(before).toContain('←')
-    // The second Edit replaces a row that has a value: the Edit request says its line may.
-    const moved = done(await stream('/api/revise', { key: first.key, change: 'Move Back to the top right, on every screen' }))
-    expect(moved.entry.versions.at(-1)!.spec?.map((l) => l.key)).toContain('ui.back')
-    expect(valueOf(moved.spec, 'ui.back')).not.toBe(before)
-    expect(valueOf(moved.spec, 'ui.back')).toMatch(/right/i)
-    const undone = await (await post('/api/undo', { key: first.key })).json()
-    expect(valueOf(undone.spec, 'ui.back')).toBe(before)
-    await post('/api/undo', { key: first.key })
   }, 60_000)
 
   test('a screen whose A OR B is still open cannot be revised', async () => {

@@ -29,7 +29,6 @@
     <div id="navMenu" class="menu nav-menu" role="menu" hidden></div>
   </div>
   <div class="tb-right zoom">
-    <button id="specButton" type="button" class="spec-button" title="The spec: the decisions every screen of this mockup follows" hidden>Spec</button>
     <button id="zoomOut" type="button" class="wide-only" title="Zoom out (⌘−)">−</button>
     <button id="zoomValue" type="button" class="menu-button" aria-haspopup="menu" title="Zoom"><span id="zoomPct">100%</span> <span class="caret">▾</span></button>
     <button id="zoomIn" type="button" class="wide-only" title="Zoom in (⌘+)">+</button>
@@ -59,7 +58,6 @@
       <div class="tabs" role="tablist">
         <button id="tabEdit" type="button" role="tab" data-tab="edit">✎ Edit</button>
         <button id="tabInfo" type="button" role="tab" data-tab="info">ⓘ Info</button>
-        <button id="tabSpec" type="button" role="tab" data-tab="spec">☰ Spec</button>
       </div>
       <button id="drawerClose" type="button" class="close" title="Close (Esc)">✕</button>
     </div>
@@ -72,24 +70,6 @@
       <ol id="history" class="history" reversed></ol>
     </form>
     <div id="infoPane" class="pane"><dl id="info" class="info"></dl></div>
-    <div id="specPane" class="pane spec-pane">
-      <p id="specFill" class="spec-fill"></p>
-      <div id="specSuggestions"></div>
-      <div id="specRows"></div>
-      <form id="specAdd" class="spec-add">
-        <h3>Add a line of your own</h3>
-        <input id="specAddKey" placeholder="ui.toggles" maxlength="40" required>
-        <input id="specAddText" placeholder="Switches, never checkboxes" maxlength="120" required>
-        <button type="submit">Add</button>
-      </form>
-      <div class="spec-export">
-        <h3>Export</h3>
-        <button id="specCopy" type="button">Copy as markdown</button>
-        <button id="specDownload" type="button">Download .md</button>
-        <pre id="specMarkdown"></pre>
-      </div>
-      <p id="specReviews" class="spec-reviews"></p>
-    </div>
   </aside>
   <form id="generate" class="generate">
     <h2>What should we mock up?</h2>
