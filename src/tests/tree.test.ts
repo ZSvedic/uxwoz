@@ -1,6 +1,6 @@
 // The tree of a mockup: levels are the fewest clicks from the first screen, worked out from the screens.
 import { expect, test } from 'bun:test'
-import { ScreenCache, linksIn, nameFrom, plannedScreens, screenKey, screenTree, treeLines, uniqueName, type Version } from '@uxwoz/core'
+import { ScreenCache, linksIn, nameFrom, plannedScreens, screenKey, screenList, screenTree, uniqueName, type Version } from '@uxwoz/core'
 
 const ver = (html: string): Version => ({
   html, model: 'claude-haiku-5.5', servedModel: null, createdAt: '2026-11-05T00:00:00Z',
@@ -59,15 +59,27 @@ test('of two shortest paths, a screen hangs under the screen that made it', () =
   expect(t.get(other.key)?.level).toBe(2)
 })
 
-test('the model gets the picked screens as an indented tree of names', () => {
-  const { cache } = sleepApp()
-  cache.propose('Sleep app', 'Open choice', 0, ver('<h1>x</h1>'), { key: 'sleep app', label: 'x' })
-  expect(treeLines(cache.map('Sleep app').entries)).toEqual([
-    '@home: the first screen of Sleep app',
-    '  @recording: Record sleep',
-    '    @sleep-report: Sleep report of last night',
-    '  @settings: Settings',
-  ])
+test('the paper lists the screens as titles in tree order, and a line for each link between two of them', () => {
+  const { cache, home } = sleepApp()
+  cache.addVersion(home.key, ver('<button data-action="Record sleep">R</button><button data-action="@settings">S</button><button data-action="@tips: Sleep tips">T</button>'))
+  expect(screenList(cache.map('Sleep app').entries)).toEqual({
+    titles: ['home: the first screen', 'recording: Record sleep', 'sleep-report: Sleep report of last night', 'settings: Settings', 'tips: Sleep tips (no drawing yet)'],
+    lines: ['home -> recording', 'home -> settings', 'home -> tips'],
+  })
+})
+
+test('a component is no screen: its links count on each screen that pastes it', () => {
+  const { cache, home, settings, levels } = sleepApp()
+  const bar = cache.addComponent('Sleep app', 'tab-bar', 'every main screen', ver('<nav><a data-action="@sleep-report">Report</a></nav>'), 'user')
+  expect(typeof bar).toBe('object')
+  cache.addVersion(settings.key, ver('<title>Settings</title><div data-component="tab-bar"></div>'))
+  expect(levels()).toEqual([1, 2, 3, 2])
+  cache.addVersion(home.key, ver('<button data-action="Record sleep">R</button><div data-component="tab-bar"></div>'))
+  expect(levels()).toEqual([1, 2, 2, 2])
+  const all = cache.map('Sleep app').entries
+  expect(screenTree(all).has((bar as { key: string }).key)).toBe(false)
+  expect(screenList(all).lines).toEqual(['home -> recording', 'home -> sleep-report', 'settings -> sleep-report'])
+  expect(cache.find('Sleep app', '@tab-bar')).toBeUndefined()
 })
 
 test('links are found in nested controls, with > in a quoted attribute, and in self-closing and void tags', () => {
@@ -87,15 +99,6 @@ test('names drop filler words and apostrophes; a name that is taken comes from t
   expect(uniqueName('notes', new Set(['notes', 'notes-from-q3']), 'Notes from Q3')).toBe('notes-2')
 })
 
-test('a long tree drops its deepest levels first', () => {
-  const cache = new ScreenCache()
-  const home = screen(cache, null, '<title>Home</title>')
-  let deep = home.key
-  for (const t of ['One', 'Two', 'Three']) deep = screen(cache, `Level ${t}`, `<title>${t}</title>`, deep, t).key
-  screen(cache, 'Side section', '<title>Side</title>', home.key, 'Side')
-  expect(treeLines(cache.map('Sleep app').entries, 3)).toEqual(['@home: the first screen of Sleep app', '  @one: Level One', '  @side: Side section'])
-})
-
 test('a link names its screen: one not made yet is planned, in the tree, and goes with its last link', () => {
   const { cache, home, record } = sleepApp()
   cache.addVersion(home.key, ver('<title>Home</title><button data-action="Record sleep">Record</button>'
@@ -107,7 +110,7 @@ test('a link names its screen: one not made yet is planned, in the tree, and goe
   ])
   expect(planned[0]!.key).toBe(screenKey('Sleep app', '@remedies-log'))
   expect(screenTree(cache.map('Sleep app').entries).get(planned[0]!.key)).toEqual({ level: 2, parent: home.key, label: 'Remedies' })
-  expect(treeLines(cache.map('Sleep app').entries)).toContain('  @remedies-log: Remedies tried, with dates and effects (not made yet)')
+  expect(screenList(cache.map('Sleep app').entries).titles).toContain('remedies-log: Remedies tried, with dates and effects (no drawing yet)')
   cache.undo(home.key)
   expect(plannedScreens(cache.map('Sleep app').entries).map((p) => [p.name, p.parent!.key])).toEqual([['remedies-log', record.key]])
 })
@@ -130,14 +133,6 @@ test('deleting a named screen that is still linked takes the screens only it lea
   const privacy = cache.pick(cache.propose('Sleep app', '@privacy: Privacy', 0, ver('<title>Privacy</title>'), { key: settings.key, label: 'Privacy' })!.key, 0)!
   expect(cache.delete(settings.key)).toEqual([settings.key, privacy.key])
   expect(plannedScreens(cache.map('Sleep app').entries).map((p) => p.name)).toEqual(['settings'])
-})
-
-test('past the line limit planned screens go before made ones; the screen being made is marked', () => {
-  const { cache, home } = sleepApp()
-  cache.addVersion(home.key, ver('<button data-action="Record sleep">R</button><button data-action="@tips: Tips">T</button><button data-action="@faq: FAQ">F</button>'))
-  const lines = treeLines(cache.map('Sleep app').entries, 4, 'tips')
-  expect(lines).toEqual(['@home: the first screen of Sleep app', '  @recording: Record sleep', '    @sleep-report: Sleep report of last night', '  @settings: Settings'])
-  expect(treeLines(cache.map('Sleep app').entries, 80, 'tips')).toContain('  @tips: Tips (this screen)')
 })
 
 test('a link from before names finds a named screen made from the same prompt', () => {

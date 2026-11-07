@@ -15,12 +15,12 @@ const tooLong = sse(
 )
 
 test('a stream with no end event is an error', async () => {
-  const run = async () => { for await (const _ of generateScreen({ app: 'Shop', action: null, model: 'claude-haiku-5.5', fetch: fakeFetch(halfScreen), env })) {} }
+  const run = async () => { for await (const _ of generateScreen({ user: 'Shop', model: 'claude-haiku-5.5', fetch: fakeFetch(halfScreen), env })) {} }
   await expect(run()).rejects.toThrow('ended before the screen was complete')
 })
 
 test('a reply cut off at the token limit is an error', async () => {
-  const run = async () => { for await (const _ of generateScreen({ app: 'Shop', action: null, model: 'gpt-6-luna-fast', fetch: fakeFetch(tooLong), env })) {} }
+  const run = async () => { for await (const _ of generateScreen({ user: 'Shop', model: 'gpt-6-luna-fast', fetch: fakeFetch(tooLong), env })) {} }
   await expect(run()).rejects.toThrow('cut off (max_output_tokens)')
 })
 

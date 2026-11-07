@@ -3,8 +3,9 @@
 
 import { join, resolve } from 'node:path'
 import {
-  DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, PROPOSALS, ScreenCache, canonicalAction, generateScreen, isDevice, isModelId,
-  plannedScreens, promptFromLabel, screenKey, screenRef, warmUp, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type Version,
+  DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, HOME_LINE, HOME_NAME, MODELS, PROPOSALS, ScreenCache, canonicalAction, drawRequest, editRequest,
+  fileDecision, generateScreen, isComponent, isDevice, isModelId, nameFrom, normalizePrompt, plannedScreens, promptFromLabel, screenKey, screenRef,
+  warmUp, type BoxName, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type Version,
 } from '@uxwoz/core'
 import index from './index.html'
 
@@ -24,7 +25,7 @@ export type ScreenEvent =
   | { type: 'chunk'; variant: number; text: string }
   | { type: 'version'; variant: number; version: Version }
   | { type: 'failed'; variant: number; message: string }
-  | { type: 'done'; entry: CacheEntry }
+  | { type: 'done'; entry: CacheEntry; filing?: boolean }
   | { type: 'error'; message: string }
 
 export interface ServerOptions {
@@ -35,7 +36,12 @@ export interface ServerOptions {
   log?: (msg: string) => void
   /** Picks the side that is asked for a clearly different design; Math.random by default. */
   random?: () => number
+  /** How long a new screen or a change waits for a running filing before it goes on without it. */
+  fileWaitMs?: number
 }
+
+/** A screen as a request shows it: its ID, its one line, its stored HTML. */
+const shown = (e: CacheEntry) => ({ id: e.name ?? HOME_NAME, line: e.action ?? HOME_LINE, html: e.versions.at(-1)?.html ?? '' })
 
 const json = (data: unknown, status = 200) => Response.json(data, { status })
 
@@ -100,6 +106,30 @@ export function createServer(opts: ServerOptions = {}) {
   const cache = opts.cache ?? new ScreenCache()
   const log = opts.log ?? ((m: string) => console.warn(m))
   const random = opts.random ?? Math.random
+  const fileWaitMs = opts.fileWaitMs ?? 5000
+
+  /** The filing running for each mockup, by root key; filings of one mockup run one after another. */
+  const filings = new Map<string, Promise<unknown>>()
+
+  /** File a decision on a screen in the background. Returns whether filing started. */
+  function file(key: string, decision: { other: string } | { change: string }): boolean {
+    const e = cache.get(key)
+    if (!e || isComponent(e)) return false
+    const root = normalizePrompt(e.app), t0 = performance.now()
+    const p: Promise<unknown> = (filings.get(root) ?? Promise.resolve())
+      .then(() => fileDecision({ cache, key, decision, fetch: opts.fetch, env: opts.env, log }))
+      .then((run) => run && log(`filed ${run.screen} in ${(run.ms / 1000).toFixed(1)} s for $${run.costUsd?.toFixed(4)}: added ${run.added.join(', ') || 'nothing'}, changed ${run.changed.join(', ') || 'nothing'}, refused ${run.refused.length}`))
+      .catch((err) => {
+        log(`filing failed: ${message(err)}`)
+        if (cache.get(root)) cache.noteFiling(e.app, { at: new Date().toISOString(), screen: e.name ?? HOME_NAME, ms: Math.round(performance.now() - t0), costUsd: null, added: [], changed: [], refused: [], error: message(err) })
+      })
+      .finally(() => { if (filings.get(root) === p) filings.delete(root) })
+    filings.set(root, p)
+    return true
+  }
+
+  /** Wait for the mockup's running filing, at most `ms`. */
+  const filed = (app: string, ms: number) => Promise.race([filings.get(normalizePrompt(app)), Bun.sleep(ms)])
 
   /** A click in screen `from`, on a control labelled `label`. Absent for the first screen. */
   interface Click { from: string; label: string }
@@ -139,12 +169,17 @@ export function createServer(opts: ServerOptions = {}) {
     }
     const prompt = ref ? screenRef(action!)!.prompt : action
     yield { type: 'meta', key, cached: false, variants: PROPOSALS }
-    const existing = cache.existingScreens(app, ref ? ref.name : undefined)
+    // The paper should hold what the last decision filed: wait for it, a little.
+    await filed(app, fileWaitMs)
+    if (signal.aborted) return
+    const from = click && cache.get(click.from)
+    const target = { id: ref ? ref.name : action ? nameFrom(action) : HOME_NAME, line: prompt ?? HOME_LINE }
+    const paper = cache.paper(app, device)
     // One random side asks for a clearly different design, so the side says nothing about which is which.
     const different = Math.min(PROPOSALS - 1, Math.floor(random() * PROPOSALS))
     const streams = Array.from({ length: PROPOSALS }, (_, slot) => tagged(slot, generateScreen({
-      app, action: prompt, existing, model, device, alternative: slot === different,
-      signal, fetch: opts.fetch, env: opts.env, log,
+      user: drawRequest(paper, target, from ? { ...shown(from), label: click!.label } : null, slot === different),
+      model, device, signal, fetch: opts.fetch, env: opts.env, log,
     })))
     const parent = click && { key: click.from, label: click.label || prompt || 'home' }
     const failed: string[] = []
@@ -171,25 +206,29 @@ export function createServer(opts: ServerOptions = {}) {
     else yield { type: 'done', entry }
   }
 
-  /** One new version of a picked screen: an Edit with `change`, else a Regenerate from its prompt. */
+  /**
+   * One new version of a picked screen or a component: an Edit with `change`, else (screens only) a
+   * Regenerate from its prompt. A screen's Edit is filed afterwards.
+   */
   async function* reviseEvents(entry: CacheEntry, change: string | null, model: ModelId, device: Device, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
-    const { key, app, action } = entry
-    const now = entry.versions.at(-1)!
+    const { key, app } = entry
     yield { type: 'meta', key, cached: false, variants: 1 }
+    await filed(app, fileWaitMs)
+    if (signal.aborted) return
+    // A revise keeps the device the screen was made for.
+    device = entry.versions.at(-1)!.device ?? device
+    const paper = cache.paper(app, device), parent = entry.parent && cache.get(entry.parent.key)
+    const user = change ? editRequest(paper, shown(entry), change, isComponent(entry))
+      : drawRequest(paper, shown(entry), parent?.versions.length ? { ...shown(parent), label: entry.parent!.label } : null)
     try {
-      for await (const ev of generateScreen({
-        // A revise keeps the device the screen was made for.
-        app, action, existing: cache.existingScreens(app, entry.name), model, device: now.device ?? device,
-        edit: change ? { html: now.html, change } : undefined,
-        signal, fetch: opts.fetch, env: opts.env, log,
-      })) {
+      for await (const ev of generateScreen({ user, model, device, signal, fetch: opts.fetch, env: opts.env, log })) {
         if (ev.type === 'chunk') { yield { type: 'chunk', variant: 0, text: ev.text }; continue }
         const version = { ...ev.version, ...(change && { feedback: change }) }
         const stored = cache.addVersion(key, version)
         if (signal.aborted) return
         if (!stored) { yield { type: 'error', message: 'this screen was deleted while it was being changed' }; return }
         yield { type: 'version', variant: 0, version }
-        yield { type: 'done', entry: stored }
+        yield { type: 'done', entry: stored, filing: !!change && file(key, { change }) }
       }
     } catch (err) {
       if (signal.aborted) return
@@ -250,8 +289,12 @@ export function createServer(opts: ServerOptions = {}) {
           const refused = refuseForeign(req)
           if (refused) return refused
           const b = await req.json().catch(() => null)
-          const entry = cache.pick(String(b?.key ?? ''), Number(b?.index))
-          return entry ? json({ entry }) : json({ error: 'no such screen, or no such design to pick' }, 404)
+          const key = String(b?.key ?? ''), index = Number(b?.index)
+          const other = cache.get(key)?.proposals?.find((p, i) => p && i !== index)?.html
+          const entry = cache.pick(key, index)
+          if (!entry) return json({ error: 'no such screen, or no such design to pick' }, 404)
+          // Filing reads the pick in the background; the page learns of it from /api/map?wait=1.
+          return json({ entry, filing: file(key, { other: other ?? '(none: it failed)' }) })
         },
       },
       // One new version of a screen: an Edit with `change`, else a Regenerate.
@@ -267,6 +310,7 @@ export function createServer(opts: ServerOptions = {}) {
           const entry = cache.get(String(b?.key ?? ''))
           if (!entry) return json({ error: 'no such screen' }, 404)
           if (!entry.versions.length) return json({ error: 'pick one of the two designs first' }, 409)
+          if (isComponent(entry) && !change) return json({ error: 'a component changes by Edit' }, 400)
           return ndjson(reviseEvents(entry, change, p.model, p.device, req.signal))
         },
       },
@@ -280,10 +324,31 @@ export function createServer(opts: ServerOptions = {}) {
           return entry ? json({ entry }) : json({ error: 'no such screen, or nothing to undo' }, 404)
         },
       },
-      '/api/map': (req) => {
-        const app = new URL(req.url).searchParams.get('app')?.trim() ?? ''
+      // One mockup; with wait=1, once its running filing has finished (at most a minute).
+      '/api/map': async (req) => {
+        const url = new URL(req.url), app = url.searchParams.get('app')?.trim() ?? ''
         if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
-        return json(cache.map(app))
+        if (url.searchParams.get('wait') === '1') await filed(app, 60_000)
+        return json({ ...cache.map(app), filing: filings.has(normalizePrompt(app)) })
+      },
+      // The user changes the boxes: add, change or delete a rule or a table, or mark a box as looked at.
+      '/api/box': {
+        POST: async (req) => {
+          const refused = refuseForeign(req)
+          if (refused) return refused
+          const b = await req.json().catch(() => null)
+          const app = typeof b?.app === 'string' ? b.app.trim() : ''
+          if (!cache.get(screenKey(app, null))) return json({ error: 'no such mockup' }, 404)
+          const box = b?.box as BoxName, op = b?.op
+          if (op === 'seen' && ['components', 'rules', 'data'].includes(box)) cache.markSeen(app, box)
+          else if ((box === 'rules' || box === 'data') && ['add', 'set', 'delete'].includes(op)) {
+            // A new entry's ID comes from its words: the rule's sentence, or the table's name.
+            const id = op === 'add' ? cache.freeId(app, box, String(b?.text ?? b?.id ?? '')) : String(b?.id ?? '')
+            const why = cache.setBox(app, op, box, { id, text: b?.text, columns: b?.columns, rows: b?.rows }, 'user')
+            if (why) return json({ error: why }, 400)
+          } else return json({ error: 'unknown box or op' }, 400)
+          return json(cache.map(app))
+        },
       },
       '/api/apps': () => json({ apps: cache.apps() }),
       // Delete a screen and the screens only it reaches; the first screen takes the mockup with it.

@@ -1,6 +1,7 @@
-// The three screen models and their call settings, as measured in spec/ui-generation.md.
+// The three screen models and the background model that files, with their call settings, as
+// measured in spec/ui-generation.md.
 
-export type ModelId = 'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast'
+export type ModelId = 'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast' | 'gpt-6.1-terra'
 
 export interface ModelConfig {
   id: ModelId
@@ -16,6 +17,8 @@ export interface ModelConfig {
   pricePerMTok?: { input: number; cachedInput: number; output: number }
   /** True when the cost shown is our estimate rather than the billed amount. */
   costEstimated: boolean
+  /** Runs in the background (filing); never offered as a screen model. */
+  background?: true
 }
 
 export const MODELS: Record<ModelId, ModelConfig> = {
@@ -50,8 +53,23 @@ export const MODELS: Record<ModelId, ModelConfig> = {
     pricePerMTok: { input: 12.0, cachedInput: 0.6, output: 60.0 },
     costEstimated: true,
   },
+  'gpt-6.1-terra': {
+    id: 'gpt-6.1-terra',
+    label: 'GPT-6.1 Terra',
+    provider: 'openai',
+    model: 'gpt-6.1-terra',
+    serviceTier: 'default',
+    reasoning: { effort: 'low' },
+    pricePerMTok: { input: 1.0, cachedInput: 0.05, output: 5.0 },
+    costEstimated: true,
+    background: true,
+  },
 }
+
+/** The model that files each decision into the boxes (the paper test's only pass). */
+export const FILING_MODEL: ModelId = 'gpt-6.1-terra'
 
 export const DEFAULT_MODEL: ModelId = 'claude-haiku-5.5'
 
-export const isModelId = (v: unknown): v is ModelId => typeof v === 'string' && Object.hasOwn(MODELS, v)
+/** A model the user may pick for screens. */
+export const isModelId = (v: unknown): v is ModelId => typeof v === 'string' && Object.hasOwn(MODELS, v) && !MODELS[v as ModelId].background

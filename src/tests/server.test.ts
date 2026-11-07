@@ -1,4 +1,4 @@
-// Feature: the web server streams a new screen's A OR B, keeps the pick, and revises screens (cassette: server).
+// Feature: the web server streams a new screen's A OR B, keeps the pick, files it, and revises screens (cassette: server).
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { ScreenCache, linksIn, plannedScreens, screenRef, type CacheEntry } from '@uxwoz/core'
 import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
@@ -10,9 +10,21 @@ const APP = 'A tiny bakery website'
 const post = (path: string, body: object, headers: Record<string, string> = {}) =>
   fetch(new URL(path, server.url), { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) })
 
-// The second side always asks for the different design, so the recorded requests replay.
-beforeAll(() => { server = createServer({ port: 0, cache: new ScreenCache(), fetch: tape.fetch, env: tape.env, log: () => {}, random: () => 0.9 }) })
-afterAll(() => { server.stop(true); tape.save() })
+// The second side always asks for the different design, and every click waits for filing to end, so
+// each request holds the same paper when recorded and when replayed.
+/** The user message of every model call, as the server sent it. */
+const sent: string[] = []
+const fetchAndKeep: typeof tape.fetch = (url, init) => {
+  const b = JSON.parse(String(init?.body))
+  sent.push(b.input ?? b.messages?.[1]?.content ?? '')
+  return tape.fetch(url, init)
+}
+beforeAll(() => { server = createServer({ port: 0, cache: new ScreenCache(), fetch: fetchAndKeep, env: tape.env, log: () => {}, random: () => 0.9, fileWaitMs: 60_000 }) })
+afterAll(async () => {
+  await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}&wait=1`, server.url))
+  server.stop(true)
+  tape.save()
+})
 
 async function stream(path: string, body: object): Promise<ScreenEvent[]> {
   const res = await post(path, body)
@@ -48,13 +60,22 @@ describe('web server', () => {
     expect(done(evs).entry.proposals).toHaveLength(2)
   })
 
-  test('a pick keeps one design as the first version and drops the other', async () => {
+  test('a pick keeps one design as the first version and drops the other, and starts filing', async () => {
     const before = done(await screen({ app: APP })).entry
-    const entry = await pick(before.key, 1)
-    expect(entry.versions).toEqual([before.proposals![1]!])
-    expect(entry.proposals).toBeUndefined()
+    const res = await (await post('/api/pick', { key: before.key, index: 1 })).json()
+    expect(res.entry.versions).toEqual([before.proposals![1]!])
+    expect(res.entry.proposals).toBeUndefined()
+    expect(res.filing).toBe(true)
     expect((await post('/api/pick', { key: before.key, index: 0 })).status).toBe(404)
   })
+
+  test('filing runs on Terra in the background; the map with wait=1 holds what it filed', async () => {
+    const map = await (await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}&wait=1`, server.url))).json()
+    expect(map.filing).toBe(false)
+    expect(map.boxes.filed).toMatchObject({ screen: 'home' })
+    expect(map.boxes.filed.error).toBeUndefined()
+    expect(map.boxes.filed.costUsd).toBeGreaterThan(0)
+  }, 60_000)
 
   test('a click opens a new screen under its name, with the prompt of its link and the click as its parent', async () => {
     const first = done(await screen({ app: APP })).entry
@@ -92,22 +113,23 @@ describe('web server', () => {
     await pick(second.key, 0)
   }, 30_000)
 
-  test('a later screen gets the tree of made and planned screens, and links to them by name', async () => {
+  test('a later screen gets the paper, and links to the screens on it by their IDs', async () => {
     const first = done(await screen({ app: APP })).entry
-    const second = done(await screen({ app: APP, action: actions(shown(first))[0]! })).entry
-    const made = async () => (await (await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}`, server.url))).json() as { entries: CacheEntry[] }).entries
-    const madeNames = new Set((await made()).map((e) => e.name))
-    const next = actions(shown(second)).find((a) => !madeNames.has(nameOf(a)))
-    expect(next).toBeTruthy()
-    const third = done(await screen({ app: APP, action: next, from: second.key, label: 'Next' })).entry
+    const third = done(await screen({ app: APP, action: '@opening-hours: Opening hours of the bakery, by day', from: first.key, label: 'Hours' })).entry
     const map = await (await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}`, server.url))).json() as { entries: CacheEntry[] }
     const known = new Set([...map.entries, ...plannedScreens(map.entries)].map((e) => e.name).filter(Boolean))
-    const links = third.proposals!.flatMap((p) => linksIn(p!.html).map((l) => l.action))
-    // Links by name to screens the mockup has: home at least, from the tree.
-    const refs = links.map(screenRef).filter((r) => r != null)
-    // (A new name without a prompt happens now and then; it is made from its words and the button's.)
-    expect(refs.some((r) => known.has(r.name))).toBe(true)
-    // One name is one screen: in one design, a name never comes with two different prompts.
+    const asked = sent.filter((m) => m.includes('Draw this screen: opening-hours: Opening hours of the bakery, by day'))
+    expect(asked).toHaveLength(2)
+    for (const m of asked) {
+      expect(m).toStartWith(`App: ${APP}\nDevice: a phone screen, 390 px wide.\n\nScreens, the first screen first (id: what it is for):\nhome: the first screen\n`)
+      expect(m).toContain(`The screen the click came from, home (the first screen):\n${shown(first)}`)
+    }
+    // A link by ID alone names a screen on the paper (made or planned).
+    for (const p of third.proposals!) for (const l of linksIn(p!.html)) {
+      const r = screenRef(l.action)
+      if (r && !r.prompt) expect(known.has(r.name)).toBe(true)
+    }
+    // One name is one screen: in one design, a new name never comes with two different prompts.
     for (const p of third.proposals!) {
       const prompts = new Map<string, Set<string>>()
       for (const l of linksIn(p!.html)) {

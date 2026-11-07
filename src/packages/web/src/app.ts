@@ -3,7 +3,7 @@
 // Info, Delete) with the drawer for Edit and Info, pickers, recent mockups, errors in a pill.
 
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
-import { nameWords, normalizePrompt, screenKey, screenRef, wayBack } from '@uxwoz/core/keys'
+import { isBack, nameWords, normalizePrompt, screenKey, screenRef } from '@uxwoz/core/keys'
 import { namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
 import type { CacheEntry, Version } from '@uxwoz/core'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
@@ -390,15 +390,12 @@ async function dropChoice(key: string) {
  * with that name, anything else to the screen of its action prompt. A name no screen has yet is made
  * by the server from the link's prompt, the planned screen's, or the words clicked.
  */
-function target(app: string, from: string, prompt: string, label: string): { to: string; prompt: string } {
-  const way = wayBack(prompt, label)
-  const root = screenKey(app, null)
-  if (way === 'back') {
+function target(app: string, from: string, prompt: string): { to: string; prompt: string } {
+  if (isBack(prompt)) {
     // The screen it hangs under on the canvas; else the one whose click made it.
     const made = state.entries.get(from)?.parent?.key
-    return { to: treeParent(from) ?? (made && state.entries.has(made) ? made : root), prompt }
+    return { to: treeParent(from) ?? (made && state.entries.has(made) ? made : screenKey(app, null)), prompt }
   }
-  if (way === 'home') return { to: root, prompt }
   const ref = screenRef(prompt)
   const known = ref && namesOf([...state.entries.values()]).get(ref.name)
   return { to: known || screenKey(app, prompt), prompt }
@@ -408,7 +405,7 @@ function target(app: string, from: string, prompt: string, label: string): { to:
 function onAction(from: string, action: string, label: string) {
   const app = state.app
   if (!app) return
-  const { to, prompt } = target(app, from, action, label)
+  const { to, prompt } = target(app, from, action)
   setCurrent(from)
   if (to === from) return
   const there = state.entries.get(to)

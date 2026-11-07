@@ -46,8 +46,11 @@ test('vh units become pixels of a fixed window, so a frame cannot grow without e
   expect(vhToPx('width:100vw;height:100%')).toBe('width:100vw;height:100%')
 })
 
-test('spec/prompt-screen.md holds the exact system prompt the app sends', () => {
+test('spec/prompt-screen.md holds the exact system prompt the app sends, and it holds the manual verbatim', () => {
   const spec = readFileSync(resolve(import.meta.dir, '../../spec/prompt-screen.md'), 'utf8')
   const block = spec.match(/```text\n([\s\S]*?)\n```/)?.[1]
   expect(block).toBe(SYSTEM_PROMPT)
+  // A manual edit fails here until the manual is copied into the prompt (and the cassettes recorded).
+  const manual = readFileSync(resolve(import.meta.dir, '../../process/plans/2026-11-06-canvas-manual.md'), 'utf8').trim()
+  expect(SYSTEM_PROMPT.startsWith(`${manual}\n\n`)).toBe(true)
 })

@@ -156,7 +156,8 @@ const NAV_CSS = `main { --pico-primary: #373c44; --pico-primary-background: #525
 main :is(${GO}) { color: #2a5bd7 !important; border-color: #2a5bd7 !important; text-decoration-color: #2a5bd7 !important; }
 main :is(button, [role="button"], input, select):is(${GO}) { background-color: #e9effc !important; }
 main a:is(${GO}) { text-decoration-line: none !important; }
-main a:is(${GO}):hover { text-decoration-line: underline !important; }`
+main a:is(${GO}):hover { text-decoration-line: underline !important; }
+main [aria-current="page"] { font-weight: 700 !important; text-decoration-line: underline !important; text-underline-offset: .25em; }`
 
 // Our layout rules, after the theme: every screen of a device is as wide as its window and at least
 // one device screen tall (set per page), with less padding, and the page never scrolls (the frame is
@@ -174,14 +175,14 @@ body > main { width: 100%; margin: 0; padding: 20px 24px; box-sizing: border-box
 
 /**
  * The full page for the iframe's srcdoc: theme CSS inlined, our bootstrap, the fragment in <main>,
- * at least one screen of `device` tall.
+ * at least one screen of `device` tall (unless `fit`: a component is as tall as its content).
  */
-export function framePage(fragment: string, css: string, final: boolean, device?: Device): string {
-  const h = device ? DEVICES[device].height : 0
+export function framePage(fragment: string, css: string, final: boolean, device?: Device, fit = false): string {
+  const h = device && !fit ? DEVICES[device].height : 0
   const style = css.replace(/<\/style/gi, '<\\/style')
   return `<!doctype html><html data-theme="light"><head><meta charset="utf-8">`
     + `<meta name="viewport" content="width=device-width, initial-scale=1">`
-    + `<style>${style}</style><style>${FRAME_CSS}\n${NAV_CSS}${h ? `\nbody > main { min-height: ${h}px; }` : ''}</style><script>${bootstrap(final, h || VIEWPORT_H)}</script></head>`
+    + `<style>${style}</style><style>${FRAME_CSS}\n${NAV_CSS}${h ? `\nbody > main { min-height: ${h}px; }` : ''}</style><script>${bootstrap(final, device ? DEVICES[device].height : VIEWPORT_H)}</script></head>`
     + `<body${final ? '' : ' style="cursor:progress"'}><main>${fragment}</main></body></html>`
 }
 
@@ -190,3 +191,56 @@ export const FRAME_SANDBOX = 'allow-scripts allow-forms'
 
 /** Rebuild the srcdoc at most this often while chunks arrive (each rebuild reloads the frame). */
 export const REBUILD_MS = 300
+
+// Paste by ID and the current link: the two things code adds to a stored screen when it shows it.
+
+/** An opening tag, its attributes read with quotes in mind (a `>` inside a quoted value is no end). */
+export const OPEN_TAG = /<([a-z][\w-]*)((?:\s+[^\s=>"'/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>"']+))?)*)\s*(\/?)>/gi
+export const VOID = new Set(['input', 'img', 'br', 'hr', 'area', 'col', 'embed', 'source', 'wbr', 'meta', 'link'])
+
+/**
+ * Where the element whose opening tag starts at `start` ends: after its closing tag, counting
+ * nested elements of the same name and skipping scripts. -1 when it has no end (yet).
+ */
+export function elementEnd(html: string, start: number): number {
+  // A sticky copy: OPEN_TAG's own lastIndex must stay 0, as matchAll starts from it.
+  const at = new RegExp(OPEN_TAG.source, 'iy')
+  at.lastIndex = start
+  const open = at.exec(html)
+  if (!open) return -1
+  const tag = open[1]!.toLowerCase(), after = start + open[0].length
+  if (open[3] || VOID.has(tag)) return after
+  const re = new RegExp(`<script\\b[\\s\\S]*?</script\\s*>|<(/?)${tag}\\b(?:[^>"']|"[^"]*"|'[^']*')*>`, 'gi')
+  re.lastIndex = after
+  let depth = 1
+  for (let m; (m = re.exec(html));) {
+    if (/^<script/i.test(m[0]) && tag !== 'script') continue
+    depth += m[1] ? -1 : 1
+    if (!depth) return m.index + m[0].length
+  }
+  return -1
+}
+
+/**
+ * Each element with `data-component="ID"`, contents and all, becomes that component's HTML; one
+ * whose component is gone becomes nothing. One pass: a component's own placeholders stay empty.
+ */
+export function pasteComponents(html: string, components: Record<string, string>): string {
+  let out = '', at = 0
+  for (const m of html.matchAll(OPEN_TAG)) {
+    if (m.index! < at) continue
+    const id = m[2]!.match(/(?:^|\s)data-component\s*=\s*["']?([\w-]+)/i)?.[1]
+    if (!id) continue
+    const end = elementEnd(html, m.index!)
+    out += html.slice(at, m.index) + (components[id.toLowerCase()] ?? '')
+    at = end < 0 ? m.index! + m[0].length : end
+  }
+  return out + html.slice(at)
+}
+
+/** Every control whose data-action opens the screen it sits on (`@name`) gets aria-current="page". */
+export function markCurrent(html: string, name: string | undefined): string {
+  if (!name || !/^[\w-]+$/.test(name)) return html
+  const re = new RegExp(`(<[a-z][\\w-]*\\b[^>]*?\\sdata-action\\s*=\\s*(["'])\\s*@${name}\\s*(?::[^"']*)?\\2)`, 'gi')
+  return html.replace(re, '$1 aria-current="page"')
+}

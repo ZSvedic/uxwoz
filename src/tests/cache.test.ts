@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ALTERNATIVE_REQUEST, EDIT_REQUEST, ScreenCache, normalizePrompt, screenIdea, screenKey, screenRequest, screenTree, wayBack, type Version } from '@uxwoz/core'
+import { ALTERNATIVE_REQUEST, ScreenCache, drawRequest, editRequest, isBack, normalizePrompt, paperText, screenIdea, screenKey, screenTree, type Paper, type Version } from '@uxwoz/core'
 
 const ver = (html: string, createdAt = '2026-10-23T00:00:00Z'): Version => ({
   html, model: 'claude-haiku-5.5', servedModel: null, createdAt,
@@ -62,37 +62,41 @@ describe('screen cache', () => {
     expect(new ScreenCache().propose('Coffee app', 'home', 0, ver('<h1>Menu</h1>'))!.action).toBeNull()
   })
 
-  test('the request lists the picked screens as a tree of names, for links', () => {
-    const lines = ['@home: the first screen of Coffee app', '  @cart: Cart']
-    expect(screenRequest('Coffee app', 'Pay', lines)).toEndWith('Screens of this mockup, as a tree:\n@home: the first screen of Coffee app\n  @cart: Cart')
-    expect(screenRequest('Coffee app', null)).toBe('Coffee app')
+  test('the paper lists the app, its device, the titles and lines, and the three boxes in full', () => {
+    const p: Paper = {
+      app: 'Coffee app', device: 'phone', titles: ['home: the first screen', 'cart: the cart (no drawing yet)'], lines: ['home -> cart'],
+      components: [{ id: 'tab-bar', where: 'every screen', html: '<nav>…</nav>' }], rules: [{ id: 'prices', text: 'Prices show in euros.' }],
+      data: [{ id: 'drinks', columns: ['name', 'price'], rows: [['Latte', '3.20']] }],
+    }
+    expect(paperText(p)).toBe(['App: Coffee app', 'Device: a phone screen, 390 px wide.', '',
+      'Screens, the first screen first (id: what it is for):', 'home: the first screen', 'cart: the cart (no drawing yet)', '',
+      'Lines (a control on the first screen opens the second):', 'home -> cart', '',
+      'Components (1 of 20), each with its ID, where it belongs, and its HTML:', 'tab-bar: every screen', '<nav>…</nav>', '',
+      'Rules (1 of 20):', 'prices: Prices show in euros.', '',
+      'Data (1 of 10 tables):', 'drinks', 'name | price', 'Latte | 3.20'].join('\n'))
+    expect(paperText({ ...p, titles: [], lines: [], components: [], rules: [], data: [] })).toContain('Rules (0 of 20):\n(none)')
   })
 
-  test('the request names the device and, for one side, asks for a different design', () => {
-    const msg = screenRequest('Coffee app', null, [], { device: 'a phone screen', alternative: true })
-    expect(msg).toBe(`Coffee app\n\nDesign it for a phone screen.\n\n${ALTERNATIVE_REQUEST}`)
-    expect(screenRequest('Coffee app', null, [], { device: 'a phone screen' })).not.toContain(ALTERNATIVE_REQUEST)
+  test('a Draw sends the paper, the screen the click came from and the screen to draw; one side asks for a different design', () => {
+    const p: Paper = { app: 'Coffee app', titles: [], lines: [], components: [], rules: [], data: [] }
+    const from = { id: 'home', line: 'the first screen', html: '<h1>Menu</h1>', label: 'Cart' }
+    const msg = drawRequest(p, { id: 'cart', line: 'the cart' }, from, true)
+    expect(msg).toEndWith(`The screen the click came from, home (the first screen):\n<h1>Menu</h1>\n\nDraw this screen: cart: the cart\nThe click came from "Cart" on home.\n\n${ALTERNATIVE_REQUEST}`)
+    expect(drawRequest(p, { id: 'home', line: 'the first screen' }, null)).toEndWith('(none)\n\nDraw this screen: home: the first screen')
   })
 
-  test('an Edit sends the screen as it is now and the change, last', () => {
-    const msg = screenRequest('Coffee app', null, [], { device: 'a phone screen', edit: { html: '<h1>Menu</h1>', change: 'Add prices' } })
-    expect(msg).toBe(`Coffee app\n\nDesign it for a phone screen.\n\nThe screen as it is now:\n<h1>Menu</h1>\n\n${EDIT_REQUEST} Add prices`)
+  test('an Edit sends the screen or component as it is now and the change, last', () => {
+    const p: Paper = { app: 'Coffee app', titles: [], lines: [], components: [], rules: [], data: [] }
+    expect(editRequest(p, { id: 'home', line: 'the first screen', html: '<h1>Menu</h1>' }, 'Add prices'))
+      .toMatch(/The screen as it is now, home \(the first screen\):\n<h1>Menu<\/h1>\n\nReply with the HTML of this screen again with one change;.* The change: Add prices$/)
+    expect(editRequest(p, { id: 'tab-bar', line: 'every screen', html: '<nav></nav>' }, 'Bigger', true)).toContain('The component as it is now, tab-bar')
   })
 
-  test('Back and Home go to screens that exist, whatever prompt the model wrote', () => {
-    expect(wayBack('back', 'Return')).toBe('back')
-    expect(wayBack('Sleep overview of a snoring tracker app', '← Back')).toBe('back')
-    expect(wayBack('Sleep overview of a snoring tracker app', '‹')).toBe('back')
-    expect(wayBack('Snoring tracker home screen', ' Home ')).toBe('home')
-    expect(wayBack('Cat list of a cat app', 'Back to cats')).toBe('back')
-    expect(wayBack('Home screen of a sleep app', '⬅ Back')).toBe('back')
-    expect(wayBack('Home screen of a sleep app', 'arrow_back Back')).toBe('back')
-    expect(wayBack('Home screen of a sleep app', '«')).toBe('back')
-    expect(wayBack('Home screen of a sleep app', '🏠 Home')).toBe('home')
-    expect(wayBack('Home screen of a sleep app', 'Back to home')).toBe('home')
-    expect(wayBack('Home screen of a sleep app', 'Return to the main menu')).toBe('home')
-    expect(wayBack('Settings screen', 'Settings')).toBeNull()
-    expect(wayBack('Booking for 2 people', '2 people')).toBeNull()
+  test('only the action back goes back; a label never decides where a click goes', () => {
+    expect(isBack('back')).toBe(true)
+    expect(isBack(' Back. ')).toBe(true)
+    expect(isBack('@home')).toBe(false)
+    expect(isBack('Back to cats')).toBe(false)
   })
 
   test('the idea is read from its meta tag', () => {
@@ -173,7 +177,7 @@ describe('screen cache', () => {
     screen(cache, 'Cafe', 'Cart', '<h1>Cart</h1>', { key: menu, label: 'Cart' })
     screen(cache, 'Bakery', null, '<h1>Bread</h1>')
     expect(cache.deleteApp('CAFE')).toBe(2)
-    expect(cache.map('Cafe')).toEqual({ root: 'cafe', entries: [] })
+    expect(cache.map('Cafe').entries).toEqual([])
     expect(cache.apps().map((a) => a.app)).toEqual(['Bakery'])
   })
 
@@ -192,7 +196,7 @@ describe('screen cache', () => {
     const cache = new ScreenCache(file)
     expect(cache.map('Cafe').entries.map((e) => [e.name, 'level' in e])).toEqual([['home', false], ['your-cart', false], [undefined, false]])
     expect(new ScreenCache(file).map('Cafe')).toEqual(cache.map('Cafe'))
-    expect(JSON.parse(readFileSync(file, 'utf8')).version).toBe(4)
+    expect(JSON.parse(readFileSync(file, 'utf8')).version).toBe(5)
   })
 
   test('a file from before versions is moved aside, and the cache starts empty', () => {
@@ -212,15 +216,19 @@ describe('screen cache', () => {
     expect(readFileSync(file, 'utf8')).toBe(text)
   })
 
-  test('format 3 and 4 files load; a format 4 file loses its specs and reviews at the next save', () => {
+  test('format 3 and 4 files load with empty boxes; the spec feature\'s fields go at the next save', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
-    const entry = { key: 'cafe', app: 'Cafe', action: null, name: 'home', parent: null, versions: [ver('<h1>Menu</h1>')] }
+    const entry = { key: 'cafe', app: 'Cafe', action: null, name: 'home', parent: null, versions: [{ ...ver('<h1>Menu</h1>'), spec: {}, misses: [], plan: 'x' }] }
     for (const version of [3, 4]) {
       writeFileSync(file, JSON.stringify({ version, entries: [entry], specs: { cafe: {} }, reviews: { cafe: {} } }))
       const cache = new ScreenCache(file)
       expect(cache.get('cafe')?.versions[0]?.html).toBe('<h1>Menu</h1>')
+      expect(cache.boxesOf('Cafe')).toMatchObject({ rules: [], data: [] })
       screen(cache, 'Cafe', 'Cart', '<h1>Cart</h1>', { key: 'cafe', label: 'Cart' })
-      expect(Object.keys(JSON.parse(readFileSync(file, 'utf8')))).toEqual(['version', 'entries'])
+      const saved = JSON.parse(readFileSync(file, 'utf8'))
+      expect(Object.keys(saved)).toEqual(['version', 'entries', 'boxes'])
+      expect(Object.keys(saved.entries[0].versions[0])).not.toContain('spec')
+      expect(Object.keys(saved.entries[0].versions[0])).not.toContain('plan')
     }
   })
 

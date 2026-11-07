@@ -1,0 +1,154 @@
+// Filing: after a pick or an Edit, the filing model reads the paper and the decision, and replies in
+// plain lines (the format at the end of the system prompt). Code applies the lines to the boxes and
+// refuses, with a reason in the log, any line that breaks the manual's limits. A new component takes
+// the outer HTML of the part the line names, and the screen pastes it in that part's place.
+
+import type { ScreenCache, Version } from './cache.ts'
+import { LIMITS, normalizePrompt } from './keys.ts'
+import { elementEnd } from './frame.ts'
+import { FILING_MODEL, MODELS } from './models.ts'
+import { SYSTEM_PROMPT, fileRequest } from './prompt.ts'
+import { ProviderError, streamModel, type Fetch } from './providers.ts'
+import { HOME_LINE, HOME_NAME } from './tree.ts'
+
+/** Filing runs in the background, so it may take longer than a screen. */
+export const FILING_DEADLINE_MS = 60_000
+
+const BLOCKS = 'header|footer|nav|section|article|aside|main|form|fieldset|table|ul|ol|div|p|h1|h2|h3|h4|figure|details|svg|label|button|a|select|progress'
+
+/** Each block element gets data-part="N", in order; nothing inside an svg or a script, and no paste placeholder. */
+export function numberParts(html: string): string {
+  let n = 0, skip = 0
+  return html.replace(new RegExp(`<(/?)(${BLOCKS}|script)\\b([^>]*)>`, 'gi'), (all, close: string, tag: string, attrs: string) => {
+    const t = tag.toLowerCase()
+    if (t === 'script') { skip += close ? -1 : 1; return all }
+    if (skip > 0) { if (t === 'svg') skip += close ? -1 : 1; return all }
+    if (close || /data-component=/i.test(attrs)) return all
+    if (t === 'svg' && !/\/\s*$/.test(attrs)) skip++
+    return `<${tag} data-part="${++n}"${attrs}>`
+  })
+}
+
+const unnumber = (html: string) => html.replace(/ data-part="\d+"/g, '')
+
+export interface FilingLine { kind: 'component' | 'rule' | 'table' | 'row' | 'nothing' | 'bad'; change: boolean; id: string; part: number | null; text: string; line: string }
+
+/** The lines of a filing reply, each read as one of the forms; anything else is `bad`. */
+export function parseFiling(reply: string): FilingLine[] {
+  return reply.split('\n').map((l) => l.trim()).filter(Boolean).map((line): FilingLine => {
+    if (/^nothing\.?$/i.test(line)) return { kind: 'nothing', change: false, id: '', part: null, text: '', line }
+    const c = line.match(/^(change\s+)?component\s+(\S+)\s+from\s+part\s+(\d+)\s*:\s*(.+)$/i)
+    if (c) return { kind: 'component', change: !!c[1], id: c[2]!, part: Number(c[3]), text: c[4]!.trim(), line }
+    const r = line.match(/^(change\s+)?(rule|table|row)\s+(\S+?)\s*:\s*(.+)$/i)
+    if (r) return { kind: r[2]!.toLowerCase() as FilingLine['kind'], change: !!r[1], id: r[3]!, part: null, text: r[4]!.trim(), line }
+    return { kind: 'bad', change: false, id: '', part: null, text: '', line }
+  })
+}
+
+/** What one filing did: the IDs added and changed, and each refused line with the reason. */
+export interface Filed { added: string[]; changed: string[]; refused: string[] }
+
+const cells = (text: string) => text.replace(/^\||\|$/g, '').split('|').map((c) => c.trim())
+
+/**
+ * Apply a filing reply to the boxes of `app`. `filedHtml` is the screen's HTML as it was filed; the
+ * screen pastes each new component in its part's place only while that HTML is still its newest.
+ */
+export function applyFiling(cache: ScreenCache, app: string, key: string, filedHtml: string, reply: string, made: Omit<Version, 'html'>): Filed {
+  const numbered = numberParts(filedHtml)
+  const out: Filed = { added: [], changed: [], refused: [] }
+  const refuse = (line: string, why: string) => out.refused.push(`"${line}": ${why}`)
+  const cuts: { start: number; end: number; id: string }[] = []
+  let table: { id: string; columns: string[]; rows: string[][]; change: boolean; line: string } | null = null
+  const done = (why: string | null, line: string, id: string, change: boolean) => (why ? refuse(line, why) : (change ? out.changed : out.added).push(id))
+  const flush = () => {
+    if (!table) return
+    const t = table
+    table = null
+    const old = cache.boxesOf(app).data.find((x) => x.id === t.id)
+    const rows = t.rows.length || !old || old.columns.length !== t.columns.length ? t.rows : old.rows
+    done(cache.setBox(app, t.change ? 'set' : 'add', 'data', { id: t.id, columns: t.columns, rows }, 'filing'), t.line, t.id, t.change)
+  }
+  for (const l of parseFiling(reply)) {
+    if (l.kind !== 'row') flush()
+    if (l.kind === 'nothing') continue
+    if (l.kind === 'bad') { refuse(l.line, 'not one of the forms'); continue }
+    if (l.kind === 'rule') { done(cache.setBox(app, l.change ? 'set' : 'add', 'rules', { id: l.id, text: l.text }, 'filing'), l.line, l.id, l.change); continue }
+    if (l.kind === 'table') { table = { id: l.id, columns: cells(l.text), rows: [], change: l.change, line: l.line }; continue }
+    if (l.kind === 'row') {
+      const t = table ?? (() => {
+        const old = cache.boxesOf(app).data.find((x) => x.id === l.id)
+        return old ? (table = { id: old.id, columns: old.columns, rows: [...old.rows], change: true, line: l.line }) : null
+      })()
+      if (!t || t.id !== l.id) refuse(l.line, `no table ${l.id} above it`)
+      else if (cells(l.text).length !== t.columns.length) refuse(l.line, `table ${l.id} has ${t.columns.length} columns`)
+      else if (t.rows.length >= LIMITS.rows) refuse(l.line, `a table has at most ${LIMITS.rows} rows`)
+      else t.rows.push(cells(l.text))
+      continue
+    }
+    // A component: the outer HTML of part N.
+    const start = numbered.search(new RegExp(`<[a-z][\\w-]*\\s+data-part="${l.part}"[\\s>/]`, 'i'))
+    const end = start < 0 ? -1 : elementEnd(numbered, start)
+    if (end < 0) { refuse(l.line, `the screen has no part ${l.part}`); continue }
+    if (cuts.some((c) => start < c.end && end > c.start)) { refuse(l.line, `part ${l.part} overlaps a part filed above`); continue }
+    const version: Version = { ...made, html: unnumber(numbered.slice(start, end)) }
+    let why: string | null = null
+    if (l.change) {
+      const c = cache.component(app, l.id)
+      if (!c) why = `components has no ${l.id}`
+      else { Object.assign(c, { by: 'filing', at: made.createdAt, seen: false }); cache.addVersion(c.key, version) }
+    } else {
+      const r = cache.addComponent(app, l.id, l.text, version, 'filing', { key, label: `part ${l.part}` })
+      if (typeof r === 'string') why = r
+    }
+    done(why, l.line, l.id, l.change)
+    if (!why) cuts.push({ start, end, id: l.id })
+  }
+  flush()
+  if (cuts.length && cache.get(key)?.versions.at(-1)?.html === filedHtml) {
+    let html = numbered
+    for (const c of cuts.sort((a, b) => b.start - a.start)) html = `${html.slice(0, c.start)}<div data-component="${c.id}"></div>${html.slice(c.end)}`
+    cache.setNewestHtml(key, unnumber(html))
+  }
+  return out
+}
+
+/** One filing run, as the boxes show the last one. */
+export interface FilingRun extends Filed { at: string; screen: string; ms: number; costUsd: number | null }
+
+export interface FileOptions {
+  cache: ScreenCache
+  /** The screen decided on: picked, or changed by an Edit. */
+  key: string
+  decision: { other: string } | { change: string }
+  fetch?: Fetch
+  env?: Record<string, string | undefined>
+  log?: (msg: string) => void
+}
+
+/** File one decision: ask the filing model, apply its lines, note the run in the boxes. Null when the screen or its mockup went meanwhile. */
+export async function fileDecision(o: FileOptions): Promise<FilingRun | null> {
+  const log = o.log ?? ((m) => console.warn(m))
+  const entry = o.cache.get(o.key), v = entry?.versions.at(-1)
+  if (!entry || !v) return null
+  const { app } = entry
+  const since = o.cache.now(), filedHtml = v.html, t0 = performance.now()
+  const user = fileRequest(o.cache.paper(app, v.device), { id: entry.name ?? HOME_NAME, line: entry.action ?? HOME_LINE, html: numberParts(filedHtml) }, o.decision)
+  let reply = '', final = null
+  for await (const ev of streamModel({ model: FILING_MODEL, system: SYSTEM_PROMPT, user, maxTokens: 4000, signal: AbortSignal.timeout(FILING_DEADLINE_MS), fetch: o.fetch, env: o.env })) {
+    if (ev.type === 'text') reply += ev.text
+    else final = ev
+  }
+  if (final?.finishReason !== 'stop') throw new ProviderError(`filing was cut off (${final?.finishReason ?? 'no end'})`)
+  // A mockup deleted or started over meanwhile gets nothing back.
+  if (o.cache.removedSince(normalizePrompt(app), since)) return null
+  const createdAt = new Date().toISOString()
+  const filed = applyFiling(o.cache, app, o.key, filedHtml, reply, {
+    model: FILING_MODEL, servedModel: final.servedModel, createdAt, costUsd: null, costEstimated: MODELS[FILING_MODEL].costEstimated,
+    firstChunkMs: null, totalMs: 0, finishReason: 'stop', device: v.device,
+  })
+  for (const r of filed.refused) log(`filing refused ${r}`)
+  const run: FilingRun = { ...filed, at: createdAt, screen: entry.name ?? HOME_NAME, ms: Math.round(performance.now() - t0), costUsd: final.costUsd }
+  o.cache.noteFiling(app, run)
+  return run
+}

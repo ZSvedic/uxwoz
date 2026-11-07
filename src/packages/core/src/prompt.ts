@@ -1,54 +1,201 @@
-// The screen prompt. spec/prompt-screen.md holds the same text; a test keeps the two in sync.
+// The system prompt: the canvas manual (process/plans/2026-11-06-canvas-manual.md) verbatim, then
+// how to reply. spec/prompt-screen.md holds the same text; a test keeps the three in step.
 // These bytes are hashed into every cassette key: changing them means `bun run test:record`.
+// The user message is the paper (paperText), then one job: draw, change, or file.
 
-export const SYSTEM_PROMPT = `You build interactive UIs as one HTML fragment with plain JavaScript, styled by classless Pico.css (already loaded; do not load anything else). Reply with the HTML only: no markdown fences, no prose, no <html>/<head>/<body> tags.
+import { LIMITS } from './keys.ts'
+import { DEVICES, type Device } from './frame.ts'
 
-- Begin the reply with <title>Name</title>: a name of 1-4 words for this screen, e.g. <title>Order checkout</title>. Then add <meta name="idea" content="...">: one short sentence naming the idea of this design, e.g. <meta name="idea" content="Common actions as buttons on top">.
+export const SYSTEM_PROMPT = `# Lean UI canvas manual
 
+This manual tells a designer how to add to a mockup that lives on one large sheet of paper. It owns
+the rules for drawing a screen, filing what the user decided and tidying up. How the app stores
+and shows the paper is in [the plan](2026-11-06-paper-canvas.md).
+
+The paper borrows from two things designers know. The screens and the lines between them are a
+wireflow. The boxes are those of an architect's sheet: Components are the legend (a design
+system's component library), Rules are the general notes, Data is the schedules, and the fixer's
+notes are the revision block.
+
+## Example
+
+The paper holds NiceSnore, a snore app with 14 screens. The user is on \`home\` and taps *Nights*
+in its tab bar.
+
+1. You read the titles and follow the lines. The tap leads to a screen that has a title and no
+   drawing yet: \`nights: every recorded night, newest first\`.
+2. You read the three boxes. Components has \`tab-bar\` and \`back\`. Rules has
+   \`score-direction: A higher snore score is worse.\` Data has the table \`nights\`, five rows.
+3. You study \`home\`, the screen the tap came from.
+4. You draw two variants of the whole \`nights\` screen, one with a list and one with a calendar.
+   Both paste \`tab-bar\`, show the five nights from Data and mark high scores as bad. Every night
+   opens \`night-details\`.
+5. The user picks the variant with the list. You ask the three filing questions and find
+   nothing new.
+
+## What is on the paper
+
+Everything is on the paper, where the user can see it and change it. Everything has an ID: 1 to 4
+lowercase words joined by dashes, like \`night-details\`. An ID is unique among entries of its
+kind, never changes, and is never used again after its entry goes.
+
+- **Screens.** A screen is the whole device screen, never a part of one. The first screen is at
+  the top. A screen sits one row below the screen that opens it, and screens of one level share
+  a row. A line joins a control to the screen it opens. A screen's title is its ID and one line
+  that says what it is for.
+- **Components**, at most 20. Parts that look the same on every screen that has them: a tab bar,
+  a Back button, a toolbar, a map legend, a game's score bar. Each has an ID and one line that
+  says where it belongs.
+- **Rules**, at most 20. Each is an ID and one sentence, at most 120 characters, that several
+  screens follow. New rules go at the end of the list.
+- **Data**, at most 10 tables of example data that several screens show. Each table has an ID,
+  a first row of column names in lowercase words, and at most 6 columns and 8 rows.
+
+A full box takes nothing new until an entry leaves it.
+
+## Drawing a screen
+
+You were asked for one screen. Spend a minute on the paper, then draw.
+
+1. Glance at the whole paper: titles and lines only. Leave the other screens unread.
+2. Read the three boxes.
+3. Study the screen the click came from. The user sees the new screen right after it.
+4. Draw two variants of the whole screen its title asks for. They share components, rules and
+   data, and differ in layout.
+   - A component goes on every screen its line names. Paste it by its ID, even where the screen
+     the click came from drew it by hand. Never copy its drawing.
+   - A part that changes from screen to screen, like a list row, is yours to draw.
+   - Follow the rules that fit this screen. When two rules disagree, follow the later one and
+     move on.
+   - Show Data rows where the screen shows that data, and make up the rest.
+   - Every button and link leads somewhere: a screen on the paper, a new screen (give it an ID
+     and its one line), or back. A button that saves or buys leads somewhere too.
+   - One purpose, one screen. Controls that do the same thing for different items (rows of a
+     list, pins on a map, cards in a grid) open the same screen, drawn once for one example item.
+
+## After the user decides
+
+The user picks a variant, or types a change on a screen variant. Ask three questions about that
+decision and file the answers. Most picks add nothing. What the user types usually adds a rule.
+
+1. **Components.** Will another screen show a part of this screen exactly as it is, words and
+   all? Give it an ID and add it to Components, with one line that says where it belongs. A list,
+   a form or a card about one item changes from screen to screen: it is no component.
+2. **Rules.** Did the user settle something other screens must follow? Look at what the user
+   typed, and at what the chosen variant has and the other lacks. Add one sentence to Rules. How
+   this one screen is laid out is no rule, unless the user typed it for every screen.
+3. **Data.** Did this screen make up rows that another screen will show? Add them to Data as a
+   table.
+
+Read the box before you add to it. If an entry already says it, in any words, add nothing. If the
+decision changes an entry, change that entry and keep its ID.
+
+## The overnight fixer
+
+Every few screens a senior designer visits, reads the boxes and the screens added since the last
+visit, and tidies up.
+
+- Merge entries that say one thing twice, keeping the older ID. Of two rules that disagree, remove
+  the older one. Remove an entry that one screen or no screen needs.
+- Add what filing missed: a part drawn by hand on three screens, a fact two screens show
+  differently (the rule takes the newer screen's side).
+- Redraw a screen that breaks a rule, draws a component by hand, or has a control that leads
+  nowhere.
+- Leave a note for each change. The user can undo any of them.
+- Leave alone what the user wrote by hand.
+
+## Mistakes
+
+Nothing here has to be perfect. The user or the fixer edits a wrong entry, and a refresh redraws a
+wrong screen. When unsure, draw the simple thing and move on.
+
+# How to reply
+
+Every request holds the paper as text: the app and its device, the screens' titles and lines, and the three boxes in full. Then it asks for one job: draw a screen, change a screen or a component, or file a decision.
+
+## Drawing or changing
+
+Every job but filing gets HTML. Reply with one variant only, as one HTML fragment with plain JavaScript, styled by classless Pico.css (already loaded; do not load anything else). The app asks for each of the two variants in a request of its own. No markdown fences, no prose, no <html>/<head>/<body> tags.
+
+- Begin a screen with <title>Name</title>: a name of 1-4 words, e.g. <title>Night details</title>. Then add <meta name="idea" content="...">: one short sentence naming the idea of this variant, e.g. <meta name="idea" content="Nights as a list, newest first">. A component has neither.
 - Write no CSS and no classes: use semantic HTML that Pico styles (h1-h3, p, small, label + input, select, button, article for cards, table, fieldset, mark, progress). A few inline style attributes for layout (e.g. grid columns) are fine.
-- Logic in one <script> element at the end, standard DOM APIs only; update every result immediately on input events.
+- Logic in one <script> element at the end, standard DOM APIs only; update every result immediately on input events. Script never shows another screen inside this one.
 - Everything must work offline: no fetch, no external images or fonts. Draw charts as inline SVG.
 - Show values formatted for humans (e.g. toLocaleString / toFixed).
-- Be brief: keep the whole reply under about 2,500 characters: no comments, no input validation beyond what is needed, minimal markup.
-- The screen is one page of a clickable mockup. Every button or link that would open another screen gets a data-action attribute: @, a name for that screen (1-4 lowercase words joined by dashes), a colon and a short prompt for it, e.g. <button data-action="@order-checkout: Checkout screen of a coffee shop app with 2 lattes in the cart">Checkout</button>. The prompt must make sense without seeing this screen; leave it out only for a screen the request lists. Use realistic sample data.
-- People explore the mockup by clicking from screen to screen, so split the app into screens as a real app would: an item's details, a form to add or edit, settings, a profile, checkout, and each section of a tab bar or menu open another screen through data-action; never show, hide or switch them with script inside this screen. The first screen also shows the app's main navigation (a tab bar or menu). Script is only for what stays on this screen, like filters, inputs and counters.
-- A control that goes back to the previous screen gets data-action="back". The request lists the mockup's screens as a tree of names, made and planned: a control that opens one of them gets just @ and its name, e.g. data-action="@home" or data-action="@order-checkout". One screen has one name, and one name is one screen. Before you make up a new name, look in the tree and in this screen's links for one that already opens that screen; a new name is only for a screen the mockup does not have.
-- Never the phone's own screens (mail, share targets): show those as plain buttons. A control that finishes a task (Stop, Save, Send) goes to a real screen or back.
-- Start small: this is an early sketch, so show only what this step needs, with 2-4 sample items per list. The screen fills the device's width: set no width on the page.`
+- Be brief: keep the whole reply under about 2,500 characters: no comments, minimal markup. Start small, with 2-4 items per list.
+- A control that opens a screen on the paper gets data-action="@id", e.g. <button data-action="@night-details">Details</button>. A control that opens a new screen gets data-action="@id: its one line", e.g. <a data-action="@export: export every night as a file">Export</a>. A control that goes back gets data-action="back".
+- Paste a component with an empty element that names its ID: <div data-component="tab-bar"></div>. The app puts the component there.
+- The screen fills the device's width: set no width on the page.
 
-/** The most lines of the screen tree one request lists, so a long session keeps requests short (treeLines trims by depth first). */
-export const MAX_EXISTING_SCREENS = 80
+## Filing
+
+A filing request ends with "File what this decision settles." Reply to it with plain lines, one entry per line, no markdown and no prose, in these forms only:
+component ID from part N: where it belongs
+change component ID from part N: where it belongs
+rule ID: one sentence
+change rule ID: the new sentence
+table ID: column | column | ...
+change table ID: column | column | ...
+row ID: value | value | ...
+nothing
+The parts of the chosen variant carry numbers, like data-part="7": name a part by its number. A table's rows follow it, and a changed table takes the rows that follow it.`
 
 /** Asked of one side of every A OR B (a random one), so the two designs are not near copies. */
 export const ALTERNATIVE_REQUEST = "Design this as a clearly different alternative to the obvious layout: arrange this screen's content another way, not just the wording."
 
-export interface RequestExtras {
-  /** What the screen is for, e.g. "a phone screen, 390 px wide". */
-  device?: string
-  /** True for one side of an A OR B: ask for a different design. */
-  alternative?: boolean
-  /** An Edit: the screen as it is now, and the change the user asked for. */
-  edit?: { html: string; change: string }
+/** What every model call reads: the screens as titles and lines, and the three boxes in full. */
+export interface Paper {
+  app: string
+  device?: Device
+  /** `id: one line`, the first screen first (see screenList). */
+  titles: string[]
+  /** `id -> id`: a control on the first screen opens the second. */
+  lines: string[]
+  components: { id: string; where: string; html: string }[]
+  rules: { id: string; text: string }[]
+  data: { id: string; columns: string[]; rows: string[][] }[]
 }
 
-/** Ends an Edit's request, after the screen as it is now and before the change the user asked for. */
-export const EDIT_REQUEST = 'Reply with this screen again with one change; keep everything else as it is, including its data-action links, and add no second control for a screen it already links to. The change:'
+/** A screen or component as a request shows it: its ID, its one line, its stored HTML. */
+export interface Shown { id: string; line: string; html: string }
 
-/**
- * The user message for one screen: the product prompt alone, or the product plus an action prompt,
- * then the tree of the mockup's screens, made and planned (lines from treeLines), so links to them
- * use their names.
- * The device and the alternative request follow when given; an Edit ends with the screen as it is
- * now and the change.
- */
-export function screenRequest(app: string, action: string | null, existing: string[] = [], extras: RequestExtras = {}): string {
-  let msg = action ? `This screen belongs to a clickable mockup of: ${app}\n\nShow this screen: ${action}` : app
-  const list = existing.slice(0, MAX_EXISTING_SCREENS)
-  if (list.length) msg += `\n\nScreens of this mockup, as a tree:\n${list.join('\n')}`
-  if (extras.device) msg += `\n\nDesign it for ${extras.device}.`
-  if (extras.alternative) msg += `\n\n${ALTERNATIVE_REQUEST}`
-  if (extras.edit) msg += `\n\nThe screen as it is now:\n${extras.edit.html}\n\n${EDIT_REQUEST} ${extras.edit.change}`
-  return msg
+const list = (xs: string[], sep = '\n') => (xs.length ? xs.join(sep) : '(none)')
+
+export function paperText(p: Paper): string {
+  return [
+    `App: ${p.app}`,
+    ...(p.device ? [`Device: ${DEVICES[p.device].request}.`] : []),
+    '', 'Screens, the first screen first (id: what it is for):', list(p.titles),
+    '', 'Lines (a control on the first screen opens the second):', list(p.lines),
+    '', `Components (${p.components.length} of ${LIMITS.components}), each with its ID, where it belongs, and its HTML:`,
+    list(p.components.map((c) => `${c.id}: ${c.where}\n${c.html}`)),
+    '', `Rules (${p.rules.length} of ${LIMITS.rules}):`, list(p.rules.map((r) => `${r.id}: ${r.text}`)),
+    '', `Data (${p.data.length} of ${LIMITS.data} tables):`,
+    list(p.data.map((t) => [t.id, ...[t.columns, ...t.rows].map((r) => r.join(' | '))].join('\n')), '\n\n'),
+  ].join('\n')
+}
+
+/** Draw one variant of a screen, from the screen the click came from (none for the first screen). */
+export function drawRequest(p: Paper, target: { id: string; line: string }, from: (Shown & { label: string }) | null, alternative = false): string {
+  let msg = paperText(p)
+  if (from) msg += `\n\nThe screen the click came from, ${from.id} (${from.line}):\n${from.html}`
+  msg += `\n\nDraw this screen: ${target.id}: ${target.line}`
+  if (from) msg += `\nThe click came from "${from.label}" on ${from.id}.`
+  return alternative ? `${msg}\n\n${ALTERNATIVE_REQUEST}` : msg
+}
+
+/** An Edit: the screen or component as it is now, and the change the user typed. */
+export function editRequest(p: Paper, what: Shown, change: string, component = false): string {
+  const kind = component ? 'component' : 'screen'
+  return `${paperText(p)}\n\nThe ${kind} as it is now, ${what.id} (${what.line}):\n${what.html}\n\n`
+    + `Reply with the HTML of this ${kind} again with one change; keep everything else as it is, including its data-action links and pasted components, and add no second control for a screen it already links to. The change: ${change}`
+}
+
+/** Filing after a pick (with the other variant) or an Edit (with the change); the screen's parts are numbered. */
+export function fileRequest(p: Paper, screen: Shown, decision: { other: string } | { change: string }): string {
+  const second = 'change' in decision ? `The user typed this change on it: "${decision.change}"` : `The other variant, which the user did not pick:\n${decision.other}`
+  return `${paperText(p)}\n\nThe decision, on the screen ${screen.id} (${screen.line}).\n`
+    + `${'change' in decision ? 'The screen after the change' : 'The user picked this variant'}:\n${screen.html}\n\n${second}\n\nFile what this decision settles.`
 }
 
 export const WARMUP_REQUEST = 'Reply with OK.'

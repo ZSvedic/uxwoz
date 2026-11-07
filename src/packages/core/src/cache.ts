@@ -3,13 +3,16 @@
 // version and drops the other, and gives the screen its fixed name for links (`@sleep-report`).
 // Edit and Regenerate add versions; Undo drops the newest. Each screen remembers the screen and
 // click that first made it; levels and the tree are worked out from the screens (see tree.ts).
+// Each mockup also has three boxes: Components (entries of their own kind, with versions like a
+// screen), Rules and Data. An entry's ID is unique in its box and never used again.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { canonicalAction, nameWords, normalizePrompt, screenKey, screenRef } from './keys.ts'
+import { LIMITS, canonicalAction, isId, nameWords, normalizePrompt, screenKey, screenRef } from './keys.ts'
 import { screenName, type Device } from './frame.ts'
-import { HOME_NAME, nameFrom, screenTree, treeLines, uniqueName } from './tree.ts'
+import { HOME_NAME, isComponent, nameFrom, screenList, screenTree, uniqueName } from './tree.ts'
 import type { ModelId } from './models.ts'
+import type { Paper } from './prompt.ts'
 
 /** One design of a screen, as the model made it. */
 export interface Version {
@@ -51,18 +54,44 @@ export interface CacheEntry {
   versions: Version[]
   /** The open A OR B, by side; a side is null until it finishes (or if it failed). Gone after a pick. */
   proposals?: (Version | null)[]
+  /**
+   * A component: its ID is `name`, the line that says where it belongs is `action`, parent is the
+   * screen it was taken from. It has versions like a screen and no place in the tree.
+   */
+  kind?: 'component'
+  by?: Mark['by']
+  at?: string
+  seen?: boolean
 }
+
+/** Who last wrote a box entry and when, and whether the user has looked at its box since. */
+export interface Mark { by: 'filing' | 'user'; at: string; seen: boolean }
+export interface Rule extends Mark { id: string; text: string }
+export interface Table extends Mark { id: string; columns: string[]; rows: string[][] }
+export type BoxName = 'components' | 'rules' | 'data'
+/** A mockup's Rules and Data (its components are entries), and the IDs each box used and deleted. */
+export interface Boxes {
+  rules: Rule[]
+  data: Table[]
+  gone: Record<BoxName, string[]>
+  /** The last filing: when, on which screen, what it added, changed and refused, its time and cost. */
+  filed?: { at: string; screen: string; ms: number; costUsd: number | null; added: string[]; changed: string[]; refused: string[]; error?: string }
+}
+
+const emptyBoxes = (): Boxes => ({ rules: [], data: [], gone: { components: [], rules: [], data: [] } })
+const componentKey = (app: string, id: string) => `${normalizePrompt(app)} » #${id}`
 
 /** How many designs a new screen offers. */
 export const PROPOSALS = 2
 
-// Format 4 files from the spec feature also hold `specs` and `reviews`; they are not read, and the
-// next save drops them. Their versions may keep `spec`, `misses` and `plan` fields, which nothing
-// reads. The entries are the same as in format 3.
-const FORMAT = 4
+// Format 5 adds the boxes. Files of format 2 to 4 load with empty boxes; the spec feature's fields
+// (`specs`, `reviews`, and `spec`, `misses`, `plan`, `specRefused` in versions) are dropped.
+const FORMAT = 5
 
 export class ScreenCache {
   private entries = new Map<string, CacheEntry>()
+  /** Each mockup's boxes, by its root key. */
+  private boxes = new Map<string, Boxes>()
   /** When each key was last deleted, on a counter, so a design still streaming cannot bring it back. */
   private removed = new Map<string, number>()
   private clock = 0
@@ -81,8 +110,11 @@ export class ScreenCache {
         this.file = null
         return
       }
-      if (data?.version === FORMAT || data?.version === 3 || data?.version === 2) {
+      if (data?.version >= 2 && data.version <= FORMAT) {
         for (const e of data.entries as CacheEntry[]) this.entries.set(e.key, e)
+        for (const [root, b] of Object.entries(data.boxes ?? {})) this.boxes.set(root, b as Boxes)
+        if (data.version < FORMAT) for (const e of this.entries.values()) for (const v of [...e.versions, ...(e.proposals ?? [])])
+          if (v) for (const k of ['spec', 'misses', 'plan', 'specRefused']) delete (v as unknown as Record<string, unknown>)[k]
         if (data.version === 2) this.migrate()
       } else {
         // A file from before versions: it stays on disk, and the cache starts empty.
@@ -107,11 +139,11 @@ export class ScreenCache {
    */
   find(app: string, action: string | null): CacheEntry | undefined {
     const ref = action ? screenRef(action) : null
-    if (ref && canonicalAction(app, action)) return this.mockup(normalizePrompt(app)).find((e) => e.name === ref.name)
+    if (ref && canonicalAction(app, action)) return this.mockup(normalizePrompt(app)).find((e) => e.name === ref.name && !isComponent(e))
     const hit = this.entries.get(screenKey(app, action))
     if (hit || !action) return hit
     const a = normalizePrompt(action)
-    return this.mockup(normalizePrompt(app)).find((e) => e.action != null && normalizePrompt(e.action) === a)
+    return this.mockup(normalizePrompt(app)).find((e) => e.action != null && !isComponent(e) && normalizePrompt(e.action) === a)
   }
 
   /** A moment to compare deletes against: see removedSince. */
@@ -169,7 +201,7 @@ export class ScreenCache {
   /** Give a picked screen opened by a plain prompt its fixed name, once: home for the first screen, else from its title. */
   private name(e: CacheEntry) {
     if (e.name || !e.versions.length) return
-    const taken = new Set(this.mockup(normalizePrompt(e.app)).map((x) => x.name).filter((n): n is string => !!n))
+    const taken = new Set(this.mockup(normalizePrompt(e.app)).filter((x) => !isComponent(x)).map((x) => x.name).filter((n): n is string => !!n))
     const v = e.versions[0]!
     // Screens made before titles: their first heading, else the start of their prompt.
     const words = (t: string) => (/[a-z]{3,}/i.test(t) && !/[${}]/.test(t) ? t : '') // not text a script fills in
@@ -186,6 +218,18 @@ export class ScreenCache {
     return entry
   }
 
+  /** Filing put a paste placeholder where a part was: the newest version's HTML changes in place, as the screen looks the same. */
+  setNewestHtml(key: string, html: string) {
+    const v = this.entries.get(key)?.versions.at(-1)
+    if (v) { v.html = html; this.save() }
+  }
+
+  /** The last filing run of a mockup, for the line under its boxes. */
+  noteFiling(app: string, run: Boxes['filed']) {
+    this.boxesOf(app).filed = run
+    this.save()
+  }
+
   /** Drop the newest version, so the one before shows again. Never the last one. */
   undo(key: string): CacheEntry | undefined {
     const entry = this.entries.get(key)
@@ -195,15 +239,85 @@ export class ScreenCache {
     return entry
   }
 
-  /** This mockup's screens as the indented tree the model links to, `self` (a name) marked as the screen being made (see treeLines). */
-  existingScreens(app: string, self?: string): string[] {
-    return treeLines(this.mockup(normalizePrompt(app)), undefined, self)
+  /** The paper every model call reads: the screens' titles and lines, and the three boxes in full. */
+  paper(app: string, device?: Device): Paper {
+    const all = this.mockup(normalizePrompt(app)), b = this.boxesOf(app)
+    const components = all.filter((e) => isComponent(e) && e.versions.length).map((e) => ({ id: e.name!, where: e.action ?? '', html: e.versions.at(-1)!.html }))
+    return { app, device, ...screenList(all), components, rules: b.rules, data: b.data }
   }
 
-  /** One mockup: its screens, oldest first. */
-  map(app: string): { root: string; entries: CacheEntry[] } {
+  /** One mockup: its screens and components, oldest first, and its boxes. */
+  map(app: string): { root: string; entries: CacheEntry[]; boxes: Boxes } {
     const root = normalizePrompt(app)
-    return { root, entries: this.mockup(root) }
+    return { root, entries: this.mockup(root), boxes: this.boxesOf(app) }
+  }
+
+  boxesOf(app: string): Boxes {
+    const root = normalizePrompt(app)
+    let b = this.boxes.get(root)
+    if (!b) this.boxes.set(root, (b = emptyBoxes()))
+    return b
+  }
+
+  /** A free ID for a new entry, from its words: up to 3 of them, then -2, -3… if taken or used before. */
+  freeId(app: string, box: BoxName, words: string): string {
+    const b = this.boxesOf(app)
+    const have = box === 'components' ? this.mockup(normalizePrompt(app)).filter(isComponent).map((e) => e.name!) : b[box].map((x) => x.id)
+    return uniqueName(nameFrom(words).split('-').slice(0, 3).join('-'), new Set([...have, ...b.gone[box]]))
+  }
+
+  /** Why an ID cannot be a new entry of a box (a bad ID, one in use or used before, a full box), or null. */
+  private refuseNew(app: string, box: BoxName, id: string): string | null {
+    const b = this.boxesOf(app)
+    const have = box === 'components' ? this.mockup(normalizePrompt(app)).filter(isComponent).map((e) => e.name) : b[box].map((x) => x.id)
+    if (!isId(id)) return `"${id}" is no ID (1 to 4 lowercase words joined by dashes)`
+    if (have.includes(id) || b.gone[box].includes(id)) return `${box} already has or had ${id}`
+    if (have.length >= LIMITS[box]) return `${box} is full (${LIMITS[box]})`
+    return null
+  }
+
+  /** Add a component taken from a screen (`from`), or by the user. Returns the entry, or why not. */
+  addComponent(app: string, id: string, where: string, version: Version, by: Mark['by'], from: Parent | null = null): CacheEntry | string {
+    const why = this.refuseNew(app, 'components', id) ?? refuseLine(where)
+    if (why) return why
+    const e: CacheEntry = { key: componentKey(app, id), app, action: where.trim(), name: id, parent: from, versions: [version], kind: 'component', ...mark(by) }
+    this.entries.set(e.key, e)
+    this.save()
+    return e
+  }
+
+  /** The component with this ID, if the mockup has it. */
+  component(app: string, id: string): CacheEntry | undefined {
+    return this.entries.get(componentKey(app, id))
+  }
+
+  /**
+   * Add, change or delete a rule or a table. A rule is one sentence of at most 120 characters; a
+   * table has 1 to 6 columns and at most 8 rows, each as long as the columns. Returns why not, or null.
+   */
+  setBox(app: string, op: 'add' | 'set' | 'delete', box: 'rules' | 'data', entry: { id: string; text?: string; columns?: string[]; rows?: string[][] }, by: Mark['by']): string | null {
+    const b = this.boxesOf(app), list: (Rule | Table)[] = b[box]
+    const i = list.findIndex((x) => x.id === entry.id)
+    const why = op === 'add' ? this.refuseNew(app, box, entry.id) : i < 0 ? `${box} has no ${entry.id}` : null
+    if (why) return why
+    if (op === 'delete') {
+      list.splice(i, 1)
+      b.gone[box].push(entry.id)
+    } else {
+      const body = box === 'rules' ? ruleBody(entry.text) : tableBody(entry.columns, entry.rows)
+      if (typeof body === 'string') return body
+      const x = { id: entry.id, ...body, ...mark(by) } as Rule & Table
+      if (op === 'add') list.push(x); else list[i] = x
+    }
+    this.save()
+    return null
+  }
+
+  /** The user looked at a box: its entries are no longer marked new. */
+  markSeen(app: string, box: BoxName) {
+    const list: { seen?: boolean }[] = box === 'components' ? this.mockup(normalizePrompt(app)).filter(isComponent) : this.boxesOf(app)[box]
+    for (const x of list) x.seen = true
+    this.save()
   }
 
   /** Every mockup once, as first typed, with its number of screens; most recently changed first. */
@@ -212,7 +326,7 @@ export class ScreenCache {
     for (const e of this.entries.values()) {
       const root = normalizePrompt(e.app)
       const a = byRoot.get(root) ?? { app: e.app, screens: 0, updatedAt: '' }
-      a.screens++
+      if (!isComponent(e)) a.screens++
       for (const v of [...e.versions, ...(e.proposals ?? [])]) if (v && v.createdAt > a.updatedAt) a.updatedAt = v.createdAt
       byRoot.set(root, a)
     }
@@ -230,6 +344,13 @@ export class ScreenCache {
     this.tomb(key)
     if (!entry) return undefined
     const root = normalizePrompt(entry.app)
+    if (isComponent(entry)) {
+      // Screens that paste it show nothing in its place; no screen goes with it.
+      this.entries.delete(key)
+      this.boxesOf(entry.app).gone.components.push(entry.name!)
+      this.save()
+      return [key]
+    }
     if (key === root) {
       const gone = this.mockup(root).map((e) => e.key)
       this.deleteApp(entry.app)
@@ -256,8 +377,9 @@ export class ScreenCache {
     const gone = this.mockup(root)
     this.tomb(root)
     for (const e of gone) { this.entries.delete(e.key); this.tomb(e.key) }
-    if (gone.length) this.save()
-    return gone.length
+    const boxes = this.boxes.delete(root)
+    if (gone.length || boxes) this.save()
+    return gone.filter((e) => !isComponent(e)).length
   }
 
   get size(): number {
@@ -281,7 +403,25 @@ export class ScreenCache {
     mkdirSync(dirname(this.file), { recursive: true })
     // Write a temp file, then rename, so a crash never leaves half a cache file.
     const tmp = `${this.file}.tmp`
-    writeFileSync(tmp, JSON.stringify({ version: FORMAT, entries: [...this.entries.values()] }, null, 1))
+    writeFileSync(tmp, JSON.stringify({ version: FORMAT, entries: [...this.entries.values()], boxes: Object.fromEntries(this.boxes) }, null, 1))
     renameSync(tmp, this.file)
   }
+}
+
+const mark = (by: Mark['by']): Mark => ({ by, at: new Date().toISOString(), seen: by === 'user' })
+
+/** Why a line (a rule, where a component belongs) cannot be stored, or null. */
+function refuseLine(text: unknown): string | null {
+  if (typeof text !== 'string' || !text.trim() || /\n/.test(text.trim())) return 'a line must be one line of text'
+  return text.trim().length > LIMITS.line ? `a line must be at most ${LIMITS.line} characters` : null
+}
+
+const ruleBody = (text: unknown) => refuseLine(text) ?? { text: (text as string).trim() }
+
+function tableBody(columns: unknown, rows: unknown): { columns: string[]; rows: string[][] } | string {
+  const ok = (r: unknown): r is string[] => Array.isArray(r) && r.every((c) => typeof c === 'string' && c.length <= LIMITS.line)
+  if (!ok(columns) || !columns.length || columns.length > LIMITS.columns || columns.some((c) => !c.trim())) return `a table has 1 to ${LIMITS.columns} named columns`
+  if (!Array.isArray(rows) || rows.length > LIMITS.rows) return `a table has at most ${LIMITS.rows} rows`
+  if (!rows.every((r) => ok(r) && r.length === columns.length)) return 'each row has one value per column'
+  return { columns: columns.map((c) => c.trim()), rows: rows.map((r: string[]) => r.map((c) => c.trim())) }
 }

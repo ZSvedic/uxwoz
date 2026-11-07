@@ -2,26 +2,20 @@
 
 import type { Version } from './cache.ts'
 import { extractFragment, screenIdea, screenName } from './frame.ts'
-import { DEVICES, type Device } from './frame.ts'
+import type { Device } from './frame.ts'
 import { MODELS, type ModelId } from './models.ts'
-import { SYSTEM_PROMPT, WARMUP_REQUEST, screenRequest } from './prompt.ts'
+import { SYSTEM_PROMPT, WARMUP_REQUEST } from './prompt.ts'
 import { ProviderError, streamModel, type Fetch } from './providers.ts'
 
 /** A slower screen is useless, and keep-alive comments can stall a stream, so this is an overall deadline. */
 export const DEADLINE_MS = 20_000
 
 export interface GenerateOptions {
-  app: string
-  action: string | null
-  /** The tree of screens the mockup already has (lines from treeLines); the model links to them by @name. */
-  existing?: string[]
+  /** The user message: the paper and the job (drawRequest or editRequest). */
+  user: string
   model: ModelId
-  /** The device to design for; left out of the request when absent. */
+  /** The device the request designs for, stored with the version. */
   device?: Device
-  /** True for one side of an A OR B: ask for a clearly different design. */
-  alternative?: boolean
-  /** An Edit: change this screen as asked instead of designing a new one. */
-  edit?: { html: string; change: string }
   signal?: AbortSignal
   fetch?: Fetch
   env?: Record<string, string | undefined>
@@ -40,9 +34,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
   let firstChunkMs: number | null = null
   try {
     for await (const ev of streamModel({
-      model: o.model, system: SYSTEM_PROMPT,
-      user: screenRequest(o.app, o.action, o.existing, { device: o.device && DEVICES[o.device].request, alternative: o.alternative, edit: o.edit }),
-      signal, fetch: o.fetch, env: o.env,
+      model: o.model, system: SYSTEM_PROMPT, user: o.user, signal, fetch: o.fetch, env: o.env,
     })) {
       if (ev.type === 'text') {
         firstChunkMs ??= performance.now() - t0
