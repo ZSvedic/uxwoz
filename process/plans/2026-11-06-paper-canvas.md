@@ -94,7 +94,8 @@ gives the size of the code before and after.
    [the cleanup list](2026-11-06-cleanup.md) says: app code 249 to 163 KB, tests 125 to 53 KB.
 3. **Boxes in the app: done** ([report](../journal/2026-11-07-boxes.md)). Filing on Terra takes 1
    to 5 s and under half a cent a decision; app code 163 to 215 KB.
-4. **The fixer** and its notes.
+4. **The fixer: done** ([report](../journal/2026-11-07-fixer.md)). A visit takes 9 to 12 s and about a
+   cent; on a real NiceSnore it repaired 2 of 5 plants, screens before boxes; app code 214.8 to 219.0 KB.
 5. **Remake** NiceSnore, a dashboard and a game, 15 screens each.
 
 It works when a person reads each remake's boxes in two minutes, a component is pasted on 9 of 10
