@@ -90,8 +90,8 @@ gives the size of the code before and after.
      tidy a paper with 10 planted mistakes, and Haiku 5.5 does too, as the cheapest. Count mistakes
      repaired, new damage, time and cost. Sol and Sonnet 5.5 ($2, $10) cost flagship prices and
      stay out. The test confirms each price on its vendor's page.
-2. **Cleanup**: delete the spec feature, as [the cleanup list](2026-11-06-cleanup.md) says. This
-   step adds nothing.
+2. **Cleanup: done** ([report](../journal/2026-11-07-cleanup.md)). The spec feature is deleted as
+   [the cleanup list](2026-11-06-cleanup.md) says: app code 249 to 163 KB, tests 125 to 53 KB.
 3. **Boxes in the app**: storage, the boxes on the canvas, paste by ID, filing.
 4. **The fixer** and its notes.
 5. **Remake** NiceSnore, a dashboard and a game, 15 screens each.
