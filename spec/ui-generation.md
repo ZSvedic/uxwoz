@@ -7,7 +7,7 @@ which models to call with which settings. It does not own the product flow, cach
 ## Example
 
 The app sends the system prompt in [prompt-screen.md](prompt-screen.md) (the benchmark's
-`benchmarks/bench/prompts/system.txt`, 208 tokens, plus two navigation bullets) and a screen request. The model streams back one HTML fragment, ending in one `<script>`:
+`benchmarks/bench/prompts/system.txt`, 208 tokens, plus bullets for the name and idea, navigation and size) and a screen request. The model streams back one HTML fragment, ending in one `<script>`:
 
 ```html
 <h1>BMI calculator</h1>

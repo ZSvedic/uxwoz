@@ -12,8 +12,6 @@ import { FRAME_SANDBOX, framePage, type Device } from '@uxwoz/core/frame'
 /** Limits on the height a screen may report, so a broken screen cannot make a huge frame. */
 const MIN_SCREEN_H = 160
 const MAX_SCREEN_H = 8000
-/** The narrowest a screen gets, so its name stays readable. */
-const MIN_SCREEN_W = 280
 /** The height of a frame whose screen has not reported its size yet. */
 const START_H = 600
 /** The height of a failed side of an A OR B. */
@@ -122,8 +120,6 @@ interface Card {
   key: string
   view: CardView | null
   width: number
-  /** The width the screen uses, once it reported it. */
-  used: number | null
   height: number
   shown: { html: string; final: boolean; css: string } | null
   /** The final screen has reported its size since it was shown. */
@@ -393,8 +389,6 @@ export class Canvas {
       return
     }
     if (s?.html !== html) { c.frozen = false; c.growth = { count: 0, at: 0 } }
-    // While a screen streams it keeps the full width, so its neighbours do not jump with every chunk.
-    if (!final && c.used != null) { c.used = null; this.queue() }
     c.shown = { html, final, css }
     c.sized = false
     c.frame.srcdoc = framePage(html, css, final, c.view?.device)
@@ -423,8 +417,7 @@ export class Canvas {
 
   /** The size a card takes on the canvas. */
   private size(c: Card) {
-    const w = c.view?.error ? c.width : Math.min(c.width, Math.max(MIN_SCREEN_W, c.used ?? c.width))
-    return { w, h: c.view?.error ? FAILED_H : c.height }
+    return { w: c.width, h: c.view?.error ? FAILED_H : c.height }
   }
 
   /** Place every screen as a tree, size the canvas, and draw the lines. */
@@ -605,7 +598,7 @@ export class Canvas {
     root.append(head, screen, error, rail)
     const c: Card = {
       el: root, name, idea, more, note, screen, frame, shield, error, rail, undo: tools[2]!, tools, key, view: null,
-      width: 0, used: null, height: START_H, shown: null, sized: false, onLoad: null, growth: { count: 0, at: 0 }, frozen: false,
+      width: 0, height: START_H, shown: null, sized: false, onLoad: null, growth: { count: 0, at: 0 }, frozen: false,
     }
     shield.addEventListener('click', () => { if (c.view?.side?.pickable) this.on.pick(c.key, c.view.side.index) })
     frame.addEventListener('load', () => this.loaded(c))
@@ -629,7 +622,6 @@ export class Canvas {
     if (!c) return
     if (d.uxwoz === 'size' && Number.isFinite(d.height)) {
       if (c.shown?.final) c.sized = true
-      if (c.shown?.final && Number.isFinite(d.width) && c.used !== Math.round(d.width)) { c.used = Math.round(d.width); this.queue() }
       const h = Math.min(MAX_SCREEN_H, Math.max(MIN_SCREEN_H, Math.round(d.height)))
       if (c.height === h) return
       // A screen sized by its window (100% heights, script reading innerHeight) grows each time its

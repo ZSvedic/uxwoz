@@ -23,7 +23,7 @@ export const MAX_EXISTING_SCREENS = 80
 export const ALTERNATIVE_REQUEST = "Design this as a clearly different alternative to the obvious layout: arrange this screen's content another way, not just the wording."
 
 export interface RequestExtras {
-  /** What the screen is for, e.g. "a phone screen, at most 390 px wide". */
+  /** What the screen is for, e.g. "a phone screen, 390 px wide". */
   device?: string
   /** True for one side of an A OR B: ask for a different design. */
   alternative?: boolean

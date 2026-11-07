@@ -202,6 +202,28 @@ describe('screen cache', () => {
     expect(existsSync(`${file}.before-versions`)).toBe(true)
   })
 
+  test('a file from a newer app is left alone, and nothing is saved', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
+    const text = JSON.stringify({ version: 99, entries: [] })
+    writeFileSync(file, text)
+    const cache = new ScreenCache(file)
+    expect(cache.warning).toContain('newer version')
+    screen(cache, 'Cafe', null, '<h1>Menu</h1>')
+    expect(readFileSync(file, 'utf8')).toBe(text)
+  })
+
+  test('format 3 and 4 files load; a format 4 file loses its specs and reviews at the next save', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
+    const entry = { key: 'cafe', app: 'Cafe', action: null, name: 'home', parent: null, versions: [ver('<h1>Menu</h1>')] }
+    for (const version of [3, 4]) {
+      writeFileSync(file, JSON.stringify({ version, entries: [entry], specs: { cafe: {} }, reviews: { cafe: {} } }))
+      const cache = new ScreenCache(file)
+      expect(cache.get('cafe')?.versions[0]?.html).toBe('<h1>Menu</h1>')
+      screen(cache, 'Cafe', 'Cart', '<h1>Cart</h1>', { key: 'cafe', label: 'Cart' })
+      expect(Object.keys(JSON.parse(readFileSync(file, 'utf8')))).toEqual(['version', 'entries'])
+    }
+  })
+
   test('a cache file survives a restart, open A OR B included', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
     const cache = new ScreenCache(file)

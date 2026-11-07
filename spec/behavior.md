@@ -247,7 +247,7 @@ that was paid for is kept even if the browser leaves. The current screen is reme
 in this browser.
 
 The cache file is version 4; a file from version 3 loads as it is, and one from the spec feature
-loses its `specs` and `reviews` at the next save. A file from a newer app is left as it is: the app says so in the red pill and saves nothing. A cache file from before names (version 2) gets names for its picked screens when the server loads
+loses its `specs` and `reviews` at the next save (old versions keep fields that nothing reads). A file from a newer app is left as it is: the app says so in the red pill and saves nothing. A cache file from before names (version 2) gets names for its picked screens when the server loads
 it, from each screen's title, else its first heading, else its prompt; its stored levels and
 clicks go. A file from before versions is moved aside to `screen-cache.json.before-versions`, and
 the cache starts empty.

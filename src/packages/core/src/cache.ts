@@ -57,7 +57,8 @@ export interface CacheEntry {
 export const PROPOSALS = 2
 
 // Format 4 files from the spec feature also hold `specs` and `reviews`; they are not read, and the
-// next save drops them. The entries are the same as in format 3.
+// next save drops them. Their versions may keep `spec`, `misses` and `plan` fields, which nothing
+// reads. The entries are the same as in format 3.
 const FORMAT = 4
 
 export class ScreenCache {
