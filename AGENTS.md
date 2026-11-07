@@ -32,23 +32,29 @@ When you answer the user in chat (status updates, failure reports, "why did X ha
 
 ```
 src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in the browser
-  models.ts      the 3 models, call settings, prices
-  prompt.ts      system prompt + user message: device, ask one side for a different design, an Edit's screen and change
-                 (system prompt is a copy of spec/prompt-screen.md; a test keeps them equal)
-  providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol)
+  models.ts      the 3 screen models and Terra (background, filing), call settings, prices
+  prompt.ts      system prompt (the canvas manual verbatim + how to reply) and the user messages: the paper
+                 (titles, lines, boxes), then Draw, Edit or File (a copy of spec/prompt-screen.md; a test keeps them equal)
+  providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol, Terra)
   generate.ts    one design: stream, 20 s deadline, cost, name and idea, keep the first copy of a doubled reply,
                  cut prose before the title, refuse cut-off replies
-  keys.ts        cache keys: a link by @name, normalize a prompt, "home" means the first screen; which clicks mean Back or Home
-  tree.ts        the tree, worked out: links in each screen, @names, planned screens, shortest-path levels, the tree lines for the model
+  filing.ts      filing: number a screen's parts, ask Terra, parse its lines, apply them to the boxes with refusals
+  keys.ts        cache keys: a link by @name, normalize a prompt, "home" means the first screen, `back`; box limits and IDs
+  tree.ts        the tree, worked out: links in each screen (components pasted), @names, planned screens,
+                 shortest-path levels, the titles and lines of the paper
   cache.ts       screen cache: find by name, proposals (the open A OR B) and pick, names, versions and undo, parents,
-                 delete with pruning, migration of old files, JSON file
-  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices and their size; name, idea
+                 delete with pruning, the boxes (components as entries, rules, tables, limits, IDs), migration, JSON file
+  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices and their size;
+                 name, idea; paste by ID and the current link
 src/packages/web/src/
   server.ts      Bun.serve: /api/config, /api/screen (NDJSON, A OR B at once), /api/pick, /api/revise, /api/undo,
-                 /api/map, /api/apps, /api/delete, /api/delete-app, /api/warmup, themes
-  app.ts         browser: generate panel, A OR B streaming, refit and pick, clicks (@names, Back, Home), rail tools, drawer
-                 (Edit, Info), toolbar menus, ← → trail, errors
-  canvas.ts      browser: the tree layout (packed rows, line lanes), cards and frames, A OR B sides, rail, pan and zoom, fits
+                 /api/map (wait=1 for filing), /api/apps, /api/delete, /api/delete-app, /api/box, /api/warmup, themes;
+                 filing in the background, one per mockup, a click waits for it
+  app.ts         browser: generate panel, A OR B streaming, refit and pick, clicks (@names, back), rail tools, drawer
+                 (Edit, Info), the boxes' data and filing's result, toolbar menus and box buttons, ← → trail, errors
+  canvas.ts      browser: the boxes column, the tree layout (packed rows, line lanes), cards and frames, A OR B sides,
+                 rail, pan and zoom, fits
+  boxes.ts       browser: the Components, Rules and Data boxes, editing in place, Export as markdown
   index.html, shell.css   the page around the canvas
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest

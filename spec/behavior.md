@@ -1,8 +1,8 @@
 # Behavior: what the user sees
 
 This doc owns the product flow of the MVP: the toolbar, the generate panel, the canvas of screens,
-A OR B and picking, the rail and the drawer, navigation, the cache, pickers and the numbers on
-screen. It does not own the screen format, rendering or model settings (see
+A OR B and picking, the rail and the drawer, the boxes and filing, navigation, the cache, pickers
+and the numbers on screen. It does not own the screen format, rendering or model settings (see
 [ui-generation.md](ui-generation.md)) or types and env vars (see [code-contract.md](code-contract.md)).
 
 Only screens the user picked exist. A new screen shows two designs side by side; the user clicks
@@ -23,6 +23,9 @@ one, and the other is gone. After that, the user changes a screen by asking for 
    and **↶ Undo** brings the old version back.
 5. Back in L1, Zel clicks *Settings*. Its A OR B appears in a new column beside the Camera branch,
    still at level 2. **Fit all** shows the whole tree, like a Figma page.
+6. Left of L1, the boxes have filled in the background: Rules holds *box-levels: Levels show as a
+   percentage*, and after Zel's Edit asking for a tab bar, Components holds `tab-bar`, which every
+   later screen pastes.
 
 ```
  L1 Home ──────────────┐
@@ -42,17 +45,21 @@ One bar, 44 px tall, with three parts:
 
 - **Project menu** (left): a button with the mockup's prompt, cut short. Its menu has
   **New mockup…** (opens the generate panel), **Recent mockups** (the last ten, the open one
-  ticked; choosing one opens it), and, with a mockup open, **↺ Start over** (deletes every screen
-  and makes the first one again) and **✕ Delete** (deletes every screen). Both ask first.
+  ticked; choosing one opens it), and, with a mockup open, **⇩ Export the boxes** (a markdown file
+  of Components, Rules and Data), **↺ Start over** (deletes every screen and the boxes, and makes
+  the first screen again) and **✕ Delete** (deletes the mockup). Both ask first.
 - **Nav** (middle): names the current screen (*L2 Camera ▾*). Its menu lists every screen as an
   indented tree, each with the control that opened it (*via Camera*), the path to the current
   screen in orange. Choosing one makes it current and scrolls to it. Planned screens (see
   Navigation) are in the tree too, greyed, marked *not made yet*; choosing one makes it, as its
-  link would.
+  link would. The components follow, under a **Components** row that moves the view to their box.
 - **← and →** (either side of Nav): back to the screen looked at before, and forward again, like a
   browser: every screen that becomes current is a step, and reaching a screen any other way drops
   the steps ahead. Screens deleted since are skipped. ⌘[ and ⌘] do the same (also while a screen
   has the focus), and so do the mouse's back and forward buttons.
+- **Components, Rules, Data** (right): each moves the view to its box. A number beside it counts
+  the entries filing added or changed since the user last looked; three seconds after a look, they
+  count as seen and lose their *new* mark.
 - **Zoom** (right): **−**, the zoom level, **+** and **⤢ Fit screen**. The level opens a menu: Zoom
   in ⌘+, Zoom out ⌘−, 50%, 100% ⌘0, 200%, Fit all ⇧1, Fit screen ⇧2, Fit screen width ⇧3. The keys
   work anywhere outside a text field (Ctrl in place of ⌘ off a Mac). Under 900 px wide only the
@@ -174,13 +181,39 @@ scrolls so the screen stays fully visible beside it. Esc or ✕ closes it. It ha
 
 Choosing another screen while the drawer is open shows that screen in it.
 
+## Boxes
+
+Left of the first screen sits a column of three labelled boxes, at the canvas's scale. Every model
+call reads them in full, so what is in them is what the screens share. A line above them says what
+the last filing did, with its time and cost; hovering it lists any line filing's reply had refused.
+
+- **Components**: small cards like screens, as tall as their content, each with its ID and the line
+  that says where it belongs. A screen pastes a component by ID; a changed component (Edit, Undo)
+  shows at once on every screen that pastes it, and a deleted one leaves nothing in its place. The
+  rail has ✎ Edit, ↶ Undo, ⓘ Info (where it belongs, the screens that paste it, the screen it was
+  taken from) and ✕ Delete.
+- **Rules**: one line each, the ID and one sentence. Click the sentence to change it; Enter or a
+  click elsewhere saves, Esc puts it back, an empty sentence deletes it. **+ Rule** asks for a
+  sentence and makes its ID from its first words.
+- **Data**: small tables, each with an ID, named columns and rows. Click a cell to change it; a row
+  left empty or a column without a name goes when the table saves. **+ row**, **+ column**, ✕, and
+  **+ Table**, which asks for a name.
+- **Limits**, as the manual says: 20 components, 20 rules of at most 120 characters, 10 tables of at
+  most 6 columns and 8 rows. A full box takes nothing new; a refused edit says why in the red pill.
+  An ID is 1 to 4 lowercase words joined by dashes, unique in its box, and never used again.
+- **Filing**: after a pick or an Edit, GPT-6.1 Terra reads the paper and the decision and files what
+  it settles, in the background: a part the screen shows the same as other screens will (it moves
+  to Components, and the screen pastes it where it was, so it looks the same), a rule, a table.
+  The line above the boxes says *Filing your last decision…* meanwhile. A click that opens a new
+  screen waits for it, at most 5 seconds; an Edit too.
+- **New** marks an entry filing added or changed since the user last looked at its box.
+
 ## Navigation
 
-Each control that opens another screen carries the name of that screen and a short prompt for it,
-written by the model (`data-action="@sleep-report: Sleep report of last night with…"`), and is
-blue; clicking it asks for *product prompt + action prompt*. The model is told to make details,
-forms, settings and tab-bar sections screens of their own, so a mockup has screens to click
-through. A plain link the screen does not handle asks for "the screen shown after clicking
+Each control that opens another screen carries the ID of that screen (its name) and, for a new
+screen, its one line, written by the model (`data-action="@sleep-report: Sleep report of last
+night with…"`), and is blue; clicking a new one asks for that screen, drawn from the paper. A
+plain link the screen does not handle asks for "the screen shown after clicking
 *label*"; in-page links (`#…`) stay put. Other controls (filters, inputs) work inside the screen.
 Only a real click opens a screen.
 
@@ -194,24 +227,21 @@ Only a real click opens a screen.
   it, when someone first opens it. It goes away when no screen links to it any more (after an Edit
   or a delete). Deleting a screen that other screens still link to makes it planned again; the
   screens only it led to go with it.
-- **The tree in each request**: every request lists the mockup's screens, made and planned, as an
-  indented tree of names and what each screen is (its prompt), two spaces deeper per level,
-  planned ones (and ones whose A OR B is open) marked *not made yet*, the screen being made or
-  changed marked *this screen*, at most 80 lines; past that, planned screens are left out first,
-  deepest first, then the deepest made ones. The model links to any of them with `@` and
-  the name alone (`data-action="@sleep-report"`), back to the screen before with `back`, and makes
-  up a name, with a prompt, only for a screen the mockup does not have. A link by name alone with no screen
-  and no plan behind it makes a screen from the name and the button's words.
+- **The paper in each request**: every request lists the mockup's screens, made and planned, as
+  titles (`sleep-report: what it is for`, the first screen first, planned ones and open A OR Bs
+  marked *no drawing yet*) and lines (`home -> sleep-report` for each link between two of them),
+  then the three boxes in full (see [prompt-screen.md](prompt-screen.md)). The model links to a
+  screen on the paper with `@` and its ID alone (`data-action="@sleep-report"`), back with `back`,
+  and to a new screen with an ID and its one line. A link by ID alone with no screen and no plan
+  behind it makes a screen from the ID and the button's words.
 - **Screens from before names**: links that are a prompt alone still work: a click finds the
   screen made from that prompt (named or not), else makes one; at the pick it gets a name from its title,
   unique in the mockup (*Sleep report* becomes `sleep-report`, a second *Settings* `settings-2`).
 
-- **Back and Home** never make a screen. A control labelled *Home*, *Go home*, *Back to home* or
-  *Main menu* goes to the first screen. A control with the action `back`, or labelled *Back*,
-  *Go back*, *Return*, *Back to …* (*Back to cats*) or only an arrow (*←*, *‹*, *«*), goes to the
-  screen that opened this one (the first screen, if it has none). Icons and arrows in front of a
-  label (*🏠 Home*, *⬅ Back*, icon-font words like *arrow_back*) do not count. The label wins over
-  the action prompt, since models sometimes give Back a long prompt for the home screen.
+- **Back** never makes a screen: a control with the action `back` goes to the screen this one hangs
+  under (the first screen, if it has none). What a control says never decides where it goes.
+- **The current link**: a control that opens the screen it sits on (a tab bar's own tab) is marked
+  current and shows bold and underlined; a click on it stays.
 - A click that leads to a screen already on the canvas (by name, by the prompt that made it, or
   Back and Home) makes it current and scrolls to it, at no cost; so does one on a screen whose
   A OR B is open.
@@ -246,8 +276,9 @@ click that first made it; levels are worked out, never stored. Each side of an A
 that was paid for is kept even if the browser leaves. The current screen is remembered per mockup
 in this browser.
 
-The cache file is version 4; a file from version 3 loads as it is, and one from the spec feature
-loses its `specs` and `reviews` at the next save (old versions keep fields that nothing reads). A file from a newer app is left as it is: the app says so in the red pill and saves nothing. A cache file from before names (version 2) gets names for its picked screens when the server loads
+The cache file is version 5 and also holds each mockup's boxes. A file from version 3 or 4 loads
+with empty boxes, and the spec feature's fields (`specs`, `reviews`, and `spec`, `misses`, `plan`,
+`specRefused` in versions) go at the next save. A file from a newer app is left as it is: the app says so in the red pill and saves nothing. A cache file from before names (version 2) gets names for its picked screens when the server loads
 it, from each screen's title, else its first heading, else its prompt; its stored levels and
 clicks go. A file from before versions is moved aside to `screen-cache.json.before-versions`, and
 the cache starts empty.

@@ -155,19 +155,6 @@ export function visibleText(html: string): string {
     .replace(/\s+/g, ' ').trim()
 }
 
-const BLOCKS = 'header|footer|nav|section|article|aside|main|form|fieldset|table|ul|ol|div|p|h1|h2|h3|h4|figure|details|svg|label|button|a|select|progress'
-
-/** Number the parts of a variant: each block element gets data-part="N"; nothing inside an svg, script or pasted component. */
-export function numberParts(html: string): string {
-  let n = 0, skip = 0
-  return html.replace(new RegExp(`<(/?)(${BLOCKS}|script)\\b([^>]*)>`, 'gi'), (all, close: string, tag: string, attrs: string) => {
-    const t = tag.toLowerCase()
-    if (t === 'script') { skip += close ? -1 : 1; return all }
-    if (skip > 0) { if (t === 'svg') skip += close ? -1 : 1; return all }
-    if (close) return all
-    if (/data-component=/i.test(attrs)) return all
-    if (t === 'svg' && !/\/\s*$/.test(attrs)) skip++
-    return `<${tag} data-part="${++n}"${attrs}>`
-  })
-}
+/** Number the parts of a variant, as filing in the app does. */
+export { numberParts } from '@uxwoz/core'
 

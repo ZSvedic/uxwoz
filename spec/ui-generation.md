@@ -6,8 +6,10 @@ which models to call with which settings. It does not own the product flow, cach
 
 ## Example
 
-The app sends the system prompt in [prompt-screen.md](prompt-screen.md) (the benchmark's
-`benchmarks/bench/prompts/system.txt`, 208 tokens, plus bullets for the name and idea, navigation and size) and a screen request. The model streams back one HTML fragment, ending in one `<script>`:
+The app sends the system prompt in [prompt-screen.md](prompt-screen.md) (the canvas manual, then
+how to reply, with the benchmark's HTML and Pico rules from `benchmarks/bench/prompts/system.txt`)
+and the paper with the screen to draw. The model streams back one HTML fragment, ending in one
+`<script>`:
 
 ```html
 <h1>BMI calculator</h1>
@@ -22,6 +24,14 @@ The app sends the system prompt in [prompt-screen.md](prompt-screen.md) (the ben
 
 The app wraps it as `<main>` in a page with the theme CSS inlined and loads it into a sandboxed
 iframe. Pico styles the bare elements, so the model writes no CSS.
+
+Before it shows a stored screen, the app makes two changes to its HTML, and stores neither:
+
+- **Paste by ID**: each element with `data-component="tab-bar"`, its contents included, becomes the
+  newest HTML of that component; one whose component is gone becomes nothing.
+- **The current link**: each control whose `data-action` is `@` and the screen's own ID (with or
+  without a line) gets `aria-current="page"`, which the frame CSS shows bold and underlined in
+  every theme.
 
 ## Format: semantic HTML + vanilla JS + classless Pico.css
 
@@ -79,6 +89,11 @@ All three were measured on 2026-10-22/23 with the lite benchmark (`benchmarks/`)
   (6x the $2 / $10 standard price).
 - **All three** got the mortgage and todo screens right every time. The small models' one
   weakness is placing the BMI scale marker in the right category.
+- **GPT-6.1 Terra** files each decision, in the background: OpenAI Responses API `gpt-6.1-terra`,
+  standard tier, `reasoning: {effort: "low"}`, $1 in, $0.05 cached, $5 out per million tokens (an
+  estimate from tokens), a 60 s deadline. It was the only model to pass the paper test's filing
+  part ([report](../process/journal/2026-11-07-paper-test.md)); a filing took 1 to 5 s and $0.001
+  to $0.004 on NiceSnore. It is never offered as a screen model.
 
 ## Calling the models
 

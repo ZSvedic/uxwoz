@@ -5,7 +5,8 @@
 ## Run it
 
 You need [bun](https://bun.sh) and a root `.env` with `OPENROUTER_API_KEY` (Claude Haiku, the
-default) and `OPENAI_API_KEY` (the two GPT models). All `bun` commands run from `src/`.
+default) and `OPENAI_API_KEY` (the two GPT models, and GPT-6.1 Terra, which files every decision
+into the boxes). All `bun` commands run from `src/`.
 
 ```bash
 cd src && bun install && bun run dev
@@ -15,6 +16,12 @@ Open http://127.0.0.1:3000, type a product idea (or pick a template), and click 
 screen comes as two designs side by side, A OR B; click the one you like to keep it. A click on a
 blue control inside a screen makes the next screen below it. Change a screen with the buttons to
 its right: ✎ Edit, ↻ Regenerate, ↶ Undo, ⓘ Info, ✕ Delete. `PORT=3001 bun run dev` picks another port.
+
+Left of the first screen are three boxes that every model call reads: **Components** (parts that
+look the same on every screen that has them; screens paste them by ID), **Rules** and **Data**.
+After each pick or Edit, filing adds what the decision settled, in the background. Edit a rule or a
+table cell by clicking it; the toolbar's Components, Rules and Data buttons move the view to each
+box, and **Export the boxes** in the project menu writes them as markdown.
 
 Generated screens are cached in `temp/screen-cache.json`. To make a mockup again from scratch,
 open it and choose **Start over** in the project menu (top left); **Delete** removes it. To clear the whole cache, stop the server,

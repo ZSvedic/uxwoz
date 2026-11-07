@@ -18,16 +18,19 @@ POST /api/screen  {"app": "A coffee shop ordering app", "action": null, "model":
 {"type":"done","entry":{...CacheEntry, "versions":[], "proposals":[{...}, {...}]}}
 
 POST /api/pick  {"key": "a coffee shop ordering app", "index": 1}
-{"entry":{...CacheEntry, "versions":[{...the second proposal}]}}
+{"entry":{...CacheEntry, "versions":[{...the second proposal}]}, "filing":true}
+
+GET /api/map?app=A%20coffee%20shop%20ordering%20app&wait=1      (answers once filing is done)
+{"root":"a coffee shop ordering app","entries":[...],"boxes":{...Boxes},"filing":false}
 ```
 
 ## Packages
 
-- `@uxwoz/core` (`src/packages/core`): models, prompt, provider streaming, screen cache, cache keys,
-  frame page and devices. `frame.ts`, `keys.ts` and `tree.ts` run in the browser too, so they use
+- `@uxwoz/core` (`src/packages/core`): models, prompt, provider streaming, screen cache with the
+  boxes, filing, cache keys, frame page (with paste by ID and the current link) and devices. `frame.ts`, `keys.ts` and `tree.ts` run in the browser too, so they use
   no Node or Bun APIs.
 - `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`,
-  `canvas.ts`, `shell.css`, bundled by Bun's HTML import), and the themes in `themes/`.
+  `canvas.ts`, `boxes.ts`, `shell.css`, bundled by Bun's HTML import), and the themes in `themes/`.
 
 There are no runtime dependencies; `@types/bun` and `typescript` are dev-only.
 
@@ -57,8 +60,16 @@ can spend model credits.
   a first screen gets `error` before any model call. A closed browser connection aborts the model
   calls; a side that already finished is still stored.
 - `POST /api/pick {key, index}`: keep proposal `index` as the screen's first version and drop the
-  other; `{entry}`, or 404 if the screen has no open A OR B or that side has not finished.
-- `POST /api/revise {key, change?, model?, device?}`: one new version of a picked screen, streamed
+  other; `{entry, filing: true}`, as filing starts in the background (see below); 404 if the screen
+  has no open A OR B or that side has not finished.
+- **Filing** runs after a pick and after a screen's Edit (whose `done` event has `filing: true`), on
+  the background model GPT-6.1 Terra, one filing per mockup at a time. It applies the reply's lines
+  to the boxes (`applyFiling` in `core/src/filing.ts`) and refuses, in the server log and in
+  `boxes.filed.refused`, a bad or used ID, a line over 120 characters, a full box, a part that is
+  not there. A new screen or a revise waits for a running filing at most 5 s (`fileWaitMs`) before
+  its model calls, after its `meta` event.
+- `POST /api/revise {key, change?, model?, device?}`: one new version of a picked screen or a
+  component (a component takes `change` only, else 400), streamed
   like `/api/screen` with one side (`meta.variants` 1, then `chunk`*, `version`, `done`). With
   `change` (1-1,000 characters) it is an Edit: the model gets the newest version's HTML and the
   change, and the version stores it as `feedback`. Without it, a Regenerate from the screen's own
@@ -66,7 +77,9 @@ can spend model credits.
   devices). 400 on a bad `change`, model or device, 404 for an unknown screen, 409 while its A OR B
   is open; `error` if the model fails or the screen was deleted meanwhile.
 - `POST /api/undo {key}`: drop the newest version; `{entry}`, or 404 when one or none is left.
-- `GET /api/map?app=…`: `{root, entries: CacheEntry[]}` for one mockup, oldest first. Levels, the
+- `GET /api/map?app=…[&wait=1]`: `{root, entries: CacheEntry[], boxes: Boxes, filing}` for one
+  mockup, oldest first, components included; with `wait=1` once its running filing has finished (at
+  most a minute). Levels, the
   tree and planned screens are not stored: `screenTree` and `plannedScreens` in `core/src/tree.ts`
   work them out (server and browser).
 - `GET /api/apps`: `{apps: {app, screens, updatedAt}[]}`, every mockup once as first typed,
@@ -76,7 +89,14 @@ can spend model credits.
   too; a screen whose first click came from a screen that is gone takes the screen that reaches it
   now as its parent. Deleting the first screen deletes the mockup. `{removed, root, entries}`: the
   keys removed and the whole mockup as `/api/map` sends it; 404 if unknown.
-- `POST /api/delete-app {app}`: delete every screen of a mockup; `{removed}`.
+- `POST /api/delete-app {app}`: delete every screen, component and box of a mockup; `{removed}`, the
+  number of screens.
+- `POST /api/box {app, op, box, id?, text?, columns?, rows?}`: the user's box edits. `op` `add`,
+  `set` or `delete` on `box` `rules` (`text`) or `data` (`columns`, `rows`); a new entry's ID comes
+  from `text` (the sentence, or the table's name). `op: 'seen', box` (also `components`) clears the
+  new marks. The whole mockup as `/api/map` sends it; 400 with `{error}` for a refused edit, 404 for
+  a mockup with no first screen. A component is deleted with `/api/delete`, changed with
+  `/api/revise`, undone with `/api/undo`.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
   `pico.css` followed by `mockup.css`.
@@ -112,6 +132,13 @@ CacheEntry { key; app; action: string | null; name?: string; parent: { key; labe
              // proposals; it is never stored.
              // The last version shows; versions is empty and proposals holds the two sides of
              // the open A OR B (null until a side finishes) until a pick
+             // A component has kind: 'component', its ID as name, where it belongs as action,
+             // the screen it was taken from as parent, and by, at, seen (as Mark); its key is
+             // normalize(app) + ' » #' + ID. It is in no tree; its links count where it is pasted.
+Mark       { by: 'filing' | 'user'; at; seen }   // who last wrote an entry, when, and whether its box was looked at since
+Boxes      { rules: (Mark & { id; text })[]; data: (Mark & { id; columns: string[]; rows: string[][] })[];
+             gone: { components, rules, data: string[] }   // IDs used and deleted, never used again
+             filed?: { at; screen; ms; costUsd; added; changed; refused; error? } }   // the last filing
 Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
              costEstimated; firstChunkMs; totalMs; finishReason; device?: Device;
              name?; idea?; feedback? }
@@ -120,7 +147,8 @@ Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | nul
              // cut, and a reply that held the screen twice keeps its first copy
 TreeNode   { level; parent: key | null; label }
              // from screenTree: level 1 is the first screen, the fewest clicks from it otherwise
-ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast'
+ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast' | 'gpt-6.1-terra'
+           // Terra is the background model (filing): never a screen model, never in /api/config
 Device     'phone' (390 × 844 px) | 'desktop' (1024 × 768 px): every screen is that wide and at
            least that tall
 key        normalize(app), normalize(app) + ' » @' + name for a screen opened by name, or
@@ -135,10 +163,10 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 | Var | Use |
 |---|---|
 | `OPENROUTER_API_KEY` | Claude Haiku 5.5 |
-| `OPENAI_API_KEY` | GPT-6 Luna, GPT-6.1 Sol |
+| `OPENAI_API_KEY` | GPT-6 Luna, GPT-6.1 Sol, GPT-6.1 Terra (filing) |
 | `PORT` | server port, default 3000 |
 | `UXWOZ_HOST` | listen address, default `127.0.0.1` |
-| `UXWOZ_CACHE_FILE` | screen cache `{version: 4, entries}`, default `temp/screen-cache.json` |
+| `UXWOZ_CACHE_FILE` | screen cache `{version: 5, entries, boxes}`, default `temp/screen-cache.json` |
 | `UXWOZ_RECORD` | `1` makes tests call the live APIs and rewrite `cassettes/` |
 
 ## Tests
@@ -146,4 +174,4 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 `bun test` runs `src/tests/*.test.ts`. Model calls go through `tests/cassette.ts`, which replays
 `cassettes/<test file name>.json` keyed by a hash of URL and request body; `tests/no-network.ts` makes any
 other non-localhost call throw. A test file that calls models has a cassette of the same name;
-`cut-off.test.ts` and `races.test.ts` use a fake provider instead.
+`cut-off.test.ts`, `races.test.ts` and `boxes.test.ts` use a fake provider instead.
