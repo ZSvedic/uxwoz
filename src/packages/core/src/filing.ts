@@ -1,7 +1,6 @@
-// Filing: after a pick or an Edit, the filing model reads the paper and the decision, and replies in
-// plain lines (the format at the end of the system prompt). Code applies the lines to the boxes and
-// refuses, with a reason in the log, any line that breaks the manual's limits. A new component takes
-// the outer HTML of the part the line names, and the screen pastes it in that part's place.
+// Filing: after a pick or an Edit, the background model reads the paper and the decision and replies
+// in plain lines; code applies them to the boxes and refuses, with a reason, any line that breaks
+// the manual's limits. A new component takes the part's HTML, and the screen pastes it there.
 
 import { refuseLine, type Boxes, type ScreenCache, type Version } from './cache.ts'
 import { LIMITS, normalizePrompt } from './keys.ts'
@@ -121,12 +120,10 @@ export function applyFiling(cache: ScreenCache, app: string, key: string, filedH
   return out
 }
 
-/** One filing run, as the boxes show the last one. */
 export type FilingRun = NonNullable<Boxes['filed']>
 
 export interface FileOptions {
   cache: ScreenCache
-  /** The screen decided on: picked, or changed by an Edit. */
   key: string
   decision: { other: string } | { change: string }
   fetch?: Fetch

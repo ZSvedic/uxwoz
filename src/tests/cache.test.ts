@@ -201,6 +201,9 @@ describe('screen cache', () => {
       const saved = JSON.parse(readFileSync(file, 'utf8'))
       expect(Object.keys(saved)).toEqual(['version', 'entries', 'boxes'])
     }
+    // An old screen with no name yet goes; a first screen with none is home.
+    writeFileSync(file, JSON.stringify({ version: 4, entries: [{ ...entry, name: undefined }, { key: 'cafe » cart', app: 'Cafe', action: 'Cart', parent: null, versions: [], proposals: [null, null] }] }))
+    expect(new ScreenCache(file).map('Cafe').entries.map((e) => [e.key, e.name])).toEqual([['cafe', 'home']])
   })
 
   test('a cache file survives a restart, open A OR B included', () => {

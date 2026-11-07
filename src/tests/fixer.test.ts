@@ -51,17 +51,28 @@ describe('a visit\'s reply', () => {
     expect(rules(cache)).toContain('calm')
   })
 
-  test('remove, add a rule, take a component from a screen it read, redraw at most 5 screens and none with an open A OR B', () => {
+  test('remove, add a rule, take a component from a screen it read, redraw at most 5 screens, each once and none with an open A OR B', () => {
     const { cache, home, visit } = paper()
     cache.propose('Snore', '@nights: all nights', 0, ver('<h1>n</h1>'), { key: home.key, label: 'Nights' })
+    const more = Array.from({ length: MAX_REDRAWS }, (_, i) => cache.pick(cache.propose('Snore', `@s${i}: screen ${i}`, 0, ver('<h1>s</h1>'), { key: home.key, label: 'S' })!.key, 0)!.name)
     const out = visit(['remove devices', 'add rule score-direction: A higher score is worse.', 'add component tab-bar from home part 2: every main screen',
-      'add component nope from nights part 1: x', 'redraw nights: x', ...Array.from({ length: MAX_REDRAWS + 1 }, (_, i) => `redraw home: change ${i}`)].join('\n'))
+      'add component nope from nights part 1: x', 'redraw nights: x', 'redraw home: x', 'redraw home: again', ...more.map((n) => `redraw ${n}: x`)].join('\n'))
     expect(out.changes.map((c) => c.text)).toEqual(['removed devices', 'added rule score-direction: A higher score is worse.', 'added component tab-bar from home',
-      ...Array.from({ length: MAX_REDRAWS }, (_, i) => `redrew home: change ${i}`)])
-    expect(out.refused.map((r) => r.split('": ')[1])).toEqual(['the visit did not read a screen nights', 'nights is waiting for a pick', 'a visit redraws at most 5 screens'])
+      'redrawing home: x', ...more.slice(0, MAX_REDRAWS - 1).map((n) => `redrawing ${n}: x`)])
+    expect(out.refused.map((r) => r.split('": ')[1])).toEqual(['the visit did not read a screen nights', 'nights is waiting for a pick', 'home is redrawn once a visit', 'a visit redraws at most 5 screens'])
     expect(cache.component('Snore', 'tab-bar')).toMatchObject({ by: 'fixer', seen: false, parent: { key: home.key }, versions: [{ html: '<nav><a data-action="@history: every night">History</a></nav>' }] })
     expect(cache.boxesOf('Snore').rules.at(-1)).toMatchObject({ id: 'score-direction', by: 'fixer' })
-    expect(out.redraws.map((r) => [r.key, r.sentence])[0]).toEqual([home.key, 'change 0'])
+    expect(out.redraws.map((r) => [r.key, r.sentence])[0]).toEqual([home.key, 'x'])
+  })
+
+  test('a component that goes, merged or removed, leaves its HTML in the screens that paste it', () => {
+    const { cache, history, visit } = paper()
+    cache.addVersion(history.key, ver('<h1>History</h1><div data-component="back"></div>'))
+    cache.addComponent('Snore', 'go-back', 'every screen', ver('<a data-action="back">Back</a>'), 'filing')
+    expect(visit('merge go-back into back').changes.map((c) => c.text)).toEqual(['merged go-back into back'])
+    expect(cache.get(history.key)!.versions.at(-1)!.html).toBe('<h1>History</h1><div data-component="back"></div>')
+    visit('remove back')
+    expect(cache.get(history.key)!.versions.at(-1)!.html).toBe('<h1>History</h1><a data-action="back">‹ Back</a>')
   })
 })
 
@@ -82,6 +93,20 @@ describe('the Undo of each change', () => {
     expect(cache.get(home.key)!.versions.map((v) => v.html)).toEqual([HOME])
     // A merged entry back in its box can be merged again.
     expect(visit('merge score-range into score-scale').changes).toHaveLength(1)
+    // A component put back keeps its place, so it is still the older one in a merge.
+    cache.addComponent('Snore', 'back-2', 'x', ver('<a>b</a>'), 'filing')
+    expect(visit('merge back-2 into back').changes.map((c) => c.text)).toEqual(['merged back-2 into back'])
+  })
+
+  test('an added rule the user rewrote since is not undone; a version the user already undid counts as undone', () => {
+    const { cache, home, visit } = paper()
+    const out = visit('add rule big: Text is big.')
+    cache.setBox('Snore', 'set', 'rules', { id: 'big', text: 'Text is huge.' }, 'user')
+    cache.noteVisit('Snore', { at: 'v', ms: 1, costUsd: 0, screens: 1, refused: [], seen: false,
+      changes: [...out.changes, { text: 'redrew home: x', undo: { key: home.key, createdAt: 'gone' } }] })
+    expect(cache.undoChange('Snore', 'v', 0)).toBe('you changed big since')
+    expect(cache.undoChange('Snore', 'v', 1)).toBeNull()
+    expect(cache.boxesOf('Snore').visits![0]!.changes[1]!.undone).toBe(true)
   })
 
   test('a redraw\'s version is dropped even when the user changed the screen after it; never the last one', () => {
@@ -177,15 +202,40 @@ describe('the visit in the server', () => {
     })
   })
 
-  test('a visit whose reply comes after a delete in the mockup, or after Start over, is dropped', () => {
-    return withServer('add rule big: Text is big.', async ({ post, map, p }) => {
+  test('a screen deleted meanwhile keeps the visit, and a line about it is refused; after Start over the visit is dropped', () => {
+    return withServer('add rule big: Text is big.\nredraw s1: x', async ({ post, map, p }) => {
       await picks(post, 2)
       await map(true)
       await post('/api/visit', { app: 'Snore' })
       await post('/api/delete', { key: 'snore » @s1' })
       p.open()
+      expect((await map(true)).boxes.visits[0]).toMatchObject({ changes: [{ text: 'added rule big: Text is big.' }], refused: ['"redraw s1: x": no screen s1'] })
+    }).then(() => withServer('add rule big: Text is big.', async ({ post, map, p }) => {
+      await picks(post, 2)
+      await map(true)
+      await post('/api/visit', { app: 'Snore' })
+      await post('/api/delete-app', { app: 'Snore' })
+      await picks(post, 1)
+      p.open()
       expect((await map(true)).boxes).toMatchObject({ rules: [] })
       expect((await map()).boxes.visits).toBeUndefined()
+    }))
+  })
+
+  test('a redraw of a screen the user changed during the visit is skipped; a failed visit leaves its screens to the next one', () => {
+    return withServer('redraw home: add a Back', async ({ post, map, p, cache }) => {
+      await picks(post, 2)
+      await map(true)
+      await post('/api/visit', { app: 'Snore' })
+      cache.addVersion('snore', ver('<h1>mine</h1>', new Date(Date.now() + 1000).toISOString()))
+      p.open()
+      const m = await map(true)
+      expect(m.boxes.visits[0].changes).toEqual([{ text: 'did not redraw home: it changed during the visit' }])
+      expect(m.entries[0].versions.at(-1).html).toBe('<h1>mine</h1>')
+      // A failed visit does not count as the last one: the next reads the same screens again.
+      cache.noteVisit('Snore', { at: new Date(Date.now() + 5000).toISOString(), ms: 1, costUsd: null, screens: 0, changes: [], refused: [], error: 'cut off', seen: false })
+      await post('/api/visit', { app: 'Snore' })
+      expect((await map(true)).boxes.visits.at(-1).screens).toBe(1)
     })
   })
 })

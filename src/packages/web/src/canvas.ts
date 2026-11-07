@@ -4,6 +4,7 @@
 // Names and rails keep their size on screen at any zoom. Left of the tree: the boxes column (boxes.ts).
 
 import { DEFAULT_DEVICE, DEVICES, FRAME_SANDBOX, framePage, type Device } from '@uxwoz/core/frame'
+import { el } from './boxes.ts'
 
 /** Bounds on a reported height, so a broken screen cannot make a huge frame; components may be shorter. */
 const MIN_SCREEN_H = 160
@@ -659,13 +660,6 @@ export class Canvas {
       this.on.action(c.key, d.prompt.slice(0, 500), typeof d.label === 'string' ? d.label.slice(0, 80) : '')
     }
   }
-}
-
-function el(tag: string, cls: string, text?: string): HTMLElement {
-  const e = document.createElement(tag)
-  if (cls) e.className = cls
-  if (text != null) e.textContent = text
-  return e
 }
 
 function svgEl(tag: string, attrs: Record<string, string>): SVGElement {

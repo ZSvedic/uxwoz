@@ -73,11 +73,14 @@ can spend model credits.
   the same chain, so filing and the fixer never change the boxes at once. Terra reads the paper and
   the screens whose newest version is newer than the last visit, parts numbered. Its lines are
   applied with refusals in `visits[].refused`: no such entry, an entry `by: 'user'`, two IDs of
-  different boxes, a used ID, a part not there, more than 5 redraws (`MAX_REDRAWS`), a screen with
-  an open A OR B. A merge removes the newer entry of the two. The reply is dropped when a screen,
-  component or the mockup was deleted, or a newer visit asked for, after the visit began. Redraws
-  then run at once, as `/api/revise` Edits on the screen's own model that start no filing; their
-  versions have `by: 'fixer'`. Start over and deleting the mockup stop them.
+  different boxes, a used ID, a part not there, a second redraw of one screen, more than 5
+  redraws (`MAX_REDRAWS`, a cost limit), a screen with an open A OR B. A merge removes the newer
+  entry of the two; a component removed this way leaves its HTML in place (`removeComponent`). The
+  reply is dropped when the mockup was deleted or started over after the visit began. Redraws then
+  run at once, as `/api/revise` Edits on the screen's own model that start no filing, skipping a
+  screen with a version newer than the visit; their versions have `by: 'fixer'`. Start over and
+  deleting the mockup stop them. The next visit reads what changed since the last visit that did
+  not fail. The map's `filing` counts filings only, so a visit in the chain is `visiting`.
 - `POST /api/visit {app}`: a visit now, unless one runs; the mockup as `/api/map` sends it, with
   `visiting: true`; 404 for a mockup with no picked first screen.
 - `POST /api/revise {key, change?, model?, device?}`: one new version of a picked screen or a

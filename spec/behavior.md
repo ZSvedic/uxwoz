@@ -195,7 +195,8 @@ the last filing did, with its time and cost; hovering it lists any line filing's
   shows at once on every screen that pastes it, and a deleted one leaves nothing in its place. The
   rail has ✎ Edit, ↶ Undo, ⓘ Info (where it belongs, the screens that paste it, the screen it was
   taken from) and ✕ Delete.
-- **Rules**: one line each, the ID and one sentence. Click the sentence to change it; Enter or a
+- **Rules**: one line each, the ID and one sentence; an entry the user wrote is marked *yours*, in
+  Data too. Click the sentence to change it; Enter or a
   click elsewhere saves, Esc puts it back, an empty sentence deletes it. **+ Rule** asks for a
   sentence and makes its ID from its first words.
 - **Data**: small tables, each with an ID, named columns and rows. Click a cell to change it; a row
@@ -217,12 +218,17 @@ the last filing did, with its time and cost; hovering it lists any line filing's
   needs, adds a rule or a component filing missed, and redraws at most 5 screens that break a
   rule, draw a component by hand or have a control that leads nowhere. A redraw is an Edit with the
   fixer's sentence as the change: a new version, no filing. An entry the user wrote is never
-  changed or removed, and a screen whose A OR B is open is not redrawn. A visit whose reply comes
-  after a delete in the mockup, Start over or a newer visit is dropped.
+  changed or removed, a screen whose A OR B is open is not redrawn, and a component that goes
+  leaves its HTML in the screens that paste it, so they look the same. A visit whose reply comes
+  after Start over or the mockup's delete is dropped; a line about a screen or entry deleted
+  meanwhile is refused, and a screen the user changed during the visit is not redrawn. A pick that
+  comes while a visit runs brings none: the next visit reads its screen. At most 5 redraws a visit
+  keeps a visit's cost to about a cent.
 - **A note per visit**, newest first: when, how many screens it read, each change on its line with
   the fixer's reason and an **Undo**, the lines code refused and why, time and cost (the redraws
-  included). Undo of a merge or a remove puts the entry back with its ID, of an added entry deletes
-  it, of a redraw drops that version. An undone change is struck through. The button says
+  included). Undo of a merge or a remove puts the entry back with its ID and place, of an added
+  entry deletes it (unless the user rewrote it since), of a redraw drops that version. An undone
+  change is struck through. A redraw reads *redrawing* until its version is stored. The button says
   *Visiting…* while a visit runs. An old mockup with empty boxes gets them filled this way.
 
 ## Navigation
@@ -230,8 +236,8 @@ the last filing did, with its time and cost; hovering it lists any line filing's
 Each control that opens another screen carries the ID of that screen (its name) and, for a new
 screen, its one line, written by the model (`data-action="@sleep-report: Sleep report of last
 night with…"`), and is blue; clicking a new one asks for that screen, drawn from the paper. A
-link without a name (`<a href>`, or an action with no `@`) leads nowhere, and the fixer redraws
-it. Other controls (filters, inputs) work inside the screen. Only a real click opens a screen.
+link without a name (`<a href>`, or an action with no `@`) leads nowhere: a click says *This
+control leads nowhere yet*, and the fixer redraws it. Other controls (filters, inputs) work inside the screen. Only a real click opens a screen.
 
 - **The name says which screen**: every link to one screen uses one name, so a screen is made
   once however many buttons lead to it, and however they word its prompt. The first screen is

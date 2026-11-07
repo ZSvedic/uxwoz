@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { LIMITS, canonicalAction, isId, nameWords, normalizePrompt, screenKey, screenRef } from './keys.ts'
-import type { Device } from './frame.ts'
+import { pasteComponents, type Device } from './frame.ts'
 import { HOME_NAME, isComponent, nameFrom, screenList, screenTree, uniqueName } from './tree.ts'
 import type { ModelId } from './models.ts'
 import type { Paper } from './prompt.ts'
@@ -108,7 +108,8 @@ export class ScreenCache {
         return
       }
       if (!(data?.version >= 3)) throw new Error('it is from before names')
-      for (const e of data.entries as CacheEntry[]) this.entries.set(e.key, e)
+      // A screen from before names with no name yet (an old A OR B) goes; the first screen is home.
+      for (const e of data.entries as CacheEntry[]) if (e.name || e.key === normalizePrompt(e.app)) this.entries.set(e.key, { name: HOME_NAME, ...e })
       for (const [root, b] of Object.entries(data.boxes ?? {})) this.boxes.set(root, b as Boxes)
     } catch (err) {
       this.entries.clear()
@@ -135,11 +136,6 @@ export class ScreenCache {
   /** True when `key` was deleted after `since` (a value of now()), even if it did not exist then. */
   removedSince(key: string, since: number): boolean {
     return (this.removed.get(key) ?? -1) > since
-  }
-
-  /** True when the mockup, or any screen or component of it, was deleted after `since`. */
-  removedIn(root: string, since: number): boolean {
-    return [...this.removed].some(([k, t]) => t > since && (k === root || k.startsWith(`${root} » `)))
   }
 
   private tomb(key: string) {
@@ -217,19 +213,32 @@ export class ScreenCache {
       // A merge or a remove: the entry comes back where it was, with its ID.
       const id = 'id' in u.entry ? u.entry.id : u.entry.name!
       if (this.ids(app, u.put).length >= LIMITS[u.put]) return `${u.put} is full (${LIMITS[u.put]})`
-      if (u.put === 'components') this.entries.set((u.entry as CacheEntry).key, u.entry as CacheEntry)
-      else (b[u.put] as (Rule | Table)[]).splice(u.index, 0, u.entry as Rule & Table)
+      if (u.put === 'components') {
+        const all = [...this.entries.values()], at = all.indexOf(all.filter(isComponent)[u.index]!)
+        all.splice(at < 0 ? all.length : at, 0, u.entry as CacheEntry)
+        this.entries = new Map(all.map((e) => [e.key, e]))
+      } else (b[u.put] as (Rule | Table)[]).splice(u.index, 0, u.entry as Rule & Table)
       b.gone[u.put] = b.gone[u.put].filter((x) => x !== id)
     } else if ('drop' in u) {
-      const why = u.drop === 'components' ? (this.delete(componentKey(app, u.id)) ? null : `components has no ${u.id}`) : this.setBox(app, 'delete', u.drop as 'rules', { id: u.id }, 'user')
+      if ((u.drop === 'components' ? this.component(app, u.id) : b.rules.find((r) => r.id === u.id))?.by === 'user') return `you changed ${u.id} since`
+      const why = u.drop === 'components' ? this.removeComponent(app, u.id) : this.setBox(app, 'delete', u.drop as 'rules', { id: u.id }, 'user')
       if (why) return why
     } else {
       const e = this.entries.get(u.key), n = e?.versions.findIndex((v) => v.createdAt === u.createdAt) ?? -1
-      if (!e || n < 0 || e.versions.length < 2) return 'that version is gone'
-      e.versions.splice(n, 1)
+      // A version the user already undid counts as undone.
+      if (e && n >= 0 && e.versions.length > 1) e.versions.splice(n, 1)
     }
     c.undone = true
     this.save()
+    return null
+  }
+
+  /** Remove a component and leave its HTML in each entry that pastes it, so they look the same. Returns why not, or null. */
+  removeComponent(app: string, id: string): string | null {
+    const c = this.component(app, id), html = c?.versions.at(-1)?.html
+    if (!c) return `components has no ${id}`
+    for (const e of this.mockup(normalizePrompt(app))) { const v = e.versions.at(-1); if (v && html != null) v.html = pasteComponents(v.html, { [id]: html }, 1) }
+    this.delete(c.key)
     return null
   }
 

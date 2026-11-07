@@ -11,7 +11,7 @@ export type BoxOp = { op: 'add' | 'set' | 'delete'; box: 'rules' | 'data'; id?: 
 /** A box of the column: the three the models read, and the fixer's notes. */
 export type Box = BoxName | 'notes'
 
-const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text?: string) => {
+export const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text?: string) => {
   const e = document.createElement(tag)
   if (cls) e.className = cls
   if (text != null) e.textContent = text
@@ -110,7 +110,7 @@ export function renderSide(side: Side, v: SideView, op: (o: BoxOp) => void) {
     const li = el('div', `rule${r.seen ? '' : ' fresh'}`)
     const text = el('span', 'rule-text', r.text)
     editable(text, (t) => op(t ? { op: 'set', box: 'rules', id: r.id, text: t } : { op: 'delete', box: 'rules', id: r.id }))
-    li.append(el('b', '', `${r.id}:`), ' ', text, button('✕', `Delete rule ${r.id}`, () => op({ op: 'delete', box: 'rules', id: r.id })))
+    li.append(el('b', '', `${r.id}:`), ' ', text, yours(r), button('✕', `Delete rule ${r.id}`, () => op({ op: 'delete', box: 'rules', id: r.id })))
     return li
   }))
   const data = side.sections.data.querySelector<HTMLElement>('.box-body')!
@@ -134,11 +134,14 @@ export function renderSide(side: Side, v: SideView, op: (o: BoxOp) => void) {
   }))
 }
 
+/** An entry the user wrote is marked: filing and the fixer leave it alone. */
+const yours = (x: { by: string }) => el('small', 'yours', x.by === 'user' ? ' yours' : '')
+
 function tableView(t: Table, op: (o: BoxOp) => void): HTMLElement {
   const wrap = el('div', `data-table${t.seen ? '' : ' fresh'}`)
   const set = (columns: string[], rows: string[][]) => op({ op: 'set', box: 'data', id: t.id, columns, rows })
   const head = el('div', 'table-head')
-  head.append(el('b', '', t.id),
+  head.append(el('b', '', t.id), yours(t),
     button('+ row', 'Add a row', () => set(t.columns, [...t.rows, t.columns.map(() => '')])),
     button('+ column', 'Add a column', () => set([...t.columns, `column ${t.columns.length + 1}`], t.rows.map((r) => [...r, '']))),
     button('✕', `Delete table ${t.id}`, () => op({ op: 'delete', box: 'data', id: t.id })))

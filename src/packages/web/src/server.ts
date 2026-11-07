@@ -110,6 +110,9 @@ export function createServer(opts: ServerOptions = {}) {
 
   /** The background job running for each mockup, by root key: filings and the fixer's visits run one after another. */
   const filings = new Map<string, Promise<unknown>>()
+  /** How many filings each mockup has in its chain, for the line above the boxes. */
+  const filingCount = new Map<string, number>()
+  const count = (root: string, n: number) => filingCount.set(root, (filingCount.get(root) ?? 0) + n)
 
   /** Run a job in the mockup's chain, after the jobs before it. */
   function chain<T>(root: string, job: () => Promise<T>): Promise<T> {
@@ -123,34 +126,40 @@ export function createServer(opts: ServerOptions = {}) {
     const e = cache.get(key)
     if (!e || isComponent(e)) return false
     const root = normalizePrompt(e.app), t0 = performance.now(), since = cache.now()
+    count(root, 1)
     chain(root, () => fileDecision({ cache, key, decision, fetch: opts.fetch, env: opts.env, log }))
       .then((run) => run && log(`filed ${run.screen} in ${(run.ms / 1000).toFixed(1)} s for $${run.costUsd?.toFixed(4)}: added ${run.added.join(', ') || 'nothing'}, changed ${run.changed.join(', ') || 'nothing'}, refused ${run.refused.length}`))
       .catch((err) => {
         log(`filing failed: ${message(err)}`)
         if (cache.get(root) && !cache.removedSince(root, since)) cache.noteFiling(e.app, { at: new Date().toISOString(), screen: e.name ?? HOME_NAME, ms: Math.round(performance.now() - t0), costUsd: null, added: [], changed: [], refused: [], error: message(err) })
       })
+      .finally(() => count(root, -1))
     return true
   }
 
-  /** Per mockup: the visit running (with its redraws), the newest visit asked for, and how to stop its redraws. */
-  const visits = new Map<string, Promise<unknown>>(), newest = new Map<string, number>(), stops = new Map<string, AbortController>()
+  /** Per mockup: the visit running (with its redraws), and how to stop its redraws. */
+  const visits = new Map<string, Promise<unknown>>(), stops = new Map<string, AbortController>()
 
-  /** A visit of the fixer in the mockup's chain; dropped after a delete or a newer visit. Its redraws are Edits that file nothing. */
+  /**
+   * A visit of the fixer in the mockup's chain, dropped when the mockup goes meanwhile. Its redraws are
+   * Edits that file nothing, skipped for a screen changed since the visit began. A pick that comes
+   * while a visit runs brings none: the next visit reads its screen.
+   */
   function visit(app: string): boolean {
     const root = normalizePrompt(app)
     if (!cache.get(root)?.versions.length || visits.has(root)) return false
-    const id = (newest.get(root) ?? 0) + 1, since = cache.now(), t0 = performance.now(), stop = new AbortController()
-    newest.set(root, id)
+    const since = cache.now(), t0 = performance.now(), stop = new AbortController()
     stops.set(root, stop)
-    const p = chain(root, () => visitPaper({ cache, app, fetch: opts.fetch, env: opts.env, log }, () => newest.get(root) !== id || cache.removedIn(root, since)))
+    const p = chain(root, () => visitPaper({ cache, app, fetch: opts.fetch, env: opts.env, log }, () => cache.removedSince(root, since)))
       .then(async (r) => {
         if (!r) return log('visit dropped: the mockup changed meanwhile')
         let cost = r.visit.costUsd ?? 0
         await Promise.all(r.redraws.map(async (d) => {
           const e = cache.get(d.key), v = e?.versions.at(-1)
           if (!e || !v) return
+          if (v.createdAt > r.visit.at) return void (d.change.text = `did not redraw ${e.name}: it changed during the visit`)
           for await (const ev of reviseEvents(e, d.sentence, isModelId(v.model) ? v.model : DEFAULT_MODEL, v.device ?? DEFAULT_DEVICE, stop.signal, true)) {
-            if (ev.type === 'version') { d.change.undo = { key: d.key, createdAt: ev.version.createdAt }; cost += ev.version.costUsd ?? 0 }
+            if (ev.type === 'version') Object.assign(d.change, { text: d.change.text.replace('redrawing', 'redrew'), undo: { key: d.key, createdAt: ev.version.createdAt } }), cost += ev.version.costUsd ?? 0
             if (ev.type === 'error') d.change.text = `could not redraw ${e.name}: ${ev.message}`
           }
         }))
@@ -160,9 +169,9 @@ export function createServer(opts: ServerOptions = {}) {
       })
       .catch((err) => {
         log(`visit failed: ${message(err)}`)
-        if (cache.get(root) && !cache.removedIn(root, since)) cache.noteVisit(app, { at: new Date().toISOString(), ms: Math.round(performance.now() - t0), costUsd: null, screens: 0, changes: [], refused: [], error: message(err), seen: false })
+        if (cache.get(root) && !cache.removedSince(root, since)) cache.noteVisit(app, { at: new Date().toISOString(), ms: Math.round(performance.now() - t0), costUsd: null, screens: 0, changes: [], refused: [], error: message(err), seen: false })
       })
-      .finally(() => { if (visits.get(root) === p) visits.delete(root) })
+      .finally(() => { if (visits.get(root) === p) visits.delete(root); if (stops.get(root) === stop) stops.delete(root) })
     visits.set(root, p)
     return true
   }
@@ -170,7 +179,7 @@ export function createServer(opts: ServerOptions = {}) {
   const filed = (app: string, ms: number) => Promise.race([filings.get(normalizePrompt(app)), Bun.sleep(ms)])
 
   /** One mockup as every reply that carries it sends it: screens, components, boxes, and whether filing or a visit runs. */
-  const mapOf = (app: string) => ({ ...cache.map(app), filing: filings.has(normalizePrompt(app)), visiting: visits.has(normalizePrompt(app)) })
+  const mapOf = (app: string) => ({ ...cache.map(app), filing: !!filingCount.get(normalizePrompt(app)), visiting: visits.has(normalizePrompt(app)) })
 
   /** A deleted mockup's filing is not waited for (its result is dropped anyway), and its visit's redraws stop. */
   const forget = (app: string) => {

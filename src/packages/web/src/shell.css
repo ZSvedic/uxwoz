@@ -197,7 +197,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 /* The fixer's notes: a visit per entry, each change with its note and Undo. */
 .visit { margin: 0 0 12px; font-size: 14px; }
 .visit ul { margin: 4px 0 0; padding-left: 20px; }
-.visit small, .visit .refused { color: var(--muted); }
+.visit small, .visit .refused, .yours { color: var(--muted); }
 .visit .undone { text-decoration: line-through; color: var(--muted); }
 .fresh > b:first-child::after, .card.fresh .name::after { content: " new"; color: var(--accent); font-size: 12px; font-weight: 600; }
 .box-components .box-body { display: flex; flex-direction: column; }

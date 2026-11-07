@@ -1,7 +1,6 @@
-// The fixer: every few picks, the background model reads the boxes, the titles and the screens added
-// or changed since its last visit, and replies in plain lines (the format at the end of the system
-// prompt). Code applies them with refusals, like filing's, and keeps a note of the visit with a way
-// to undo each change. A redraw is an Edit, which the server runs after the visit.
+// The fixer's visit: the background model reads the paper and the screens new since its last visit
+// and replies in plain lines; code applies them with refusals and keeps how to undo each change.
+// The server runs the redraws, as Edits.
 
 import type { BoxName, CacheEntry, Change, Rule, ScreenCache, Table, Visit } from './cache.ts'
 import { refuseLine } from './cache.ts'
@@ -36,13 +35,10 @@ export function parseVisit(reply: string): VisitLine[] {
   })
 }
 
-/** What applying a visit leaves for the server: the redraws to run, by screen key, with the fixer's sentence. */
+/** What applying a visit leaves for the server: the redraws to run. */
 export interface Applied { changes: Change[]; refused: string[]; redraws: { key: string; sentence: string; change: Change }[] }
 
-/**
- * Apply a visit's reply to the boxes of `app`. `sent` holds the numbered HTML of each screen the
- * visit read, by ID. An entry the user wrote is never removed; a merge keeps the older entry.
- */
+/** Apply a visit's reply to the boxes of `app`; `sent` holds the numbered HTML of each screen it read, by ID. */
 export function applyVisit(cache: ScreenCache, app: string, reply: string, sent: Map<string, string>): Applied {
   const out: Applied = { changes: [], refused: [], redraws: [] }
   const refuse = (line: string, why: string) => out.refused.push(`"${line}": ${why}`)
@@ -64,7 +60,7 @@ export function applyVisit(cache: ScreenCache, app: string, reply: string, sent:
     if (!f) return refuse(line, `no entry ${id}`)
     if (f.entry.by === 'user') return refuse(line, `${id} was written by the user`)
     const entry = structuredClone(f.entry)
-    if (f.box === 'components') cache.delete((f.entry as CacheEntry).key)
+    if (f.box === 'components') cache.removeComponent(app, id)
     else cache.setBox(app, 'delete', f.box, { id }, 'fixer')
     did({ text, undo: { put: f.box, entry, index: f.index } })
   }
@@ -90,9 +86,9 @@ export function applyVisit(cache: ScreenCache, app: string, reply: string, sent:
       if (typeof e === 'string') refuse(l.line, e); else did({ text: `added component ${l.a} from ${l.b}`, undo: { drop: 'components', id: l.a } })
     } else {
       const s = screens.get(l.a)
-      const why = !s ? `no screen ${l.a}` : !s.versions.length ? `${l.a} is waiting for a pick` : out.redraws.length >= MAX_REDRAWS ? `a visit redraws at most ${MAX_REDRAWS} screens` : refuseLine(l.text)
+      const why = !s ? `no screen ${l.a}` : !s.versions.length ? `${l.a} is waiting for a pick` : out.redraws.some((r) => r.key === s.key) ? `${l.a} is redrawn once a visit` : out.redraws.length >= MAX_REDRAWS ? `a visit redraws at most ${MAX_REDRAWS} screens` : refuseLine(l.text)
       if (why) refuse(l.line, why)
-      else out.redraws.push({ key: s!.key, sentence: l.text, change: did({ text: `redrew ${l.a}: ${l.text}` }) })
+      else out.redraws.push({ key: s!.key, sentence: l.text, change: did({ text: `redrawing ${l.a}: ${l.text}` }) })
     }
   }
   return out
@@ -100,15 +96,11 @@ export function applyVisit(cache: ScreenCache, app: string, reply: string, sent:
 
 export interface VisitOptions { cache: ScreenCache; app: string; fetch?: Fetch; env?: Record<string, string | undefined>; log?: (msg: string) => void }
 
-/**
- * One visit: send the paper and the screens added or changed since the last visit (all of them on the
- * first), apply the reply, keep the note. `dropped()` says, when the reply comes, whether the mockup
- * changed in a way that makes it stale; then nothing is applied and the result is null.
- */
+/** One visit: ask, apply, keep the note. Null when `dropped()` says, as the reply comes, that the mockup went. */
 export async function visitPaper(o: VisitOptions, dropped: () => boolean): Promise<{ visit: Visit; redraws: Applied['redraws'] } | null> {
   const { cache, app } = o
   const all = cache.map(app).entries.filter((e) => !isComponent(e) && e.versions.length)
-  const lastAt = cache.boxesOf(app).visits?.at(-1)?.at ?? ''
+  const lastAt = cache.boxesOf(app).visits?.filter((v) => !v.error).at(-1)?.at ?? ''
   const fresh = all.filter((e) => e.versions.at(-1)!.createdAt > lastAt)
   const sent = new Map(fresh.map((e) => [e.name ?? HOME_NAME, numberParts(e.versions.at(-1)!.html)]))
   const at = new Date().toISOString(), t0 = performance.now()

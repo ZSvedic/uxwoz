@@ -235,9 +235,10 @@ function showError(msg: string | null) {
 $('errorClose').addEventListener('click', () => showError(null))
 
 let hintTimer: ReturnType<typeof setTimeout> | undefined
-/** Briefly say why a click does nothing while a screen is being made. */
-function hint() {
+/** Briefly say why a click does nothing: a screen is being made, or the control leads nowhere. */
+function hint(text = 'One screen at a time: wait until this one is made.') {
   const h = $('hint')
+  h.textContent = text
   h.hidden = false
   clearTimeout(hintTimer)
   hintTimer = setTimeout(() => { h.hidden = true }, 2500)
@@ -436,13 +437,13 @@ function onAction(from: string, action: string, label: string) {
   if (!app) return
   const { to, prompt } = target(app, from, action)
   setCurrent(from)
-  if (to === from) return
+  if (to === from) return void (screenRef(action) || isBack(action) || hint('This control leads nowhere yet: the fixer redraws it.'))
   const there = state.entries.get(to)
   if (there || state.making?.key === to) {
     if (there?.versions.length) { setCurrent(to); canvas.reveal(to) } else fitChoice(to)
     return
   }
-  if (state.busy) return hint()
+  if (state.busy) return void hint()
   openScreen(prompt, from, label)
 }
 
