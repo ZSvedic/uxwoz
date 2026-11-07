@@ -96,7 +96,12 @@ gives the size of the code before and after.
    to 5 s and under half a cent a decision; app code 163 to 215 KB.
 4. **The fixer: done** ([report](../journal/2026-11-07-fixer.md)). A visit takes 9 to 12 s and about a
    cent; on a real NiceSnore it repaired 2 of 5 plants, screens before boxes; app code 214.8 to 219.0 KB.
-5. **Remake** NiceSnore, a dashboard and a game, 15 screens each.
+5. **Remake: done** ([report](../journal/2026-11-07-remakes.md)). Two sentences in the fixer
+   section took a planted NiceSnore from 9 to 23 of 25 repairs and the held-out dashboard to 50 of
+   50. Three remakes of 15 screens: boxes of 5 to 16 entries, components pasted on 54 of 79
+   screens that need them (all misses the late Back), first side in 2.4 to 2.8 s, app code 218.5
+   KB on `main`. The 10-plant visit did not run (no OpenAI credits); the manual's change waits on
+   the branch `paper-fixer-wording` for one `bun run test:record`.
 
 It works when a person reads each remake's boxes in two minutes, a component is pasted on 9 of 10
 screens that need it, a fixer's visit repairs 8 of 10 planted mistakes and changes nothing the
