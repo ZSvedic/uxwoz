@@ -158,7 +158,7 @@ export const dashboard: Paper = {
 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
 <article><small>Revenue</small><h2>$4,480.00</h2><small>▲ 12%</small></article>
 <article><small>Orders</small><h2>52</h2><small>▲ 4%</small></article>
-<article><small>Low stock</small><h2>2</h2><a data-action="@stock">See stock</a></article>
+<article><small>Low stock</small><h2>3</h2><a data-action="@stock">See stock</a></article>
 </div>
 <h3>Latest orders</h3>
 <table><thead><tr><th>Order</th><th>Date</th><th>Total</th><th>Status</th></tr></thead><tbody>
@@ -373,13 +373,13 @@ export const gameCheck: PaperCheck = {
     },
     cargo: {
       // The cargo load, not the cargo hold upgrade or one ore's tons.
-      fits: (_h, t) => /\bcargo\b(?! hold)\W{0,3}(\d|used|full|load)|\d+\s?(t|tons?)\s?(of|\/)\s?\d+/i.test(t),
+      fits: (_h, t) => /(?<!\bin |t )\bcargo\b(?! hold)\W{0,3}(\d|used|full|load)|\d+\s?(t|tons?)\s?(of|\/)\s?\d+/i.test(t),
       broken: (_h, t) => !/\d+\s?\/\s?\d+\s?t\b/.test(t) ? (first(t, /cargo[^.]{0,30}|\d+\s?(t|tons?)\s?(of|\/)\s?\d+/i) ?? 'cargo') : null,
     },
     hull: {
       // The hull's state, not the hull plating upgrade or a hull damage warning.
-      fits: (_h, t) => /\bhull\b(?! plating)\W{0,3}(\d|integrity|health|status|strength)|\d+\s?%?\s?hull\b/i.test(t),
-      broken: (_h, t) => !/hull\W{0,20}\d+\s?%|\d+\s?%\W{0,10}hull/i.test(t) ? (first(t, /hull[^.]{0,30}/i) ?? 'hull') : null,
+      fits: (_h, t) => /\bhull\b(?! plating)\W{0,3}(integrity|health|status|strength)?\W{0,3}\d|\d+\s?%?\s?hull\b/i.test(t),
+      broken: (_h, t) => !/hull[^.%]{0,30}\d+\s?%|\d+\s?%\W{0,10}hull/i.test(t) ? (first(t, /hull[^.]{0,30}/i) ?? 'hull') : null,
     },
   },
   items: {},

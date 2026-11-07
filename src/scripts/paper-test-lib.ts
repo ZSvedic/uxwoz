@@ -25,6 +25,16 @@ const EXTRA: Record<string, ModelConfig> = {
     serviceTier: 'default', reasoning: { effort: 'low' },
     pricePerMTok: { input: 1.0, cachedInput: 0.05, output: 5.0 }, costEstimated: true,
   },
+  // The two cheap models with the same low reasoning effort Terra and Gemini get, for a fair File test.
+  'claude-haiku-5.5-think': {
+    id: 'claude-haiku-5.5-think' as ModelId, label: 'Claude Haiku 5.5 (low reasoning)', provider: 'openrouter', model: 'anthropic/claude-haiku-5.5',
+    providerOrder: ['anthropic'], reasoning: { effort: 'low' }, costEstimated: false,
+  },
+  'gpt-6-luna-low': {
+    id: 'gpt-6-luna-low' as ModelId, label: 'GPT-6 Luna (standard, low reasoning)', provider: 'openai', model: 'gpt-6-luna',
+    serviceTier: 'default', reasoning: { effort: 'low' },
+    pricePerMTok: { input: 0.1, cachedInput: 0.01, output: 0.5 }, costEstimated: true,
+  },
   'gemini-3.8-flash': {
     id: 'gemini-3.8-flash' as ModelId, label: 'Gemini 3.8 Flash', provider: 'openrouter', model: 'google/gemini-3.8-flash',
     reasoning: { effort: 'low' }, costEstimated: false,

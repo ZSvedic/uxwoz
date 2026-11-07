@@ -97,7 +97,7 @@ const PASTE = /<(\w+)\b[^>]*\bdata-component\s*=\s*(["'])([^"']+)\2[^>]*>([\s\S]
 /** What code can see in one variant. Rules marked for reading come back as text to read. */
 export function checkVariant(id: PaperId, target: string, html: string, paper: Paper) {
   const { check } = PAPERS[id]
-  const pastes = [...html.matchAll(PASTE)].map((m) => ({ id: m[3]!, filled: m[4]!.trim().length > 0 }))
+  const pastes = [...html.matchAll(PASTE)].map((m) => ({ id: m[3]! }))
   const bare = html.replace(PASTE, '')
   const text = visibleText(bare)
   const components = paper.components.map((c) => {
@@ -138,7 +138,9 @@ export function checkVariant(id: PaperId, target: string, html: string, paper: P
       else if (!ids.has(t) && !declared.has(t) && !act.includes('${')) nowhere.push(`"${label}" -> @${t} (unknown)`)
       continue
     }
-    if (/\bonclick=|\btype=["']?submit|\bhref=["']?#[a-z]/i.test(attrs)) continue
+    if (/\bonclick=|\btype=["']?submit/i.test(attrs)) continue
+    const hash = attrs.match(/\bhref=["']?#([a-z][\w-]*)/i)?.[1]
+    if (hash && new RegExp(`\\bid=["']?${hash}\\b`).test(bare)) continue
     const elId = attrs.match(/\bid=["']([^"']+)/)?.[1]
     const dataAttr = attrs.match(/\bdata-([a-z-]+)=/)?.[1]
     const reachable = (elId && script.includes(elId)) || (dataAttr && script.includes(dataAttr))
@@ -197,7 +199,7 @@ function check(rounds: string[]) {
     out.push(`\n## ${model}: ${steps.length} calls, ${rows.length} variants, $${cost.toFixed(3)}, median ${(ms[ms.length >> 1]! / 1000).toFixed(1)} s`)
     out.push(`calls with fewer than 2 variants: ${steps.filter((s) => s.variants.length < 2).length}; more than 2: ${steps.filter((s) => s.variants.length > 2).length}; cut off: ${steps.filter((s) => s.call.finish !== 'stop').length}`)
     out.push(`components needed: ${needed.length}; pasted ${pct(needed.filter((c) => c.pasted).length, needed.length)}, redrawn by hand ${needed.filter((c) => !c.pasted && c.redrawn).length}, missing ${needed.filter((c) => c.missing).length}`)
-    out.push(`components pasted and also redrawn: ${comps.filter((c) => c.pasted && c.redrawn).length}; pasted where not needed: ${comps.filter((c) => c.pasted && !c.needed).length}; filled paste elements or unknown IDs: ${rows.filter((r) => r.c.unknownPastes.length).length}`)
+    out.push(`components pasted and also redrawn: ${comps.filter((c) => c.pasted && c.redrawn).length}; pasted where not needed: ${comps.filter((c) => c.pasted && !c.needed).length}; pastes of unknown IDs: ${rows.filter((r) => r.c.unknownPastes.length).length}`)
     for (const cid of [...new Set(comps.map((c) => `${c.r.w.paper}/${c.id}`))]) {
       const n = needed.filter((c) => `${c.r.w.paper}/${c.id}` === cid)
       out.push(`  ${cid}: needed ${n.length}, pasted ${n.filter((c) => c.pasted).length}, redrawn ${n.filter((c) => !c.pasted && c.redrawn).length}, missing ${n.filter((c) => c.missing).length}`)
@@ -207,9 +209,8 @@ function check(rounds: string[]) {
       const n = rules.filter((r) => `${r.r.w.paper}/${r.id}` === rid)
       out.push(`  ${rid}: fits ${n.length}, held ${n.filter((r) => !r.broken).length}${n.some((r) => r.broken) ? `; e.g. ${[...new Set(n.filter((r) => r.broken).map((r) => JSON.stringify(r.broken!.slice(0, 60))))].slice(0, 4).join(', ')}` : ''}`)
     }
-    const dataRows = rows.flatMap((r) => r.c.data.map((d) => ({ ...d, r })))
-    out.push(`data: variants showing a table's rows ${dataRows.filter((d) => d.used.length).length}; with items not in the table (where code can tell) ${dataRows.filter((d) => d.invented.length).length}`)
-    out.push(`controls that lead nowhere: ${rows.filter((r) => r.c.nowhere.length).length} variants, ${rows.reduce((s, r) => s + r.c.nowhere.length, 0)} controls`)
+    out.push(`data: variants showing rows of some table ${rows.filter((r) => r.c.data.some((d) => d.used.length)).length} of ${rows.length}; with items not in the table (where code can tell) ${rows.filter((r) => r.c.data.some((d) => d.invented.length)).length}`)
+    out.push(`controls that lead nowhere: ${rows.filter((r) => r.c.nowhere.length).length} variants, ${rows.reduce((s, r) => s + r.c.nowhere.length, 0)} controls, ${rows.filter((r) => !/<script/i.test(r.s.variants[r.k]!)).reduce((s, r) => s + r.c.nowhere.length, 0)} of them on screens with no script`)
     const lists = rows.flatMap((r) => r.c.lists)
     out.push(`lists with linked rows: ${lists.length}; rows open one screen ${lists.filter((l) => l.targets.length === 1 && !l.perItem).length}; several screens ${lists.filter((l) => l.targets.length > 1 && !l.perItem).length}; one screen per item ${lists.filter((l) => l.perItem).length}`)
     out.push('')

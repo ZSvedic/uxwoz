@@ -16,7 +16,7 @@ user sees, what each model call does and the build order. The rules a designer f
 4. On Settings the user types *use switches*. The Edit redraws Settings, and filing adds
    `on-off-settings: On/off settings are switches.`
 5. After the fifth pick the fixer visits. Its note reads *merged `score-meaning` into
-   `score-direction`; redrew `history` to paste `tab-bar`; 9 s, 2 cents*, with an Undo beside
+   `score-direction`; redrew `history` to paste `tab-bar`; 6 s, under 1 cent*, with an Undo beside
    each change.
 6. The user renames a tab in the `tab-bar` card. Every screen that pastes it shows the new name.
 

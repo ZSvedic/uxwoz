@@ -144,7 +144,7 @@ function check(round: string) {
   const verdicts: Verdicts = existsSync(vfile) ? JSON.parse(readFileSync(vfile, 'utf8')) : {}
   const review: string[] = [`# File, round ${round}: every entry, for reading`]
   const out: string[] = [`# File, round ${round}`, '', '| | entries | keep | junk | double | bad lines | parts right | nothing | missed | cost | median time |', '|---|---|---|---|---|---|---|---|---|---|---|']
-  const models = ['claude-haiku-5.5', 'gpt-6-luna', 'gpt-6.1-terra'].filter((m) => existsSync(resolve(dir, `${m}.json`)))
+  const models = ['claude-haiku-5.5', 'claude-haiku-5.5-think', 'gpt-6-luna', 'gpt-6-luna-low', 'gpt-6.1-terra'].filter((m) => existsSync(resolve(dir, `${m}.json`)))
   const missing: string[] = []
   for (const model of models) {
     const filed = (JSON.parse(readFileSync(resolve(dir, `${model}.json`), 'utf8')) as Filed[]).sort((a, b) => a.n - b.n)
