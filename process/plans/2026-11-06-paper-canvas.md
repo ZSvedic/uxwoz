@@ -92,7 +92,8 @@ gives the size of the code before and after.
      stay out. The test confirms each price on its vendor's page.
 2. **Cleanup: done** ([report](../journal/2026-11-07-cleanup.md)). The spec feature is deleted as
    [the cleanup list](2026-11-06-cleanup.md) says: app code 249 to 163 KB, tests 125 to 53 KB.
-3. **Boxes in the app**: storage, the boxes on the canvas, paste by ID, filing.
+3. **Boxes in the app: done** ([report](../journal/2026-11-07-boxes.md)). Filing on Terra takes 1
+   to 5 s and under half a cent a decision; app code 163 to 215 KB.
 4. **The fixer** and its notes.
 5. **Remake** NiceSnore, a dashboard and a game, 15 screens each.
 
