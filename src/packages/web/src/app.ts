@@ -1,13 +1,11 @@
-// The browser side: the generate panel, the canvas of picked screens, a new screen's A OR B
-// (streamed side by side, then picked), click-to-navigate, the rail's tools (Edit, Regenerate, Undo,
-// Info, Delete) with the drawer for Edit and Info, the boxes (with filing's results after a pick or
-// an Edit), pickers, recent mockups, errors in a pill.
+// The browser side: the generate panel, the canvas, A OR B streaming and picking, clicks, the rail's
+// tools with the Edit and Info drawer, the boxes, pickers, recent mockups, errors.
 
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, markCurrent, pasteComponents, type Device } from '@uxwoz/core/frame'
 import { canonicalAction, isBack, nameWords, normalizePrompt, screenKey, screenRef } from '@uxwoz/core/keys'
 import { componentsOf, isComponent, namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
-import type { BoxName, Boxes, CacheEntry, Version } from '@uxwoz/core'
-import { boxesMarkdown, createSide, renderSide, type BoxOp } from './boxes.ts'
+import type { Boxes, CacheEntry, Version } from '@uxwoz/core'
+import { boxesMarkdown, createSide, renderSide, type Box, type BoxOp } from './boxes.ts'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
 
@@ -25,14 +23,14 @@ const changeInput = $<HTMLTextAreaElement>('change')
 
 /** One side of a new screen's A OR B while it streams. */
 interface Side { stream: StreamRenderer | null; version: Version | null; error: string | null }
-/** A new screen being made: its A OR B streams in before the screen is stored. */
+/** A new screen whose A OR B streams in before it is stored. */
 interface Making { key: string; parent: string | null; device: Device; sides: Side[] }
 
 const state = {
   app: null as string | null,
-  /** Every screen of this mockup, by key, as the server last sent it. */
+  /** Every screen, by key, as the server last sent it. */
   entries: new Map<string, CacheEntry>(),
-  /** Where each screen sits (level, the screen it hangs under), worked out from the screens on every draw. */
+  /** Each screen's level and parent, worked out on every draw. */
   tree: new Map<string, TreeNode>(),
   /** The screen the user last picked, clicked in, or chose in Nav. */
   current: null as string | null,
@@ -43,17 +41,18 @@ const state = {
   picking: false,
   /** A picked screen getting a new version: an Edit with `change`, else a Regenerate. */
   revising: null as { key: string; change: string | null } | null,
-  /** The open drawer tab, if any. It shows the current screen. */
+  /** The open drawer tab; it shows the current screen. */
   drawer: null as 'edit' | 'info' | null,
   busy: null as AbortController | null,
   /** The view before an A OR B was fitted, to go back to after the pick. */
   before: null as View | null,
   /** Counts mockups opened, so a slower earlier open gives way to a newer one. */
   starts: 0,
-  /** The open mockup's Rules and Data (its components are entries), and whether filing runs. */
+  /** Rules and Data (components are entries), and whether filing or a fixer visit runs. */
   boxes: null as Boxes | null,
   filing: false,
-  /** A filed() loop is waiting for filing to end. */
+  visiting: false,
+  /** A filed() loop is waiting for filing or a visit to end. */
   waiting: false,
   /** Counts changes this page applied, so a map fetched before one of them is not applied after it. */
   edits: 0,
@@ -86,7 +85,7 @@ function nameOf(e: CacheEntry, v: Version): string {
   return (text || e.action || e.app).slice(0, 60)
 }
 
-/** A screen's label, e.g. "L2 Camera"; a planned screen's comes from its name; a component's is its ID. */
+/** e.g. "L2 Camera"; a planned screen's from its name; a component's is its ID. */
 const labelOf = (e: CacheEntry) => {
   if (isComponent(e)) return e.name!
   const level = state.tree.get(e.key)?.level ?? '?'
@@ -95,7 +94,7 @@ const labelOf = (e: CacheEntry) => {
   return `L${level} New screen · pick one`
 }
 
-/** The screen a screen hangs under in the tree (the one fewest clicks from home that leads to it). */
+/** The tree parent: the screen fewest clicks from home that leads here. */
 const treeParent = (key: string) => state.tree.get(key)?.parent ?? null
 
 const widthOf = (d: Device | undefined) => (d ? DEVICES[d].width : LEGACY_WIDTH)
@@ -154,7 +153,7 @@ function views(): ScreenView[] {
 async function draw() {
   state.tree = screenTree([...state.entries.values()])
   side.el.hidden = !state.app || !state.entries.size || !state.boxes
-  if (state.boxes) renderSide(side, { boxes: state.boxes, components: components(), filing: state.filing }, boxOp)
+  if (state.boxes) renderSide(side, { boxes: state.boxes, components: components(), filing: state.filing, visiting: state.visiting }, boxOp)
   canvas.render(views(), !!state.busy)
   generate.hidden = !!state.app && !generate.classList.contains('open')
   renderDrawer()
@@ -162,7 +161,7 @@ async function draw() {
   const theme = themeSelect.value
   const css = await themeCss(theme)
   if (theme !== themeSelect.value) return // a newer draw shows the newer theme
-  // Every screen is shown with today's components, so a changed component redraws the screens that paste it.
+  // Today's components, so a changed component redraws the screens that paste it.
   const c = componentsOf([...state.entries.values()])
   for (const e of state.entries.values()) {
     const v = e.versions.at(-1)
@@ -227,7 +226,7 @@ const fmtS = (ms: number) => `${(ms / 1000).toFixed(ms < 1000 ? 2 : 1)} s`
 const fmtUsd = (v: number) => `$${v < 0.01 ? v.toFixed(4) : v.toFixed(3)}`
 const modelLabel = (id: string) => [...modelSelect.options].find((o) => o.value === id)?.text ?? id
 
-/** An error shows in a red pill at the bottom of the canvas until closed, or until the next one. */
+/** A red pill at the bottom of the canvas, until closed or replaced. */
 function showError(msg: string | null) {
   errorText.textContent = msg ?? ''
   errorBox.hidden = !msg
@@ -236,7 +235,7 @@ function showError(msg: string | null) {
 $('errorClose').addEventListener('click', () => showError(null))
 
 let hintTimer: ReturnType<typeof setTimeout> | undefined
-/** A click that would start a second screen while one is being made says why nothing happens, briefly. */
+/** Briefly say why a click does nothing while a screen is being made. */
 function hint() {
   const h = $('hint')
   h.hidden = false
@@ -267,10 +266,7 @@ const post = (url: string, body: object, signal?: AbortSignal) =>
 
 // ---- Screens ----------------------------------------------------------------------------------
 
-/**
- * Open a screen: from the cache when it is there, else as A OR B, two designs streamed side by
- * side. Before they show, the view is remembered and both are fitted to the stage.
- */
+/** Open a screen from the cache, else as A OR B: remember the view, fit both, stream them. */
 async function openScreen(action: string | null, from: string | null, label: string | null) {
   const app = state.app!
   showError(null)
@@ -279,7 +275,7 @@ async function openScreen(action: string | null, from: string | null, label: str
   state.busy = ctrl
   const model = modelSelect.value
   const device = deviceSelect.value as Device
-  /** When the A OR B was fitted: if the user has not moved the canvas since, it is fitted again once both finish. */
+  /** When the A OR B was fitted; refitted once both finish unless the canvas moved since. */
   let fitted: number | null = null
   try {
     const css = await themeCss(themeSelect.value)
@@ -341,9 +337,8 @@ async function openScreen(action: string | null, from: string | null, label: str
 }
 
 /**
- * Once a screen (or both designs of an A OR B) has its final size, fit it again snugly: it is
- * often smaller than the window it was fitted for. Not when the user has moved the view since
- * `fitted`, and not for an A OR B that was picked meanwhile (`choice`).
+ * Once a screen (or an A OR B) has its final size, fit it snugly: it is often smaller than the window
+ * it was fitted for. Not if the view moved since `fitted`, or an A OR B was picked meanwhile (`choice`).
  */
 async function refit(key: string, fitted: number | null, choice = true) {
   await canvas.sized(key)
@@ -352,7 +347,7 @@ async function refit(key: string, fitted: number | null, choice = true) {
   canvas.fit(key, { snug: true })
 }
 
-/** Fit an A OR B that is already finished: by width at once, then snugly once both have their size. */
+/** Fit a finished A OR B by width now, then snugly once both have their size. */
 function fitChoice(key: string) {
   canvas.fit(key, { top: true })
   refit(key, performance.now())
@@ -364,13 +359,13 @@ function fitScreenSoon(key: string) {
   refit(key, performance.now(), false)
 }
 
-/** Go back to the view from before an A OR B, if there was one. */
+/** Back to the view from before an A OR B. */
 function back() {
   if (state.before) canvas.setView(state.before)
   state.before = null
 }
 
-/** Keep one side of an open A OR B. If the other one is still streaming, it stops. */
+/** Keep one side of an open A OR B; the other stops streaming. */
 async function pick(key: string, index: number) {
   const m = state.making?.key === key ? state.making : null
   if (state.picking || !(m?.sides[index]?.version ?? state.entries.get(key)?.proposals?.[index])) return
@@ -389,10 +384,11 @@ async function pick(key: string, index: number) {
       showError('Could not keep that design')
       return reloadMap()
     }
-    const { entry, filing } = await res.json() as { entry: CacheEntry; filing: boolean }
+    const { entry, filing, visiting } = await res.json() as { entry: CacheEntry; filing: boolean; visiting: boolean }
     state.entries.set(key, entry)
     state.edits++
-    if (filing) filed()
+    Object.assign(state, { filing, visiting: visiting || state.visiting })
+    if (filing || visiting) filed()
     canvas.rename(`${key}#${index}`, key)
     state.current = key
     saveCurrent()
@@ -420,10 +416,8 @@ async function dropChoice(key: string) {
 }
 
 /**
- * Where a click leads, and the prompt for it if it is a new screen: Back to the screen this one
- * hangs under (one click nearer the first screen), Home to the first screen, `@name` to the screen
- * with that name. A name no screen has yet is made by the server from the link's prompt, the planned
- * screen's, or the words clicked. Words with no `@` lead nowhere.
+ * Where a click leads, and its prompt if new: Back to the tree parent, Home to the first screen,
+ * `@name` to that screen (the server makes it if missing). Words with no `@` lead nowhere.
  */
 function target(app: string, from: string, prompt: string): { to: string; prompt: string } {
   if (isBack(prompt)) {
@@ -436,7 +430,7 @@ function target(app: string, from: string, prompt: string): { to: string; prompt
   return { to: known || (ref || !canonicalAction(prompt) ? screenKey(app, prompt) : from), prompt }
 }
 
-/** A click inside a picked screen: open the screen it leads to, or go to it when it is already there. */
+/** A click in a picked screen: go to the screen it leads to, making it if new. */
 function onAction(from: string, action: string, label: string) {
   const app = state.app
   if (!app) return
@@ -478,7 +472,7 @@ function resetTrail() {
   trail.at = trail.keys.length - 1
 }
 
-/** The nearest screen on the trail in a direction that is still there, by its place on the trail. */
+/** The trail index of the nearest screen in a direction that still exists. */
 function trailStep(dir: 1 | -1): number | null {
   for (let i = trail.at + dir; i >= 0 && i < trail.keys.length; i += dir) {
     const k = trail.keys[i]!
@@ -505,24 +499,25 @@ async function reloadMap() {
   applyMap(await res.json())
 }
 
-function applyMap(map: { entries: CacheEntry[]; boxes?: Boxes; filing?: boolean }) {
+function applyMap(map: { entries: CacheEntry[]; boxes?: Boxes; filing?: boolean; visiting?: boolean }) {
   state.entries = new Map(map.entries.map((e) => [e.key, e]))
   state.boxes = map.boxes ?? state.boxes
   state.filing = !!map.filing
+  state.visiting = !!map.visiting
   state.edits++
-  // Filing runs (after a reload, say) and nothing waits for it here yet: wait for it.
-  if (state.filing && !state.waiting) filed()
+  // Filing or a visit runs (after a reload, say) and nothing waits for it yet.
+  if ((state.filing || state.visiting) && !state.waiting) filed()
   if (state.current && !state.entries.has(state.current)) state.current = null
   draw()
 }
 
 /**
- * Filing started after a pick or an Edit: ask for the mockup once filing is done, and show what it
- * filed. A map that crosses a change made here (or a screen still being made) is asked for again.
+ * After a pick, an Edit or a fixer visit: fetch the mockup once filing is done and show the result.
+ * A map that crosses a change made here (or a screen being made) is fetched again.
  */
 async function filed() {
   const app = state.app
-  state.filing = state.waiting = true
+  state.waiting = true
   try {
     for (let tries = 0, wait = true; tries < 40 && app && app === state.app; tries++, wait = false) {
       const n = state.edits
@@ -536,31 +531,35 @@ async function filed() {
       await new Promise((r) => setTimeout(r, 1500))
     }
   } finally {
-    // Given up (no answer, or changes kept crossing it): the line says filing no more.
-    if (state.waiting) { state.waiting = state.filing = false; draw() }
+    // Given up (no answer, or changes kept crossing it): the lines say filing and visiting no more.
+    if (state.waiting) { state.waiting = state.filing = state.visiting = false; draw() }
   }
 }
 
-/** A change to the boxes; the server answers with the whole mockup. */
-async function boxOp(o: BoxOp | { op: 'seen'; box: BoxName; ids: string[] }) {
+/** A change to the boxes, or a visit asked for; the server answers with the whole mockup. */
+async function boxOp(o: BoxOp | { op: 'seen'; box: Box; ids: string[] }) {
   const app = state.app
   if (!app) return
-  const res = await post('/api/box', { app, ...o }).catch(() => null)
+  const res = await post(o.op === 'visit' ? '/api/visit' : '/api/box', { app, ...o }).catch(() => null)
   const body = await res?.json().catch(() => null)
   if (!res?.ok) { showError(`Could not change the box: ${body?.error ?? 'no answer'}`); return draw() }
   if (app === state.app) applyMap(body)
 }
 
+/** What is new in a box since the user last looked: entries by ID, visits by when they started. */
+const unseen = (box: Box): string[] => box === 'components' ? components().filter((e) => !e.seen).map((e) => e.name!)
+  : box === 'notes' ? (state.boxes?.visits ?? []).filter((v) => !v.seen).map((v) => v.at) : state.boxes?.[box].filter((x) => !x.seen).map((x) => x.id) ?? []
+
 /** A toolbar button: move the view to a box; after a moment its new entries are no longer marked. */
-function lookAt(box: BoxName) {
+function lookAt(box: Box) {
   if (side.el.hidden) return
   canvas.showBox(side.sections[box])
   // Only the entries new at the look count as seen: one filed meanwhile stays marked.
-  const ids = box === 'components' ? components().filter((e) => !e.seen).map((e) => e.name!) : state.boxes?.[box].filter((x) => !x.seen).map((x) => x.id) ?? []
+  const ids = unseen(box)
   if (ids.length) setTimeout(() => boxOp({ op: 'seen', box, ids }), 3000)
 }
 
-for (const b of document.querySelectorAll<HTMLButtonElement>('[data-box]')) b.addEventListener('click', () => lookAt(b.dataset.box as BoxName))
+for (const b of document.querySelectorAll<HTMLButtonElement>('[data-box]')) b.addEventListener('click', () => lookAt(b.dataset.box as Box))
 
 /** Export: the three boxes as a markdown file. */
 $('exportBoxes').addEventListener('click', () => {
@@ -609,7 +608,7 @@ async function revise(key: string, change: string | null) {
           stream.cancel()
           state.entries.set(key, ev.entry)
           state.edits++
-          if (ev.filing) filed()
+          if (ev.filing) { state.filing = true; filed() }
           state.revising = null
           if (change) changeInput.value = ''
           // The new version may be taller or narrower: keep it in view once it has its size.
@@ -700,7 +699,7 @@ function renderDrawer() {
   history.replaceChildren(...e.versions.map((x, i) => {
     const li = document.createElement('li')
     const from = comp && e.parent && state.entries.get(e.parent.key)
-    li.textContent = x.feedback ? `Edit: ${x.feedback}` : comp ? (i === 0 ? (from ? `Taken from ${labelOf(from)} by filing` : 'Added') : 'Changed by filing')
+    li.textContent = x.feedback ? `${x.by === 'fixer' ? 'Fixer' : 'Edit'}: ${x.feedback}` : comp ? (i === 0 ? (from ? `Taken from ${labelOf(from)} by ${e.by === 'fixer' ? 'the fixer' : 'filing'}` : 'Added') : 'Changed by filing')
       : i === 0 ? 'The design you picked' : 'Regenerated'
     li.classList.toggle('now', i === e.versions.length - 1)
     return li
@@ -713,7 +712,7 @@ function renderDrawer() {
     ['Where it belongs', e.action ?? '–'],
     ['Pasted on', pastedOn(e.name!).map(labelOf).join(', ') || 'no screen'],
     ['Taken from', from ? labelOf(from) : '–'],
-    ['Last written by', `${e.by === 'user' ? 'you' : 'filing'}, ${e.at ? new Date(e.at).toLocaleString() : '–'}`],
+    ['Last written by', `${e.by === 'user' ? 'you' : e.by === 'fixer' ? 'the fixer' : 'filing'}, ${e.at ? new Date(e.at).toLocaleString() : '–'}`],
     ['Versions', `${e.versions.length}${e.versions.length > 1 ? ' (↶ Undo goes back one)' : ''}`],
     ['Model', modelLabel(v.model)],
     ['Size', `${v.html.length.toLocaleString()} characters`],
@@ -722,7 +721,7 @@ function renderDrawer() {
     ['Idea', ideaOf(v) || '–'],
     ['Name in links', e.name ? `@${e.name}` : '–'],
     ['Reached by', parent ? `${node!.label || 'a click'} in ${labelOf(parent)}` : e.action ? '–' : 'the first screen'],
-    ['Made by', v.feedback ? `Edit: ${v.feedback}` : e.versions.length > 1 ? 'Regenerate' : 'your pick of two designs'],
+    ['Made by', v.feedback ? `${v.by === 'fixer' ? 'The fixer' : 'Edit'}: ${v.feedback}` : e.versions.length > 1 ? 'Regenerate' : 'your pick of two designs'],
     ['Versions', `${e.versions.length}${e.versions.length > 1 ? ' (↶ Undo goes back one)' : ''}`],
     ['Model', modelLabel(v.model) + (v.servedModel ? ` (served ${v.servedModel})` : '')],
     ['Device', v.device ? DEVICES[v.device].label : 'from before devices'],
@@ -876,11 +875,11 @@ addEventListener('keydown', (e: KeyboardEvent) => {
   else if (e.code === 'Digit3') fitWidth()
 })
 
-/** Every mockup, newest first, as the server last listed them. */
+/** Every mockup, newest first. */
 let recentApps: { app: string; screens: number }[] = []
 const screensNote = (n: number) => `${n} screen${n === 1 ? '' : 's'}`
 
-/** Fill the generate panel's Recent list (and the project menu's) with every mockup, newest first. */
+/** Fill the Recent list and the project menu's. */
 async function loadRecent() {
   const res = await fetch('/api/apps').catch(() => null)
   if (!res?.ok) return
@@ -890,7 +889,7 @@ async function loadRecent() {
   renderRecentMenu()
 }
 
-/** The project menu's recent mockups, the open one ticked: a click switches to one. */
+/** The project menu's recent mockups, the open one ticked. */
 function renderRecentMenu() {
   const now = state.app && normalizePrompt(state.app)
   const rows = recentApps.slice(0, 10).map((a) => {
@@ -904,7 +903,7 @@ function renderRecentMenu() {
   $('menuRecent').replaceChildren(...(rows.length ? [head, ...rows] : []))
 }
 
-/** A row in a list or menu: a label, a note on the right, and what a click does. */
+/** A row in a list or menu: label, note on the right, click action. */
 function item(label: string, note: string, run: () => void, cls = 'item'): HTMLButtonElement {
   const b = document.createElement('button')
   b.type = 'button'
@@ -969,7 +968,7 @@ function closeGenerate() {
   draw()
 }
 
-/** The project button names the open mockup; Nav names the current screen; the menus list what they offer. */
+/** Project button, Nav, trail arrows and box buttons. */
 function renderToolbar() {
   const app = state.app
   $('projectName').textContent = app ? (app.length > 40 ? app.slice(0, 39) + '…' : app) : 'New mockup'
@@ -986,20 +985,16 @@ function renderToolbar() {
   $('navName').textContent = cur ? labelOf(cur) : 'Screens'
   nav.title = cur ? labelOf(cur) : 'Every screen of this mockup'
   $('exportBoxes').hidden = !app
-  // The box buttons count the entries added since the user last looked at each box.
+  // Each box button counts entries new since the user last looked.
   for (const b of document.querySelectorAll<HTMLButtonElement>('[data-box]')) {
-    const box = b.dataset.box as BoxName
-    const n = box === 'components' ? components().filter((e) => !e.seen).length : state.boxes?.[box].filter((x) => !x.seen).length ?? 0
+    const n = unseen(b.dataset.box as Box).length
     b.hidden = side.el.hidden
     b.querySelector('b')!.textContent = n ? String(n) : ''
   }
   if (!$('navMenu').hidden) renderNav()
 }
 
-/**
- * Every screen as an indented tree, children in the order they were made, planned screens greyed
- * (a click makes one, as its link would); the current path marked.
- */
+/** Every screen as an indented tree, planned screens greyed (a click makes one), the current path marked. */
 function renderNav() {
   const menu = $('navMenu')
   const made = [...state.entries.values()]
@@ -1025,7 +1020,7 @@ function renderNav() {
   }
   // The first screen first; screens the first screen does not reach after it, as their own trees.
   for (const e of all) if (!treeParent(e.key) && !isComponent(e)) walk(e, 0)
-  // Then the components, under a Components parent.
+  // Then the components.
   const comps = components()
   if (comps.length) {
     const head = item('Components', `${comps.length}`, () => lookAt('components'))

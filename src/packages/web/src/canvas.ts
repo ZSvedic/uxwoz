@@ -1,94 +1,79 @@
-// The canvas: every screen of the mockup on one panning, zooming surface, laid out as a tree. Each
-// level is a row, as tall as its tallest screen, with its screens side by side: children in the order
-// of their parents, a screen's first child straight below it when there is room, else in the next
-// free place to the right. A thin line joins each screen to the one it hangs under; each parent's
-// lines branch at a height of their own in the gap below its row, so lines never cross. A new screen shows as A OR B: two locked
-// previews side by side, with its idea above each; a click on a finished one picks it. Right of
-// each picked screen is a rail of tools, kept at the same size on screen whatever the zoom.
-// Every screen of a device is as wide as the device and at least one device screen tall.
-// Left of the tree is a column with the mockup's boxes (built by boxes.ts); component cards are
-// cards like screens, in the Components box, as tall as their content.
+// The canvas: every screen on one panning, zooming surface, laid out as a tree. Each level is a row;
+// a first child sits below its parent when there is room. Each parent's lines branch at a height of
+// their own, so lines never cross. A new screen shows as A OR B; a click on a finished side picks it.
+// Names and rails keep their size on screen at any zoom. Left of the tree: the boxes column (boxes.ts).
 
 import { DEFAULT_DEVICE, DEVICES, FRAME_SANDBOX, framePage, type Device } from '@uxwoz/core/frame'
 
-/** Limits on the height a screen may report, so a broken screen cannot make a huge frame. A component may be short. */
+/** Bounds on a reported height, so a broken screen cannot make a huge frame; components may be shorter. */
 const MIN_SCREEN_H = 160
 const MIN_COMPONENT_H = 80
 const MAX_SCREEN_H = 8000
-/** The height of a frame whose screen has not reported its size yet. */
+/** Height until a screen reports its size. */
 const START_H = 600
-/** The height of a failed side of an A OR B. */
+/** Height of a failed side. */
 const FAILED_H = 220
-/** A frame that grows this many times in a row, each within GROWTH_MS of the last, stops growing. */
-const GROWTH_LIMIT = 4
-const GROWTH_MS = 1500
-/** Space between columns (it holds the rails) and between rows (it holds the names), in canvas pixels. */
+/** Gaps between columns (for the rails) and rows (for the names), in canvas pixels. */
 const GAP_X = 120
 const GAP_Y = 150
-/** The space between the two sides of an A OR B, where the OR sits. */
+/** Room for the OR between two sides. */
 const OR_W = 160
-/** The room a rail takes right of its screen, and the least room the OR needs, in pixels on screen. */
+/** A rail's width and the OR's least width, in pixels on screen. */
 const RAIL_W = 60
 const OR_MIN = 120
-/** Empty canvas around the tree, so any screen can be scrolled to the middle. */
+/** Margin so any screen can be scrolled to the middle. */
 const PAD = 600
-/**
- * How far right of a screen's left edge its lines leave it, and a line that bends enters it: never
- * the same, so a line into a screen that sits below another parent does not run on from that parent's.
- */
+/** Where lines leave and bent lines enter a screen: different, so a line into a screen below another parent does not run on from that parent's. */
 const LINE_X = 40
 const ENTRY_X = 110
-/** How far apart the branch heights of two parents' lines are, in pixels on screen. */
+/** Spacing of parents' branch heights, in pixels on screen. */
 const LANE = 14
-/** The height of the name and idea above a screen, and of the idea above a side, in pixels on screen. */
+/** Label height above a screen and above a side, in pixels on screen. */
 const LABEL_H = 62
 const IDEA_H = 76
-/** Zoomed out further than this, a screen shows only its name (see .surface.far), which needs less room. */
+/** Below this zoom a screen shows only its name (.surface.far). */
 const FAR = 0.5
 const NAME_H = 26
 const labelH = (z: number) => (z < FAR ? NAME_H : LABEL_H)
-/** The radius of a line's corners. */
+/** Line corner radius. */
 const BEND = 10
 const SVG_NS = 'http://www.w3.org/2000/svg'
 export const MIN_ZOOM = 0.1
 export const MAX_ZOOM = 2
-/** The steps of Zoom in and Zoom out. */
 const STEPS = [0.1, 0.15, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2]
 
 export interface CardView {
   /** Unique on the canvas: the screen's key, or `key#0` and `key#1` for the sides of its A OR B. */
   id: string
-  /** Width of the window the screen is designed for. */
   width: number
-  /** The device it is designed for; absent for screens made before devices. */
+  /** Absent for screens made before devices. */
   device?: Device
-  /** The bold line above a screen, e.g. "L2 Camera"; '' for a side of an A OR B. */
+  /** e.g. "L2 Camera"; '' for a side. */
   name: string
-  /** One sentence naming the design idea: under the name, or alone above a side. */
+  /** The design idea in one sentence. */
   idea: string
-  /** For a side of an A OR B: which one, and whether it may be picked (it finished). */
+  /** For a side: which one, and whether it finished (may be picked). */
   side?: { index: number; pickable: boolean }
-  /** Why a side failed; it shows instead of the screen. */
+  /** Why a side failed; shown instead of the screen. */
   error?: string
   streaming: boolean
-  /** A component: as tall as its content, not one device screen. */
+  /** A component: as tall as its content. */
   fit?: boolean
 }
 
 export interface ScreenView {
   key: string
-  /** The screen that made it, or null for the first screen. */
+  /** null for the first screen. */
   parent: string | null
   /** One card for a picked screen; two for an open A OR B. */
   cards: CardView[]
   current: boolean
-  /** The rail shows Undo. */
   undo: boolean
-  /** What is happening to it, e.g. "Making the change…"; '' for nothing. */
+  /** e.g. "Making the change…"; '' for nothing. */
   note: string
-  /** A component card, in the Components box instead of the tree; no Regenerate. */
+  /** In the Components box, not the tree; no Regenerate. */
   component?: boolean
-  /** Added or changed since the user last looked at its box: marked new. */
+  /** Changed since the user last looked at its box. */
   fresh?: boolean
 }
 
@@ -102,7 +87,6 @@ export interface CanvasHandlers {
   focus: (key: string) => void
   /** A rail button: edit, regenerate, undo, info or delete. */
   tool: (key: string, name: string) => void
-  /** The zoom changed, by a gesture or a call. */
   zoomed: (zoom: number) => void
 }
 
@@ -110,11 +94,11 @@ export interface Box { x: number; y: number; w: number; h: number }
 export interface View { z: number; left: number; top: number }
 
 interface Card {
-  /** The card's whole block: name above, screen, rail to the right. Positioned on the canvas, never moved in the DOM (that reloads the frame). */
+  /** Name, screen and rail. Positioned, never moved in the DOM (that reloads the frame). */
   el: HTMLElement
   name: HTMLElement
   idea: HTMLElement
-  /** Shows an idea longer than two lines in full. */
+  /** Unfolds an idea longer than two lines. */
   more: HTMLButtonElement
   note: HTMLElement
   screen: HTMLElement
@@ -125,7 +109,6 @@ interface Card {
   rail: HTMLElement
   undo: HTMLButtonElement
   tools: HTMLButtonElement[]
-  /** The screen this card belongs to. */
   key: string
   view: CardView | null
   width: number
@@ -134,8 +117,6 @@ interface Card {
   /** The final screen has reported its size since it was shown. */
   sized: boolean
   onLoad: (() => void) | null
-  growth: { count: number; at: number }
-  frozen: boolean
 }
 
 const RAIL: [string, string, string][] = [
@@ -150,24 +131,21 @@ export class Canvas {
   private surface = el('div', 'surface')
   private lines = document.createElementNS(SVG_NS, 'svg')
   private cards = new Map<string, Card>()
-  /** The OR between the sides of each open A OR B, by screen key. */
+  /** The OR of each open A OR B, by screen key. */
   private ors = new Map<string, HTMLElement>()
   private screens: ScreenView[] = []
-  /** From the last layout: the screen each one hangs under, the bottom of each one's row, and each parent's branch height (0 the highest). */
+  /** From the last layout: each screen's parent and row bottom, each parent's branch height (0 highest). */
   private parentOf = new Map<string, string>()
   private rowBottom = new Map<string, number>()
   private lanes = new Map<string, number>()
-  /** Where each screen sits, from the last layout, in canvas pixels. */
+  /** Each screen's place from the last layout, in canvas pixels. */
   private boxes = new Map<string, Box>()
   private extent: Box = { x: 0, y: 0, w: 0, h: 0 }
   private queued = false
   /** The surface's CSS zoom. Its own coordinates (positions, lines) are unzoomed. */
   private z = 1
 
-  /**
-   * `stage` is the scrolling area; the canvas replaces what it holds on the first render. `side` is
-   * the boxes column, placed left of the tree; component cards go into `components`, inside it.
-   */
+  /** `stage` scrolls (its content is replaced on first render); `side` is the boxes column; component cards go in `components`. */
   constructor(private stage: HTMLElement, private on: CanvasHandlers, private side: HTMLElement, private components: HTMLElement) {
     this.lines.classList.add('lines')
     this.surface.append(this.lines, side)
@@ -217,8 +195,7 @@ export class Canvas {
     const st = this.stage, r = st.getBoundingClientRect()
     const ax = x == null ? st.clientWidth / 2 : x - r.left, ay = y == null ? st.clientHeight / 2 : y - r.top
     let px = (st.scrollLeft + ax) / this.z, py = (st.scrollTop + ay) / this.z
-    // Names and rails keep their size on screen, so screens move a little on the canvas as the zoom
-    // changes: the point under the pointer follows the screen nearest to it.
+    // Names and rails keep their size on screen, so screens shift with the zoom: follow the nearest one.
     const near = this.nearest(px, py), before = near && { ...this.boxes.get(near)! }
     this.applyZoom(z)
     const after = near && this.boxes.get(near)
@@ -227,7 +204,6 @@ export class Canvas {
     st.scrollTop = py * z - ay
   }
 
-  /** The screen whose box is nearest to a canvas point. */
   private nearest(px: number, py: number): string | undefined {
     let best: string | undefined, dist = Infinity
     for (const [k, b] of this.boxes) {
@@ -237,7 +213,6 @@ export class Canvas {
     return best
   }
 
-  /** The next zoom step in or out from now. */
   step(dir: 1 | -1) {
     const next = dir > 0 ? STEPS.find((s) => s > this.z + 0.001) : [...STEPS].reverse().find((s) => s < this.z - 0.001)
     this.setZoom(next ?? this.z)
@@ -278,16 +253,14 @@ export class Canvas {
   }
 
   /**
-   * Zoom and scroll so a screen (or the whole tree, without a key) fills the stage, at most `max`.
-   * With `top`, only its width counts, and its top shows: for an A OR B, whose heights still change.
-   * With `snug`, the height counts too, but never shrinks the zoom below 60% of the width's fit:
-   * a tall screen shows its top at a readable size instead of all of it, tiny.
+   * Zoom and scroll so a screen (or the tree) fills the stage, at most `max`. `top`: fit the width and
+   * show the top (an A OR B's heights still change). `snug`: fit the height too, but not below 60% of
+   * the width's fit, so a tall screen shows its top readably.
    */
   fit(key?: string, { max = 1, top = false, snug = false } = {}) {
     const st = this.stage, m = 48
     if (this.queued) this.layout() // sizes that arrived since the last frame count
-    // Names and rails keep their size on screen, so they take more of the canvas at a lower zoom:
-    // the box changes with the zoom, and a few rounds settle it.
+    // Names and rails keep their size on screen, so the box changes with the zoom; a few rounds settle it.
     for (let i = 0; i < 4; i++) {
       const box = this.box(key)
       if (!box) return
@@ -330,7 +303,7 @@ export class Canvas {
     this.center({ ...this.elBox(el), h: Infinity })
   }
 
-  /** Zoom so a screen fills the stage's width (at most 200%), and scroll to its top. */
+  /** Fit a screen's width (at most 200%) and scroll to its top. */
   fitWidth(key: string) {
     this.fit(key, { max: MAX_ZOOM, top: true })
   }
@@ -426,7 +399,6 @@ export class Canvas {
       if (onLoad) requestAnimationFrame(() => this.loaded(c))
       return
     }
-    if (s?.html !== html) { c.frozen = false; c.growth = { count: 0, at: 0 } }
     c.shown = { html, final, css }
     c.sized = false
     c.frame.srcdoc = framePage(html, css, final, c.view?.device, c.view?.fit)
@@ -453,12 +425,11 @@ export class Canvas {
     requestAnimationFrame(() => { this.queued = false; this.layout() })
   }
 
-  /** The size a card takes on the canvas. */
   private size(c: Card) {
     return { w: c.width, h: c.view?.error ? FAILED_H : c.height }
   }
 
-  /** Place the boxes column, every screen as a tree right of it, size the canvas, and draw the lines. */
+  /** Place the boxes column and the tree, size the canvas, draw the lines. */
   private layout() {
     const z = this.z
     // At a low zoom, rails and the OR need more of the canvas than the fixed gaps give.
@@ -493,7 +464,7 @@ export class Canvas {
       for (const c of kids.get(k) ?? []) walk(c, d + 1)
     }
     for (const r of roots) walk(r, 0)
-    // The rows, top down: each the children of the row above, in its order.
+    // Rows top down: each the children of the row above, in order.
     const rows: string[][] = [roots.filter((r) => depth.get(r) === 0)]
     while (rows.at(-1)!.length) rows.push(rows.at(-1)!.flatMap((k) => (kids.get(k) ?? []).filter((c) => depth.get(c) === rows.length)))
     rows.pop()
@@ -511,8 +482,7 @@ export class Canvas {
         maxX = Math.max(maxX, x + sizes.get(k)!.w)
       }
     }
-    // Each parent whose lines bend gets a branch height of its own below its row, the leftmost lowest,
-    // so no line crosses another; the gap under a row grows with them.
+    // Each bending parent gets its own branch height, the leftmost lowest, so no lines cross; the gap grows.
     const lane = Math.max(LANE / z, 10)
     this.lanes.clear()
     const lanesIn = rows.map((row) => {
@@ -539,7 +509,6 @@ export class Canvas {
     const sideH = sideW ? this.side.offsetHeight : 0
     y = Math.max(y - lastGap, PAD + sideH)
     this.extent = { x: PAD, y: PAD, w: Math.max(0, maxX - PAD), h: Math.max(0, y - PAD) }
-    // The cards, and the OR between the sides of an A OR B.
     for (const s of screens) {
       const b = this.boxes.get(s.key)
       if (!b) continue
@@ -580,7 +549,7 @@ export class Canvas {
     })
   }
 
-  /** One line from each screen to the one it hangs under: straight down in its column, else an elbow at its parent's branch height. */
+  /** A line from each screen to its parent: straight down, else an elbow at the parent's branch height. */
   private drawLines(kids: Map<string, string[]>) {
     const svg = this.lines
     svg.setAttribute('width', this.surface.style.width)
@@ -644,7 +613,7 @@ export class Canvas {
     root.append(head, screen, error, rail)
     const c: Card = {
       el: root, name, idea, more, note, screen, frame, shield, error, rail, undo: tools[2]!, tools, key, view: null,
-      width: 0, height: START_H, shown: null, sized: false, onLoad: null, growth: { count: 0, at: 0 }, frozen: false,
+      width: 0, height: START_H, shown: null, sized: false, onLoad: null,
     }
     shield.addEventListener('click', () => { if (c.view?.side?.pickable) this.on.pick(c.key, c.view.side.index) })
     frame.addEventListener('load', () => this.loaded(c))
@@ -670,14 +639,6 @@ export class Canvas {
       if (c.shown?.final) c.sized = true
       const h = Math.min(MAX_SCREEN_H, Math.max(c.view?.fit ? MIN_COMPONENT_H : MIN_SCREEN_H, Math.round(d.height)))
       if (c.height === h) return
-      // A screen sized by its window (100% heights, script reading innerHeight) grows each time its
-      // frame grows. Stop that loop instead of following it to MAX_SCREEN_H.
-      if (c.shown && h > c.height) {
-        if (c.frozen) return
-        const now = performance.now()
-        c.growth = { count: now - c.growth.at < GROWTH_MS ? c.growth.count + 1 : 1, at: now }
-        if (c.growth.count >= GROWTH_LIMIT) { c.frozen = true; return }
-      }
       c.height = h
       c.frame.style.height = `${h}px`
       this.queue()

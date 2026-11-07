@@ -1,11 +1,15 @@
-// The boxes column left of the first screen: Components (cards the canvas puts in it), Rules and
-// Data, with a line on the last filing above them. The user edits rules and tables in place; each
-// change goes to the server as one /api/box request. Export writes the boxes as markdown.
+// The boxes column left of the first screen: Components (cards the canvas puts in it), Rules, Data
+// and the fixer's notes, with a line on the last filing above them. The user edits rules and tables
+// in place, and undoes a fixer's change; each goes to the server as one /api/box request. Export
+// writes the boxes as markdown.
 
 import type { BoxName, Boxes, CacheEntry, Table } from '@uxwoz/core'
 import { LIMITS } from '@uxwoz/core/keys'
 
-export interface BoxOp { op: 'add' | 'set' | 'delete'; box: 'rules' | 'data'; id?: string; text?: string; columns?: string[]; rows?: string[][] }
+export type BoxOp = { op: 'add' | 'set' | 'delete'; box: 'rules' | 'data'; id?: string; text?: string; columns?: string[]; rows?: string[][] }
+  | { op: 'undo'; at: string; i: number } | { op: 'visit' }
+/** A box of the column: the three the models read, and the fixer's notes. */
+export type Box = BoxName | 'notes'
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text?: string) => {
   const e = document.createElement(tag)
@@ -38,25 +42,27 @@ function editable(e: HTMLElement, save: (text: string) => void) {
   })
 }
 
-const HINTS: Record<BoxName, string> = {
+const HINTS: Record<Box, string> = {
   components: 'Parts that look the same on every screen that has them. Filing takes them from the screens you pick; screens paste them by ID.',
   rules: 'One sentence each that several screens follow. Filing adds them; click a sentence to change it.',
   data: 'Example data that several screens show. Click a cell to change it; clear a row or a column name to remove it.',
+  notes: 'Every 5 picks the fixer reads the boxes and the new screens, and tidies up: it merges doubles, removes what no screen needs and redraws screens that break a rule. It never changes what you wrote.',
 }
-const TITLES: Record<BoxName, string> = { components: 'Components', rules: 'Rules', data: 'Data' }
+const TITLES: Record<Box, string> = { components: 'Components', rules: 'Rules', data: 'Data', notes: 'Fixer\'s notes' }
+const BOXES = Object.keys(TITLES) as Box[]
 
 export interface Side {
   el: HTMLElement
   /** Where the canvas puts the component cards. */
   components: HTMLElement
-  sections: Record<BoxName, HTMLElement>
+  sections: Record<Box, HTMLElement>
 }
 
 export function createSide(): Side {
   const root = el('div', 'boxes')
   root.append(el('p', 'box-status'), el('ul', 'box-refused'))
-  const sections = {} as Record<BoxName, HTMLElement>
-  for (const name of ['components', 'rules', 'data'] as BoxName[]) {
+  const sections = {} as Record<Box, HTMLElement>
+  for (const name of BOXES) {
     const s = el('section', `box box-${name}`)
     s.append(el('h3'), el('p', 'box-hint', HINTS[name]), el('div', 'box-body'))
     sections[name] = s
@@ -65,7 +71,7 @@ export function createSide(): Side {
   return { el: root, components: sections.components.querySelector('.box-body')!, sections }
 }
 
-export interface SideView { boxes: Boxes; components: CacheEntry[]; filing: boolean }
+export interface SideView { boxes: Boxes; components: CacheEntry[]; filing: boolean; visiting: boolean }
 
 /** True while the user types in a field inside `box`. */
 const typing = (box: HTMLElement) => document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable && box.contains(document.activeElement)
@@ -82,11 +88,13 @@ export function renderSide(side: Side, v: SideView, op: (o: BoxOp) => void) {
   const refused = side.el.querySelector<HTMLElement>('.box-refused')!
   refused.replaceChildren(...(v.filing ? [] : f?.refused ?? []).map((r) => el('li', '', `Refused ${r}`)))
   refused.hidden = !refused.children.length
-  const counts = { components: v.components.length, rules: v.boxes.rules.length, data: v.boxes.data.length }
-  for (const name of ['components', 'rules', 'data'] as BoxName[]) {
+  const visits = [...v.boxes.visits ?? []].reverse()
+  const counts = { components: v.components.length, rules: v.boxes.rules.length, data: v.boxes.data.length, notes: visits.length }
+  for (const name of BOXES) {
     const s = side.sections[name]
     const h = s.querySelector('h3')!
-    h.replaceChildren(TITLES[name], el('small', '', ` ${counts[name]} of ${LIMITS[name]}`))
+    h.replaceChildren(TITLES[name], el('small', '', name === 'notes' ? ` ${counts[name]} visits` : ` ${counts[name]} of ${LIMITS[name]}`))
+    if (name === 'notes') h.append(button(v.visiting ? 'Visiting…' : 'Visit now', 'Let the fixer visit now', () => v.visiting || op({ op: 'visit' })))
     if (name === 'rules') h.append(button('+ Rule', 'Add a rule', () => {
       const text = prompt('A new rule: one sentence that several screens follow')?.trim()
       if (text) op({ op: 'add', box: 'rules', text })
@@ -107,6 +115,23 @@ export function renderSide(side: Side, v: SideView, op: (o: BoxOp) => void) {
   }))
   const data = side.sections.data.querySelector<HTMLElement>('.box-body')!
   if (!typing(data)) data.replaceChildren(...v.boxes.data.map((t) => tableView(t, op)))
+  // The fixer's notes, newest visit first: what it changed, each with an Undo, and what code refused.
+  side.sections.notes.querySelector('.box-body')!.replaceChildren(...visits.map((x) => {
+    const d = el('div', `visit${x.seen ? '' : ' fresh'}`)
+    const cost = x.costUsd == null ? '' : ` · ~$${x.costUsd.toFixed(4)}`
+    d.append(el('b', '', new Date(x.at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })),
+      el('span', '', x.error ? ` The visit failed: ${x.error}` : ` Read ${x.screens} screens, ${x.changes.length ? `made ${x.changes.length} changes` : 'changed nothing'} · ${(x.ms / 1000).toFixed(1)} s${cost}`))
+    const ul = el('ul')
+    x.changes.forEach((c, i) => {
+      const li = el('li', c.undone ? 'undone' : '', c.text)
+      if (c.note) li.append(el('small', '', ` ${c.note}`))
+      if (c.undo && !c.undone) li.append(' ', button('Undo', 'Undo this change', () => op({ op: 'undo', at: x.at, i })))
+      ul.append(li)
+    })
+    for (const r of x.refused) ul.append(el('li', 'refused', `Refused ${r}`))
+    d.append(ul)
+    return d
+  }))
 }
 
 function tableView(t: Table, op: (o: BoxOp) => void): HTMLElement {

@@ -4,7 +4,7 @@
 import { join, resolve } from 'node:path'
 import {
   DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, HOME_LINE, HOME_NAME, MODELS, PROPOSALS, ScreenCache, canonicalAction, drawRequest, editRequest,
-  fileDecision, generateScreen, isComponent, isDevice, isModelId, normalizePrompt, plannedScreens, promptFromLabel, screenKey, screenRef,
+  fileDecision, generateScreen, isComponent, isDevice, isModelId, normalizePrompt, visitPaper, plannedScreens, promptFromLabel, screenKey, screenRef,
   warmUp, type BoxName, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type Version,
 } from '@uxwoz/core'
 import index from './index.html'
@@ -13,13 +13,10 @@ const THEMES_DIR = resolve(import.meta.dir, '../themes')
 /** Theme ids and labels; the first is the default. `clean` is Pico alone, `mockup` is Pico plus mockup.css. */
 export const THEMES = { mockup: 'Mockup (sketch)', clean: 'Clean (Pico)' } as const
 const THEME_FILES = new Set(['pico', 'mockup'])
+/** The fixer visits a mockup after every this many picks. */
+export const VISIT_EVERY = 5
 
-/**
- * One line of a /api/screen or /api/revise NDJSON stream. `meta.variants` is how many designs stream
- * now (2 for a new screen's A OR B, 1 for a revise, 0 for a cache hit); each chunk names its side.
- * `version` says a side finished and is stored, `failed` that it did not. `done` ends a stream that
- * stored something (or a cache hit), `error` one that did not.
- */
+/** One line of a /api/screen or /api/revise NDJSON stream (spec/code-contract.md). `meta.variants`: 2, 1 for a revise, 0 for a cache hit. */
 export type ScreenEvent =
   | { type: 'meta'; key: string; cached: boolean; variants: number }
   | { type: 'chunk'; variant: number; text: string }
@@ -40,7 +37,6 @@ export interface ServerOptions {
   fileWaitMs?: number
 }
 
-/** A screen as a request shows it: its ID, its one line, its stored HTML. */
 const shown = (e: CacheEntry) => ({ id: e.name ?? HOME_NAME, line: e.action ?? HOME_LINE, html: e.versions.at(-1)?.html ?? '' })
 
 const json = (data: unknown, status = 200) => Response.json(data, { status })
@@ -78,6 +74,10 @@ function refuseForeign(req: Request): Response | null {
   return null
 }
 
+/** A POST route: refuse a foreign request, then read its JSON body (null when it has none). */
+const api = (run: (b: any, req: Request) => Response | Promise<Response>) => async (req: Request) => refuseForeign(req) ?? run(await req.json().catch(() => null), req)
+const appOf = (b: any): string => (typeof b?.app === 'string' ? b.app.trim() : '')
+
 function ndjson(events: AsyncIterable<ScreenEvent>): Response {
   const enc = new TextEncoder()
   const body = new ReadableStream({
@@ -108,36 +108,78 @@ export function createServer(opts: ServerOptions = {}) {
   const random = opts.random ?? Math.random
   const fileWaitMs = opts.fileWaitMs ?? 5000
 
-  /** The filing running for each mockup, by root key; filings of one mockup run one after another. */
+  /** The background job running for each mockup, by root key: filings and the fixer's visits run one after another. */
   const filings = new Map<string, Promise<unknown>>()
 
-  /** File a decision on a screen in the background. Returns whether filing started. */
+  /** Run a job in the mockup's chain, after the jobs before it. */
+  function chain<T>(root: string, job: () => Promise<T>): Promise<T> {
+    const p = (filings.get(root) ?? Promise.resolve()).then(job)
+    const settled: Promise<unknown> = p.catch(() => {}).finally(() => { if (filings.get(root) === settled) filings.delete(root) })
+    filings.set(root, settled)
+    return p
+  }
+
   function file(key: string, decision: { other: string } | { change: string }): boolean {
     const e = cache.get(key)
     if (!e || isComponent(e)) return false
     const root = normalizePrompt(e.app), t0 = performance.now(), since = cache.now()
-    const p: Promise<unknown> = (filings.get(root) ?? Promise.resolve())
-      .then(() => fileDecision({ cache, key, decision, fetch: opts.fetch, env: opts.env, log }))
+    chain(root, () => fileDecision({ cache, key, decision, fetch: opts.fetch, env: opts.env, log }))
       .then((run) => run && log(`filed ${run.screen} in ${(run.ms / 1000).toFixed(1)} s for $${run.costUsd?.toFixed(4)}: added ${run.added.join(', ') || 'nothing'}, changed ${run.changed.join(', ') || 'nothing'}, refused ${run.refused.length}`))
       .catch((err) => {
         log(`filing failed: ${message(err)}`)
         if (cache.get(root) && !cache.removedSince(root, since)) cache.noteFiling(e.app, { at: new Date().toISOString(), screen: e.name ?? HOME_NAME, ms: Math.round(performance.now() - t0), costUsd: null, added: [], changed: [], refused: [], error: message(err) })
       })
-      .finally(() => { if (filings.get(root) === p) filings.delete(root) })
-    filings.set(root, p)
     return true
   }
 
-  /** Wait for the mockup's running filing, at most `ms`. */
+  /** Per mockup: the visit running (with its redraws), the newest visit asked for, and how to stop its redraws. */
+  const visits = new Map<string, Promise<unknown>>(), newest = new Map<string, number>(), stops = new Map<string, AbortController>()
+
+  /** A visit of the fixer in the mockup's chain; dropped after a delete or a newer visit. Its redraws are Edits that file nothing. */
+  function visit(app: string): boolean {
+    const root = normalizePrompt(app)
+    if (!cache.get(root)?.versions.length || visits.has(root)) return false
+    const id = (newest.get(root) ?? 0) + 1, since = cache.now(), t0 = performance.now(), stop = new AbortController()
+    newest.set(root, id)
+    stops.set(root, stop)
+    const p = chain(root, () => visitPaper({ cache, app, fetch: opts.fetch, env: opts.env, log }, () => newest.get(root) !== id || cache.removedIn(root, since)))
+      .then(async (r) => {
+        if (!r) return log('visit dropped: the mockup changed meanwhile')
+        let cost = r.visit.costUsd ?? 0
+        await Promise.all(r.redraws.map(async (d) => {
+          const e = cache.get(d.key), v = e?.versions.at(-1)
+          if (!e || !v) return
+          for await (const ev of reviseEvents(e, d.sentence, isModelId(v.model) ? v.model : DEFAULT_MODEL, v.device ?? DEFAULT_DEVICE, stop.signal, true)) {
+            if (ev.type === 'version') { d.change.undo = { key: d.key, createdAt: ev.version.createdAt }; cost += ev.version.costUsd ?? 0 }
+            if (ev.type === 'error') d.change.text = `could not redraw ${e.name}: ${ev.message}`
+          }
+        }))
+        Object.assign(r.visit, { ms: Math.round(performance.now() - t0), costUsd: cost })
+        cache.save()
+        log(`visited ${root.slice(0, 40)}: ${r.visit.changes.length} changes, ${r.visit.refused.length} refused, ${(r.visit.ms / 1000).toFixed(1)} s, $${cost.toFixed(4)}`)
+      })
+      .catch((err) => {
+        log(`visit failed: ${message(err)}`)
+        if (cache.get(root) && !cache.removedIn(root, since)) cache.noteVisit(app, { at: new Date().toISOString(), ms: Math.round(performance.now() - t0), costUsd: null, screens: 0, changes: [], refused: [], error: message(err), seen: false })
+      })
+      .finally(() => { if (visits.get(root) === p) visits.delete(root) })
+    visits.set(root, p)
+    return true
+  }
+
   const filed = (app: string, ms: number) => Promise.race([filings.get(normalizePrompt(app)), Bun.sleep(ms)])
 
-  /** One mockup as every reply that carries it sends it: screens, components, boxes, and whether filing runs. */
-  const mapOf = (app: string) => ({ ...cache.map(app), filing: filings.has(normalizePrompt(app)) })
+  /** One mockup as every reply that carries it sends it: screens, components, boxes, and whether filing or a visit runs. */
+  const mapOf = (app: string) => ({ ...cache.map(app), filing: filings.has(normalizePrompt(app)), visiting: visits.has(normalizePrompt(app)) })
 
-  /** A deleted mockup's filing is not waited for: its result is dropped anyway. */
-  const forget = (app: string) => filings.delete(normalizePrompt(app))
+  /** A deleted mockup's filing is not waited for (its result is dropped anyway), and its visit's redraws stop. */
+  const forget = (app: string) => {
+    const root = normalizePrompt(app)
+    filings.delete(root)
+    visits.delete(root)
+    stops.get(root)?.abort()
+  }
 
-  /** A click in screen `from`, on a control labelled `label`. Absent for the first screen. */
   interface Click { from: string; label: string }
   interface ScreenRequest { app: string; action: string | null; model: ModelId; device: Device; click: Click | null }
 
@@ -185,7 +227,7 @@ export function createServer(opts: ServerOptions = {}) {
     const different = Math.min(PROPOSALS - 1, Math.floor(random() * PROPOSALS))
     const streams = Array.from({ length: PROPOSALS }, (_, slot) => tagged(slot, generateScreen({
       user: drawRequest(paper, target, from ? { ...shown(from), label: click!.label } : null, slot === different),
-      model, device, signal, fetch: opts.fetch, env: opts.env, log,
+      model, device, signal, fetch: opts.fetch, env: opts.env,
     })))
     const parent = click && { key: click.from, label: click.label || prompt || 'home' }
     const failed: string[] = []
@@ -197,9 +239,8 @@ export function createServer(opts: ServerOptions = {}) {
         yield { type: 'failed', variant: t.slot, message: message(t.error) }
       } else if (t.ev.type === 'chunk') yield { type: 'chunk', variant: t.slot, text: t.ev.text }
       else {
-        // A side that finished is paid for: keep it, even if the browser left (or picked the other
-        // side, which aborts this one). Not when the screen was deleted meanwhile, or the other side
-        // was already picked (by another browser).
+        // A finished side is paid for: keep it even if the browser left or picked the other side,
+        // unless the screen was deleted or picked meanwhile.
         if (gone()) continue
         if (!cache.propose(app, action, t.slot, t.ev.version, parent)) continue
         yield { type: 'version', variant: t.slot, version: t.ev.version }
@@ -216,27 +257,26 @@ export function createServer(opts: ServerOptions = {}) {
    * One new version of a picked screen or a component: an Edit with `change`, else (screens only) a
    * Regenerate from its prompt. A screen's Edit is filed afterwards.
    */
-  async function* reviseEvents(entry: CacheEntry, change: string | null, model: ModelId, device: Device, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
+  async function* reviseEvents(entry: CacheEntry, change: string | null, model: ModelId, device: Device, signal: AbortSignal, fixer = false): AsyncGenerator<ScreenEvent> {
     const { key, app } = entry
     yield { type: 'meta', key, cached: false, variants: 1 }
     await filed(app, fileWaitMs)
     if (signal.aborted) return
-    // A revise keeps the device the screen was made for.
     device = entry.versions.at(-1)!.device ?? device
     const paper = cache.paper(app, device), parent = entry.parent && cache.get(entry.parent.key)
     const user = change ? editRequest(paper, shown(entry), change, isComponent(entry))
       : drawRequest(paper, shown(entry), parent?.versions.length ? { ...shown(parent), label: entry.parent!.label } : null)
     try {
-      for await (const ev of generateScreen({ user, model, device, signal, fetch: opts.fetch, env: opts.env, log })) {
+      for await (const ev of generateScreen({ user, model, device, signal, fetch: opts.fetch, env: opts.env })) {
         if (ev.type === 'chunk') { yield { type: 'chunk', variant: 0, text: ev.text }; continue }
-        const version = { ...ev.version, ...(change && { feedback: change }) }
+        const version: Version = { ...ev.version, ...(change && { feedback: change }), ...(fixer && { by: 'fixer' as const }) }
         // A component the user changed is the user's now.
         if (isComponent(entry)) Object.assign(entry, { by: 'user', at: version.createdAt, seen: true })
         const stored = cache.addVersion(key, version)
         if (signal.aborted) return
         if (!stored) { yield { type: 'error', message: 'this screen was deleted while it was being changed' }; return }
         yield { type: 'version', variant: 0, version }
-        yield { type: 'done', entry: stored, filing: !!change && file(key, { change }) }
+        yield { type: 'done', entry: stored, filing: !!change && !fixer && file(key, { change }) }
       }
     } catch (err) {
       if (signal.aborted) return
@@ -245,7 +285,6 @@ export function createServer(opts: ServerOptions = {}) {
     }
   }
 
-  /** The model and device of a request body, or the error response for a bad one. */
   const pickers = (b: { model?: unknown; device?: unknown } | null) => {
     const model = b?.model ?? DEFAULT_MODEL, device = b?.device ?? DEFAULT_DEVICE
     if (!isModelId(model)) return json({ error: `unknown model ${model}` }, 400)
@@ -277,11 +316,8 @@ export function createServer(opts: ServerOptions = {}) {
         ...(cache.warning && { warning: cache.warning }),
       }),
       '/api/screen': {
-        POST: async (req) => {
-          const refused = refuseForeign(req)
-          if (refused) return refused
-          const b = await req.json().catch(() => null)
-          const app = typeof b?.app === 'string' ? b.app.trim() : ''
+        POST: api(async (b, req) => {
+          const app = appOf(b)
           const action = typeof b?.action === 'string' && b.action.trim() ? b.action.trim() : null
           if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
           if (action && (action.length > 500 || (canonicalAction(action) && !screenRef(action)))) return json({ error: 'action must be @name or @name: its one line, at most 500 characters' }, 400)
@@ -289,28 +325,22 @@ export function createServer(opts: ServerOptions = {}) {
           if (p instanceof Response) return p
           const click = typeof b?.from === 'string' && b.from ? { from: b.from.slice(0, 3000), label: String(b?.label ?? '').slice(0, 200) } : null
           return ndjson(screenEvents({ app, action, ...p, click }, req.signal))
-        },
+        }),
       },
-      // Keep one side of a screen's open A OR B; the other is gone.
       '/api/pick': {
-        POST: async (req) => {
-          const refused = refuseForeign(req)
-          if (refused) return refused
-          const b = await req.json().catch(() => null)
+        POST: api(async (b) => {
           const key = String(b?.key ?? ''), index = Number(b?.index)
           const other = cache.get(key)?.proposals?.find((p, i) => p && i !== index)?.html
           const entry = cache.pick(key, index)
           if (!entry) return json({ error: 'no such screen, or no such design to pick' }, 404)
-          // Filing reads the pick in the background; the page learns of it from /api/map?wait=1.
-          return json({ entry, filing: file(key, { other: other ?? '(none: it failed)' }) })
-        },
+          // Filing reads the pick in the background, and every 5th pick the fixer visits after it;
+          // the page learns of both from /api/map?wait=1.
+          const filing = file(key, { other: other ?? '(none: it failed)' })
+          return json({ entry, filing, visiting: cache.boxesOf(entry.app).picks! % VISIT_EVERY === 0 && visit(entry.app) })
+        }),
       },
-      // One new version of a screen: an Edit with `change`, else a Regenerate.
       '/api/revise': {
-        POST: async (req) => {
-          const refused = refuseForeign(req)
-          if (refused) return refused
-          const b = await req.json().catch(() => null)
+        POST: api(async (b, req) => {
           const change = typeof b?.change === 'string' ? b.change.trim() : null
           if (b?.change != null && (!change || change.length > 1000)) return json({ error: 'change must be 1-1000 characters' }, 400)
           const p = pickers(b)
@@ -320,35 +350,39 @@ export function createServer(opts: ServerOptions = {}) {
           if (!entry.versions.length) return json({ error: 'pick one of the two designs first' }, 409)
           if (isComponent(entry) && !change) return json({ error: 'a component changes by Edit' }, 400)
           return ndjson(reviseEvents(entry, change, p.model, p.device, req.signal))
-        },
+        }),
       },
-      // Drop a screen's newest version, so the one before shows again.
       '/api/undo': {
-        POST: async (req) => {
-          const refused = refuseForeign(req)
-          if (refused) return refused
-          const b = await req.json().catch(() => null)
+        POST: api(async (b) => {
           const entry = cache.undo(String(b?.key ?? ''))
           return entry ? json({ entry }) : json({ error: 'no such screen, or nothing to undo' }, 404)
-        },
+        }),
       },
-      // One mockup; with wait=1, once its running filing has finished (at most a minute).
       '/api/map': async (req) => {
         const url = new URL(req.url), app = url.searchParams.get('app')?.trim() ?? ''
         if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
-        if (url.searchParams.get('wait') === '1') await filed(app, 60_000)
+        const root = normalizePrompt(app)
+        if (url.searchParams.get('wait') === '1') await Promise.race([Promise.all([filings.get(root), visits.get(root)]), Bun.sleep(60_000)])
         return json(mapOf(app))
       },
-      // The user changes the boxes: add, change or delete a rule or a table, or mark a box as looked at.
+      '/api/visit': {
+        POST: api(async (b) => {
+          const app = appOf(b)
+          if (!cache.get(screenKey(app, null))?.versions.length) return json({ error: 'no such mockup' }, 404)
+          visit(app)
+          return json(mapOf(app))
+        }),
+      },
       '/api/box': {
-        POST: async (req) => {
-          const refused = refuseForeign(req)
-          if (refused) return refused
-          const b = await req.json().catch(() => null)
-          const app = typeof b?.app === 'string' ? b.app.trim() : ''
+        POST: api(async (b) => {
+          const app = appOf(b)
           if (!cache.get(screenKey(app, null))) return json({ error: 'no such mockup' }, 404)
           const box = b?.box as BoxName, op = b?.op
-          if (op === 'seen' && ['components', 'rules', 'data'].includes(box)) cache.markSeen(app, box, Array.isArray(b?.ids) ? b.ids.map(String) : undefined)
+          if (op === 'seen' && ['components', 'rules', 'data', 'notes'].includes(box)) cache.markSeen(app, box, Array.isArray(b?.ids) ? b.ids.map(String) : undefined)
+          else if (op === 'undo') {
+            const why = cache.undoChange(app, String(b?.at ?? ''), Number(b?.i))
+            if (why) return json({ error: why }, 400)
+          }
           else if ((box === 'rules' || box === 'data') && ['add', 'set', 'delete'].includes(op)) {
             // A new entry's ID comes from its words: the rule's sentence, or the table's name.
             const id = op === 'add' ? cache.freeId(app, box, String(b?.text ?? b?.id ?? '')) : String(b?.id ?? '')
@@ -356,44 +390,33 @@ export function createServer(opts: ServerOptions = {}) {
             if (why) return json({ error: why }, 400)
           } else return json({ error: 'unknown box or op' }, 400)
           return json(mapOf(app))
-        },
+        }),
       },
       '/api/apps': () => json({ apps: cache.apps() }),
-      // Delete a screen and the screens only it reaches; the first screen takes the mockup with it.
-      // Returns the mockup as /api/map does: a delete can give other screens new parents.
+      // Returns the whole mockup: a delete can give other screens new parents.
       '/api/delete': {
-        POST: async (req) => {
-          const refused = refuseForeign(req)
-          if (refused) return refused
-          const b = await req.json().catch(() => null)
+        POST: api(async (b) => {
           const key = String(b?.key ?? ''), app = cache.get(key)?.app
           const removed = cache.delete(key)
           if (app && key === normalizePrompt(app)) forget(app)
           return removed && app ? json({ removed, ...mapOf(app) }) : json({ error: 'no such screen' }, 404)
-        },
+        }),
       },
-      // Delete a whole mockup, so its prompt starts over.
       '/api/delete-app': {
-        POST: async (req) => {
-          const refused = refuseForeign(req)
-          if (refused) return refused
-          const b = await req.json().catch(() => null)
-          const app = typeof b?.app === 'string' ? b.app.trim() : ''
+        POST: api(async (b) => {
+          const app = appOf(b)
           if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
           forget(app)
           return json({ removed: cache.deleteApp(app) })
-        },
+        }),
       },
       '/api/warmup': {
-        POST: async (req) => {
-          const refused = refuseForeign(req)
-          if (refused) return refused
-          const b = await req.json().catch(() => null)
+        POST: api(async (b) => {
           const model = b?.model ?? DEFAULT_MODEL
           if (!isModelId(model)) return json({ error: `unknown model ${model}` }, 400)
           warmUp(model, { fetch: opts.fetch, env: opts.env }).catch((e) => log(`warm-up failed (${model}): ${e.message}`))
           return new Response(null, { status: 204 })
-        },
+        }),
       },
     },
     fetch: () => new Response('Not found', { status: 404 }),
