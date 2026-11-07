@@ -158,10 +158,11 @@ decision changes an entry, change that entry and keep its ID.
 Every few screens a senior designer visits, reads the boxes and the screens added since the last
 visit, and tidies up.
 
-- Merge entries that say one thing twice, keeping the older ID. Of two rules that disagree, remove
-  the older one. Remove an entry that one screen or no screen needs.
-- Add what filing missed: a part drawn by hand on three screens, a fact two screens show
-  differently (the rule takes the newer screen's side).
+- Go through the boxes entry by entry. Ask of each: do two or more screens need it? If one screen
+  or none does, remove it, even if a screen could use it. Merge entries that say one thing twice,
+  keeping the older ID. Of two rules that disagree, remove the older one.
+- Add what filing missed: a part drawn by hand on three screens. Where two screens show one fact
+  differently, redraw the older screen to match the newer one.
 - Redraw a screen that breaks a rule, draws a component by hand, or has a control that leads
   nowhere.
 - Leave a note for each change. The user can undo any of them.

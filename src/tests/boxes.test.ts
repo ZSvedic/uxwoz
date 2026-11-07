@@ -51,9 +51,9 @@ describe('paste by ID and the current link', () => {
 })
 
 describe('filing', () => {
-  test('parts are numbered in order, not inside an svg or a script, and not a paste placeholder', () => {
-    expect(numberParts('<div><p>a</p><svg><g></g></svg><div data-component="x"></div><script>"<p>"</script><p>b</p></div>'))
-      .toBe('<div data-part="1"><p data-part="2">a</p><svg data-part="3"><g></g></svg><div data-component="x"></div><script>"<p>"</script><p data-part="4">b</p></div>')
+  test('parts are numbered in order, not inside an svg or a script, and not a paste placeholder; numbers a model wrote go', () => {
+    expect(numberParts('<div><p data-part="9">a</p><b DATA-PART=3></b><svg><g></g></svg><div data-component="x"></div><script>"<p>"</script><p>b</p></div>'))
+      .toBe('<div data-part="1"><p data-part="2">a</p><b></b><svg data-part="3"><g></g></svg><div data-component="x"></div><script>"<p>"</script><p data-part="4">b</p></div>')
   })
 
   test('each line is read as one of the forms; anything else is bad', () => {
@@ -85,7 +85,7 @@ describe('filing', () => {
     expect(out.added).toEqual(['nav-bar'])
     expect(out.refused.map((r) => r.split('": ')[1])).toEqual([
       '"Tab_Bar" is no ID (1 to 4 lowercase words joined by dashes)', 'rules already has or had calm', 'a line must be at most 120 characters',
-      'rules has no missing', 'the screen has no part 99', 'part 4 overlaps a part filed above', 'no table lonely above it',
+      'rules has no missing', 'the screen has no part 99', 'part 4 overlaps a part filed above', 'no table above it',
       'a table has 1 to 6 named columns', 'not one of the forms',
     ])
     for (let i = 1; cache.boxesOf('Snore').rules.length < LIMITS.rules; i++) cache.setBox('Snore', 'add', 'rules', { id: `r${i}`, text: 'A rule.' }, 'user')
@@ -96,9 +96,11 @@ describe('filing', () => {
     const { cache, file } = mockup()
     const rows = Array.from({ length: LIMITS.rows + 1 }, (_, i) => `row t: n${i} | ${i}`)
     expect(file(['table t: name | value', ...rows, 'row t: one cell'].join('\n')).refused).toEqual(['"row t: n8 | 8": a table has at most 8 rows', '"row t: one cell": table t has 2 columns'])
-    file('change table t: name | amount\nrow t: a | 1')
+    file('change table t: name | amount\nrow first-row: a | 1')
     expect(cache.boxesOf('Snore').data[0]).toMatchObject({ id: 't', columns: ['name', 'amount'], rows: [['a', '1']] })
-    expect(file('row t: b | 2').refused).toEqual(['"row t: b | 2": no table t above it'])
+    expect(file('row t: b | 2').refused).toEqual(['"row t: b | 2": no table above it'])
+    expect(file('table u: a | b\nrow t: 1 | 2\nrow u-one: 3 | 4').refused).toEqual(['"row t: 1 | 2": table t is not the one above it'])
+    expect(file('table u: a | b\nrow u: 5 | 6').refused).toEqual(['"table u: a | b": data already has or had u', '"row u: 5 | 6": table u was refused'])
     expect(file('change table t: name | amount').changed).toEqual(['t'])
     expect(cache.boxesOf('Snore').data[0]!.rows).toEqual([])
     file('change rule x: nope\nrule x: Once.\nchange rule x: Twice.')

@@ -15,10 +15,10 @@ export const FILING_DEADLINE_MS = 60_000
 
 const BLOCKS = 'header|footer|nav|section|article|aside|main|form|fieldset|table|ul|ol|div|p|h1|h2|h3|h4|figure|details|svg|label|button|a|select|progress'
 
-/** Each block element gets data-part="N", in order; nothing inside an svg or a script, and no paste placeholder. */
+/** Each block element gets data-part="N", in order (numbers a model wrote go first); nothing inside an svg or a script, and no paste placeholder. */
 export function numberParts(html: string): string {
   let n = 0, skip = 0
-  return html.replace(new RegExp(`<(/?)(${BLOCKS}|script)\\b([^>]*)>`, 'gi'), (all, close: string, tag: string, attrs: string) => {
+  return unnumber(html).replace(new RegExp(`<(/?)(${BLOCKS}|script)\\b([^>]*)>`, 'gi'), (all, close: string, tag: string, attrs: string) => {
     const t = tag.toLowerCase()
     if (t === 'script') { skip += close ? -1 : 1; return all }
     if (skip > 0) { if (t === 'svg') skip += close ? -1 : 1; return all }
@@ -28,7 +28,7 @@ export function numberParts(html: string): string {
   })
 }
 
-const unnumber = (html: string) => html.replace(/ data-part="\d+"/g, '')
+const unnumber = (html: string) => html.replace(/\s+data-part\s*=\s*(["']?)\d+\1/gi, '')
 
 /** Where part N of a numbered screen starts and ends, or null when it has none. */
 function partAt(numbered: string, n: number): { start: number; end: number } | null {
@@ -71,26 +71,30 @@ export function applyFiling(cache: ScreenCache, app: string, key: string, filedH
   const out: Filed = { added: [], changed: [], refused: [] }
   const refuse = (line: string, why: string) => out.refused.push(`"${line}": ${why}`)
   const cuts: { start: number; end: number; id: string }[] = []
-  let table: { id: string; columns: string[]; rows: string[][]; change: boolean; line: string } | null = null
+  let table: { id: string; columns: string[]; rows: string[][]; lines: string[]; change: boolean; line: string } | null = null
   const done = (why: string | null, line: string, id: string, change: boolean) => (why ? refuse(line, why) : (change ? out.changed : out.added).push(id))
   const flush = () => {
     if (!table) return
     const t = table
     table = null
-    done(cache.setBox(app, t.change ? 'set' : 'add', 'data', { id: t.id, columns: t.columns, rows: t.rows }, 'filing'), t.line, t.id, t.change)
+    const why = cache.setBox(app, t.change ? 'set' : 'add', 'data', { id: t.id, columns: t.columns, rows: t.rows }, 'filing')
+    done(why, t.line, t.id, t.change)
+    if (why) for (const r of t.lines) refuse(r, `table ${t.id} was refused`)
   }
   for (const l of parseFiling(reply)) {
     if (l.kind !== 'row') flush()
     if (l.kind === 'nothing') continue
     if (l.kind === 'bad') { refuse(l.line, 'not one of the forms'); continue }
     if (l.kind === 'rule') { done(cache.setBox(app, l.change ? 'set' : 'add', 'rules', { id: l.id, text: l.text }, 'filing'), l.line, l.id, l.change); continue }
-    if (l.kind === 'table') { table = { id: l.id, columns: cells(l.text), rows: [], change: l.change, line: l.line }; continue }
+    if (l.kind === 'table') { table = { id: l.id, columns: cells(l.text), rows: [], lines: [], change: l.change, line: l.line }; continue }
     if (l.kind === 'row') {
-      const t = table as { id: string; columns: string[]; rows: string[][] } | null
-      if (!t || t.id !== l.id) refuse(l.line, `no table ${l.id} above it`)
-      else if (cells(l.text).length !== t.columns.length) refuse(l.line, `table ${l.id} has ${t.columns.length} columns`)
+      const t = table as { id: string; columns: string[]; rows: string[][]; lines: string[] } | null
+      // A row belongs to the table above it, unless it names another table in Data.
+      if (!t) refuse(l.line, 'no table above it')
+      else if (l.id !== t.id && cache.boxesOf(app).data.some((x) => x.id === l.id)) refuse(l.line, `table ${l.id} is not the one above it`)
+      else if (cells(l.text).length !== t.columns.length) refuse(l.line, `table ${t.id} has ${t.columns.length} columns`)
       else if (t.rows.length >= LIMITS.rows) refuse(l.line, `a table has at most ${LIMITS.rows} rows`)
-      else t.rows.push(cells(l.text))
+      else t.rows.push(cells(l.text)), t.lines.push(l.line)
       continue
     }
     // A component: the outer HTML of part N.

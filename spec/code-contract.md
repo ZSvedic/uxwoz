@@ -67,11 +67,13 @@ can spend model credits.
   the background model GPT-6.1 Terra, one filing per mockup at a time. It applies the reply's lines
   to the boxes (`applyFiling` in `core/src/filing.ts`) and refuses, in the server log and in
   `boxes.filed.refused`, a bad or used ID, a line over 120 characters, a full box, a part that is
-  not there. A new screen or a revise waits for a running filing at most 5 s (`fileWaitMs`) before
+  not there, a row with no table above it or naming another table, the rows of a refused table. A
+  row joins the table above it whatever ID it names. A new screen or a revise waits for a running filing at most 5 s (`fileWaitMs`) before
   its model calls, after its `meta` event.
 - **A visit** of the fixer (`visitPaper` and `applyVisit` in `core/src/fixer.ts`) takes its turn in
   the same chain, so filing and the fixer never change the boxes at once. Terra reads the paper and
-  the screens whose newest version is newer than the last visit, parts numbered. Its lines are
+  the screens whose newest version is newer than the last visit, oldest first, parts numbered
+  (code's numbers only: `numberParts` drops any a model wrote). Its lines are
   applied with refusals in `visits[].refused`: no such entry, an entry `by: 'user'`, two IDs of
   different boxes, a used ID, a part not there, a second redraw of one screen, more than 5
   redraws (`MAX_REDRAWS`, a cost limit), a screen with an open A OR B. A merge removes the newer

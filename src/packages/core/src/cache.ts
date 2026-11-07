@@ -253,7 +253,9 @@ export class ScreenCache {
   /** The paper every model call reads: the screens' titles and lines, and the three boxes in full. */
   paper(app: string, device?: Device): Paper {
     const all = this.mockup(normalizePrompt(app)), b = this.boxesOf(app)
-    const components = all.filter((e) => isComponent(e) && e.versions.length).map((e) => ({ id: e.name!, where: e.action ?? '', html: e.versions.at(-1)!.html, by: e.by }))
+    const screens = all.filter((e) => !isComponent(e) && e.versions.length)
+    const components = all.filter((e) => isComponent(e) && e.versions.length).map((e) => ({ id: e.name!, where: e.action ?? '', html: e.versions.at(-1)!.html, by: e.by,
+      on: screens.filter((s) => s.versions.at(-1)!.html.includes(`data-component="${e.name}"`)).map((s) => s.name ?? HOME_NAME) }))
     return { app, device, ...screenList(all), components, rules: b.rules, data: b.data }
   }
 

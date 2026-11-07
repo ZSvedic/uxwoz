@@ -101,7 +101,7 @@ export async function visitPaper(o: VisitOptions, dropped: () => boolean): Promi
   const { cache, app } = o
   const all = cache.map(app).entries.filter((e) => !isComponent(e) && e.versions.length)
   const lastAt = cache.boxesOf(app).visits?.filter((v) => !v.error).at(-1)?.at ?? ''
-  const fresh = all.filter((e) => e.versions.at(-1)!.createdAt > lastAt)
+  const fresh = all.filter((e) => e.versions.at(-1)!.createdAt > lastAt).sort((a, b) => a.versions.at(-1)!.createdAt.localeCompare(b.versions.at(-1)!.createdAt))
   const sent = new Map(fresh.map((e) => [e.name ?? HOME_NAME, numberParts(e.versions.at(-1)!.html)]))
   const at = new Date().toISOString(), t0 = performance.now()
   const user = visitRequest(cache.paper(app, all[0]?.versions.at(-1)?.device), fresh.map((e) => ({ id: e.name ?? HOME_NAME, line: e.action ?? HOME_LINE, html: sent.get(e.name ?? HOME_NAME)! })))

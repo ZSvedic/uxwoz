@@ -216,7 +216,8 @@ the last filing did, with its time and cost; hovering it lists any line filing's
   titles and the screens added or changed since its last visit (all of them on the first), and
   merges entries that say one thing twice (the older ID stays), removes what one screen or none
   needs, adds a rule or a component filing missed, and redraws at most 5 screens that break a
-  rule, draw a component by hand or have a control that leads nowhere. A redraw is an Edit with the
+  rule, draw a component by hand, have a control that leads nowhere or show a fact differently
+  from a newer screen. A redraw is an Edit with the
   fixer's sentence as the change: a new version, no filing. An entry the user wrote is never
   changed or removed, a screen whose A OR B is open is not redrawn, and a component that goes
   leaves its HTML in the screens that paste it, so they look the same. A visit whose reply comes
@@ -252,7 +253,8 @@ control leads nowhere yet*, and the fixer redraws it. Other controls (filters, i
 - **The paper in each request**: every request lists the mockup's screens, made and planned, as
   titles (`sleep-report: what it is for`, the first screen first, planned ones and open A OR Bs
   marked *no drawing yet*) and lines (`home -> sleep-report` for each link between two of them),
-  then the three boxes in full (see [prompt-screen.md](prompt-screen.md)). The model links to a
+  then the three boxes in full, each component with the screens that paste it (see
+  [prompt-screen.md](prompt-screen.md)). The model links to a
   screen on the paper with `@` and its ID alone (`data-action="@sleep-report"`), back with `back`,
   and to a new screen with an ID and its one line. A link by ID alone with no screen and no plan
   behind it makes a screen from the ID and the button's words.
