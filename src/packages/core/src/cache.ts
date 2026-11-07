@@ -226,7 +226,7 @@ export class ScreenCache {
 
   /** The last filing run of a mockup, for the line under its boxes. */
   noteFiling(app: string, run: Boxes['filed']) {
-    this.boxesOf(app).filed = run
+    this.own(app).filed = run
     this.save()
   }
 
@@ -252,28 +252,35 @@ export class ScreenCache {
     return { root, entries: this.mockup(root), boxes: this.boxesOf(app) }
   }
 
+  /** A mockup's boxes, to read: empty ones for a mockup that has none yet. */
   boxesOf(app: string): Boxes {
+    return this.boxes.get(normalizePrompt(app)) ?? emptyBoxes()
+  }
+
+  /** A mockup's boxes, to change: stored from now on. */
+  private own(app: string): Boxes {
     const root = normalizePrompt(app)
     let b = this.boxes.get(root)
     if (!b) this.boxes.set(root, (b = emptyBoxes()))
     return b
   }
 
+  /** The IDs a box holds now. */
+  private ids(app: string, box: BoxName): string[] {
+    return box === 'components' ? this.mockup(normalizePrompt(app)).filter(isComponent).map((e) => e.name!) : this.boxesOf(app)[box].map((x) => x.id)
+  }
+
   /** A free ID for a new entry, from its words: up to 3 of them, then -2, -3… if taken or used before. */
   freeId(app: string, box: BoxName, words: string): string {
-    const b = this.boxesOf(app)
-    const have = box === 'components' ? this.mockup(normalizePrompt(app)).filter(isComponent).map((e) => e.name!) : b[box].map((x) => x.id)
-    return uniqueName(nameFrom(words).split('-').slice(0, 3).join('-'), new Set([...have, ...b.gone[box]]))
+    return uniqueName(nameFrom(words).split('-').slice(0, 3).join('-'), new Set([...this.ids(app, box), ...this.boxesOf(app).gone[box]]))
   }
 
   /** Why an ID cannot be a new entry of a box (a bad ID, one in use or used before, a full box), or null. */
   private refuseNew(app: string, box: BoxName, id: string): string | null {
-    const b = this.boxesOf(app)
-    const have = box === 'components' ? this.mockup(normalizePrompt(app)).filter(isComponent).map((e) => e.name) : b[box].map((x) => x.id)
+    const have = this.ids(app, box)
     if (!isId(id)) return `"${id}" is no ID (1 to 4 lowercase words joined by dashes)`
-    if (have.includes(id) || b.gone[box].includes(id)) return `${box} already has or had ${id}`
-    if (have.length >= LIMITS[box]) return `${box} is full (${LIMITS[box]})`
-    return null
+    if (have.includes(id) || this.boxesOf(app).gone[box].includes(id)) return `${box} already has or had ${id}`
+    return have.length >= LIMITS[box] ? `${box} is full (${LIMITS[box]})` : null
   }
 
   /** Add a component taken from a screen (`from`), or by the user. Returns the entry, or why not. */
@@ -296,7 +303,7 @@ export class ScreenCache {
    * table has 1 to 6 columns and at most 8 rows, each as long as the columns. Returns why not, or null.
    */
   setBox(app: string, op: 'add' | 'set' | 'delete', box: 'rules' | 'data', entry: { id: string; text?: string; columns?: string[]; rows?: string[][] }, by: Mark['by']): string | null {
-    const b = this.boxesOf(app), list: (Rule | Table)[] = b[box]
+    const b = this.own(app), list: (Rule | Table)[] = b[box]
     const i = list.findIndex((x) => x.id === entry.id)
     const why = op === 'add' ? this.refuseNew(app, box, entry.id) : i < 0 ? `${box} has no ${entry.id}` : null
     if (why) return why
@@ -313,10 +320,10 @@ export class ScreenCache {
     return null
   }
 
-  /** The user looked at a box: its entries are no longer marked new. */
-  markSeen(app: string, box: BoxName) {
-    const list: { seen?: boolean }[] = box === 'components' ? this.mockup(normalizePrompt(app)).filter(isComponent) : this.boxesOf(app)[box]
-    for (const x of list) x.seen = true
+  /** The user looked at a box: its entries (those with `ids`, when given) are no longer marked new. */
+  markSeen(app: string, box: BoxName, ids?: string[]) {
+    const list: { seen?: boolean; id?: string; name?: string }[] = box === 'components' ? this.mockup(normalizePrompt(app)).filter(isComponent) : this.own(app)[box]
+    for (const x of list) if (!ids || ids.includes(x.id ?? x.name ?? '')) x.seen = true
     this.save()
   }
 
@@ -347,7 +354,7 @@ export class ScreenCache {
     if (isComponent(entry)) {
       // Screens that paste it show nothing in its place; no screen goes with it.
       this.entries.delete(key)
-      this.boxesOf(entry.app).gone.components.push(entry.name!)
+      this.own(entry.app).gone.components.push(entry.name!)
       this.save()
       return [key]
     }
@@ -411,7 +418,7 @@ export class ScreenCache {
 const mark = (by: Mark['by']): Mark => ({ by, at: new Date().toISOString(), seen: by === 'user' })
 
 /** Why a line (a rule, where a component belongs) cannot be stored, or null. */
-function refuseLine(text: unknown): string | null {
+export function refuseLine(text: unknown): string | null {
   if (typeof text !== 'string' || !text.trim() || /\n/.test(text.trim())) return 'a line must be one line of text'
   return text.trim().length > LIMITS.line ? `a line must be at most ${LIMITS.line} characters` : null
 }
@@ -419,7 +426,8 @@ function refuseLine(text: unknown): string | null {
 const ruleBody = (text: unknown) => refuseLine(text) ?? { text: (text as string).trim() }
 
 function tableBody(columns: unknown, rows: unknown): { columns: string[]; rows: string[][] } | string {
-  const ok = (r: unknown): r is string[] => Array.isArray(r) && r.every((c) => typeof c === 'string' && c.length <= LIMITS.line)
+  const ok = (r: unknown): r is string[] => Array.isArray(r) && r.every((c) => typeof c === 'string')
+  if ([columns, ...(Array.isArray(rows) ? rows : [])].some((r) => ok(r) && r.some((c) => c.length > LIMITS.line))) return `a value must be at most ${LIMITS.line} characters`
   if (!ok(columns) || !columns.length || columns.length > LIMITS.columns || columns.some((c) => !c.trim())) return `a table has 1 to ${LIMITS.columns} named columns`
   if (!Array.isArray(rows) || rows.length > LIMITS.rows) return `a table has at most ${LIMITS.rows} rows`
   if (!rows.every((r) => ok(r) && r.length === columns.length)) return 'each row has one value per column'

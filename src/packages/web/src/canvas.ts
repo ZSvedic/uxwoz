@@ -9,7 +9,7 @@
 // Left of the tree is a column with the mockup's boxes (built by boxes.ts); component cards are
 // cards like screens, in the Components box, as tall as their content.
 
-import { FRAME_SANDBOX, framePage, type Device } from '@uxwoz/core/frame'
+import { DEFAULT_DEVICE, DEVICES, FRAME_SANDBOX, framePage, type Device } from '@uxwoz/core/frame'
 
 /** Limits on the height a screen may report, so a broken screen cannot make a huge frame. A component may be short. */
 const MIN_SCREEN_H = 160
@@ -465,7 +465,7 @@ export class Canvas {
     const gapX = Math.max(GAP_X, (RAIL_W + 24) / z), orW = Math.max(OR_W, OR_MIN / z)
     const screens = this.screens.filter((s) => !s.component)
     // The boxes column is as wide as a screen of the mockup and its rail.
-    const devW = Math.max(390, ...this.screens.filter((s) => s.component || !s.parent).map((s) => s.cards[0]?.width ?? 0))
+    const devW = Math.max(DEVICES[DEFAULT_DEVICE].width, ...this.screens.filter((s) => s.component || !s.parent).map((s) => s.cards[0]?.width ?? 0))
     const sideW = this.side.hidden ? 0 : devW + 40 + (RAIL_W + 10) / z
     Object.assign(this.side.style, { left: `${PAD}px`, top: `${PAD}px`, width: `${sideW}px` })
     const left = PAD + (sideW && sideW + gapX)

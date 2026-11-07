@@ -22,11 +22,15 @@ function mockup(html = HOME) {
 }
 
 describe('paste by ID and the current link', () => {
-  test('a placeholder becomes its component, contents and all; a gone one becomes nothing; one pass only', () => {
-    const comps = { 'tab-bar': '<nav><a data-action="@home">Home</a><div data-component="tab-bar"></div></nav>' }
+  test('a placeholder becomes its component, contents and all; an ID not in the box leaves its element as it is', () => {
+    const comps = { 'tab-bar': '<nav><a data-action="@home">Home</a></nav>', footer: '<footer><div data-component="tab-bar"></div></footer>' }
     expect(pasteComponents('<h1>x</h1><div data-component="tab-bar"></div><p>y</p>', comps)).toBe(`<h1>x</h1>${comps['tab-bar']}<p>y</p>`)
     expect(pasteComponents('<div data-component="tab-bar"><div>hand-drawn</div></div>!', comps)).toBe(`${comps['tab-bar']}!`)
-    expect(pasteComponents('<section data-component="gone">x</section><b>z</b>', comps)).toBe('<b>z</b>')
+    // A deleted component's empty placeholder shows nothing; hand-drawn contents of an unknown ID stay.
+    expect(pasteComponents('<div data-component="gone"></div><nav data-component="new">x</nav>', comps)).toBe('<div data-component="gone"></div><nav data-component="new">x</nav>')
+    // A component taken from a part that pasted another one pastes it too, three levels deep at most.
+    expect(pasteComponents('<div data-component="footer"></div>', comps)).toBe(`<footer>${comps['tab-bar']}</footer>`)
+    expect(pasteComponents('<i data-component="loop"></i>', { loop: '<b data-component="loop"></b>' })).toBe('<b data-component="loop"></b>')
     // While a screen streams, a placeholder with no end yet still shows its component.
     expect(pasteComponents('<p>a</p><div data-component="tab-bar">', comps)).toBe(`<p>a</p>${comps['tab-bar']}`)
   })
@@ -41,6 +45,7 @@ describe('paste by ID and the current link', () => {
   test('a link to the screen it sits on is marked current, wherever it is', () => {
     expect(markCurrent('<a data-action="@history">H</a><button data-action="@history: all nights">All</button><a data-action="@history-2">2</a>', 'history'))
       .toBe('<a data-action="@history" aria-current="page">H</a><button data-action="@history: all nights" aria-current="page">All</button><a data-action="@history-2">2</a>')
+    expect(markCurrent(`<a data-action="@history: the user's nights">H</a>`, 'history')).toContain('aria-current')
     expect(markCurrent('<a data-action="@home">H</a>', undefined)).toBe('<a data-action="@home">H</a>')
   })
 })
@@ -61,7 +66,7 @@ describe('filing', () => {
     const out = file('component tab-bar from part 3: every main screen\nrule calm-words: Screens speak calmly.\ntable nights: night | score\nrow nights: Mon | 4\nrow nights: Tue | 6')
     expect(out).toEqual({ added: ['tab-bar', 'calm-words', 'nights'], changed: [], refused: [] })
     const bar = cache.component('Snore', 'tab-bar')!
-    expect(bar).toMatchObject({ kind: 'component', name: 'tab-bar', action: 'every main screen', by: 'filing', seen: false, parent: { key, label: 'part 3' } })
+    expect(bar).toMatchObject({ kind: 'component', name: 'tab-bar', action: 'every main screen', by: 'filing', seen: false, parent: { key } })
     expect(bar.versions[0]!.html).toBe('<nav><a data-action="@home">Tonight</a><a data-action="@history: every night">History</a></nav>')
     const now = cache.get(key)!.versions[0]!.html
     expect(now).toBe('<title>Home</title><h1>Tonight</h1><p>Ready.</p><div data-component="tab-bar"></div>')
@@ -87,16 +92,25 @@ describe('filing', () => {
     expect(file('rule one-more: Too many.').refused).toEqual(['"rule one-more: Too many.": rules is full (20)'])
   })
 
-  test('a table takes at most 8 rows of its own width; a change keeps the ID; rows alone add to a table', () => {
+  test('a table takes at most 8 rows of its own width; a change keeps the ID and takes the rows after it', () => {
     const { cache, file } = mockup()
     const rows = Array.from({ length: LIMITS.rows + 1 }, (_, i) => `row t: n${i} | ${i}`)
     expect(file(['table t: name | value', ...rows, 'row t: one cell'].join('\n')).refused).toEqual(['"row t: n8 | 8": a table has at most 8 rows', '"row t: one cell": table t has 2 columns'])
     file('change table t: name | amount\nrow t: a | 1')
     expect(cache.boxesOf('Snore').data[0]).toMatchObject({ id: 't', columns: ['name', 'amount'], rows: [['a', '1']] })
-    file('row t: b | 2')
-    expect(cache.boxesOf('Snore').data[0]!.rows).toEqual([['a', '1'], ['b', '2']])
+    expect(file('row t: b | 2').refused).toEqual(['"row t: b | 2": no table t above it'])
+    expect(file('change table t: name | amount').changed).toEqual(['t'])
+    expect(cache.boxesOf('Snore').data[0]!.rows).toEqual([])
     file('change rule x: nope\nrule x: Once.\nchange rule x: Twice.')
     expect(cache.boxesOf('Snore').rules).toMatchObject([{ id: 'x', text: 'Twice.' }])
+  })
+
+  test('a changed component takes its new part and its new line; a bad line is refused', () => {
+    const { cache, file } = mockup()
+    file('component tab-bar from part 3: every screen')
+    expect(file(`change component tab-bar from part 4: ${'x'.repeat(121)}`).refused).toHaveLength(1)
+    expect(file('change component tab-bar from part 4: the top of every screen').changed).toEqual(['tab-bar'])
+    expect(cache.component('Snore', 'tab-bar')).toMatchObject({ action: 'the top of every screen', versions: [{}, { html: '<a data-action="@home">Tonight</a>' }] })
   })
 
   test('a screen changed while filing ran keeps its HTML; the component still goes in the box', () => {
@@ -157,11 +171,11 @@ function provider() {
   return { fetch, open, screens }
 }
 
-async function withServer(fileWaitMs: number, run: (s: { post: (p: string, b: object) => Promise<Response>; url: URL; p: ReturnType<typeof provider> }) => Promise<void>) {
-  const p = provider()
-  const server = createServer({ port: 0, cache: new ScreenCache(), fetch: p.fetch, env, log: () => {}, random: () => 0.9, fileWaitMs })
+async function withServer(fileWaitMs: number, run: (s: { post: (p: string, b: object) => Promise<Response>; url: URL; p: ReturnType<typeof provider>; cache: ScreenCache }) => Promise<void>) {
+  const p = provider(), cache = new ScreenCache()
+  const server = createServer({ port: 0, cache, fetch: p.fetch, env, log: () => {}, random: () => 0.9, fileWaitMs })
   const post = (path: string, body: object) => fetch(new URL(path, server.url), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  try { await run({ post, url: server.url, p }) } finally { p.open(); server.stop(true) }
+  try { await run({ post, url: server.url, p, cache }) } finally { p.open(); server.stop(true) }
 }
 
 describe('filing in the server', () => {
@@ -181,12 +195,40 @@ describe('filing in the server', () => {
     return withServer(100, async ({ post, url, p }) => {
       await (await post('/api/screen', { app: 'Snore' })).text()
       await post('/api/pick', { key: 'snore', index: 0 })
+      const t0 = performance.now()
       await (await post('/api/screen', { app: 'Snore', action: '@history: every night', from: 'snore', label: 'H' })).text()
+      expect(performance.now() - t0).toBeLessThan(1000)
       expect(p.screens.at(-1)).not.toContain('quiet-nights')
       expect((await (await fetch(new URL('/api/map?app=Snore', url))).json()).filing).toBe(true)
       setTimeout(p.open, 50)
       const map = await (await fetch(new URL('/api/map?app=Snore&wait=1', url))).json()
       expect(map).toMatchObject({ filing: false, boxes: { rules: [{ id: 'quiet-nights', by: 'filing', seen: false }], filed: { screen: 'home', added: ['quiet-nights'] } } })
+    })
+  })
+
+  test('Start over does not wait for the old mockup\'s filing, and drops what it files', () => {
+    return withServer(5000, async ({ post, url }) => {
+      await (await post('/api/screen', { app: 'Snore' })).text()
+      await post('/api/pick', { key: 'snore', index: 0 })
+      await post('/api/delete-app', { app: 'Snore' })
+      const t0 = performance.now()
+      await (await post('/api/screen', { app: 'Snore' })).text()
+      expect(performance.now() - t0).toBeLessThan(1000)
+      expect((await (await fetch(new URL('/api/map?app=Snore', url))).json()).boxes.rules).toEqual([])
+    })
+  })
+
+  test('a component the user changes is the user\'s; Terra is no screen model', () => {
+    return withServer(100, async ({ post, url, cache }) => {
+      await (await post('/api/screen', { app: 'Snore' })).text()
+      await post('/api/pick', { key: 'snore', index: 0 })
+      const bar = cache.addComponent('Snore', 'bar', 'every screen', ver('<nav></nav>'), 'filing') as { key: string }
+      await (await post('/api/revise', { key: bar.key, change: 'Bigger' })).text()
+      expect(cache.get(bar.key)).toMatchObject({ by: 'user', seen: true, versions: [{}, { feedback: 'Bigger' }] })
+      expect((await post('/api/revise', { key: bar.key })).status).toBe(400)
+      const cfg = await (await fetch(new URL('/api/config', url))).json()
+      expect(cfg.models.map((m: { id: string }) => m.id)).not.toContain('gpt-6.1-terra')
+      expect((await post('/api/screen', { app: 'X', model: 'gpt-6.1-terra' })).status).toBe(400)
     })
   })
 
@@ -202,6 +244,7 @@ describe('filing in the server', () => {
       expect(t.boxes.data).toMatchObject([{ id: 'nights', columns: ['night', 'score'] }])
       const del = await (await post('/api/box', { app: 'Snore', op: 'delete', box: 'rules', id: 'scores-run-from' })).json()
       expect(del.boxes).toMatchObject({ rules: [], gone: { rules: ['scores-run-from'] } })
+      expect(await (await post('/api/box', { app: 'Snore', op: 'set', box: 'data', id: 'nights', columns: ['night', 'x'.repeat(121)], rows: [] })).json()).toMatchObject({ error: 'a value must be at most 120 characters' })
       expect((await post('/api/box', { app: 'Snore', op: 'seen', box: 'data' })).status).toBe(200)
       expect((await post('/api/box', { app: 'Snore', op: 'drop', box: 'rules' })).status).toBe(400)
     })

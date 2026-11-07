@@ -54,7 +54,7 @@ export interface Side {
 
 export function createSide(): Side {
   const root = el('div', 'boxes')
-  root.append(el('p', 'box-status'))
+  root.append(el('p', 'box-status'), el('ul', 'box-refused'))
   const sections = {} as Record<BoxName, HTMLElement>
   for (const name of ['components', 'rules', 'data'] as BoxName[]) {
     const s = el('section', `box box-${name}`)
@@ -77,8 +77,11 @@ export function renderSide(side: Side, v: SideView, op: (o: BoxOp) => void) {
   status.textContent = v.filing ? 'Filing your last decision…' : f?.error ? `The last filing failed: ${f.error}`
     : f ? `Last filing, after ${f.screen}: ${[...f.added.map((x) => `added ${x}`), ...f.changed.map((x) => `changed ${x}`)].join(', ') || 'nothing new'}`
       + `${f.refused.length ? `, refused ${f.refused.length}` : ''} · ${(f.ms / 1000).toFixed(1)} s${f.costUsd == null ? '' : ` · ~$${f.costUsd.toFixed(4)}`}` : ''
-  status.title = f?.refused.join('\n') ?? ''
   status.hidden = !status.textContent
+  // What filing's reply said that code refused, and why, in plain words under the line.
+  const refused = side.el.querySelector<HTMLElement>('.box-refused')!
+  refused.replaceChildren(...(v.filing ? [] : f?.refused ?? []).map((r) => el('li', '', `Refused ${r}`)))
+  refused.hidden = !refused.children.length
   const counts = { components: v.components.length, rules: v.boxes.rules.length, data: v.boxes.data.length }
   for (const name of ['components', 'rules', 'data'] as BoxName[]) {
     const s = side.sections[name]

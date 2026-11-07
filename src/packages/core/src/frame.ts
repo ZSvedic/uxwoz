@@ -222,17 +222,17 @@ export function elementEnd(html: string, start: number): number {
 }
 
 /**
- * Each element with `data-component="ID"`, contents and all, becomes that component's HTML; one
- * whose component is gone becomes nothing. One pass: a component's own placeholders stay empty.
+ * Each element with `data-component="ID"`, contents and all, becomes that component's HTML, and so
+ * on inside it, three levels deep. An element whose ID is not in the box stays as it is, so an
+ * empty placeholder of a deleted component shows nothing.
  */
-export function pasteComponents(html: string, components: Record<string, string>): string {
+export function pasteComponents(html: string, components: Record<string, string>, depth = 3): string {
   let out = '', at = 0
   for (const m of html.matchAll(OPEN_TAG)) {
-    if (m.index! < at) continue
-    const id = m[2]!.match(/(?:^|\s)data-component\s*=\s*["']?([\w-]+)/i)?.[1]
-    if (!id) continue
+    const id = m.index! >= at && m[2]!.match(/(?:^|\s)data-component\s*=\s*["']?([\w-]+)/i)?.[1]?.toLowerCase()
+    if (!id || components[id] == null) continue
     const end = elementEnd(html, m.index!)
-    out += html.slice(at, m.index) + (components[id.toLowerCase()] ?? '')
+    out += html.slice(at, m.index) + (depth > 1 ? pasteComponents(components[id], components, depth - 1) : components[id])
     at = end < 0 ? m.index! + m[0].length : end
   }
   return out + html.slice(at)
@@ -241,6 +241,6 @@ export function pasteComponents(html: string, components: Record<string, string>
 /** Every control whose data-action opens the screen it sits on (`@name`) gets aria-current="page". */
 export function markCurrent(html: string, name: string | undefined): string {
   if (!name || !/^[\w-]+$/.test(name)) return html
-  const re = new RegExp(`(<[a-z][\\w-]*\\b[^>]*?\\sdata-action\\s*=\\s*(["'])\\s*@${name}\\s*(?::[^"']*)?\\2)`, 'gi')
+  const re = new RegExp(`(<[a-z][\\w-]*\\b[^>]*?\\sdata-action\\s*=\\s*(["'])\\s*@${name}\\s*(?::(?:(?!\\2)[\\s\\S])*)?\\2)`, 'gi')
   return html.replace(re, '$1 aria-current="page"')
 }

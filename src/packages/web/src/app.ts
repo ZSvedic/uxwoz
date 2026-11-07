@@ -53,6 +53,8 @@ const state = {
   /** The open mockup's Rules and Data (its components are entries), and whether filing runs. */
   boxes: null as Boxes | null,
   filing: false,
+  /** A filed() loop is waiting for filing to end. */
+  waiting: false,
   /** Counts changes this page applied, so a map fetched before one of them is not applied after it. */
   edits: 0,
   css: {} as Record<string, string>,
@@ -103,14 +105,16 @@ const components = () => [...state.entries.values()].filter(isComponent)
 /** A stored screen as it shows: its components pasted, links to itself marked current. */
 const page = (html: string, name: string | undefined, c = componentsOf([...state.entries.values()])) => markCurrent(pasteComponents(html, c), name)
 /** The screens whose newest version pastes a component. */
-const pastedOn = (id: string) => [...state.entries.values()].filter((e) => !isComponent(e) && e.versions.at(-1)?.html.includes(`data-component="${id}"`))
+const pastedOn = (id: string) => [...state.entries.values()].filter((e) => !isComponent(e) && new RegExp(`data-component\\s*=\\s*["']?${id}["'\\s>]`, 'i').test(e.versions.at(-1)?.html ?? ''))
 
 function sideCard(key: string, index: number, side: Side | null, stored: Version | null, device: Device | undefined): CardView {
   const version = stored ?? side?.version ?? null
   const id = `${key}#${index}`
   const error = version ? undefined : side ? side.error ?? undefined : state.failed.get(id) ?? 'This design was not finished.'
+  // A new screen waits for the last filing first (at most 5 s), so its paper holds what was filed.
+  const idea = version ? ideaOf(version) : side && state.filing ? 'Waiting for filing, then drawing…' : ''
   return {
-    id, width: widthOf(version?.device ?? device), device: version?.device ?? device, name: '', idea: version ? ideaOf(version) : '',
+    id, width: widthOf(version?.device ?? device), device: version?.device ?? device, name: '', idea,
     side: { index, pickable: !!version }, error, streaming: !version && !error,
   }
 }
@@ -506,6 +510,8 @@ function applyMap(map: { entries: CacheEntry[]; boxes?: Boxes; filing?: boolean 
   state.boxes = map.boxes ?? state.boxes
   state.filing = !!map.filing
   state.edits++
+  // Filing runs (after a reload, say) and nothing waits for it here yet: wait for it.
+  if (state.filing && !state.waiting) filed()
   if (state.current && !state.entries.has(state.current)) state.current = null
   draw()
 }
@@ -516,19 +522,27 @@ function applyMap(map: { entries: CacheEntry[]; boxes?: Boxes; filing?: boolean 
  */
 async function filed() {
   const app = state.app
-  state.filing = true
-  for (let tries = 0, wait = true; tries < 40 && app && app === state.app; tries++, wait = false) {
-    const n = state.edits
-    const res = await fetch(`/api/map?app=${encodeURIComponent(app)}${wait ? '&wait=1' : ''}`).catch(() => null)
-    if (!res?.ok || app !== state.app) return
-    const map = await res.json()
-    if (n === state.edits && !state.busy && !state.picking) return applyMap(map)
-    await new Promise((r) => setTimeout(r, 1500))
+  state.filing = state.waiting = true
+  try {
+    for (let tries = 0, wait = true; tries < 40 && app && app === state.app; tries++, wait = false) {
+      const n = state.edits
+      const res = await fetch(`/api/map?app=${encodeURIComponent(app)}${wait ? '&wait=1' : ''}`).catch(() => null)
+      if (app !== state.app) return
+      const map = res?.ok ? await res.json() : null
+      if (map && n === state.edits && !state.busy && !state.picking) {
+        state.waiting = false
+        return applyMap(map)
+      }
+      await new Promise((r) => setTimeout(r, 1500))
+    }
+  } finally {
+    // Given up (no answer, or changes kept crossing it): the line says filing no more.
+    if (state.waiting) { state.waiting = state.filing = false; draw() }
   }
 }
 
 /** A change to the boxes; the server answers with the whole mockup. */
-async function boxOp(o: BoxOp | { op: 'seen'; box: BoxName }) {
+async function boxOp(o: BoxOp | { op: 'seen'; box: BoxName; ids: string[] }) {
   const app = state.app
   if (!app) return
   const res = await post('/api/box', { app, ...o }).catch(() => null)
@@ -541,8 +555,9 @@ async function boxOp(o: BoxOp | { op: 'seen'; box: BoxName }) {
 function lookAt(box: BoxName) {
   if (side.el.hidden) return
   canvas.showBox(side.sections[box])
-  const fresh = box === 'components' ? components().some((e) => !e.seen) : state.boxes?.[box].some((x) => !x.seen)
-  if (fresh) setTimeout(() => boxOp({ op: 'seen', box }), 3000)
+  // Only the entries new at the look count as seen: one filed meanwhile stays marked.
+  const ids = box === 'components' ? components().filter((e) => !e.seen).map((e) => e.name!) : state.boxes?.[box].filter((x) => !x.seen).map((x) => x.id) ?? []
+  if (ids.length) setTimeout(() => boxOp({ op: 'seen', box, ids }), 3000)
 }
 
 for (const b of document.querySelectorAll<HTMLButtonElement>('[data-box]')) b.addEventListener('click', () => lookAt(b.dataset.box as BoxName))
@@ -684,7 +699,8 @@ function renderDrawer() {
   const comp = isComponent(e)
   history.replaceChildren(...e.versions.map((x, i) => {
     const li = document.createElement('li')
-    li.textContent = x.feedback ? `Edit: ${x.feedback}` : comp ? (i === 0 ? (e.parent ? `Taken from ${e.parent.label} of a screen by filing` : 'Added') : 'Changed by filing')
+    const from = comp && e.parent && state.entries.get(e.parent.key)
+    li.textContent = x.feedback ? `Edit: ${x.feedback}` : comp ? (i === 0 ? (from ? `Taken from ${labelOf(from)} by filing` : 'Added') : 'Changed by filing')
       : i === 0 ? 'The design you picked' : 'Regenerated'
     li.classList.toggle('now', i === e.versions.length - 1)
     return li
@@ -696,7 +712,7 @@ function renderDrawer() {
     ['Component', e.name!],
     ['Where it belongs', e.action ?? '–'],
     ['Pasted on', pastedOn(e.name!).map(labelOf).join(', ') || 'no screen'],
-    ['Taken from', from ? `${e.parent!.label} of ${labelOf(from)}` : '–'],
+    ['Taken from', from ? labelOf(from) : '–'],
     ['Last written by', `${e.by === 'user' ? 'you' : 'filing'}, ${e.at ? new Date(e.at).toLocaleString() : '–'}`],
     ['Versions', `${e.versions.length}${e.versions.length > 1 ? ' (↶ Undo goes back one)' : ''}`],
     ['Model', modelLabel(v.model)],
@@ -1049,8 +1065,8 @@ $('deleteApp').addEventListener('click', () => { closeMenus(); deleteApp(false).
 async function deleteApp(again: boolean) {
   const app = state.app
   if (!app) return
-  const n = state.entries.size
-  const what = n === 1 ? 'the only screen of this mockup' : `all ${n} screens of this mockup`
+  const n = state.entries.size - components().length
+  const what = `${n === 1 ? 'the only screen of this mockup' : `all ${n} screens of this mockup`} and its boxes (components, rules, data)`
   if (!confirm(again ? `Start over? This deletes ${what} and makes its first screen again.` : `Delete ${what}?`)) return
   state.busy?.abort()
   const res = await post('/api/delete-app', { app }).catch(() => null)

@@ -115,13 +115,13 @@ export function createServer(opts: ServerOptions = {}) {
   function file(key: string, decision: { other: string } | { change: string }): boolean {
     const e = cache.get(key)
     if (!e || isComponent(e)) return false
-    const root = normalizePrompt(e.app), t0 = performance.now()
+    const root = normalizePrompt(e.app), t0 = performance.now(), since = cache.now()
     const p: Promise<unknown> = (filings.get(root) ?? Promise.resolve())
       .then(() => fileDecision({ cache, key, decision, fetch: opts.fetch, env: opts.env, log }))
       .then((run) => run && log(`filed ${run.screen} in ${(run.ms / 1000).toFixed(1)} s for $${run.costUsd?.toFixed(4)}: added ${run.added.join(', ') || 'nothing'}, changed ${run.changed.join(', ') || 'nothing'}, refused ${run.refused.length}`))
       .catch((err) => {
         log(`filing failed: ${message(err)}`)
-        if (cache.get(root)) cache.noteFiling(e.app, { at: new Date().toISOString(), screen: e.name ?? HOME_NAME, ms: Math.round(performance.now() - t0), costUsd: null, added: [], changed: [], refused: [], error: message(err) })
+        if (cache.get(root) && !cache.removedSince(root, since)) cache.noteFiling(e.app, { at: new Date().toISOString(), screen: e.name ?? HOME_NAME, ms: Math.round(performance.now() - t0), costUsd: null, added: [], changed: [], refused: [], error: message(err) })
       })
       .finally(() => { if (filings.get(root) === p) filings.delete(root) })
     filings.set(root, p)
@@ -130,6 +130,12 @@ export function createServer(opts: ServerOptions = {}) {
 
   /** Wait for the mockup's running filing, at most `ms`. */
   const filed = (app: string, ms: number) => Promise.race([filings.get(normalizePrompt(app)), Bun.sleep(ms)])
+
+  /** One mockup as every reply that carries it sends it: screens, components, boxes, and whether filing runs. */
+  const mapOf = (app: string) => ({ ...cache.map(app), filing: filings.has(normalizePrompt(app)) })
+
+  /** A deleted mockup's filing is not waited for: its result is dropped anyway. */
+  const forget = (app: string) => filings.delete(normalizePrompt(app))
 
   /** A click in screen `from`, on a control labelled `label`. Absent for the first screen. */
   interface Click { from: string; label: string }
@@ -224,6 +230,8 @@ export function createServer(opts: ServerOptions = {}) {
       for await (const ev of generateScreen({ user, model, device, signal, fetch: opts.fetch, env: opts.env, log })) {
         if (ev.type === 'chunk') { yield { type: 'chunk', variant: 0, text: ev.text }; continue }
         const version = { ...ev.version, ...(change && { feedback: change }) }
+        // A component the user changed is the user's now.
+        if (isComponent(entry)) Object.assign(entry, { by: 'user', at: version.createdAt, seen: true })
         const stored = cache.addVersion(key, version)
         if (signal.aborted) return
         if (!stored) { yield { type: 'error', message: 'this screen was deleted while it was being changed' }; return }
@@ -261,7 +269,7 @@ export function createServer(opts: ServerOptions = {}) {
       },
       '/api/config': () => json({
         defaultModel: DEFAULT_MODEL,
-        models: Object.values(MODELS).map((m) => ({ id: m.id, label: m.label, costEstimated: m.costEstimated })),
+        models: Object.values(MODELS).filter((m) => !m.background).map((m) => ({ id: m.id, label: m.label, costEstimated: m.costEstimated })),
         themes: Object.entries(THEMES).map(([id, label]) => ({ id, label })),
         defaultTheme: 'mockup',
         devices: Object.entries(DEVICES).map(([id, d]) => ({ id, label: d.label, width: d.width })),
@@ -329,7 +337,7 @@ export function createServer(opts: ServerOptions = {}) {
         const url = new URL(req.url), app = url.searchParams.get('app')?.trim() ?? ''
         if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
         if (url.searchParams.get('wait') === '1') await filed(app, 60_000)
-        return json({ ...cache.map(app), filing: filings.has(normalizePrompt(app)) })
+        return json(mapOf(app))
       },
       // The user changes the boxes: add, change or delete a rule or a table, or mark a box as looked at.
       '/api/box': {
@@ -340,14 +348,14 @@ export function createServer(opts: ServerOptions = {}) {
           const app = typeof b?.app === 'string' ? b.app.trim() : ''
           if (!cache.get(screenKey(app, null))) return json({ error: 'no such mockup' }, 404)
           const box = b?.box as BoxName, op = b?.op
-          if (op === 'seen' && ['components', 'rules', 'data'].includes(box)) cache.markSeen(app, box)
+          if (op === 'seen' && ['components', 'rules', 'data'].includes(box)) cache.markSeen(app, box, Array.isArray(b?.ids) ? b.ids.map(String) : undefined)
           else if ((box === 'rules' || box === 'data') && ['add', 'set', 'delete'].includes(op)) {
             // A new entry's ID comes from its words: the rule's sentence, or the table's name.
             const id = op === 'add' ? cache.freeId(app, box, String(b?.text ?? b?.id ?? '')) : String(b?.id ?? '')
             const why = cache.setBox(app, op, box, { id, text: b?.text, columns: b?.columns, rows: b?.rows }, 'user')
             if (why) return json({ error: why }, 400)
           } else return json({ error: 'unknown box or op' }, 400)
-          return json(cache.map(app))
+          return json(mapOf(app))
         },
       },
       '/api/apps': () => json({ apps: cache.apps() }),
@@ -360,7 +368,8 @@ export function createServer(opts: ServerOptions = {}) {
           const b = await req.json().catch(() => null)
           const key = String(b?.key ?? ''), app = cache.get(key)?.app
           const removed = cache.delete(key)
-          return removed && app ? json({ removed, ...cache.map(app) }) : json({ error: 'no such screen' }, 404)
+          if (app && key === normalizePrompt(app)) forget(app)
+          return removed && app ? json({ removed, ...mapOf(app) }) : json({ error: 'no such screen' }, 404)
         },
       },
       // Delete a whole mockup, so its prompt starts over.
@@ -371,6 +380,7 @@ export function createServer(opts: ServerOptions = {}) {
           const b = await req.json().catch(() => null)
           const app = typeof b?.app === 'string' ? b.app.trim() : ''
           if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
+          forget(app)
           return json({ removed: cache.deleteApp(app) })
         },
       },

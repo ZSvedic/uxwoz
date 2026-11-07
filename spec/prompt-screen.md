@@ -45,7 +45,7 @@ The jobs, each after the paper:
   without that line.
 - **Edit**: *The screen as it is now, history (...):* and its HTML, then *Reply with the HTML of this
   screen again with one change; keep everything else as it is, including its data-action links and
-  pasted components, and add no second control for a screen it already links to. The change: ...*
+  pasted components. The change: ...*
   A component's Edit says *component* in place of *screen*.
 - **File**: *The decision, on the screen history (...).* Then the chosen variant with its block
   elements numbered (`data-part="N"`), and the other variant, or after an Edit the typed change. It
@@ -175,7 +175,7 @@ Every job but filing gets HTML. Reply with one variant only, as one HTML fragmen
 
 - Begin a screen with <title>Name</title>: a name of 1-4 words, e.g. <title>Night details</title>. Then add <meta name="idea" content="...">: one short sentence naming the idea of this variant, e.g. <meta name="idea" content="Nights as a list, newest first">. A component has neither.
 - Write no CSS and no classes: use semantic HTML that Pico styles (h1-h3, p, small, label + input, select, button, article for cards, table, fieldset, mark, progress). A few inline style attributes for layout (e.g. grid columns) are fine.
-- Logic in one <script> element at the end, standard DOM APIs only; update every result immediately on input events. Script never shows another screen inside this one.
+- Logic in one <script> element at the end, standard DOM APIs only; update every result immediately on input events.
 - Everything must work offline: no fetch, no external images or fonts. Draw charts as inline SVG.
 - Show values formatted for humans (e.g. toLocaleString / toFixed).
 - Be brief: keep the whole reply under about 2,500 characters: no comments, minimal markup. Start small, with 2-4 items per list.
