@@ -5,7 +5,7 @@
 | What the user sees, what the system does | [spec/behavior.md](spec/behavior.md) |
 | How a screen is generated: HTML + Pico format, rendering, models | [spec/ui-generation.md](spec/ui-generation.md) |
 | Packages, HTTP API, frame messages, types, env vars, tests | [spec/code-contract.md](spec/code-contract.md) |
-| The LLM prompts | [spec/prompt-screen.md](spec/prompt-screen.md), [spec/prompt-plan.md](spec/prompt-plan.md), [spec/prompt-review.md](spec/prompt-review.md) |
+| The LLM prompt | [spec/prompt-screen.md](spec/prompt-screen.md) |
 | How to run, test, re-record | [README.md](README.md) |
 | How to write any markdown you add | [process/writing-style.md](process/writing-style.md) |
 | The product idea | [process/uxwoz-product-brief.md](process/uxwoz-product-brief.md) |
@@ -36,29 +36,23 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
   prompt.ts      system prompt + user message: device, ask one side for a different design, an Edit's screen and change
                  (system prompt is a copy of spec/prompt-screen.md; a test keeps them equal)
   providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol)
-  generate.ts    one design: stream, 20 s deadline, cost, name and idea, spec lines and the check, refuse cut-off replies
-  spec.ts        the spec per mockup: limits, shapes, the plan's parse, design lines, pick, Edit, Undo and
-                 user rules, the request block and its markup, drawChrome (tabs and Back drawn at show
-                 time), the check, Export's markdown (runs in the browser too)
-  plan.ts        the plan call before Home: planner prompt (copy of spec/prompt-plan.md), Sol, 6 s limit
-  review.ts      the review pass after every 5 picks: prompt (copy of spec/prompt-review.md), parse, Sol
+  generate.ts    one design: stream, 20 s deadline, cost, name and idea, keep the first copy of a doubled reply,
+                 cut prose before the title, refuse cut-off replies
   keys.ts        cache keys: a link by @name, normalize a prompt, "home" means the first screen; which clicks mean Back or Home
-  tree.ts        the tree, worked out: links in each screen, @names, planned screens (also the spec's flow and tabs), shortest-path levels, the tree lines for the model
+  tree.ts        the tree, worked out: links in each screen, @names, planned screens, shortest-path levels, the tree lines for the model
   cache.ts       screen cache: find by name, proposals (the open A OR B) and pick, names, versions and undo, parents,
-                 the spec per mockup, delete with pruning, migration of old files, JSON file
-  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices and their size;
-                 the spec's tab, Back and switch markup styles; name, idea
+                 delete with pruning, migration of old files, JSON file
+  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices and their size; name, idea
 src/packages/web/src/
-  server.ts      Bun.serve: /api/config, /api/screen (NDJSON, the plan before Home, A OR B at once), /api/pick,
-                 /api/revise, /api/undo, /api/spec/drop|set|remove|suggestion, the review pass, /api/map, /api/apps,
-                 /api/delete, /api/delete-app, /api/warmup, themes
+  server.ts      Bun.serve: /api/config, /api/screen (NDJSON, A OR B at once), /api/pick, /api/revise, /api/undo,
+                 /api/map, /api/apps, /api/delete, /api/delete-app, /api/warmup, themes
   app.ts         browser: generate panel, A OR B streaming, refit and pick, clicks (@names, Back, Home), rail tools, drawer
-                 (Edit, Info, the spec panel with Export), toolbar menus, ← → trail, errors
+                 (Edit, Info), toolbar menus, ← → trail, errors
   canvas.ts      browser: the tree layout (packed rows, line lanes), cards and frames, A OR B sides, rail, pan and zoom, fits
   index.html, shell.css   the page around the canvas
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
-src/scripts/                 live experiments, run by hand: spec-reading-test.ts and planner-test.ts (spec note, build steps 1 and 2)
+src/scripts/                 live experiments, run by hand: paper-*.ts (the paper test, build step 1 of the paper canvas plan)
 ```
 
 ## Do not read (large or generated)

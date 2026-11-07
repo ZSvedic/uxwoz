@@ -24,8 +24,8 @@ POST /api/pick  {"key": "a coffee shop ordering app", "index": 1}
 ## Packages
 
 - `@uxwoz/core` (`src/packages/core`): models, prompt, provider streaming, screen cache, cache keys,
-  frame page and devices, the spec rules (`spec.ts`) and the plan call (`plan.ts`). `frame.ts`,
-  `keys.ts`, `tree.ts` and `spec.ts` run in the browser too, so they use no Node or Bun APIs.
+  frame page and devices. `frame.ts`, `keys.ts` and `tree.ts` run in the browser too, so they use
+  no Node or Bun APIs.
 - `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`,
   `canvas.ts`, `shell.css`, bundled by Bun's HTML import), and the themes in `themes/`.
 
@@ -45,14 +45,11 @@ can spend model credits.
   plan is made from the name and `label`), or a plain prompt (links from before names). A screen
   with that name, else with that prompt's key, is a cache hit. A cache hit sends `meta` (cached true, variants 0) and `done` only; a screen whose A OR B
   is still open comes back with its `proposals`, at no cost. Otherwise two designs stream at once:
-  `meta.variants` is 2 and each `chunk` names its side (`variant` 0 or 1). A new mockup's first
-  screen is planned first: after `meta`, the server asks GPT-6.1 Sol for the plan (6 s at most),
-  stores it as the mockup's spec and sends `spec`; a plan that fails or is slow stores a spec with
-  `ui.nav` and `ui.back` open (`fallbackSpec`), and the screen goes on. Every request carries the spec after the tree. One random side is asked
+  `meta.variants` is 2 and each `chunk` names its side (`variant` 0 or 1). One random side is asked
   for a clearly different design. Each side that finishes is stored at once as that side's
   proposal and sent as `version`; one that fails sends `failed` with its message. The first side to
   finish makes the screen, with the click as its parent (`from`, the key of the screen clicked in,
-  and `label`, the control's text). `done` ends the stream with the screen and the mockup's spec; `error` comes when both sides fail. A side that finishes after the other was
+  and `label`, the control's text). `done` ends the stream with the screen; `error` comes when both sides fail. A side that finishes after the other was
   picked, or after the screen, the screen clicked in or its mockup was deleted (even before the
   screen existed: the cache remembers when each key was deleted), is dropped. A `from` that is not
   a picked screen gets `error` before any model call. 400 on an empty or too long
@@ -60,32 +57,16 @@ can spend model credits.
   a first screen gets `error` before any model call. A closed browser connection aborts the model
   calls; a side that already finished is still stored.
 - `POST /api/pick {key, index}`: keep proposal `index` as the screen's first version and drop the
-  other; its spec lines fill the spec's open rows (see `applyPick`). `{entry, spec}`, or 404 if the
-  screen has no open A OR B or that side has not finished.
+  other; `{entry}`, or 404 if the screen has no open A OR B or that side has not finished.
 - `POST /api/revise {key, change?, model?, device?}`: one new version of a picked screen, streamed
   like `/api/screen` with one side (`meta.variants` 1, then `chunk`*, `version`, `done`). With
   `change` (1-1,000 characters) it is an Edit: the model gets the newest version's HTML and the
-  change, and the version stores it as `feedback`; its spec lines set rows (`applyEdit`). Without
-  it, a Regenerate from the screen's own prompt, whose spec lines are dropped. `done` carries the spec. Both keep the device of the newest version (`device` only for screens made before
+  change, and the version stores it as `feedback`. Without it, a Regenerate from the screen's own
+  prompt. Both keep the device of the newest version (`device` only for screens made before
   devices). 400 on a bad `change`, model or device, 404 for an unknown screen, 409 while its A OR B
   is open; `error` if the model fails or the screen was deleted meanwhile.
-- `POST /api/undo {key}`: drop the newest version and the spec values it set; `{entry, spec}`, or
-  404 when one or none is left.
-- `POST /api/spec/drop {key, at, row}`: take back the value that the version of screen `key` made
-  at `at` (its `createdAt`) set on row `row`; the ✕ beside an Edit's line in the drawer calls it.
-  Not by index: after an Undo and a new Edit, an old ✕ would take back the new line. `{spec}`, or
-  404 if there is no such value.
-- `POST /api/spec/set {app, key, text}`: the user's own line for a row (new rows too), `from:
-  user`, in its key's shape and within the limits; `{spec}`, 400 with why, 404 for an unknown mockup.
-- `POST /api/spec/remove {app, key, what: 'line' | 'row'}`: delete a row's newest line, or the row;
-  `{spec}`, or 404.
-- `POST /api/spec/suggestion {app, id, accept}`: accept a review suggestion (it becomes the user's
-  line; a merge also removes its second row) or dismiss it; `{spec, review}`, 400, or 404.
-- `POST /api/pick` also starts the review pass, in the background, after every 5th picked screen
-  of a mockup, and says `reviewing: true` then.
-- `GET /api/map?app=…`: `{root, entries: CacheEntry[], spec, review, reviewing}` for one mockup,
-  oldest first; `review` is `{suggestions, reviews, lastCount?, deleted?}`, its suggestions only
-  those that still hold. Levels, the
+- `POST /api/undo {key}`: drop the newest version; `{entry}`, or 404 when one or none is left.
+- `GET /api/map?app=…`: `{root, entries: CacheEntry[]}` for one mockup, oldest first. Levels, the
   tree and planned screens are not stored: `screenTree` and `plannedScreens` in `core/src/tree.ts`
   work them out (server and browser).
 - `GET /api/apps`: `{apps: {app, screens, updatedAt}[]}`, every mockup once as first typed,
@@ -93,9 +74,8 @@ can spend model credits.
 - `POST /api/delete {key}`: delete a screen. Screens the first screen reached before and no longer
   reaches (through the clicks that made screens and the buttons in each screen's newest version) go
   too; a screen whose first click came from a screen that is gone takes the screen that reaches it
-  now as its parent. Deleting the first screen deletes the mockup and its spec, even while its A OR
-  B has no finished side. `{removed, root, entries, spec}`: the keys removed and the whole mockup as
-  `/api/map` sends it; 404 if unknown.
+  now as its parent. Deleting the first screen deletes the mockup. `{removed, root, entries}`: the
+  keys removed and the whole mockup as `/api/map` sends it; 404 if unknown.
 - `POST /api/delete-app {app}`: delete every screen of a mockup; `{removed}`.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
@@ -104,10 +84,7 @@ can spend model credits.
 ## Frame messages
 
 The script we add to every screen talks to the app with `postMessage`; the app accepts a message
-only from a card's own frame. The app sends a frame two messages, accepted only from its parent:
-`{ uxwoz: 'tab', on }` (this screen is a tab of `ui.nav`: hide Back) and
-`{ uxwoz: 'chrome', bar, back }` (redraw the tab bar and Back's label in place, as `applyChrome`
-does for the first build).
+only from a card's own frame.
 
 ```ts
 { uxwoz: 'action', prompt, label }   // a click on a control with an action prompt (ignored on a side of an A OR B)
@@ -137,25 +114,10 @@ CacheEntry { key; app; action: string | null; name?: string; parent: { key; labe
              // the open A OR B (null until a side finishes) until a pick
 Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
              costEstimated; firstChunkMs; totalMs; finishReason; device?: Device;
-             name?; idea?; feedback?; spec?: SpecLine[]; misses?: string[] }
+             name?; idea?; feedback? }
              // name comes from the model's <title>, idea from its <meta name="idea">;
-             // feedback is the Edit request that made this version; spec is the design's
-             // <meta name="spec"> lines (taken out of html); misses is what checkScreen found
-             // against the spec it was made with (absent for screens made without one). html has
-             // prose before <title> cut. Tabs and Back are as the model wrote them: the app draws
-             // them from the spec at show time (drawChrome), so nothing stored is rewritten.
-             // plan, on a first screen's designs: { rows, ms, costUsd, error? } of the plan before it.
-             // specRefused, on an Edit: { line, why }[] for its lines that were not taken.
-             // A reply that held the screen twice keeps its first copy, and misses says so
-Spec       Record<key, { ask?; from?: SpecFrom; values: { text; from: SpecFrom; screen?; at? }[] }>
-             // one per mockup; key is product.*, ui.* or data.*; the last value counts; a row with
-             // no value is open. SpecFrom is 'plan' | 'pick' | 'edit' | 'user'. screen and at (the
-             // version's createdAt) say which screen version set a value, so Undo and ✕ can take it back
-Suggestion { id; kind: 'reword' | 'merge'; keys: string[]; text; against: string[] }
-           // against: the rows' values it was made against; when one changes, it is stale
-ReviewInfo { at; screens; ms; costUsd; added: string[]; suggested; error? }   // one review run
-SpecLine   { key; text }   // from one <meta name="spec" content="key = value"> tag, either attribute
-             // first, read up to its closing quote; a value with < is refused
+             // feedback is the Edit request that made this version. html has prose before <title>
+             // cut, and a reply that held the screen twice keeps its first copy
 TreeNode   { level; parent: key | null; label }
              // from screenTree: level 1 is the first screen, the fewest clicks from it otherwise
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast'
@@ -176,7 +138,7 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 | `OPENAI_API_KEY` | GPT-6 Luna, GPT-6.1 Sol |
 | `PORT` | server port, default 3000 |
 | `UXWOZ_HOST` | listen address, default `127.0.0.1` |
-| `UXWOZ_CACHE_FILE` | screen cache `{version: 4, entries, specs, reviews}` (by mockup root), default `temp/screen-cache.json` |
+| `UXWOZ_CACHE_FILE` | screen cache `{version: 4, entries}`, default `temp/screen-cache.json` |
 | `UXWOZ_RECORD` | `1` makes tests call the live APIs and rewrite `cassettes/` |
 
 ## Tests
@@ -184,5 +146,4 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 `bun test` runs `src/tests/*.test.ts`. Model calls go through `tests/cassette.ts`, which replays
 `cassettes/<test file name>.json` keyed by a hash of URL and request body; `tests/no-network.ts` makes any
 other non-localhost call throw. A test file that calls models has a cassette of the same name;
-`cut-off.test.ts`, `races.test.ts` and `spec.test.ts` use a fake provider instead, and pass a
-`plan` that needs no model. `server.test.ts` records the plan calls too.
+`cut-off.test.ts` and `races.test.ts` use a fake provider instead.

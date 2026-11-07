@@ -45,17 +45,6 @@ iframe. Pico styles the bare elements, so the model writes no CSS.
   First visible UI came at 1.1-1.6 s, fully rendered at 3.5-5 s.
 - **Strip only a markdown fence** if a model adds one; never patch the code.
 
-## The spec's markup
-
-With `ui.nav`, `ui.back` or `ui.toggles` in the mockup's spec, the request names one markup for
-each, and our frame CSS gives it its place: the tab bar (`<nav data-ui="tabs">`) sits at the bottom
-of a phone screen and the top of a desktop one, the current tab (`aria-current="page"`) bold and underlined; Back (`<a data-ui="back">`) is a bold link; a switch is Pico's
-`<input type="checkbox" role="switch">`. The theme gives them its look (Mockup draws the tab bar's
-line thick). The app draws the tab bar from `ui.nav` and Back's label from `ui.back` (`‹ Back` while the row
-is open) when it builds a screen's page (`chromeOf`, `applyChrome`), and on a spec change our
-frame script redraws them in place from a message, the same way, with no reload; and hides Back on the tab screens with CSS: asking the model not to
-draw it there failed on 20 of 30 tab screens, and asking it for the same tabs failed on 2 of 6.
-
 ## Themes
 
 The model never sees the theme, so a theme changes looks and nothing else. A theme is a drop-in
