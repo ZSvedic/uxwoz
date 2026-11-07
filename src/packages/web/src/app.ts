@@ -74,7 +74,7 @@ const canvas = new Canvas($('stage'), {
   zoomed: (z) => { zoomPct.textContent = `${Math.round(z * 100)}%` },
 }, side.el, side.components)
 
-// ---- Views ------------------------------------------------------------------------------------
+// ---- Views
 
 /** A screen's short name: the one the model gave it, else its first heading, else its prompt. */
 function nameOf(e: CacheEntry, v: Version): string {
@@ -220,7 +220,7 @@ class StreamRenderer {
   }
 }
 
-// ---- Errors -----------------------------------------------------------------------------------
+// ---- Errors
 
 const fmtS = (ms: number) => `${(ms / 1000).toFixed(ms < 1000 ? 2 : 1)} s`
 const fmtUsd = (v: number) => `$${v < 0.01 ? v.toFixed(4) : v.toFixed(3)}`
@@ -265,7 +265,7 @@ async function* readEvents(res: Response): AsyncGenerator<ScreenEvent> {
 const post = (url: string, body: object, signal?: AbortSignal) =>
   fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal })
 
-// ---- Screens ----------------------------------------------------------------------------------
+// ---- Screens
 
 /** Open a screen from the cache, else as A OR B: remember the view, fit both, stream them. */
 async function openScreen(action: string | null, from: string | null, label: string | null) {
@@ -573,7 +573,7 @@ $('exportBoxes').addEventListener('click', () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000)
 })
 
-// ---- The rail and the drawer --------------------------------------------------------------------
+// ---- The rail and the drawer
 
 function onTool(key: string, tool: string) {
   if (!state.entries.get(key)?.versions.length) return
@@ -757,7 +757,7 @@ for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.addE
 $('drawerClose').addEventListener('click', closeDrawer)
 addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape' && state.drawer) closeDrawer() })
 
-// ---- Mockups ----------------------------------------------------------------------------------
+// ---- Mockups
 
 /** Open a mockup: its screens from the cache, else (unless `make` is false) its first screen as A OR B. */
 async function start(app: string, make = true) {
@@ -817,7 +817,7 @@ function closeMockup() {
   draw()
 }
 
-// ---- Wiring -----------------------------------------------------------------------------------
+// ---- Wiring
 
 generate.addEventListener('submit', (e) => {
   e.preventDefault()
@@ -924,7 +924,7 @@ function open(app: string) {
   generate.requestSubmit()
 }
 
-// ---- The toolbar: project menu, Nav, zoom --------------------------------------------------------
+// ---- The toolbar: project menu, Nav, zoom
 
 const MENUS: [string, string][] = [['projectButton', 'projectMenu'], ['navButton', 'navMenu'], ['zoomValue', 'zoomMenu']]
 
