@@ -50,8 +50,8 @@ The canvas is the only place: the tree of screens as today, and four boxes left 
 | Job | When | Model | Reads | Writes |
 |---|---|---|---|---|
 | Draw | a click opens a new screen | Haiku 5.5 or Luna, as today | the manual, titles and lines, the boxes, the screen the click came from | two variants |
-| File | after a pick or an Edit, in the background | Haiku 5.5 or Luna if they pass the test, else the fixer's model | the chosen variant, the other one or the typed change, the boxes | new or changed box entries |
-| Fix | every 5 picks, in the background, at standard speed | GPT-6.1 Terra or Gemini 3.8 Flash, by test | the boxes, the titles, the text of screens new since the last visit | tidied boxes, redrawn screens, a note |
+| File | after a pick or an Edit, in the background | GPT-6.1 Terra, low reasoning (the test's only pass) | the chosen variant, the other one or the typed change, the boxes | new or changed box entries |
+| Fix | every 5 picks, in the background, at standard speed | GPT-6.1 Terra (10 of 10 on the held-out paper) | the boxes, the titles, the text of screens new since the last visit | tidied boxes, redrawn screens, a note |
 
 - A click made while filing runs waits for it, at most 5 seconds.
 - The boxes go whole into every Draw. The manual's limits (20 components, 20 rules, 10 tables)
@@ -80,8 +80,8 @@ markdown.
 The manual is the risky part and the cheap one to test, so it goes first. Each step's report
 gives the size of the code before and after.
 
-1. **Paper test**, with scripts and no app code. When a model fails a part, the manual gets
-   simpler and the part runs again.
+1. **Paper test: done** ([report](../journal/2026-11-07-paper-test.md)). Haiku and Luna draw by the
+   manual; only Terra files and fixes. The whole test cost $0.67.
    - *Draw*: Haiku 5.5 and Luna draw 10 screens each on three hand-made papers (phone app,
      dashboard, game). Count components pasted, redrawn or missing, rules followed, Data rows used.
    - *File*: Haiku 5.5, Luna and GPT-6.1 Terra file 20 real picks. Count the entries a person
