@@ -6,11 +6,14 @@
 // previews side by side, with its idea above each; a click on a finished one picks it. Right of
 // each picked screen is a rail of tools, kept at the same size on screen whatever the zoom.
 // Every screen of a device is as wide as the device and at least one device screen tall.
+// Left of the tree is a column with the mockup's boxes (built by boxes.ts); component cards are
+// cards like screens, in the Components box, as tall as their content.
 
 import { FRAME_SANDBOX, framePage, type Device } from '@uxwoz/core/frame'
 
-/** Limits on the height a screen may report, so a broken screen cannot make a huge frame. */
+/** Limits on the height a screen may report, so a broken screen cannot make a huge frame. A component may be short. */
 const MIN_SCREEN_H = 160
+const MIN_COMPONENT_H = 80
 const MAX_SCREEN_H = 8000
 /** The height of a frame whose screen has not reported its size yet. */
 const START_H = 600
@@ -68,6 +71,8 @@ export interface CardView {
   /** Why a side failed; it shows instead of the screen. */
   error?: string
   streaming: boolean
+  /** A component: as tall as its content, not one device screen. */
+  fit?: boolean
 }
 
 export interface ScreenView {
@@ -81,6 +86,10 @@ export interface ScreenView {
   undo: boolean
   /** What is happening to it, e.g. "Making the change…"; '' for nothing. */
   note: string
+  /** A component card, in the Components box instead of the tree; no Regenerate. */
+  component?: boolean
+  /** Added or changed since the user last looked at its box: marked new. */
+  fresh?: boolean
 }
 
 export interface CanvasHandlers {
@@ -155,10 +164,14 @@ export class Canvas {
   /** The surface's CSS zoom. Its own coordinates (positions, lines) are unzoomed. */
   private z = 1
 
-  /** `stage` is the scrolling area; the canvas replaces what it holds on the first render. */
-  constructor(private stage: HTMLElement, private on: CanvasHandlers) {
+  /**
+   * `stage` is the scrolling area; the canvas replaces what it holds on the first render. `side` is
+   * the boxes column, placed left of the tree; component cards go into `components`, inside it.
+   */
+  constructor(private stage: HTMLElement, private on: CanvasHandlers, private side: HTMLElement, private components: HTMLElement) {
     this.lines.classList.add('lines')
-    this.surface.append(this.lines)
+    this.surface.append(this.lines, side)
+    new ResizeObserver(() => this.queue()).observe(side)
     this.surface.style.setProperty('--z', '1')
     addEventListener('message', (e) => this.onFrameMessage(e))
     new ResizeObserver(() => this.queue()).observe(stage)
@@ -256,7 +269,8 @@ export class Canvas {
   /** A screen's place with the names above it and its rail, or the whole tree's without a key. */
   box(key?: string): Box | undefined {
     if (key == null) return this.extent.w ? this.extent : undefined
-    const b = this.boxes.get(key)
+    const comp = this.cards.get(key)
+    const b = this.boxes.get(key) ?? (comp && this.components.contains(comp.el) ? this.elBox(comp.el) : undefined)
     if (!b) return undefined
     const choice = !!this.screens.find((s) => s.key === key)?.cards[0]?.side
     const above = (choice ? IDEA_H : labelH(this.z)) / this.z
@@ -297,6 +311,25 @@ export class Canvas {
     }
   }
 
+  /** Where an element inside the surface sits, in canvas pixels. */
+  private elBox(el: HTMLElement): Box {
+    let x = 0, y = 0
+    for (let e: HTMLElement | null = el; e && e !== this.surface; e = e.offsetParent as HTMLElement | null) { x += e.offsetLeft; y += e.offsetTop }
+    return { x, y, w: el.offsetWidth, h: el.offsetHeight }
+  }
+
+  /** Move the view to a box of the side column: its width fits (at most 100%), its top shows. */
+  showBox(el: HTMLElement) {
+    this.moved = performance.now()
+    if (this.queued) this.layout()
+    for (let i = 0; i < 3; i++) {
+      const z = Math.max(MIN_ZOOM, Math.min(1, Math.floor(((this.stage.clientWidth - 96) / this.elBox(el).w) * 100) / 100))
+      if (z === this.z) break
+      this.applyZoom(z)
+    }
+    this.center({ ...this.elBox(el), h: Infinity })
+  }
+
   /** Zoom so a screen fills the stage's width (at most 200%), and scroll to its top. */
   fitWidth(key: string) {
     this.fit(key, { max: MAX_ZOOM, top: true })
@@ -333,10 +366,13 @@ export class Canvas {
     for (const [k, o] of this.ors) if (!choices.has(k)) { o.remove(); this.ors.delete(k) }
     for (const s of screens) {
       for (const v of s.cards) {
-        const c = this.card(v.id, s.key)
+        const c = this.card(v.id, s.key, s.component ? this.components : this.surface)
         c.key = s.key
         c.view = v
         if (c.width !== v.width) { c.width = v.width; c.frame.style.width = `${v.width}px` }
+        // A component card flows in its box: only its width is set.
+        if (s.component) c.el.style.width = c.screen.style.width = `${v.width}px`
+        c.el.classList.toggle('fresh', !!s.fresh)
         c.el.classList.toggle('side', !!v.side)
         c.el.classList.toggle('pickable', !!v.side?.pickable)
         c.el.classList.toggle('streaming', v.streaming)
@@ -359,6 +395,8 @@ export class Canvas {
         c.shield.title = v.side ? (v.side.pickable ? 'Pick this design' : 'Wait until it is finished') : ''
         c.rail.hidden = !!v.side
         c.undo.hidden = !s.undo
+        c.tools[1]!.hidden = !!s.component
+        c.tools[4]!.title = s.component ? 'Delete this component: screens that paste it show nothing in its place' : RAIL[4]![2]
         for (const b of c.tools) b.disabled = busy && b.dataset.tool !== 'info'
       }
       if (choices.has(s.key) && !this.ors.has(s.key)) {
@@ -391,7 +429,7 @@ export class Canvas {
     if (s?.html !== html) { c.frozen = false; c.growth = { count: 0, at: 0 } }
     c.shown = { html, final, css }
     c.sized = false
-    c.frame.srcdoc = framePage(html, css, final, c.view?.device)
+    c.frame.srcdoc = framePage(html, css, final, c.view?.device, c.view?.fit)
   }
 
   /** Drop the callback waiting for a card's next load, once its stream is cancelled. */
@@ -420,23 +458,29 @@ export class Canvas {
     return { w: c.width, h: c.view?.error ? FAILED_H : c.height }
   }
 
-  /** Place every screen as a tree, size the canvas, and draw the lines. */
+  /** Place the boxes column, every screen as a tree right of it, size the canvas, and draw the lines. */
   private layout() {
     const z = this.z
     // At a low zoom, rails and the OR need more of the canvas than the fixed gaps give.
     const gapX = Math.max(GAP_X, (RAIL_W + 24) / z), orW = Math.max(OR_W, OR_MIN / z)
+    const screens = this.screens.filter((s) => !s.component)
+    // The boxes column is as wide as a screen of the mockup and its rail.
+    const devW = Math.max(390, ...this.screens.filter((s) => s.component || !s.parent).map((s) => s.cards[0]?.width ?? 0))
+    const sideW = this.side.hidden ? 0 : devW + 40 + (RAIL_W + 10) / z
+    Object.assign(this.side.style, { left: `${PAD}px`, top: `${PAD}px`, width: `${sideW}px` })
+    const left = PAD + (sideW && sideW + gapX)
     const sizes = new Map<string, { w: number; h: number; parts: { id: string; w: number; h: number }[] }>()
-    for (const s of this.screens) {
+    for (const s of screens) {
       const parts = s.cards.map((v) => ({ id: v.id, ...this.size(this.cards.get(v.id)!) }))
       const w = parts.reduce((t, p) => t + p.w, 0) + orW * (parts.length - 1)
       sizes.set(s.key, { w, h: Math.max(...parts.map((p) => p.h)), parts })
     }
     // The tree from the parents; a screen whose parent is not here starts a tree of its own, to the right.
-    const keys = new Set(this.screens.map((s) => s.key))
+    const keys = new Set(screens.map((s) => s.key))
     const kids = new Map<string, string[]>()
     const roots: string[] = []
     this.parentOf.clear()
-    for (const s of this.screens) {
+    for (const s of screens) {
       if (s.parent && keys.has(s.parent) && s.parent !== s.key) {
         kids.set(s.parent, [...(kids.get(s.parent) ?? []), s.key])
         this.parentOf.set(s.key, s.parent)
@@ -456,9 +500,9 @@ export class Canvas {
     // Across: side by side, a first child below its parent when that place is free.
     this.boxes.clear()
     const xs = new Map<string, number>()
-    let maxX = PAD
+    let maxX = sideW ? PAD + sideW : PAD
     for (const row of rows) {
-      let cursor = PAD
+      let cursor = left
       for (const k of row) {
         const p = this.parentOf.get(k), first = p != null && kids.get(p)![0] === k
         const x = Math.max(cursor, first ? xs.get(p)! : cursor)
@@ -492,9 +536,11 @@ export class Canvas {
       this.rowBottom.set(k, rowY[d]! + rowH[d]!)
     }))
     const lastGap = rows.length ? GAP_Y + Math.max(0, lanesIn.at(-1)! - 1) * lane : 0
-    this.extent = { x: PAD, y: PAD, w: Math.max(0, maxX - PAD), h: Math.max(0, y - lastGap - PAD) }
+    const sideH = sideW ? this.side.offsetHeight : 0
+    y = Math.max(y - lastGap, PAD + sideH)
+    this.extent = { x: PAD, y: PAD, w: Math.max(0, maxX - PAD), h: Math.max(0, y - PAD) }
     // The cards, and the OR between the sides of an A OR B.
-    for (const s of this.screens) {
+    for (const s of screens) {
       const b = this.boxes.get(s.key)
       if (!b) continue
       let cx = b.x
@@ -557,7 +603,7 @@ export class Canvas {
     svg.replaceChildren(...parts)
   }
 
-  private card(id: string, key: string): Card {
+  private card(id: string, key: string, parent: HTMLElement): Card {
     const have = this.cards.get(id)
     if (have) return have
     const root = el('article', 'card')
@@ -602,7 +648,7 @@ export class Canvas {
     }
     shield.addEventListener('click', () => { if (c.view?.side?.pickable) this.on.pick(c.key, c.view.side.index) })
     frame.addEventListener('load', () => this.loaded(c))
-    this.surface.append(root)
+    parent.append(root)
     this.cards.set(id, c)
     return c
   }
@@ -622,7 +668,7 @@ export class Canvas {
     if (!c) return
     if (d.uxwoz === 'size' && Number.isFinite(d.height)) {
       if (c.shown?.final) c.sized = true
-      const h = Math.min(MAX_SCREEN_H, Math.max(MIN_SCREEN_H, Math.round(d.height)))
+      const h = Math.min(MAX_SCREEN_H, Math.max(c.view?.fit ? MIN_COMPONENT_H : MIN_SCREEN_H, Math.round(d.height)))
       if (c.height === h) return
       // A screen sized by its window (100% heights, script reading innerHeight) grows each time its
       // frame grows. Stop that loop instead of following it to MAX_SCREEN_H.

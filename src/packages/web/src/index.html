@@ -15,6 +15,7 @@
     <div id="projectMenu" class="menu" role="menu" hidden>
       <button type="button" class="item" id="menuNew">＋ New mockup…</button>
       <div id="menuRecent" class="menu-recent"></div>
+      <button type="button" class="item" id="exportBoxes" title="Download the Components, Rules and Data boxes as one markdown file">⇩ Export the boxes (markdown)</button>
       <div class="menu-foot" id="menuFoot">
         <button type="button" id="startOver" title="Start over: delete every screen and make the first one again">↺ Start over</button>
         <button type="button" id="deleteApp" class="danger" title="Delete this mockup">✕ Delete</button>
@@ -29,6 +30,11 @@
     <div id="navMenu" class="menu nav-menu" role="menu" hidden></div>
   </div>
   <div class="tb-right zoom">
+    <span class="box-nav">
+      <button type="button" data-box="components" title="Show the Components box; the number counts what is new since you last looked">Components <b></b></button>
+      <button type="button" data-box="rules" title="Show the Rules box; the number counts what is new since you last looked">Rules <b></b></button>
+      <button type="button" data-box="data" title="Show the Data box; the number counts what is new since you last looked">Data <b></b></button>
+    </span>
     <button id="zoomOut" type="button" class="wide-only" title="Zoom out (⌘−)">−</button>
     <button id="zoomValue" type="button" class="menu-button" aria-haspopup="menu" title="Zoom"><span id="zoomPct">100%</span> <span class="caret">▾</span></button>
     <button id="zoomIn" type="button" class="wide-only" title="Zoom in (⌘+)">+</button>

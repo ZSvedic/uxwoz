@@ -1,11 +1,13 @@
 // The browser side: the generate panel, the canvas of picked screens, a new screen's A OR B
 // (streamed side by side, then picked), click-to-navigate, the rail's tools (Edit, Regenerate, Undo,
-// Info, Delete) with the drawer for Edit and Info, pickers, recent mockups, errors in a pill.
+// Info, Delete) with the drawer for Edit and Info, the boxes (with filing's results after a pick or
+// an Edit), pickers, recent mockups, errors in a pill.
 
-import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, type Device } from '@uxwoz/core/frame'
+import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, markCurrent, pasteComponents, type Device } from '@uxwoz/core/frame'
 import { isBack, nameWords, normalizePrompt, screenKey, screenRef } from '@uxwoz/core/keys'
-import { namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
-import type { CacheEntry, Version } from '@uxwoz/core'
+import { componentsOf, isComponent, namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
+import type { BoxName, Boxes, CacheEntry, Version } from '@uxwoz/core'
+import { boxesMarkdown, createSide, renderSide, type BoxOp } from './boxes.ts'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
 
@@ -48,6 +50,11 @@ const state = {
   before: null as View | null,
   /** Counts mockups opened, so a slower earlier open gives way to a newer one. */
   starts: 0,
+  /** The open mockup's Rules and Data (its components are entries), and whether filing runs. */
+  boxes: null as Boxes | null,
+  filing: false,
+  /** Counts changes this page applied, so a map fetched before one of them is not applied after it. */
+  edits: 0,
   css: {} as Record<string, string>,
 }
 
@@ -56,6 +63,7 @@ const store = {
   set: (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* private mode */ } },
 }
 
+const side = createSide()
 const canvas = new Canvas($('stage'), {
   action: onAction,
   pick,
@@ -63,7 +71,7 @@ const canvas = new Canvas($('stage'), {
   focus: (key) => setCurrent(key),
   tool: onTool,
   zoomed: (z) => { zoomPct.textContent = `${Math.round(z * 100)}%` },
-})
+}, side.el, side.components)
 
 // ---- Views ------------------------------------------------------------------------------------
 
@@ -76,8 +84,9 @@ function nameOf(e: CacheEntry, v: Version): string {
   return (text || e.action || e.app).slice(0, 60)
 }
 
-/** A screen's label, e.g. "L2 Camera"; a planned screen's comes from its name. */
+/** A screen's label, e.g. "L2 Camera"; a planned screen's comes from its name; a component's is its ID. */
 const labelOf = (e: CacheEntry) => {
+  if (isComponent(e)) return e.name!
   const level = state.tree.get(e.key)?.level ?? '?'
   if (e.versions.length) return `L${level} ${nameOf(e, e.versions.at(-1)!)}`
   if (!state.entries.has(e.key)) return `L${level} ${nameWords(e.name!).replace(/^./, (c) => c.toUpperCase())}`
@@ -89,6 +98,12 @@ const treeParent = (key: string) => state.tree.get(key)?.parent ?? null
 
 const widthOf = (d: Device | undefined) => (d ? DEVICES[d].width : LEGACY_WIDTH)
 const ideaOf = (v: Version) => v.idea ?? ''
+
+const components = () => [...state.entries.values()].filter(isComponent)
+/** A stored screen as it shows: its components pasted, links to itself marked current. */
+const page = (html: string, name: string | undefined, c = componentsOf([...state.entries.values()])) => markCurrent(pasteComponents(html, c), name)
+/** The screens whose newest version pastes a component. */
+const pastedOn = (id: string) => [...state.entries.values()].filter((e) => !isComponent(e) && e.versions.at(-1)?.html.includes(`data-component="${id}"`))
 
 function sideCard(key: string, index: number, side: Side | null, stored: Version | null, device: Device | undefined): CardView {
   const version = stored ?? side?.version ?? null
@@ -107,6 +122,14 @@ function views(): ScreenView[] {
     const v = e.versions.at(-1)
     const making = m?.key === e.key ? m : null
     const revising = state.revising?.key === e.key ? state.revising : null
+    if (isComponent(e)) {
+      if (v) out.push({
+        key: e.key, parent: null, current: state.current === e.key, undo: e.versions.length > 1, component: true, fresh: !e.seen,
+        note: revising ? 'Making the change…' : '',
+        cards: [{ id: e.key, width: widthOf(v.device), device: v.device, name: e.name!, idea: e.action ?? '', streaming: !!revising, fit: true }],
+      })
+      continue
+    }
     out.push(v ? {
       key: e.key, parent: treeParent(e.key), current: state.current === e.key, undo: e.versions.length > 1,
       note: revising ? (revising.change ? 'Making the change…' : 'Making a new design…') : '',
@@ -126,6 +149,8 @@ function views(): ScreenView[] {
 /** Draw every screen and put each stored design in its frame. Streaming frames are left to their streams. */
 async function draw() {
   state.tree = screenTree([...state.entries.values()])
+  side.el.hidden = !state.app || !state.entries.size || !state.boxes
+  if (state.boxes) renderSide(side, { boxes: state.boxes, components: components(), filing: state.filing }, boxOp)
   canvas.render(views(), !!state.busy)
   generate.hidden = !!state.app && !generate.classList.contains('open')
   renderDrawer()
@@ -133,12 +158,14 @@ async function draw() {
   const theme = themeSelect.value
   const css = await themeCss(theme)
   if (theme !== themeSelect.value) return // a newer draw shows the newer theme
+  // Every screen is shown with today's components, so a changed component redraws the screens that paste it.
+  const c = componentsOf([...state.entries.values()])
   for (const e of state.entries.values()) {
     const v = e.versions.at(-1)
-    if (v) { if (state.revising?.key !== e.key) canvas.show(e.key, v.html, true, css) }
-    else e.proposals?.forEach((p, i) => { if (p) canvas.show(`${e.key}#${i}`, p.html, true, css) })
+    if (v) { if (state.revising?.key !== e.key) canvas.show(e.key, isComponent(e) ? v.html : page(v.html, e.name, c), true, css) }
+    else e.proposals?.forEach((p, i) => { if (p) canvas.show(`${e.key}#${i}`, page(p.html, undefined, c), true, css) })
   }
-  state.making?.sides.forEach((s, i) => { if (s.version) canvas.show(`${state.making!.key}#${i}`, s.version.html, true, css) })
+  state.making?.sides.forEach((s, i) => { if (s.version) canvas.show(`${state.making!.key}#${i}`, page(s.version.html, undefined, c), true, css) })
 }
 
 async function fetchText(url: string): Promise<string> {
@@ -162,7 +189,8 @@ class StreamRenderer {
   private shown: string | null = null
   private lastBuild = 0
   private timer: ReturnType<typeof setTimeout> | null = null
-  constructor(private id: string, private css: string) {}
+  /** `bare`: a component, shown as it streams; a screen gets its components pasted. */
+  constructor(private id: string, private css: string, private bare = false) {}
 
   push(text: string) {
     this.raw += text
@@ -185,7 +213,7 @@ class StreamRenderer {
     if (fragment === this.shown || !hasVisibleText(fragment)) return
     this.lastBuild = now
     this.shown = fragment
-    canvas.show(this.id, fragment, false, this.css)
+    canvas.show(this.id, this.bare ? fragment : page(fragment, undefined), false, this.css)
   }
 }
 
@@ -280,6 +308,7 @@ async function openScreen(action: string | null, from: string | null, label: str
       else if (ev.type === 'done') {
         finished = true
         state.entries.set(ev.entry.key, ev.entry)
+        state.edits++
         if (state.making === m) state.making = null
         loadRecent()
         await draw()
@@ -356,8 +385,10 @@ async function pick(key: string, index: number) {
       showError('Could not keep that design')
       return reloadMap()
     }
-    const { entry } = await res.json() as { entry: CacheEntry }
+    const { entry, filing } = await res.json() as { entry: CacheEntry; filing: boolean }
     state.entries.set(key, entry)
+    state.edits++
+    if (filing) filed()
     canvas.rename(`${key}#${index}`, key)
     state.current = key
     saveCurrent()
@@ -470,11 +501,62 @@ async function reloadMap() {
   applyMap(await res.json())
 }
 
-function applyMap(map: { entries: CacheEntry[] }) {
+function applyMap(map: { entries: CacheEntry[]; boxes?: Boxes; filing?: boolean }) {
   state.entries = new Map(map.entries.map((e) => [e.key, e]))
+  state.boxes = map.boxes ?? state.boxes
+  state.filing = !!map.filing
+  state.edits++
   if (state.current && !state.entries.has(state.current)) state.current = null
   draw()
 }
+
+/**
+ * Filing started after a pick or an Edit: ask for the mockup once filing is done, and show what it
+ * filed. A map that crosses a change made here (or a screen still being made) is asked for again.
+ */
+async function filed() {
+  const app = state.app
+  state.filing = true
+  for (let tries = 0, wait = true; tries < 40 && app && app === state.app; tries++, wait = false) {
+    const n = state.edits
+    const res = await fetch(`/api/map?app=${encodeURIComponent(app)}${wait ? '&wait=1' : ''}`).catch(() => null)
+    if (!res?.ok || app !== state.app) return
+    const map = await res.json()
+    if (n === state.edits && !state.busy && !state.picking) return applyMap(map)
+    await new Promise((r) => setTimeout(r, 1500))
+  }
+}
+
+/** A change to the boxes; the server answers with the whole mockup. */
+async function boxOp(o: BoxOp | { op: 'seen'; box: BoxName }) {
+  const app = state.app
+  if (!app) return
+  const res = await post('/api/box', { app, ...o }).catch(() => null)
+  const body = await res?.json().catch(() => null)
+  if (!res?.ok) { showError(`Could not change the box: ${body?.error ?? 'no answer'}`); return draw() }
+  if (app === state.app) applyMap(body)
+}
+
+/** A toolbar button: move the view to a box; after a moment its new entries are no longer marked. */
+function lookAt(box: BoxName) {
+  if (side.el.hidden) return
+  canvas.showBox(side.sections[box])
+  const fresh = box === 'components' ? components().some((e) => !e.seen) : state.boxes?.[box].some((x) => !x.seen)
+  if (fresh) setTimeout(() => boxOp({ op: 'seen', box }), 3000)
+}
+
+for (const b of document.querySelectorAll<HTMLButtonElement>('[data-box]')) b.addEventListener('click', () => lookAt(b.dataset.box as BoxName))
+
+/** Export: the three boxes as a markdown file. */
+$('exportBoxes').addEventListener('click', () => {
+  closeMenus()
+  if (!state.app || !state.boxes) return
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([boxesMarkdown(state.app, components(), state.boxes)], { type: 'text/markdown' }))
+  a.download = `${state.app.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40).replace(/^-+|-+$/g, '') || 'mockup'}-boxes.md`
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+})
 
 // ---- The rail and the drawer --------------------------------------------------------------------
 
@@ -482,7 +564,7 @@ function onTool(key: string, tool: string) {
   if (!state.entries.get(key)?.versions.length) return
   setCurrent(key)
   if (tool === 'edit' || tool === 'info') return openDrawer(tool)
-  if (tool === 'regenerate') return revise(key, null)
+  if (tool === 'regenerate' && !isComponent(state.entries.get(key)!)) return revise(key, null)
   if (tool === 'undo') return undo(key)
   if (tool === 'delete') return removeScreen(key)
 }
@@ -500,7 +582,7 @@ async function revise(key: string, change: string | null) {
   draw()
   try {
     const css = await themeCss(themeSelect.value)
-    const stream = new StreamRenderer(key, css)
+    const stream = new StreamRenderer(key, css, isComponent(e))
     const res = await post('/api/revise', { key, change, model, device: deviceSelect.value }, ctrl.signal)
     let finished = false
     try {
@@ -511,6 +593,8 @@ async function revise(key: string, change: string | null) {
           finished = true
           stream.cancel()
           state.entries.set(key, ev.entry)
+          state.edits++
+          if (ev.filing) filed()
           state.revising = null
           if (change) changeInput.value = ''
           // The new version may be taller or narrower: keep it in view once it has its size.
@@ -537,6 +621,7 @@ async function undo(key: string) {
   if (!res?.ok) return showError('Nothing to undo')
   const { entry } = await res.json() as { entry: CacheEntry }
   state.entries.set(key, entry)
+  state.edits++
   draw()
 }
 
@@ -551,8 +636,9 @@ async function removeScreen(key: string) {
   const e = state.entries.get(key)
   if (!e || state.busy || !state.app) return
   const root = screenKey(state.app, null) === key
-  const n = goesWith(key)
-  const what = root ? `${labelOf(e)}, the first screen? That deletes the whole mockup.`
+  const n = isComponent(e) ? pastedOn(e.name!).length : goesWith(key)
+  const what = isComponent(e) ? `the component ${e.name}? ${n ? `The ${n === 1 ? 'screen' : `${n} screens`} that paste it show nothing in its place.` : 'No screen pastes it.'}`
+    : root ? `${labelOf(e)}, the first screen? That deletes the whole mockup.`
     : `${labelOf(e)}${n ? ` and the ${n === 1 ? 'screen' : `${n} screens`} only it leads to` : ''}?`
   if (!confirm(`Delete ${what}`)) return
   const res = await post('/api/delete', { key }).catch(() => null)
@@ -595,15 +681,27 @@ function renderDrawer() {
   $('drawerName').textContent = labelOf(e)
   $<HTMLButtonElement>('makeChange').disabled = !!state.busy
   const history = $('history')
+  const comp = isComponent(e)
   history.replaceChildren(...e.versions.map((x, i) => {
     const li = document.createElement('li')
-    li.textContent = i === 0 ? 'The design you picked' : x.feedback ? `Edit: ${x.feedback}` : 'Regenerated'
+    li.textContent = x.feedback ? `Edit: ${x.feedback}` : comp ? (i === 0 ? (e.parent ? `Taken from ${e.parent.label} of a screen by filing` : 'Added') : 'Changed by filing')
+      : i === 0 ? 'The design you picked' : 'Regenerated'
     li.classList.toggle('now', i === e.versions.length - 1)
     return li
   }).reverse())
   const node = state.tree.get(e.key)
   const parent = node?.parent ? state.entries.get(node.parent) : undefined
-  const info: [string, string][] = [
+  const from = comp && e.parent ? state.entries.get(e.parent.key) : undefined
+  const info: [string, string][] = comp ? [
+    ['Component', e.name!],
+    ['Where it belongs', e.action ?? '–'],
+    ['Pasted on', pastedOn(e.name!).map(labelOf).join(', ') || 'no screen'],
+    ['Taken from', from ? `${e.parent!.label} of ${labelOf(from)}` : '–'],
+    ['Last written by', `${e.by === 'user' ? 'you' : 'filing'}, ${e.at ? new Date(e.at).toLocaleString() : '–'}`],
+    ['Versions', `${e.versions.length}${e.versions.length > 1 ? ' (↶ Undo goes back one)' : ''}`],
+    ['Model', modelLabel(v.model)],
+    ['Size', `${v.html.length.toLocaleString()} characters`],
+  ] : [
     ['Name', labelOf(e)],
     ['Idea', ideaOf(v) || '–'],
     ['Name in links', e.name ? `@${e.name}` : '–'],
@@ -691,6 +789,8 @@ function closeMockup() {
   store.set('uxwoz:app', '')
   state.app = null
   state.entries = new Map()
+  state.boxes = null
+  state.filing = false
   state.current = null
   resetTrail()
   state.making = null
@@ -869,6 +969,14 @@ function renderToolbar() {
   }
   $('navName').textContent = cur ? labelOf(cur) : 'Screens'
   nav.title = cur ? labelOf(cur) : 'Every screen of this mockup'
+  $('exportBoxes').hidden = !app
+  // The box buttons count the entries added since the user last looked at each box.
+  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-box]')) {
+    const box = b.dataset.box as BoxName
+    const n = box === 'components' ? components().filter((e) => !e.seen).length : state.boxes?.[box].filter((x) => !x.seen).length ?? 0
+    b.hidden = side.el.hidden
+    b.querySelector('b')!.textContent = n ? String(n) : ''
+  }
   if (!$('navMenu').hidden) renderNav()
 }
 
@@ -900,7 +1008,19 @@ function renderNav() {
     for (const k of all) if (treeParent(k.key) === e.key) walk(k, depth + 1)
   }
   // The first screen first; screens the first screen does not reach after it, as their own trees.
-  for (const e of all) if (!treeParent(e.key)) walk(e, 0)
+  for (const e of all) if (!treeParent(e.key) && !isComponent(e)) walk(e, 0)
+  // Then the components, under a Components parent.
+  const comps = components()
+  if (comps.length) {
+    const head = item('Components', `${comps.length}`, () => lookAt('components'))
+    rows.push(head)
+    for (const c of comps) {
+      const b = item(c.name!, 'component', () => goTo(c.key))
+      b.style.setProperty('--depth', '1')
+      b.classList.toggle('current', c.key === state.current)
+      rows.push(b)
+    }
+  }
   menu.replaceChildren(...rows)
 }
 

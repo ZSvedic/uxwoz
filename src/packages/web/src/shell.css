@@ -176,3 +176,37 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .info { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
 .info dt { color: var(--muted); }
 .info dd { margin: 0; overflow-wrap: anywhere; }
+
+/* The box buttons in the toolbar: each moves the view to its box; the number counts what is new. */
+.box-nav { display: flex; gap: 2px; margin-right: 8px; }
+.box-nav button { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; }
+.box-nav b { color: #fff; background: var(--accent); border-radius: 9px; padding: 0 6px; font-size: 11px; }
+.box-nav b:empty { display: none; }
+
+/* The boxes column left of the first screen, at canvas scale: it zooms with the screens. */
+.boxes { position: absolute; display: flex; flex-direction: column; gap: 28px; font-size: 15px; }
+.box { padding: 14px 18px 18px; border: 2px solid var(--line); border-radius: 12px; background: var(--card); }
+.box h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font-size: 18px; }
+.box h3 small { color: var(--muted); font-weight: 400; font-size: 13px; flex: 1; }
+.box-hint, .box-status { margin: 0; color: var(--muted); font-size: 13px; }
+.box-status { padding: 0 4px; }
+.box-btn { padding: 1px 8px; font-size: 12px; color: var(--muted); }
+.box-btn:hover { color: var(--fg); border-color: var(--accent); }
+/* An entry added since the user last looked at its box. */
+.fresh > b:first-child::after, .card.fresh .name::after { content: " new"; color: var(--accent); font-size: 12px; font-weight: 600; }
+.box-components .box-body { display: flex; flex-direction: column; }
+/* A component card is at least as tall as its rail, so the rail never covers the box below. */
+.box-components .card { position: relative; margin-top: calc(62px / var(--z)); min-height: calc(190px / var(--z)); }
+.surface.far .box-components .card { margin-top: calc(26px / var(--z)); }
+.rule { display: flex; gap: 6px; align-items: baseline; padding: 4px 0; border-top: 1px dashed var(--line); }
+.rule:first-child { border-top: 0; }
+.rule-text { flex: 1; min-width: 0; }
+.rule .box-btn, .table-head .box-btn:last-child { border-color: transparent; background: none; }
+[contenteditable] { outline: none; border-radius: 4px; cursor: text; }
+[contenteditable]:hover, [contenteditable]:focus { background: var(--bg); box-shadow: 0 0 0 2px var(--line); }
+.data-table + .data-table { margin-top: 16px; }
+.table-head { display: flex; gap: 6px; align-items: baseline; margin-bottom: 4px; }
+.table-head b { flex: 1; }
+.data-table table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.data-table th, .data-table td { border: 1px solid var(--line); padding: 3px 6px; text-align: left; height: 1.6em; }
+.data-table th { color: var(--muted); font-weight: 600; }
