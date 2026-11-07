@@ -1,6 +1,7 @@
-// A stream that stops early must fail and never reach the cache (no cassette: a fake provider).
-import { expect, test } from 'bun:test'
-import { ALTERNATIVE_REQUEST, ScreenCache, generateScreen, screenKey, type Fetch } from '@uxwoz/core'
+// A stream that stops early must fail and never reach the cache, and a reply that holds the screen
+// twice, or prose before it, is cleaned before it is stored (no cassette: a fake provider).
+import { describe, expect, test } from 'bun:test'
+import { ALTERNATIVE_REQUEST, ScreenCache, cutProse, firstCopy, generateScreen, screenKey, type Fetch } from '@uxwoz/core'
 import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
 
 const sse = (...events: object[]) => events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('')
@@ -57,4 +58,29 @@ test('when one side of the A OR B fails, the other is still cached and shown', a
   } finally {
     server.stop(true)
   }
+})
+
+describe('a doubled reply keeps its first copy', () => {
+  test('cut at the second idea or title outside SVG', () => {
+    const one = '<title>Home</title>\n<meta name="idea" content="a">\n<h1>Home</h1><svg><title>chart</title></svg>'
+    expect(firstCopy(`${one}\n/final\n${one}`)).toEqual({ html: one, cut: true })
+    expect(firstCopy(one)).toEqual({ html: one, cut: false })
+  })
+
+  test('a title in a script\'s string after an SVG is no second copy, and a cut never ends inside a script', () => {
+    const html = '<title>Trends</title>\n<meta name="idea" content="a">\n<svg id="chart"></svg>\n<script>chart.innerHTML = data.map((v) => `<rect><title>${v}</title></rect>`).join("")</script>'
+    expect(firstCopy(html)).toEqual({ html, cut: false })
+  })
+
+  test('the junk between copies goes: a marker like </assistant>, or notes after the last tag', () => {
+    const one = '<title>Home</title>\n<meta name="idea" content="a">\n<main><h1>Home</h1></main><script>go()</script>'
+    expect(firstCopy(`${one}</assistant>ablytyped\n${one}`)).toEqual({ html: one, cut: true })
+    expect(firstCopy(`${one}\nHere is the screen again, with the notes I wrote.\n${one}`)).toEqual({ html: one, cut: true })
+  })
+})
+
+test('prose before the title is cut; markup before it stays', () => {
+  expect(cutProse('The request has no change, so here it is again.\n\n<title>Home</title><h1>Hi</h1>')).toBe('<title>Home</title><h1>Hi</h1>')
+  expect(cutProse('<style>p{}</style><title>Home</title>')).toBe('<style>p{}</style><title>Home</title>')
+  expect(cutProse('<h1>No title</h1>')).toBe('<h1>No title</h1>')
 })
