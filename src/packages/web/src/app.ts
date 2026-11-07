@@ -4,7 +4,7 @@
 // an Edit), pickers, recent mockups, errors in a pill.
 
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, markCurrent, pasteComponents, type Device } from '@uxwoz/core/frame'
-import { isBack, nameWords, normalizePrompt, screenKey, screenRef } from '@uxwoz/core/keys'
+import { canonicalAction, isBack, nameWords, normalizePrompt, screenKey, screenRef } from '@uxwoz/core/keys'
 import { componentsOf, isComponent, namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
 import type { BoxName, Boxes, CacheEntry, Version } from '@uxwoz/core'
 import { boxesMarkdown, createSide, renderSide, type BoxOp } from './boxes.ts'
@@ -422,8 +422,8 @@ async function dropChoice(key: string) {
 /**
  * Where a click leads, and the prompt for it if it is a new screen: Back to the screen this one
  * hangs under (one click nearer the first screen), Home to the first screen, `@name` to the screen
- * with that name, anything else to the screen of its action prompt. A name no screen has yet is made
- * by the server from the link's prompt, the planned screen's, or the words clicked.
+ * with that name. A name no screen has yet is made by the server from the link's prompt, the planned
+ * screen's, or the words clicked. Words with no `@` lead nowhere.
  */
 function target(app: string, from: string, prompt: string): { to: string; prompt: string } {
   if (isBack(prompt)) {
@@ -433,7 +433,7 @@ function target(app: string, from: string, prompt: string): { to: string; prompt
   }
   const ref = screenRef(prompt)
   const known = ref && namesOf([...state.entries.values()]).get(ref.name)
-  return { to: known || screenKey(app, prompt), prompt }
+  return { to: known || (ref || !canonicalAction(prompt) ? screenKey(app, prompt) : from), prompt }
 }
 
 /** A click inside a picked screen: open the screen it leads to, or go to it when it is already there. */

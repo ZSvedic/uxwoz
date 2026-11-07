@@ -172,7 +172,7 @@ describe('web server', () => {
 
   test('a screen whose A OR B is still open cannot be revised', async () => {
     const first = done(await screen({ app: APP })).entry
-    const open = done(await screen({ app: APP, action: 'A page about the bakers of a tiny bakery', from: first.key, label: 'Our bakers' })).entry
+    const open = done(await screen({ app: APP, action: '@bakers: A page about the bakers of a tiny bakery', from: first.key, label: 'Our bakers' })).entry
     expect(open.versions).toEqual([])
     expect((await post('/api/revise', { key: open.key })).status).toBe(409)
     expect((await post('/api/undo', { key: open.key })).status).toBe(404)
@@ -184,6 +184,7 @@ describe('web server', () => {
     expect((await post('/api/screen', { app: '' })).status).toBe(400)
     expect((await post('/api/screen', { app: 'x', device: 'watch' })).status).toBe(400)
     expect((await post('/api/screen', { app: 'x', action: 'x'.repeat(501) })).status).toBe(400)
+    expect((await post('/api/screen', { app: 'x', action: 'Words with no name' })).status).toBe(400)
     expect((await post('/api/delete', { key: 'no such screen' })).status).toBe(404)
     expect((await post('/api/pick', { key: 'no such screen', index: 0 })).status).toBe(404)
   })

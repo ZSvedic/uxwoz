@@ -50,8 +50,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
       // Only a finished screen may be cached: a stream that stopped early or hit the token limit is an error.
       if (!ev.finishReason) throw new ProviderError('the stream ended before the screen was complete')
       if (ev.finishReason !== 'stop') throw new ProviderError(`the screen was cut off (${ev.finishReason})`)
-      // Prose before the title goes, and a reply that holds the screen twice keeps its first copy.
-      const html = firstCopy(cutProse(extractFragment(raw)))
+      const html = extractFragment(raw)
       if (!html.trim()) throw new ProviderError('the model returned an empty screen')
       const name = screenName(html), idea = screenIdea(html)
       yield {
@@ -78,34 +77,6 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
     if (deadline.aborted) throw new ProviderError(`no complete screen within ${DEADLINE_MS / 1000} s`)
     throw err
   }
-}
-
-/**
- * The first copy of a reply that holds the screen twice, as Luna's sometimes do: cut where a second
- * idea, or a second title outside SVG, starts.
- */
-export function firstCopy(html: string): string {
-  const ideas = [...html.matchAll(/<meta\s+name=["']?idea\b/gi)].map((m) => m.index!)
-  const titles = [...html.matchAll(/<title>/gi)].map((m) => m.index!).filter((i) => !inside(html, i, 'svg') && !inside(html, i, 'script'))
-  const at = Math.min(...[ideas[1], titles[1]].filter((x): x is number => x != null))
-  // Never a kept copy that ends inside a script: a title in a script's string is no second copy.
-  if (!Number.isFinite(at) || inside(html, at, 'script')) return html
-  const kept = html.slice(0, at)
-  // The junk between the copies goes: from a marker like </final> or </assistant>, else after the last tag.
-  const junk = kept.search(/<\/(?:final|assistant|analysis|answer|response|output)>/i)
-  return (junk >= 0 ? kept.slice(0, junk) : kept.slice(0, kept.lastIndexOf('>') + 1)).trimEnd()
-}
-
-/** True when position `i` of `html` lies inside an element `tag` (svg, script). */
-function inside(html: string, i: number, tag: string): boolean {
-  const before = html.slice(0, i).toLowerCase()
-  return before.lastIndexOf(`<${tag}`) > before.lastIndexOf(`</${tag}>`)
-}
-
-/** Prose a model wrote before `<title>` goes: the reply must begin with the title. Markup before it stays. */
-export function cutProse(html: string): string {
-  const i = html.search(/<title>/i)
-  return i > 0 && !html.slice(0, i).includes('<') ? html.slice(i) : html
 }
 
 /** One short request with the same system prompt, so the provider's prompt cache is warm for the session. */

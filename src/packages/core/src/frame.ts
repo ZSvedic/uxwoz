@@ -49,7 +49,7 @@ export const DEFAULT_DEVICE: Device = 'phone'
 export const LEGACY_WIDTH = 800
 export const isDevice = (v: unknown): v is Device => typeof v === 'string' && Object.hasOwn(DEVICES, v)
 
-// Our script, added before the model's markup. It turns clicks on data-action controls (and links)
+// Our script, added before the model's markup. It turns clicks on data-action controls
 // into postMessage calls to the app, and keeps the frame from navigating away. While the screen is
 // still streaming (`final` false), controls do nothing: their handlers are not ready yet.
 const bootstrap = (final: boolean, vh: number) => `(() => {
@@ -82,24 +82,14 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     parent.postMessage({ uxwoz: 'key', key: e.button === 3 ? '[' : ']', code: '', shift: false, mod: true }, '*')
   })
   document.addEventListener('click', (e) => {
-    const el = e.target instanceof Element && e.target.closest('[data-action], a[href]')
+    const el = e.target instanceof Element && e.target.closest('[data-action]')
     if (!el) return
     if (!final) { e.preventDefault(); e.stopImmediatePropagation(); return }
     const prompt = el.getAttribute('data-action')
     if (prompt) { e.preventDefault(); go(prompt, labelOf(el)) }
   }, true)
-  // A plain link the screen's own script did not handle opens "the screen behind this link".
-  // In-page links (#, #tab, javascript:) stay in the screen.
-  window.addEventListener('click', (e) => {
-    const a = e.target instanceof Element && e.target.closest('a[href]:not([data-action])')
-    if (!a) return
-    const handled = e.defaultPrevented
-    e.preventDefault()
-    const href = a.getAttribute('href') || ''
-    const label = (a.textContent || '').trim()
-    if (handled || href.startsWith('#') || href.startsWith('javascript:') || !label) return
-    go('The screen shown after clicking the "' + label + '" link on the "' + document.title + '" screen', label)
-  })
+  // A link never leaves the screen: the frame would show another page.
+  window.addEventListener('click', (e) => { if (e.target instanceof Element && e.target.closest('a[href]')) e.preventDefault() })
   document.addEventListener('submit', (e) => {
     const p = e.target.getAttribute('data-action') || e.submitter?.getAttribute('data-action')
     if (p) { e.preventDefault(); go(p, labelOf(e.submitter) || labelOf(e.target.querySelector('button,[type=submit]'))) }
@@ -148,7 +138,7 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
 // until hovered: Pico drops it inside <nav> and the mockup theme makes it wavy elsewhere, so the
 // same tab bar looked different depending on the markup the model chose. A form with an action prompt
 // opens a screen on submit, so its submit button is blue, not the whole form.
-const GO = `[data-action]:not(form), form[data-action] :is(button:not([type="button"]), [type="submit"]), a[href]:not([href^="#"], [href^="javascript:"])`
+const GO = `[data-action]:not(form), form[data-action] :is(button:not([type="button"]), [type="submit"])`
 const NAV_CSS = `main { --pico-primary: #373c44; --pico-primary-background: #525f7a; --pico-primary-border: #525f7a;
   --pico-primary-underline: rgba(55, 60, 68, .5); --pico-primary-hover: #1f2329; --pico-primary-hover-background: #48536b;
   --pico-primary-hover-border: #48536b; --pico-primary-hover-underline: #1f2329; --pico-primary-focus: rgba(82, 95, 122, .25);

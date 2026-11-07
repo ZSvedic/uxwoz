@@ -1,6 +1,6 @@
-// Cached generative exploration: every screen is stored under its normalized prompt.
+// Cached generative exploration: every screen is stored under its name for links (`@sleep-report`).
 // A new screen first holds two proposals (the A OR B); a pick keeps one as the screen's first
-// version and drops the other, and gives the screen its fixed name for links (`@sleep-report`).
+// version and drops the other.
 // Edit and Regenerate add versions; Undo drops the newest. Each screen remembers the screen and
 // click that first made it; levels and the tree are worked out from the screens (see tree.ts).
 // Each mockup also has three boxes: Components (entries of their own kind, with versions like a
@@ -9,7 +9,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { LIMITS, canonicalAction, isId, nameWords, normalizePrompt, screenKey, screenRef } from './keys.ts'
-import { screenName, type Device } from './frame.ts'
+import type { Device } from './frame.ts'
 import { HOME_NAME, isComponent, nameFrom, screenList, screenTree, uniqueName } from './tree.ts'
 import type { ModelId } from './models.ts'
 import type { Paper } from './prompt.ts'
@@ -43,10 +43,7 @@ export interface CacheEntry {
   key: string
   app: string
   action: string | null
-  /**
-   * The name links use (`@sleep-report`): the one in the link that opened it, `home` for the first
-   * screen; a screen opened by a plain prompt gets one from its title at the pick.
-   */
+  /** The name links use (`@sleep-report`): the one in the link that opened it, `home` for the first screen. */
   name?: string
   /** The screen and click that first made it; null for the first screen (and screens made without a click). */
   parent: Parent | null
@@ -84,7 +81,7 @@ const componentKey = (app: string, id: string) => `${normalizePrompt(app)} » #$
 /** How many designs a new screen offers. */
 export const PROPOSALS = 2
 
-// Format 5 adds the boxes. Files of format 2 to 4 load with empty boxes; the spec feature's fields
+// Format 5 adds the boxes. Files of format 3 and 4 load with empty boxes; the spec feature's fields
 // (`specs`, `reviews`, and `spec`, `misses`, `plan`, `specRefused` in versions) are dropped.
 const FORMAT = 5
 
@@ -110,16 +107,15 @@ export class ScreenCache {
         this.file = null
         return
       }
-      if (data?.version >= 2 && data.version <= FORMAT) {
+      if (data?.version >= 3) {
         for (const e of data.entries as CacheEntry[]) this.entries.set(e.key, e)
         for (const [root, b] of Object.entries(data.boxes ?? {})) this.boxes.set(root, b as Boxes)
         if (data.version < FORMAT) for (const e of this.entries.values()) for (const v of [...e.versions, ...(e.proposals ?? [])])
           if (v) for (const k of ['spec', 'misses', 'plan', 'specRefused']) delete (v as unknown as Record<string, unknown>)[k]
-        if (data.version === 2) this.migrate()
       } else {
-        // A file from before versions: it stays on disk, and the cache starts empty.
-        renameSync(file, `${file}.before-versions`)
-        console.warn(`screen cache ${file} is from before versions; moved it to ${file}.before-versions and started empty`)
+        // A file from before names: it stays on disk, and the cache starts empty.
+        renameSync(file, `${file}.before-names`)
+        console.warn(`screen cache ${file} is from before names; moved it to ${file}.before-names and started empty`)
       }
     } catch (err) {
       this.entries.clear()
@@ -133,17 +129,10 @@ export class ScreenCache {
     return this.entries.get(key)
   }
 
-  /**
-   * The screen an action opens, if the mockup has it: by name for `@name`; for a plain prompt (a
-   * link from before names), the screen made from that prompt, else a named one with that prompt.
-   */
+  /** The screen an action opens, if the mockup has it: the first screen, or the screen with the name in `@name`. */
   find(app: string, action: string | null): CacheEntry | undefined {
-    const ref = action ? screenRef(action) : null
-    if (ref && canonicalAction(app, action)) return this.mockup(normalizePrompt(app)).find((e) => e.name === ref.name && !isComponent(e))
-    const hit = this.entries.get(screenKey(app, action))
-    if (hit || !action) return hit
-    const a = normalizePrompt(action)
-    return this.mockup(normalizePrompt(app)).find((e) => e.action != null && !isComponent(e) && normalizePrompt(e.action) === a)
+    const ref = canonicalAction(action) && screenRef(action!)
+    return ref ? this.mockup(normalizePrompt(app)).find((e) => e.name === ref.name && !isComponent(e)) : this.entries.get(normalizePrompt(app))
   }
 
   /** A moment to compare deletes against: see removedSince. */
@@ -162,20 +151,22 @@ export class ScreenCache {
 
   /**
    * Store one finished side of a new screen's A OR B. The first side to finish makes the screen,
-   * with the click as its parent; `@name: prompt` gives it its name and prompt. Returns the screen,
+   * with the click as its parent; `@name: prompt` gives it its name and prompt (`home` for the first
+   * screen). Returns the screen,
    * or undefined when a side was already picked (the other one is dropped).
    */
   propose(app: string, action: string | null, side: number, version: Version, parent: Parent | null = null): CacheEntry | undefined {
-    action = canonicalAction(app, action)
+    action = canonicalAction(action)
     let entry = this.find(app, action)
     if (!entry) {
       const key = screenKey(app, action)
       const ref = action ? screenRef(action) : null
+      if (action && !ref) return undefined
       // A parent must be a picked screen of this mockup; a click that raced a delete makes no parent.
       const from = parent && this.entries.get(parent.key)
       const ok = action && parent && from?.versions.length && normalizePrompt(from.app) === normalizePrompt(app)
       entry = {
-        key, app, action: ref ? ref.prompt || nameWords(ref.name) : action, ...(ref && { name: ref.name }),
+        key, app, action: ref ? ref.prompt || nameWords(ref.name) : null, name: ref ? ref.name : HOME_NAME,
         parent: ok ? { key: parent!.key, label: parent!.label } : null, versions: [], proposals: Array(PROPOSALS).fill(null),
       }
       this.entries.set(key, entry)
@@ -186,27 +177,15 @@ export class ScreenCache {
     return entry
   }
 
-  /** Keep one side of the open A OR B as the screen's first version; the other is gone. The screen gets its name for links. */
+  /** Keep one side of the open A OR B as the screen's first version; the other is gone. */
   pick(key: string, side: number): CacheEntry | undefined {
     const entry = this.entries.get(key)
     const v = Number.isInteger(side) ? entry?.proposals?.[side] : null
     if (!entry || !v) return undefined
     entry.versions = [v]
     delete entry.proposals
-    this.name(entry)
     this.save()
     return entry
-  }
-
-  /** Give a picked screen opened by a plain prompt its fixed name, once: home for the first screen, else from its title. */
-  private name(e: CacheEntry) {
-    if (e.name || !e.versions.length) return
-    const taken = new Set(this.mockup(normalizePrompt(e.app)).filter((x) => !isComponent(x)).map((x) => x.name).filter((n): n is string => !!n))
-    const v = e.versions[0]!
-    // Screens made before titles: their first heading, else the start of their prompt.
-    const words = (t: string) => (/[a-z]{3,}/i.test(t) && !/[${}]/.test(t) ? t : '') // not text a script fills in
-    const heading = v.html.match(/<h[12][^>]*>([\s\S]*?)<\/h[12]>/i)?.[1]?.replace(/<[^>]*>/g, '') ?? ''
-    e.name = e.action ? uniqueName(nameFrom(v.name || words(screenName(v.html)) || words(heading) || e.action), new Set([...taken, HOME_NAME]), e.action) : HOME_NAME
   }
 
   /** Add a version to a picked screen (an Edit or a Regenerate); it shows from now on. */
@@ -396,13 +375,6 @@ export class ScreenCache {
   /** One mockup's screens, oldest first: the order the tree uses for children. */
   private mockup(root: string): CacheEntry[] {
     return [...this.entries.values()].filter((e) => normalizePrompt(e.app) === root)
-  }
-
-  /** A file from before names: stored levels and recorded clicks go (levels are worked out now), and picked screens get names. */
-  private migrate() {
-    for (const e of this.entries.values()) delete (e as CacheEntry & { level?: number }).level
-    for (const e of this.entries.values()) this.name(e)
-    this.save()
   }
 
   private save() {

@@ -21,23 +21,13 @@ export function screenRef(action: string): { name: string; prompt: string } | nu
 /** A name in words: `sleep-report` becomes "sleep report". */
 export const nameWords = (name: string) => name.replace(/[-_]+/g, ' ')
 
-/** The action as stored: null for the first screen, whether asked for as no action, "home", "@home", or the product prompt. */
-export function canonicalAction(app: string, action: string | null): string | null {
-  if (!action) return null
-  const a = normalizePrompt(action)
-  return a === '' || a === HOME_ACTION || screenRef(a)?.name === HOME_ACTION || a === normalizePrompt(app) ? null : action
-}
+/** The action as stored: null for the first screen, whether asked for as no action, "home" or "@home". */
+export const canonicalAction = (action: string | null): string | null => (!action?.trim() || normalizePrompt(action) === HOME_ACTION || screenRef(action)?.name === HOME_ACTION ? null : action)
 
-/**
- * The cache key: the normalized product prompt, plus `@name` for a screen opened by name, or the
- * normalized action prompt for one opened by a plain prompt (as screens were before names).
- */
+/** The cache key: the normalized product prompt, plus `@name` for a screen opened by name. */
 export function screenKey(app: string, action: string | null): string {
-  const root = normalizePrompt(app)
-  const a = canonicalAction(app, action)
-  if (!a) return root
-  const ref = screenRef(a)
-  return `${root} » ${ref ? `@${ref.name}` : normalizePrompt(a)}`
+  const ref = canonicalAction(action) && screenRef(action!)
+  return ref ? `${normalizePrompt(app)} » @${ref.name}` : normalizePrompt(app)
 }
 
 /** True for the action that goes back to the screen that opened this one: `back`. */

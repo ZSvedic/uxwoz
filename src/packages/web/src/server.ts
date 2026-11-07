@@ -4,7 +4,7 @@
 import { join, resolve } from 'node:path'
 import {
   DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, HOME_LINE, HOME_NAME, MODELS, PROPOSALS, ScreenCache, canonicalAction, drawRequest, editRequest,
-  fileDecision, generateScreen, isComponent, isDevice, isModelId, nameFrom, normalizePrompt, plannedScreens, promptFromLabel, screenKey, screenRef,
+  fileDecision, generateScreen, isComponent, isDevice, isModelId, normalizePrompt, plannedScreens, promptFromLabel, screenKey, screenRef,
   warmUp, type BoxName, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type Version,
 } from '@uxwoz/core'
 import index from './index.html'
@@ -146,7 +146,7 @@ export function createServer(opts: ServerOptions = {}) {
   /** A new screen: from the cache when it is there (with its open A OR B, if any), else two designs at once. */
   async function* screenEvents(r: ScreenRequest, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
     const { app, model, device, click } = r
-    let action = canonicalAction(app, r.action)
+    let action = canonicalAction(r.action)
     const hit = cache.find(app, action)
     const key = hit?.key ?? screenKey(app, action)
     if (hit) {
@@ -173,13 +173,13 @@ export function createServer(opts: ServerOptions = {}) {
       const planned = plannedScreens(cache.map(app).entries).find((p) => p.name === ref.name)
       action = `@${ref.name}: ${planned?.action ?? promptFromLabel(ref.name, click?.label ?? '')}`
     }
-    const prompt = ref ? screenRef(action!)!.prompt : action
+    const prompt = ref ? screenRef(action!)!.prompt : null
     yield { type: 'meta', key, cached: false, variants: PROPOSALS }
     // The paper should hold what the last decision filed: wait for it, a little.
     await filed(app, fileWaitMs)
     if (signal.aborted) return
     const from = click && cache.get(click.from)
-    const target = { id: ref ? ref.name : action ? nameFrom(action) : HOME_NAME, line: prompt ?? HOME_LINE }
+    const target = { id: ref ? ref.name : HOME_NAME, line: prompt ?? HOME_LINE }
     const paper = cache.paper(app, device)
     // One random side asks for a clearly different design, so the side says nothing about which is which.
     const different = Math.min(PROPOSALS - 1, Math.floor(random() * PROPOSALS))
@@ -284,7 +284,7 @@ export function createServer(opts: ServerOptions = {}) {
           const app = typeof b?.app === 'string' ? b.app.trim() : ''
           const action = typeof b?.action === 'string' && b.action.trim() ? b.action.trim() : null
           if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
-          if (action && action.length > 500) return json({ error: 'action must be at most 500 characters' }, 400)
+          if (action && (action.length > 500 || (canonicalAction(action) && !screenRef(action)))) return json({ error: 'action must be @name or @name: its one line, at most 500 characters' }, 400)
           const p = pickers(b)
           if (p instanceof Response) return p
           const click = typeof b?.from === 'string' && b.from ? { from: b.from.slice(0, 3000), label: String(b?.label ?? '').slice(0, 200) } : null

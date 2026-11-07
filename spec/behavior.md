@@ -213,9 +213,8 @@ the last filing did, with its time and cost; hovering it lists any line filing's
 Each control that opens another screen carries the ID of that screen (its name) and, for a new
 screen, its one line, written by the model (`data-action="@sleep-report: Sleep report of last
 night with…"`), and is blue; clicking a new one asks for that screen, drawn from the paper. A
-plain link the screen does not handle asks for "the screen shown after clicking
-*label*"; in-page links (`#…`) stay put. Other controls (filters, inputs) work inside the screen.
-Only a real click opens a screen.
+link without a name (`<a href>`, or an action with no `@`) leads nowhere, and the fixer redraws
+it. Other controls (filters, inputs) work inside the screen. Only a real click opens a screen.
 
 - **The name says which screen**: every link to one screen uses one name, so a screen is made
   once however many buttons lead to it, and however they word its prompt. The first screen is
@@ -234,16 +233,11 @@ Only a real click opens a screen.
   screen on the paper with `@` and its ID alone (`data-action="@sleep-report"`), back with `back`,
   and to a new screen with an ID and its one line. A link by ID alone with no screen and no plan
   behind it makes a screen from the ID and the button's words.
-- **Screens from before names**: links that are a prompt alone still work: a click finds the
-  screen made from that prompt (named or not), else makes one; at the pick it gets a name from its title,
-  unique in the mockup (*Sleep report* becomes `sleep-report`, a second *Settings* `settings-2`).
-
 - **Back** never makes a screen: a control with the action `back` goes to the screen this one hangs
   under (the first screen, if it has none). What a control says never decides where it goes.
 - **The current link**: a control that opens the screen it sits on (a tab bar's own tab) is marked
   current and shows bold and underlined; a click on it stays.
-- A click that leads to a screen already on the canvas (by name, by the prompt that made it, or
-  Back and Home) makes it current and scrolls to it, at no cost; so does one on a screen whose
+- A click that leads to a screen already on the canvas (by name, or Back and Home) makes it current and scrolls to it, at no cost; so does one on a screen whose
   A OR B is open.
 - One screen is made at a time: while one is being made or changed, a click that would open
   another does nothing, and a note says so for a moment at the bottom of the canvas.
@@ -258,18 +252,10 @@ for the GPT models an estimate from tokens, marked *~* and *(est.)*.
 A design that is not complete after 20 s, stops early, or hits the token limit fails; nothing of it
 is cached. A failed Edit or Regenerate leaves the screen as it was.
 
-Two things are cut from a reply before it is stored:
-
-- **Prose before the title** (*"The request as given contains no change…"*).
-- **A second copy of the screen** (Luna's replies sometimes hold it twice): the first copy stays,
-  ended at its last tag or at a marker like `</final>`, so the junk between the copies goes. A
-  second idea, or a second title outside `<svg>` and `<script>`, starts a second copy; a cut that
-  would end inside a script is not made.
-
 ## Cache
 
-Every screen is stored under its name (`product » @sleep-report`); a screen from before names, under
-its normalized prompt: lowercase, single spaces, no trailing punctuation. A screen holds its versions (the last one shows) and, until a pick, its open A OR B.
+Every screen is stored under its name (`product » @sleep-report`), the first screen under the
+normalized product prompt: lowercase, single spaces, no trailing punctuation. A screen holds its versions (the last one shows) and, until a pick, its open A OR B.
 Opening a stored screen makes no model call and costs nothing. The cache lives on the server and
 survives restarts, so every browser shares it. Each screen also stores its name and the screen and
 click that first made it; levels are worked out, never stored. Each side of an A OR B is stored as soon as it finishes, so a design
@@ -278,10 +264,10 @@ in this browser.
 
 The cache file is version 5 and also holds each mockup's boxes. A file from version 3 or 4 loads
 with empty boxes, and the spec feature's fields (`specs`, `reviews`, and `spec`, `misses`, `plan`,
-`specRefused` in versions) go at the next save. A file from a newer app is left as it is: the app says so in the red pill and saves nothing. A cache file from before names (version 2) gets names for its picked screens when the server loads
-it, from each screen's title, else its first heading, else its prompt; its stored levels and
-clicks go. A file from before versions is moved aside to `screen-cache.json.before-versions`, and
-the cache starts empty.
+`specRefused` in versions) go at the next save. A file from a newer app is left as it is: the app says so in the red pill and saves nothing. A file from before names (version 2, or older) is moved aside to
+`screen-cache.json.before-names`, and the cache starts empty. Screens of version 3 and 4 that
+were stored under their prompt keep their place in the tree, through the click that made them;
+their links with no `@` lead nowhere.
 
 ## Pickers
 

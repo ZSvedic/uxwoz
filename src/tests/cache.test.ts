@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ALTERNATIVE_REQUEST, ScreenCache, drawRequest, editRequest, isBack, normalizePrompt, paperText, screenIdea, screenKey, screenTree, type Paper, type Version } from '@uxwoz/core'
+import { ALTERNATIVE_REQUEST, ScreenCache, drawRequest, editRequest, isBack, nameFrom, normalizePrompt, paperText, screenIdea, screenKey, screenTree, type Paper, type Version } from '@uxwoz/core'
 
 const ver = (html: string, createdAt = '2026-10-23T00:00:00Z'): Version => ({
   html, model: 'claude-haiku-5.5', servedModel: null, createdAt,
@@ -11,22 +11,22 @@ const ver = (html: string, createdAt = '2026-10-23T00:00:00Z'): Version => ({
 
 /** A picked screen: one side proposed, then picked. */
 function screen(cache: ScreenCache, app: string, action: string | null, html: string, parent: { key: string; label: string } | null = null, at?: string) {
-  const e = cache.propose(app, action, 0, ver(html, at), parent)!
+  const e = cache.propose(app, action && `@${nameFrom(action)}: ${action}`, 0, ver(html, at), parent)!
   return cache.pick(e.key, 0)!
 }
 
 describe('screen cache', () => {
-  test('prompts that differ only in case, spacing and end punctuation share a key', () => {
+  test('a key is the normalized product prompt, plus the name of a screen opened by name', () => {
     expect(normalizePrompt('  A Coffee   shop app!! ')).toBe('a coffee shop app')
-    expect(screenKey('Coffee app', 'Show  the Cart.')).toBe(screenKey('coffee app', 'show the cart'))
-    expect(screenKey('Coffee app', null)).not.toBe(screenKey('Coffee app', 'Show the cart'))
+    expect(screenKey('Coffee app!', '@cart: Show the cart')).toBe('coffee app » @cart')
+    expect(screenKey('Coffee app', '@Cart')).toBe(screenKey('coffee app', '@cart: other words'))
   })
 
   test('a new screen holds both sides until a pick keeps one as its first version', () => {
     const cache = new ScreenCache()
     const e = cache.propose('Coffee app', null, 1, ver('<h1>B</h1>'))!
     expect(e).toMatchObject({ versions: [], proposals: [null, { html: '<h1>B</h1>' }] })
-    expect(e.name).toBeUndefined()
+    expect(e.name).toBe('home')
     cache.propose('coffee app', null, 0, ver('<h1>A</h1>'))
     expect(cache.pick(e.key, 2)).toBeUndefined()
     const picked = cache.pick(e.key, 1)!
@@ -52,14 +52,14 @@ describe('screen cache', () => {
     expect(cache.undo(key)!.versions.map((v) => v.html)).toEqual(['<h1>v1</h1>'])
     expect(cache.undo(key)).toBeUndefined()
     // No versions while the A OR B is open.
-    const open = cache.propose('Cafe', 'Cart', 0, ver('<h1>c</h1>'), { key, label: 'Cart' })!
+    const open = cache.propose('Cafe', '@cart', 0, ver('<h1>c</h1>'), { key, label: 'Cart' })!
     expect(cache.addVersion(open.key, ver('<h1>x</h1>'))).toBeUndefined()
   })
 
-  test('"home" and the product prompt as an action both mean the first screen', () => {
-    expect(screenKey('Coffee app', 'Home')).toBe(screenKey('Coffee app', null))
-    expect(screenKey('Coffee app', 'coffee app.')).toBe(screenKey('Coffee app', null))
+  test('"home" and "@home" as an action mean the first screen; words with no @ open no screen', () => {
+    expect(screenKey('Coffee app', 'Home')).toBe(screenKey('Coffee app', '@home: start'))
     expect(new ScreenCache().propose('Coffee app', 'home', 0, ver('<h1>Menu</h1>'))!.action).toBeNull()
+    expect(new ScreenCache().propose('Coffee app', 'Show the cart', 0, ver('<h1>Cart</h1>'))).toBeUndefined()
   })
 
   test('the paper lists the app, its device, the titles and lines, and the three boxes in full', () => {
@@ -111,21 +111,9 @@ describe('screen cache', () => {
     const cart = screen(cache, 'Cafe', 'Cart', '<h1>Cart</h1>', { key: menu.key, label: 'Cart' })
     expect(cart.parent).toEqual({ key: menu.key, label: 'Cart' })
     const tea = screen(cache, 'Tea', null, '<h1>T</h1>')
-    expect(cache.propose('Cafe', 'X', 0, ver('<h1>x</h1>'), { key: tea.key, label: 'x' })!.parent).toBeNull()
-    const open = cache.propose('Cafe', 'Help', 0, ver('<h1>h</h1>'), { key: menu.key, label: 'Help' })!
-    expect(cache.propose('Cafe', 'Y', 0, ver('<h1>y</h1>'), { key: open.key, label: 'y' })!.parent).toBeNull()
-  })
-
-  test('a pick names the screen from its title, once and uniquely; the first screen is home', () => {
-    const cache = new ScreenCache()
-    const menu = screen(cache, 'Cafe', null, '<title>Menu</title>')
-    expect(menu.name).toBe('home')
-    const a = screen(cache, 'Cafe', 'Settings of the cafe', '<title>Settings</title>', { key: menu.key, label: 'Settings' })
-    const b = screen(cache, 'Cafe', 'Settings for orders', '<title>Settings</title>', { key: a.key, label: 'Orders' })
-    const h = screen(cache, 'Cafe', 'A home page', '<title>Home</title>', { key: a.key, label: 'x' })
-    expect([a.name, b.name, h.name]).toEqual(['settings', 'settings-orders', 'home-2'])
-    cache.addVersion(a.key, { ...ver('<title>Preferences</title>'), name: 'Preferences' })
-    expect(cache.get(a.key)!.name).toBe('settings')
+    expect(cache.propose('Cafe', '@x', 0, ver('<h1>x</h1>'), { key: tea.key, label: 'x' })!.parent).toBeNull()
+    const open = cache.propose('Cafe', '@help', 0, ver('<h1>h</h1>'), { key: menu.key, label: 'Help' })!
+    expect(cache.propose('Cafe', '@y', 0, ver('<h1>y</h1>'), { key: open.key, label: 'y' })!.parent).toBeNull()
   })
 
   test('the cache serves one mockup at a time', () => {
@@ -181,29 +169,14 @@ describe('screen cache', () => {
     expect(cache.apps().map((a) => a.app)).toEqual(['Bakery'])
   })
 
-  test('a file from before names gets names, and loses its stored levels and clicks', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'uxwoz-'))
-    const file = join(dir, 'cache.json')
-    writeFileSync(file, JSON.stringify({
-      version: 2,
-      entries: [
-        { key: 'cafe', app: 'Cafe', action: null, level: 1, parent: null, versions: [{ ...ver('<h1>Menu</h1>'), name: 'Menu' }] },
-        { key: 'cafe » cart', app: 'Cafe', action: 'Cart', level: 2, parent: { key: 'cafe', label: 'Cart' }, versions: [{ ...ver('<h1>Cart</h1>'), name: 'Your cart' }] },
-        { key: 'cafe » pay', app: 'Cafe', action: 'Pay', level: 2, parent: { key: 'cafe', label: 'Pay' }, versions: [], proposals: [ver('<h1>Pay</h1>'), null] },
-      ],
-      links: [{ from: 'cafe » cart', to: 'cafe', label: 'Back', createdAt: '2026-10-24T00:00:00Z' }],
-    }))
-    const cache = new ScreenCache(file)
-    expect(cache.map('Cafe').entries.map((e) => [e.name, 'level' in e])).toEqual([['home', false], ['your-cart', false], [undefined, false]])
-    expect(new ScreenCache(file).map('Cafe')).toEqual(cache.map('Cafe'))
-    expect(JSON.parse(readFileSync(file, 'utf8')).version).toBe(5)
-  })
-
-  test('a file from before versions is moved aside, and the cache starts empty', () => {
-    const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
-    writeFileSync(file, JSON.stringify({ entries: [{ key: 'cafe', app: 'Cafe', action: null, chosen: 0, candidates: [ver('<h1>Menu</h1>')] }], links: [] }))
-    expect(new ScreenCache(file).size).toBe(0)
-    expect(existsSync(`${file}.before-versions`)).toBe(true)
+  test('a file from before names (format 2, or before versions) is moved aside, and the cache starts empty', () => {
+    for (const data of [{ entries: [{ key: 'cafe', app: 'Cafe', action: null, chosen: 0, candidates: [ver('<h1>Menu</h1>')] }], links: [] },
+      { version: 2, entries: [{ key: 'cafe', app: 'Cafe', action: null, level: 1, parent: null, versions: [ver('<h1>Menu</h1>')] }] }]) {
+      const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
+      writeFileSync(file, JSON.stringify(data))
+      expect(new ScreenCache(file).size).toBe(0)
+      expect(existsSync(`${file}.before-names`)).toBe(true)
+    }
   })
 
   test('a file from a newer app is left alone, and nothing is saved', () => {
@@ -236,9 +209,9 @@ describe('screen cache', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
     const cache = new ScreenCache(file)
     const menu = screen(cache, 'Coffee app', null, '<h1>Menu</h1>')
-    cache.propose('Coffee app', 'Cart', 1, ver('<h1>Cart</h1>'), { key: menu.key, label: 'Cart' })
+    cache.propose('Coffee app', '@cart', 1, ver('<h1>Cart</h1>'), { key: menu.key, label: 'Cart' })
     const again = new ScreenCache(file)
     expect(again.get(menu.key)?.versions[0]?.html).toBe('<h1>Menu</h1>')
-    expect(again.get(screenKey('coffee app', 'cart'))?.proposals).toEqual([null, ver('<h1>Cart</h1>')])
+    expect(again.get(screenKey('coffee app', '@cart'))?.proposals).toEqual([null, ver('<h1>Cart</h1>')])
   })
 })

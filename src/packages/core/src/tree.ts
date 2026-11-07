@@ -68,25 +68,17 @@ export function nameFrom(title: string): string {
   return (kept.length ? kept : words).slice(0, 4).join('-').slice(0, 32).replace(/-+$/, '') || 'screen'
 }
 
-/**
- * A name no other screen of the mockup has: `name`, else one made from `fallback` (the screen's
- * prompt, which says more), else name-2, name-3…
- */
-export function uniqueName(name: string, taken: Set<string>, fallback = ''): string {
-  if (!taken.has(name)) return name
-  const other = fallback && nameFrom(fallback)
-  if (other && other !== 'screen' && !taken.has(other)) return other
+/** A name not in `taken`: `name`, else name-2, name-3… */
+export function uniqueName(name: string, taken: Set<string>): string {
   let n = name, i = 1
   while (taken.has(n)) n = `${name}-${++i}`
   return n
 }
 
-/** The screen an action opens if the mockup has it: by `@name`, `home`, or a prompt it was made from. Null for `back` and for a new screen. */
-export function resolveAction(app: string, action: string, byName: Map<string, string>): string | null {
+/** The screen a link opens if the mockup has it: by `@name` (`@home` is the first screen). Null for `back`, a new screen, and words with no `@`. */
+export function resolveAction(action: string, byName: Map<string, string>): string | null {
   const ref = screenRef(action)
-  if (ref) return byName.get(ref.name) ?? null
-  if (normalizePrompt(action) === 'back') return null
-  return screenKey(app, action)
+  return ref ? byName.get(ref.name) ?? null : null
 }
 
 /** Every screen of one mockup (all from the same app) by name. */
@@ -160,7 +152,7 @@ function build(all: CacheEntry[]): { tree: Map<string, TreeNode>; entries: Cache
   for (const e of entries) {
     if (!e.versions.length) continue
     for (const l of linksIn(shownHtml(e, components))) {
-      const to = resolveAction(app, l.action, byName)
+      const to = resolveAction(l.action, byName)
       if (!to || to === e.key || !keys.has(to)) continue
       edges.set(e.key, [...(edges.get(e.key) ?? []), { to, label: l.label }])
       if (!links.some(([f, t]) => f === e.key && t === to)) links.push([e.key, to])

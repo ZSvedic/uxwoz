@@ -45,8 +45,8 @@ can spend model credits.
   newer app (it is left alone and nothing is saved).
 - `POST /api/screen {app, action?, model?, device?, from?, label?}`: a new screen, as an NDJSON
   stream. `action` is `@name: prompt`, `@name` alone (a screen the mockup has or plans; one with no
-  plan is made from the name and `label`), or a plain prompt (links from before names). A screen
-  with that name, else with that prompt's key, is a cache hit. A cache hit sends `meta` (cached true, variants 0) and `done` only; a screen whose A OR B
+  plan is made from the name and `label`); anything else but `home` is 400. A screen with that name
+  is a cache hit. A cache hit sends `meta` (cached true, variants 0) and `done` only; a screen whose A OR B
   is still open comes back with its `proposals`, at no cost. Otherwise two designs stream at once:
   `meta.variants` is 2 and each `chunk` names its side (`variant` 0 or 1). One random side is asked
   for a clearly different design. Each side that finishes is stored at once as that side's
@@ -124,8 +124,7 @@ only from a card's own frame.
 CacheEntry { key; app; action: string | null; name?: string; parent: { key; label } | null;
              versions: Version[]; proposals?: (Version | null)[] }
              // name never changes: "home" for the first screen, else the one in the link that
-             // opened it ("@sleep-report: …"), or, for a screen opened by a plain prompt, one
-             // from its title at the pick; unique in the mockup; links use it as "@sleep-report".
+             // opened it ("@sleep-report: …"); unique in the mockup; links use it as "@sleep-report".
              // action is the screen's prompt (without "@name: "). parent is the screen and
              // click that first made it.
              // A planned screen (plannedScreens) has the same shape with no versions and no
@@ -143,17 +142,16 @@ Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | nul
              costEstimated; firstChunkMs; totalMs; finishReason; device?: Device;
              name?; idea?; feedback? }
              // name comes from the model's <title>, idea from its <meta name="idea">;
-             // feedback is the Edit request that made this version. html has prose before <title>
-             // cut, and a reply that held the screen twice keeps its first copy
+             // feedback is the Edit request that made this version
 TreeNode   { level; parent: key | null; label }
              // from screenTree: level 1 is the first screen, the fewest clicks from it otherwise
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast' | 'gpt-6.1-terra'
            // Terra is the background model (filing): never a screen model, never in /api/config
 Device     'phone' (390 × 844 px) | 'desktop' (1024 × 768 px): every screen is that wide and at
            least that tall
-key        normalize(app), normalize(app) + ' » @' + name for a screen opened by name, or
-           normalize(app) + ' » ' + normalize(action) for one opened by a plain prompt; normalize
-           turns » into >; action "home", "@home" or the product prompt means the first screen
+key        normalize(app) for the first screen, normalize(app) + ' » @' + name for any other
+           (version 3 and 4 files also hold screens under normalize(app) + ' » ' + normalize(prompt));
+           normalize turns » into >; action "home" or "@home" means the first screen
 ```
 
 ## Env vars
