@@ -54,42 +54,45 @@ You were asked for one screen. Spend a minute on the paper, then draw.
 3. Study the screen the click came from. The user sees the new screen right after it.
 4. Draw two variants of the whole screen its title asks for. They share components, rules and
    data, and differ in layout.
-   - A part that is in Components: paste it by its ID. Never redraw it.
+   - A component goes on every screen its line names. Paste it by its ID, even where the screen
+     the click came from drew it by hand. Never copy its drawing.
    - A part that changes from screen to screen, like a list row, is yours to draw.
    - Follow the rules that fit this screen. When two rules disagree, follow the later one and
      move on.
    - Show Data rows where the screen shows that data, and make up the rest.
-   - Every control leads somewhere: a screen on the paper, a new screen (give it an ID and its
-     one line), or back.
+   - Every button and link leads somewhere: a screen on the paper, a new screen (give it an ID
+     and its one line), or back. A button that saves or buys leads somewhere too.
    - One purpose, one screen. Controls that do the same thing for different items (rows of a
      list, pins on a map, cards in a grid) open the same screen, drawn once for one example item.
 
 ## After the user decides
 
 The user picks a variant, or types a change on a screen variant. Ask three questions about that
-decision and file the answers. Most decisions add nothing.
+decision and file the answers. Most picks add nothing. What the user types usually adds a rule.
 
-1. **Components.** Will other screens reuse a part of this screen as it is? Give it an ID and add
-   it to Components, with one line that says where it belongs.
-2. **Rules.** Did the user settle something other screens must follow? Look at what the chosen
-   variant has and the other lacks, and at what the user typed. Add one sentence to Rules.
-3. **Data.** Did this screen make up data that another screen will show? Add it to Data as a
+1. **Components.** Will another screen show a part of this screen exactly as it is, words and
+   all? Give it an ID and add it to Components, with one line that says where it belongs. A list,
+   a form or a card about one item changes from screen to screen: it is no component.
+2. **Rules.** Did the user settle something other screens must follow? Look at what the user
+   typed, and at what the chosen variant has and the other lacks. Add one sentence to Rules. How
+   this one screen is laid out is no rule, unless the user typed it for every screen.
+3. **Data.** Did this screen make up rows that another screen will show? Add them to Data as a
    table.
 
-Read the box before you add to it. If an entry already says it, add nothing. If the decision
-changes an entry, change that entry and keep its ID. File nothing that matters to this screen
-alone.
+Read the box before you add to it. If an entry already says it, in any words, add nothing. If the
+decision changes an entry, change that entry and keep its ID.
 
 ## The overnight fixer
 
 Every few screens a senior designer visits, reads the boxes and the screens added since the last
 visit, and tidies up.
 
-- Merge entries that say one thing twice, keeping the older ID. Remove an entry only one screen
-  needs.
+- Merge entries that say one thing twice, keeping the older ID. Of two rules that disagree, remove
+  the older one. Remove an entry that one screen or no screen needs.
 - Add what filing missed: a part drawn by hand on three screens, a fact two screens show
   differently (the rule takes the newer screen's side).
-- Redraw a screen that breaks a rule or draws a component by hand.
+- Redraw a screen that breaks a rule, draws a component by hand, or has a control that leads
+  nowhere.
 - Leave a note for each change. The user can undo any of them.
 - Leave alone what the user wrote by hand.
 
