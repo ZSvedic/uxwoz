@@ -1,11 +1,10 @@
 // One screen generation: stream the model's fragment, then report what it cost and who served it.
 
-import type { PlanInfo, Version } from './cache.ts'
+import type { Version } from './cache.ts'
 import { extractFragment, screenIdea, screenName } from './frame.ts'
 import { DEVICES, type Device } from './frame.ts'
 import { MODELS, type ModelId } from './models.ts'
 import { SYSTEM_PROMPT, WARMUP_REQUEST, screenRequest } from './prompt.ts'
-import { applyEdit, checkScreen, cutProse, firstCopy, flowNames, flowRequest, namesIn, navNames, specRequest, takeSpecLines, type Spec, type SpecLine } from './spec.ts'
 import { ProviderError, streamModel, type Fetch } from './providers.ts'
 
 /** A slower screen is useless, and keep-alive comments can stall a stream, so this is an overall deadline. */
@@ -21,11 +20,6 @@ export interface GenerateOptions {
   device?: Device
   /** True for one side of an A OR B: ask for a clearly different design. */
   alternative?: boolean
-  /** The mockup's spec, sent after the tree, and the screen's name, for the check. A string is sent as it is. */
-  spec?: Spec | string
-  name?: string
-  /** For a first screen: how the plan went, kept on the version for Info. */
-  plan?: PlanInfo
   /** An Edit: change this screen as asked instead of designing a new one. */
   edit?: { html: string; change: string }
   signal?: AbortSignal
@@ -47,8 +41,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
   try {
     for await (const ev of streamModel({
       model: o.model, system: SYSTEM_PROMPT,
-      user: screenRequest(o.app, o.action, o.existing, { device: o.device && DEVICES[o.device].request, alternative: o.alternative, spec: typeof o.spec === 'string' ? o.spec : o.spec && specRequest(o.spec),
-        flow: typeof o.spec === 'object' ? flowRequest(o.spec, o.name) : undefined, edit: o.edit }),
+      user: screenRequest(o.app, o.action, o.existing, { device: o.device && DEVICES[o.device].request, alternative: o.alternative, edit: o.edit }),
       signal, fetch: o.fetch, env: o.env,
     })) {
       if (ev.type === 'text') {
@@ -65,21 +58,9 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
       // Only a finished screen may be cached: a stream that stopped early or hit the token limit is an error.
       if (!ev.finishReason) throw new ProviderError('the stream ended before the screen was complete')
       if (ev.finishReason !== 'stop') throw new ProviderError(`the screen was cut off (${ev.finishReason})`)
-      // Prose before the title goes, and the spec lines the design proposes come out of the stored
-      // screen. Tabs and Back are drawn at show time (drawChrome), so the stored screen keeps the model's.
-      // A reply that holds the screen twice keeps its first copy.
-      const first = firstCopy(cutProse(extractFragment(raw)))
-      const taken = takeSpecLines(first.html)
-      const html = taken.html
+      // Prose before the title goes, and a reply that holds the screen twice keeps its first copy.
+      const html = firstCopy(cutProse(extractFragment(raw)))
       if (!html.trim()) throw new ProviderError('the model returned an empty screen')
-      // An Edit is checked against the spec with its own lines in: the Edit that sets Back is not a Back miss.
-      let spec = typeof o.spec === 'object' ? o.spec : null
-      if (spec && o.edit && taken.lines.length) {
-        spec = JSON.parse(JSON.stringify(spec)) as Spec
-        applyEdit(spec, taken.lines, '', '')
-      }
-      const misses = spec && Object.keys(spec).length ? checkScreen(html, spec, o.name, knownNames(o.existing, spec, taken.lines)) : null
-      if (misses && first.cut) misses.push('the reply held the screen twice; the first copy was kept')
       const name = screenName(html), idea = screenIdea(html)
       yield {
         type: 'done',
@@ -96,11 +77,6 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
           ...(o.device && { device: o.device }),
           ...(name && { name }),
           ...(idea && { idea }),
-          ...(taken.lines.length && { spec: taken.lines }),
-          ...(o.edit && taken.refusals.length && { specRefused: taken.refusals }),
-          // A mockup with no spec rows (made before the spec) has nothing to check.
-          ...(misses && { misses }),
-          ...(o.plan && { plan: o.plan }),
         },
       }
       return
@@ -113,14 +89,31 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
 }
 
 /**
- * The screens a new screen may link to without opening one the mockup does not plan: the names in
- * the request's tree (`  @sleep-report: …`), the spec's flow and tabs, and the tabs of the design's
- * own ui.nav line (Home plans its tabs as it draws them).
+ * The first copy of a reply that holds the screen twice, as Luna's sometimes do: cut where a second
+ * idea, or a second title outside SVG, starts.
  */
-function knownNames(lines: string[] = [], spec: Spec, own: SpecLine[]): Set<string> {
-  const tree = lines.map((l) => l.match(/^\s*@([a-z0-9_-]+)/i)?.[1]?.toLowerCase()).filter((n): n is string => !!n)
-  const tabs = own.filter((l) => l.key === 'ui.nav').flatMap((l) => namesIn(l.text))
-  return new Set(['home', ...tree, ...flowNames(spec), ...navNames(spec), ...tabs])
+export function firstCopy(html: string): string {
+  const ideas = [...html.matchAll(/<meta\s+name=["']?idea\b/gi)].map((m) => m.index!)
+  const titles = [...html.matchAll(/<title>/gi)].map((m) => m.index!).filter((i) => !inside(html, i, 'svg') && !inside(html, i, 'script'))
+  const at = Math.min(...[ideas[1], titles[1]].filter((x): x is number => x != null))
+  // Never a kept copy that ends inside a script: a title in a script's string is no second copy.
+  if (!Number.isFinite(at) || inside(html, at, 'script')) return html
+  const kept = html.slice(0, at)
+  // The junk between the copies goes: from a marker like </final> or </assistant>, else after the last tag.
+  const junk = kept.search(/<\/(?:final|assistant|analysis|answer|response|output)>/i)
+  return (junk >= 0 ? kept.slice(0, junk) : kept.slice(0, kept.lastIndexOf('>') + 1)).trimEnd()
+}
+
+/** True when position `i` of `html` lies inside an element `tag` (svg, script). */
+function inside(html: string, i: number, tag: string): boolean {
+  const before = html.slice(0, i).toLowerCase()
+  return before.lastIndexOf(`<${tag}`) > before.lastIndexOf(`</${tag}>`)
+}
+
+/** Prose a model wrote before `<title>` goes: the reply must begin with the title. Markup before it stays. */
+export function cutProse(html: string): string {
+  const i = html.search(/<title>/i)
+  return i > 0 && !html.slice(0, i).includes('<') ? html.slice(i) : html
 }
 
 /** One short request with the same system prompt, so the provider's prompt cache is warm for the session. */

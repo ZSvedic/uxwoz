@@ -63,19 +63,19 @@ test('when one side of the A OR B fails, the other is still cached and shown', a
 describe('a doubled reply keeps its first copy', () => {
   test('cut at the second idea or title outside SVG', () => {
     const one = '<title>Home</title>\n<meta name="idea" content="a">\n<h1>Home</h1><svg><title>chart</title></svg>'
-    expect(firstCopy(`${one}\n/final\n${one}`)).toEqual({ html: one, cut: true })
-    expect(firstCopy(one)).toEqual({ html: one, cut: false })
+    expect(firstCopy(`${one}\n/final\n${one}`)).toBe(one)
+    expect(firstCopy(one)).toBe(one)
   })
 
   test('a title in a script\'s string after an SVG is no second copy, and a cut never ends inside a script', () => {
     const html = '<title>Trends</title>\n<meta name="idea" content="a">\n<svg id="chart"></svg>\n<script>chart.innerHTML = data.map((v) => `<rect><title>${v}</title></rect>`).join("")</script>'
-    expect(firstCopy(html)).toEqual({ html, cut: false })
+    expect(firstCopy(html)).toBe(html)
   })
 
   test('the junk between copies goes: a marker like </assistant>, or notes after the last tag', () => {
     const one = '<title>Home</title>\n<meta name="idea" content="a">\n<main><h1>Home</h1></main><script>go()</script>'
-    expect(firstCopy(`${one}</assistant>ablytyped\n${one}`)).toEqual({ html: one, cut: true })
-    expect(firstCopy(`${one}\nHere is the screen again, with the notes I wrote.\n${one}`)).toEqual({ html: one, cut: true })
+    expect(firstCopy(`${one}</assistant>ablytyped\n${one}`)).toBe(one)
+    expect(firstCopy(`${one}\nHere is the screen again, with the notes I wrote.\n${one}`)).toBe(one)
   })
 })
 

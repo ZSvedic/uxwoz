@@ -3,8 +3,6 @@
 // version and drops the other, and gives the screen its fixed name for links (`@sleep-report`).
 // Edit and Regenerate add versions; Undo drops the newest. Each screen remembers the screen and
 // click that first made it; levels and the tree are worked out from the screens (see tree.ts).
-// Each mockup has a spec (see spec.ts): a pick fills its open rows, an Edit sets rows, Undo takes
-// an Edit's values back.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
@@ -12,15 +10,6 @@ import { canonicalAction, nameWords, normalizePrompt, screenKey, screenRef } fro
 import { screenName, type Device } from './frame.ts'
 import { HOME_NAME, nameFrom, screenTree, treeLines, uniqueName } from './tree.ts'
 import type { ModelId } from './models.ts'
-import { MAX_ROWS, applyEdit, applyPick, dropValues, fits, removeLine, removeRow, setUserLine, untie, type Spec, type SpecLine, type SpecRefusal, type SpecValue } from './spec.ts'
-import { KEPT_ROWS, stillHolds, type ReviewInfo, type Suggestion } from './review.ts'
-
-/**
- * What the review pass left for a mockup: suggestions waiting for the user, a log of its runs, the
- * highest count of picked screens it has read (so one count is read once), and the rows the user
- * deleted (so no review adds them again).
- */
-export interface SpecReview { suggestions: Suggestion[]; reviews: ReviewInfo[]; lastCount?: number; deleted?: string[] }
 
 /** One design of a screen, as the model made it. */
 export interface Version {
@@ -42,18 +31,7 @@ export interface Version {
   idea?: string
   /** The Edit request that made this version. */
   feedback?: string
-  /** The spec lines the design proposed (`<meta name="spec">`), taken out of `html`. */
-  spec?: SpecLine[]
-  /** An Edit's lines that were not taken, and why (shown in the drawer). */
-  specRefused?: SpecRefusal[]
-  /** What the screen misses against the spec it was made with (checkScreen); absent when made without one. */
-  misses?: string[]
-  /** On a first screen's designs: how the plan before it went (its time and cost, or why it failed). */
-  plan?: PlanInfo
 }
-
-/** How a mockup's plan went: rows it opened, time and cost, or the error that left the fallback spec. */
-export interface PlanInfo { rows: number; ms: number; costUsd: number | null; error?: string }
 
 /** The screen and click that first made a screen. */
 export interface Parent { key: string; label: string }
@@ -78,14 +56,12 @@ export interface CacheEntry {
 /** How many designs a new screen offers. */
 export const PROPOSALS = 2
 
+// Format 4 files from the spec feature also hold `specs` and `reviews`; they are not read, and the
+// next save drops them. The entries are the same as in format 3.
 const FORMAT = 4
 
 export class ScreenCache {
   private entries = new Map<string, CacheEntry>()
-  /** Each mockup's spec, by its root (the normalized app prompt). */
-  private specs = new Map<string, Spec>()
-  /** Each mockup's review suggestions and runs, by its root. */
-  private reviewsOf = new Map<string, SpecReview>()
   /** When each key was last deleted, on a counter, so a design still streaming cannot bring it back. */
   private removed = new Map<string, number>()
   private clock = 0
@@ -106,10 +82,6 @@ export class ScreenCache {
       }
       if (data?.version === FORMAT || data?.version === 3 || data?.version === 2) {
         for (const e of data.entries as CacheEntry[]) this.entries.set(e.key, e)
-        // Files from before specs (version 3 and older): every mockup starts with an empty spec.
-        for (const [root, spec] of Object.entries((data.specs ?? {}) as Record<string, Spec>)) this.specs.set(root, spec)
-        for (const [root, r] of Object.entries((data.reviews ?? {}) as Record<string, SpecReview>)) this.reviewsOf.set(root, r)
-        this.migrateValues()
         if (data.version === 2) this.migrate()
       } else {
         // A file from before versions: it stays on disk, and the cache starts empty.
@@ -189,127 +161,8 @@ export class ScreenCache {
     entry.versions = [v]
     delete entry.proposals
     this.name(entry)
-    // The picked design's lines fill open rows; the other design's lines go with it.
-    if (v.spec?.length) applyPick(this.specOf(entry.app), v.spec, key, v.createdAt)
     this.save()
     return entry
-  }
-
-  /** A mockup's spec; an empty one when it has none (an old mockup, or a plan that failed). */
-  spec(app: string): Spec {
-    return this.specs.get(normalizePrompt(app)) ?? {}
-  }
-
-  /** True once a mockup has a spec, even an empty one: its plan ran. */
-  hasSpec(app: string): boolean {
-    return this.specs.has(normalizePrompt(app))
-  }
-
-  /** Set a mockup's spec (the plan's). */
-  setSpec(app: string, spec: Spec) {
-    this.specs.set(normalizePrompt(app), spec)
-    this.save()
-  }
-
-  /** A mockup's review suggestions and runs. */
-  review(app: string): SpecReview {
-    const r = this.reviewsOf.get(normalizePrompt(app)) ?? { suggestions: [], reviews: [] }
-    // A suggestion made against values that changed since (the user's line, a deleted row) is stale and does not show.
-    const spec = this.spec(app)
-    return { ...r, suggestions: r.suggestions.filter((s) => stillHolds(spec, s)) }
-  }
-
-  /** True when a mockup with this many picked screens is due a review: it has a spec, and that count was not read yet. */
-  dueReview(app: string, picked: number, every: number): boolean {
-    if (!picked || picked % every || !Object.keys(this.spec(app)).length) return false
-    return picked > (this.review(app).lastCount ?? 0)
-  }
-
-  /**
-   * Store one review: its new open rows go in (only keys the spec still does not have, within the
-   * limits), its suggestions wait for the user, and its run is logged. A filled row is never touched.
-   */
-  addReview(app: string, adds: { key: string; ask: string }[], suggestions: Suggestion[], info: ReviewInfo) {
-    const spec = this.specOf(app)
-    const r = this.review(app)
-    const added = adds.filter((a) => !Object.hasOwn(spec, a.key) && !r.deleted?.includes(a.key) && Object.keys(spec).length < MAX_ROWS && fits(spec, a.key))
-      .map((a) => { spec[a.key] = { ask: a.ask, from: 'review', values: [] }; return a.key })
-    // A new run replaces the suggestions the user has not settled, so they do not pile up.
-    const fresh = suggestions.filter((s) => stillHolds(spec, s))
-    this.reviewsOf.set(normalizePrompt(app), {
-      ...r, suggestions: fresh, reviews: [...r.reviews, { ...info, added, suggested: fresh.length }], lastCount: Math.max(r.lastCount ?? 0, info.screens),
-    })
-    this.save()
-  }
-
-  /** The user's own line for a row. Returns why it was refused, or null. */
-  setLine(app: string, key: string, text: string): string | null {
-    const why = setUserLine(this.specOf(app), key, text)
-    if (why) return why
-    // A row the user writes again is no longer one they deleted.
-    const r = this.reviewsOf.get(normalizePrompt(app))
-    if (r?.deleted?.length) r.deleted = r.deleted.filter((k) => k !== key.trim())
-    this.save()
-    return null
-  }
-
-  /** Delete a row's newest line (`line`) or the whole row. False when there was nothing to delete. */
-  remove(app: string, key: string, what: 'line' | 'row'): boolean {
-    const spec = this.specOf(app)
-    const done = what === 'row' ? removeRow(spec, key) : removeLine(spec, key)
-    if (!done) return false
-    // A row the user deleted stays deleted: no review adds it again.
-    if (what === 'row' || !Object.hasOwn(spec, key)) {
-      const root = normalizePrompt(app), r = this.reviewsOf.get(root) ?? { suggestions: [], reviews: [] }
-      this.reviewsOf.set(root, { ...r, deleted: [...new Set([...(r.deleted ?? []), key])] })
-    }
-    this.save()
-    return true
-  }
-
-  /**
-   * Accept a review suggestion (it becomes the user's line; a merge also removes its second row) or
-   * dismiss it. Returns why accepting failed, or null; undefined when there is no such suggestion.
-   */
-  settle(app: string, id: string, accept: boolean): string | null | undefined {
-    const root = normalizePrompt(app)
-    const r = this.reviewsOf.get(root)
-    const s = r?.suggestions.find((x) => x.id === id)
-    if (!r || !s) return undefined
-    const spec = this.specOf(app)
-    const drop = () => this.reviewsOf.set(root, { ...r, suggestions: r.suggestions.filter((x) => x.id !== id) })
-    let why: string | null = null
-    // A suggestion made against values that changed since would put an old decision over a newer one.
-    if (accept && !stillHolds(spec, s)) why = 'the rows changed since this suggestion; it was dropped'
-    else if (accept && s.kind === 'merge' && KEPT_ROWS.includes(s.keys[1]!)) why = `a merge may not remove ${s.keys[1]}`
-    else if (accept) {
-      why = setUserLine(spec, s.keys[0]!, s.text)
-      if (!why && s.kind === 'merge') removeRow(spec, s.keys[1]!)
-    }
-    if (!why || !stillHolds(spec, s)) drop()
-    this.save()
-    return why
-  }
-
-  /**
-   * Take back the line that the version made at `at` (its createdAt) of a screen set on row `row`
-   * (the ✕ in the drawer). Not by index: after an Undo and a new Edit, a second browser's ✕ for the
-   * first Edit would take back the second. Returns the spec, or undefined if there was no such line.
-   */
-  dropLine(key: string, at: string, row: string): Spec | undefined {
-    const entry = this.entries.get(key)
-    if (!entry?.versions.some((v) => v.createdAt === at)) return undefined
-    const spec = this.specOf(entry.app)
-    if (!dropValues(spec, key, at, row)) return undefined
-    this.save()
-    return spec
-  }
-
-  private specOf(app: string): Spec {
-    const root = normalizePrompt(app)
-    let s = this.specs.get(root)
-    if (!s) this.specs.set(root, s = {})
-    return s
   }
 
   /** Give a picked screen opened by a plain prompt its fixed name, once: home for the first screen, else from its title. */
@@ -327,13 +180,6 @@ export class ScreenCache {
   addVersion(key: string, version: Version): CacheEntry | undefined {
     const entry = this.entries.get(key)
     if (!entry?.versions.length) return undefined
-    // An Edit's lines set rows at once; a Regenerate's are dropped.
-    if (version.feedback) {
-      const refused = [...(version.specRefused ?? [])]
-      if (version.spec?.length) applyEdit(this.specOf(entry.app), version.spec, key, version.createdAt, refused)
-      if (refused.length) version.specRefused = refused
-      else delete version.specRefused
-    } else { delete version.spec; delete version.specRefused }
     entry.versions.push(version)
     this.save()
     return entry
@@ -343,8 +189,6 @@ export class ScreenCache {
   undo(key: string): CacheEntry | undefined {
     const entry = this.entries.get(key)
     if (!entry || entry.versions.length < 2) return undefined
-    // The values the version set go, so the values before count again.
-    dropValues(this.specOf(entry.app), key, entry.versions.at(-1)!.createdAt)
     entry.versions.pop()
     this.save()
     return entry
@@ -352,13 +196,13 @@ export class ScreenCache {
 
   /** This mockup's screens as the indented tree the model links to, `self` (a name) marked as the screen being made (see treeLines). */
   existingScreens(app: string, self?: string): string[] {
-    return treeLines(this.mockup(normalizePrompt(app)), undefined, self, this.spec(app))
+    return treeLines(this.mockup(normalizePrompt(app)), undefined, self)
   }
 
   /** One mockup: its screens, oldest first. */
-  map(app: string): { root: string; entries: CacheEntry[]; spec: Spec; review: SpecReview } {
+  map(app: string): { root: string; entries: CacheEntry[] } {
     const root = normalizePrompt(app)
-    return { root, entries: this.mockup(root), spec: this.spec(app), review: this.review(app) }
+    return { root, entries: this.mockup(root) }
   }
 
   /** Every mockup once, as first typed, with its number of screens; most recently changed first. */
@@ -382,23 +226,17 @@ export class ScreenCache {
   delete(key: string): string[] | undefined {
     const entry = this.entries.get(key)
     // Even an unknown key is marked: an A OR B dropped before its first side finished stays dropped.
-    // A first screen dropped that early takes its plan with it, so the next try plans again.
     this.tomb(key)
-    if (!entry) {
-      if (!key.includes(' » ') && this.specs.delete(key)) { this.reviewsOf.delete(key); this.save() }
-      return undefined
-    }
+    if (!entry) return undefined
     const root = normalizePrompt(entry.app)
     if (key === root) {
       const gone = this.mockup(root).map((e) => e.key)
       this.deleteApp(entry.app)
       return gone
     }
-    // The tree as the frame shows it, drawn tabs included, both times: as the browser's confirm counts.
-    const spec = this.specs.get(root) ?? {}
-    const before = screenTree(this.mockup(root), spec)
+    const before = screenTree(this.mockup(root))
     this.entries.delete(key)
-    const after = screenTree(this.mockup(root), spec)
+    const after = screenTree(this.mockup(root))
     const removed = [key]
     for (const k of before.keys()) if (!after.has(k) && this.entries.delete(k)) removed.push(k)
     // A screen first made from a screen that is gone now hangs under the one that reaches it.
@@ -407,8 +245,6 @@ export class ScreenCache {
       if (e.parent && !this.entries.has(e.parent.key)) e.parent = node?.parent && this.entries.has(node.parent) ? { key: node.parent, label: node.label } : null
     }
     for (const k of removed) this.tomb(k)
-    // Their values stay in the spec, no longer tied to a screen that a remade one could take them back through.
-    if (this.specs.has(root)) for (const k of removed) untie(spec, k)
     this.save()
     return removed
   }
@@ -418,11 +254,8 @@ export class ScreenCache {
     const root = normalizePrompt(app)
     const gone = this.mockup(root)
     this.tomb(root)
-    // Start over and Delete clear the spec too, and what the review pass left.
-    const had = this.specs.delete(root)
-    this.reviewsOf.delete(root)
     for (const e of gone) { this.entries.delete(e.key); this.tomb(e.key) }
-    if (gone.length || had) this.save()
+    if (gone.length) this.save()
     return gone.length
   }
 
@@ -433,20 +266,6 @@ export class ScreenCache {
   /** One mockup's screens, oldest first: the order the tree uses for children. */
   private mockup(root: string): CacheEntry[] {
     return [...this.entries.values()].filter((e) => normalizePrompt(e.app) === root)
-  }
-
-  /**
-   * Spec values saved before versions were keyed by createdAt carry `version: n`: they get that
-   * version's createdAt, so Undo, ✕ and the drawer find them again, or lose their tie when it is gone.
-   */
-  private migrateValues() {
-    for (const spec of this.specs.values()) for (const row of Object.values(spec)) for (const v of row.values as (SpecValue & { version?: number })[]) {
-      if (v.version == null) continue
-      const at = v.screen ? this.entries.get(v.screen)?.versions[v.version]?.createdAt : undefined
-      if (at) v.at = at
-      else { delete v.screen; delete v.at }
-      delete v.version
-    }
   }
 
   /** A file from before names: stored levels and recorded clicks go (levels are worked out now), and picked screens get names. */
@@ -461,7 +280,7 @@ export class ScreenCache {
     mkdirSync(dirname(this.file), { recursive: true })
     // Write a temp file, then rename, so a crash never leaves half a cache file.
     const tmp = `${this.file}.tmp`
-    writeFileSync(tmp, JSON.stringify({ version: FORMAT, entries: [...this.entries.values()], specs: Object.fromEntries(this.specs), reviews: Object.fromEntries(this.reviewsOf) }, null, 1))
+    writeFileSync(tmp, JSON.stringify({ version: FORMAT, entries: [...this.entries.values()] }, null, 1))
     renameSync(tmp, this.file)
   }
 }

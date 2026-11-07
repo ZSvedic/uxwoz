@@ -6,7 +6,6 @@
 
 import type { CacheEntry } from './cache.ts'
 import { nameWords, normalizePrompt, screenKey, screenRef } from './keys.ts'
-import { drawChrome, flowNames, navNames, tabLabel, type Spec } from './spec.ts'
 
 /** Where a screen sits: its level (1 for the first screen), the screen it hangs under, and the control clicked there. */
 export interface TreeNode { level: number; parent: string | null; label: string }
@@ -87,40 +86,19 @@ export function promptFromLabel(name: string, label: string): string {
 }
 
 /**
- * The planned screens of one mockup: names the picked screens link to that no screen has yet, then
- * the names of the spec's core flow and ui.nav that are neither made nor linked. Each one is an
- * entry with no versions. The first link that names it (oldest screen first) gives its prompt and
- * the screen it hangs under; a flow step hangs under the step before, a tab under the first screen.
+ * The planned screens of one mockup: names the picked screens link to that no screen has yet. Each
+ * one is an entry with no versions; the first link that names it (oldest screen first) gives its
+ * prompt and the screen it hangs under.
  */
-export function plannedScreens(entries: CacheEntry[], spec: Spec = {}): CacheEntry[] {
+export function plannedScreens(entries: CacheEntry[]): CacheEntry[] {
   const first = entries[0]
   if (!first) return []
-  const planned = linkedScreens(entries, spec)
-  const names = namesOf(entries)
-  const add = (name: string, parent: string, label: string) => {
-    if (name === HOME_NAME || names.has(name) || planned.some((p) => p.name === name)) return
-    planned.push({ key: screenKey(first.app, `@${name}`), app: first.app, action: promptFromLabel(name, label), name, parent: { key: parent, label }, versions: [] })
-  }
-  const root = screenKey(first.app, null)
-  // The spec's screens count once the first screen is picked: until then there is no screen to open them from.
-  if (!entries.some((e) => e.key === root && e.versions.length)) return planned
-  const keyOf = (n: string) => (n === HOME_NAME ? root : names.get(n) ?? screenKey(first.app, `@${n}`))
-  const flow = flowNames(spec)
-  flow.forEach((n, i) => { if (i > 0) add(n, keyOf(flow[i - 1]!), '') })
-  for (const n of navNames(spec)) add(n, root, tabLabel(spec, n))
-  return planned
-}
-
-/** The planned screens that made screens link to (see plannedScreens). */
-function linkedScreens(entries: CacheEntry[], spec: Spec = {}): CacheEntry[] {
-  const first = entries[0]!
   const names = namesOf(entries)
   const planned = new Map<string, CacheEntry>()
   for (const e of entries) {
     const v = e.versions.at(-1)
     if (!v) continue
-    // The links of the screen as the frame shows it: its tab bar drawn from the spec, not the stored one.
-    for (const l of linksIn(drawChrome(v.html, spec, e.name))) {
+    for (const l of linksIn(v.html)) {
       const ref = screenRef(l.action)
       if (!ref || ref.name === HOME_NAME || names.has(ref.name)) continue
       const have = planned.get(ref.name)
@@ -141,12 +119,11 @@ function linkedScreens(entries: CacheEntry[], spec: Spec = {}): CacheEntry[] {
  * hangs under the screen the click that made it came from when that is on a shortest path, else
  * under the first other one that is. Screens the first screen does not reach are left out.
  */
-export const screenTree = (made: CacheEntry[], spec: Spec = {}): Map<string, TreeNode> => build(made, spec).tree
+export const screenTree = (made: CacheEntry[]): Map<string, TreeNode> => build(made).tree
 
 /** The tree, and every screen in it: the made ones (and open A OR Bs), then the planned ones. */
-function build(made: CacheEntry[], spec: Spec = {}): { tree: Map<string, TreeNode>; entries: CacheEntry[] } {
-  const linked = new Set(made.length ? linkedScreens(made, spec).map((e) => e.key) : [])
-  const entries = [...made, ...plannedScreens(made, spec)]
+function build(made: CacheEntry[]): { tree: Map<string, TreeNode>; entries: CacheEntry[] } {
+  const entries = [...made, ...plannedScreens(made)]
   const tree = new Map<string, TreeNode>()
   const first = entries[0]
   if (!first) return { tree, entries }
@@ -158,18 +135,14 @@ function build(made: CacheEntry[], spec: Spec = {}): { tree: Map<string, TreeNod
   const edges = new Map<string, { to: string; label: string }[]>()
   // A screen's first click counts only from a screen that is there: a planned screen has no buttons,
   // so a screen made from one that was deleted (and is planned again) is not reached through it.
-  // A screen the spec plans hangs under the step before it, even one not made yet.
   const madeKeys = new Set(made.map((e) => e.key))
-  const fromSpec = (e: CacheEntry) => !e.versions.length && !e.proposals && !linked.has(e.key)
   for (const e of entries) {
-    if (e.parent && (madeKeys.has(e.parent.key) || (fromSpec(e) && keys.has(e.parent.key)))) edges.set(e.parent.key, [...(edges.get(e.parent.key) ?? []), { to: e.key, label: e.parent.label }])
+    if (e.parent && madeKeys.has(e.parent.key)) edges.set(e.parent.key, [...(edges.get(e.parent.key) ?? []), { to: e.key, label: e.parent.label }])
   }
-  // The links of each screen as the frame shows it (drawChrome): its drawn tab bar is links, a stored
-  // bar's stray links are not, so the tree knows exactly what the frame shows.
   for (const e of entries) {
     const v = e.versions.at(-1)
     if (!v) continue
-    for (const l of linksIn(drawChrome(v.html, spec, e.name))) {
+    for (const l of linksIn(v.html)) {
       const to = resolveAction(app, l.action, byName)
       if (to && to !== e.key && keys.has(to)) edges.set(e.key, [...(edges.get(e.key) ?? []), { to, label: l.label }])
     }
@@ -200,8 +173,8 @@ function build(made: CacheEntry[], spec: Spec = {}): { tree: Map<string, TreeNod
  * made yet". Past `max` lines planned screens go first, deepest first, then made ones by depth, so
  * the model still sees the names of the screens there are.
  */
-export function treeLines(made: CacheEntry[], max = 80, self?: string, spec: Spec = {}): string[] {
-  const { tree, entries } = build(made, spec)
+export function treeLines(made: CacheEntry[], max = 80, self?: string): string[] {
+  const { tree, entries } = build(made)
   const rows: { level: number; planned: boolean; text: string }[] = []
   const walk = (e: CacheEntry) => {
     const { level } = tree.get(e.key)!

@@ -74,11 +74,6 @@ describe('screen cache', () => {
     expect(screenRequest('Coffee app', null, [], { device: 'a phone screen' })).not.toContain(ALTERNATIVE_REQUEST)
   })
 
-  test('the spec goes after the tree and before the device', () => {
-    const msg = screenRequest('Coffee app', 'Pay', ['@home: the first screen of Coffee app'], { device: 'a phone screen', spec: 'ui.nav: Tabs' })
-    expect(msg).toEndWith('@home: the first screen of Coffee app\n\nui.nav: Tabs\n\nDesign it for a phone screen.')
-  })
-
   test('an Edit sends the screen as it is now and the change, last', () => {
     const msg = screenRequest('Coffee app', null, [], { device: 'a phone screen', edit: { html: '<h1>Menu</h1>', change: 'Add prices' } })
     expect(msg).toBe(`Coffee app\n\nDesign it for a phone screen.\n\nThe screen as it is now:\n<h1>Menu</h1>\n\n${EDIT_REQUEST} Add prices`)
@@ -178,7 +173,7 @@ describe('screen cache', () => {
     screen(cache, 'Cafe', 'Cart', '<h1>Cart</h1>', { key: menu, label: 'Cart' })
     screen(cache, 'Bakery', null, '<h1>Bread</h1>')
     expect(cache.deleteApp('CAFE')).toBe(2)
-    expect(cache.map('Cafe')).toEqual({ root: 'cafe', entries: [], spec: {}, review: { suggestions: [], reviews: [] } })
+    expect(cache.map('Cafe')).toEqual({ root: 'cafe', entries: [] })
     expect(cache.apps().map((a) => a.app)).toEqual(['Bakery'])
   })
 
