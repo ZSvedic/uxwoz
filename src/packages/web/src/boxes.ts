@@ -1,5 +1,6 @@
 // The boxes right of the first screen, each with a rail: Rules, the fixer's notes, Components (the
-// canvas puts the cards in) and Data. Rules and tables are edited in place. Export writes markdown.
+// canvas puts the cards in) and Data. Rules and tables are edited in place, and added there empty.
+// Export writes markdown.
 
 import type { BoxName, Boxes, CacheEntry, Table } from '@uxwoz/core'
 import { BOX_TITLES, LIMITS } from '@uxwoz/core/keys'
@@ -24,7 +25,7 @@ export function button(text: string, title: string, run: () => void, cls = 'box-
   return b
 }
 
-/** A rail: big icon buttons right of a screen or a box, kept at 40 px on screen; each tool is [name, icon, tip]. */
+/** A rail: big icon buttons right of a screen or a box, at the canvas's scale; each tool is [name, icon, tip]. */
 export function railOf(tools: string[][], run: (tool: string) => void) {
   const buttons = tools.map(([tool, icon, tip]) => {
     const b = button(icon!, tip!, () => run(tool!), 'tool')
@@ -66,17 +67,17 @@ const OWN: Partial<Record<Box, string[]>> = {
   data: ['add', '+', 'Add a table'],
 }
 
-/** The boxes: their sections and rails, and where the canvas puts the component cards (`components`). */
-export function createSide(op: (o: BoxOp) => void) {
+/** The boxes: their sections and rails, and where the canvas puts the component cards (`components`). `open`: ✎ Edit and ⓘ Info in the drawer. */
+export function createSide(op: (o: BoxOp) => void, open: (box: Box, tab: 'edit' | 'info') => void) {
   const root = el('div', 'boxes')
   const sections = {} as Record<Box, HTMLElement>, rails = {} as Record<Box, HTMLButtonElement[]>
   for (const name of BOXES) {
     const undo = name === 'notes' ? 'Undo the newest visit' : 'Undo the last change'
-    const rail = railOf([...OWN[name] ? [OWN[name]] : [], ['edit', '✎', 'Edit: ask the fixer'], ['undo', '↶', undo]], (tool) => {
-      if (tool === 'undo') return op({ op: 'undo-box', box: name })
-      if (tool === 'visit') return op({ op: 'visit' })
-      const text = prompt(tool === 'edit' ? `What should change in ${BOX_TITLES[name]}?` : name === 'rules' ? 'A new rule, one sentence' : 'Name of the new table, e.g. nights')?.trim()
-      if (text) op(tool === 'edit' ? { op: 'edit', box: name, text } : name === 'rules' ? { op: 'add', box: 'rules', text } : { op: 'add', box: 'data', text, columns: ['name', 'value'], rows: [['', '']] })
+    const rail = railOf([...OWN[name] ? [OWN[name]] : [], ['edit', '✎', 'Edit: ask the fixer for a change in this box'], ['undo', '↶', undo], ['info', 'ⓘ', 'Info: counts and limits']], (tool) => {
+      if (tool === 'undo') op({ op: 'undo-box', box: name })
+      else if (tool === 'visit') op({ op: 'visit' })
+      else if (tool === 'add') addEmpty(sections[name], name === 'rules', op)
+      else open(name, tool as 'edit' | 'info')
     })
     const s = el('section', `box box-${name}`, el('h3'), el('p', 'box-hint', HINTS[name]), el('div', 'box-body'), rail.el)
     sections[name] = s
@@ -86,22 +87,46 @@ export function createSide(op: (o: BoxOp) => void) {
   return { el: root, components: sections.components.querySelector<HTMLElement>('.box-body')!, sections, rails }
 }
 
+/** + Rule and + Table: an empty rule, or a table with only its name, in place with the cursor in it; left empty, it goes. */
+function addEmpty(box: HTMLElement, rule: boolean, op: (o: BoxOp) => void) {
+  const body = box.querySelector<HTMLElement>('.box-body')!
+  const text = editable(el('span', rule ? 'rule-text' : ''), (t) => op(rule ? { op: 'add', box: 'rules', text: t } : { op: 'add', box: 'data', text: t, columns: ['name', 'value'], rows: [['', '']] }))
+  text.dataset.placeholder = rule ? 'A new rule, one sentence' : 'Name of the new table, e.g. nights'
+  const row = rule ? el('div', 'rule', el('b', '', 'new:'), ' ', text) : el('div', 'data-table', el('div', 'table-head', text))
+  const hint = box.querySelector<HTMLElement>('.box-hint')!
+  text.addEventListener('blur', () => { if (!text.textContent?.trim()) { row.remove(); hint.hidden = body.children.length > 0 } })
+  body.append(row)
+  hint.hidden = true
+  body.scrollTop = body.scrollHeight
+  text.focus()
+}
 
 /** True while the user types in a field inside `box`. */
 const typing = (box: HTMLElement) => document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable && box.contains(document.activeElement)
 
+/** How many entries (or visits) a box has, and that against its limit: the fixer's notes have none. */
+export const countOf = (boxes: Boxes, components: CacheEntry[], name: Box) => name === 'notes' ? boxes.visits?.length ?? 0 : name === 'components' ? components.length : boxes[name].length
+export const countLabel = (n: number, name: Box) => name === 'notes' ? `${n} visits` : `${n} of ${LIMITS[name]}`
+
+/** Mark the current box: an orange border, its rail at full strength. */
+export const markBox = (side: ReturnType<typeof createSide>, current: Box | null) => { for (const [name, s] of Object.entries(side.sections)) s.classList.toggle('current', name === current) }
+
+/** True when Undo of the fixer's notes has a visit to undo. */
+export const visitToUndo = (boxes: Boxes) => !!boxes.visits?.some((x) => !x.undone && x.changes.some((c) => c.undo && !c.undone))
+
 /** Draw the boxes' headers and rails, the rules and the tables. A box the user is typing in is left alone. */
-export function renderSide(side: ReturnType<typeof createSide>, v: { boxes: Boxes; components: CacheEntry[]; undos: Record<BoxName, number>; visiting: boolean }, op: (o: BoxOp) => void) {
+export function renderSide(side: ReturnType<typeof createSide>, v: { boxes: Boxes; components: CacheEntry[]; past: Record<BoxName, unknown[]>; visiting: boolean; current: Box | null }, op: (o: BoxOp) => void) {
   const visits = [...v.boxes.visits ?? []].reverse()
-  const counts = { components: v.components.length, rules: v.boxes.rules.length, data: v.boxes.data.length, notes: visits.length }
+  markBox(side, v.current)
   for (const name of BOXES) {
     const s = side.sections[name]
-    s.querySelector('h3')!.replaceChildren(BOX_TITLES[name], el('small', '', name === 'notes' ? ` ${counts[name]} visits` : ` ${counts[name]} of ${LIMITS[name]}`))
-    s.querySelector<HTMLElement>('.box-hint')!.hidden = counts[name] > 0
-    // Undo shows when there is something to undo; Visit now and Edit wait while the fixer visits.
+    const n = countOf(v.boxes, v.components, name)
+    s.querySelector('h3')!.replaceChildren(BOX_TITLES[name], el('small', '', ` ${countLabel(n, name)}`))
+    if (!typing(s)) s.querySelector<HTMLElement>('.box-hint')!.hidden = n > 0
+    // Undo shows when there is something to undo; Visit now waits while the fixer visits.
     for (const b of side.rails[name]) {
-      b.hidden = b.dataset.tool === 'undo' && !(name === 'notes' ? visits.some((x) => !x.undone && x.changes.some((c) => c.undo && !c.undone)) : v.undos[name])
-      b.disabled = v.visiting && /visit|edit/.test(b.dataset.tool!)
+      b.hidden = b.dataset.tool === 'undo' && !(name === 'notes' ? visitToUndo(v.boxes) : v.past[name]!.length)
+      b.disabled = v.visiting && b.dataset.tool === 'visit'
     }
   }
   const rules = side.sections.rules.querySelector<HTMLElement>('.box-body')!

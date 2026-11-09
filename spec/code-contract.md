@@ -21,7 +21,7 @@ POST /api/pick  {"key": "a coffee shop ordering app", "index": 1}
 {"entry":{...CacheEntry, "versions":[{...the second proposal}]}, "filing":true, "visiting":false}
 
 GET /api/map?app=A%20coffee%20shop%20ordering%20app&wait=1      (answers once filing and a visit are done)
-{"root":"a coffee shop ordering app","entries":[...],"boxes":{...Boxes},"undos":{"components":0,"rules":2,"data":1},"filing":false,"visiting":false}
+{"root":"a coffee shop ordering app","entries":[...],"boxes":{...Boxes},"past":{"components":[],"rules":[{"what":"Filing after home","at":"…"}],"data":[]},"filing":false,"visiting":false}
 ```
 
 ## Packages
@@ -91,8 +91,10 @@ can spend model credits.
 - **An Edit of a box** is a visit with `ask: {box, text}`: the request names the box and the
   user's words just before the visit's last line, and the note keeps `ask`.
 - **Box states**: each box (components, rules, data) keeps its last 10 states (`BOX_STATES`), one
-  before each change; `cache.group` makes a filing, a visit with its redraws, or an Undo of a
-  visit one change. They are saved in the cache file under `states`, by mockup. An Undo that drops
+  before each change, with `what` that change was and `at` when; `cache.group(fn, change?, what?)`
+  makes a filing (*Filing after home*), a visit with its redraws (*Visit*, or *Edit: …* for an Edit
+  of a box), or an Undo of a visit one change, and the outermost group names it; a user's change
+  is named by what it did (*You changed score-direction*). They are saved in the cache file under `states`, by mockup. An Undo that drops
   a component pastes its HTML into the screens that paste it; no Undo frees an ID (`gone` keeps
   every ID it drops).
 - `POST /api/revise {key, change?, model?, device?}`: one new version of a picked screen or a
@@ -104,8 +106,8 @@ can spend model credits.
   devices). 400 on a bad `change`, model or device, 404 for an unknown screen, 409 while its A OR B
   is open; `error` if the model fails or the screen was deleted meanwhile.
 - `POST /api/undo {key}`: drop the newest version; `{entry}`, or 404 when one or none is left.
-- `GET /api/map?app=…[&wait=1]`: `{root, entries: CacheEntry[], boxes: Boxes, undos, filing, visiting}`
-  (`undos`: how many states each box can go back)
+- `GET /api/map?app=…[&wait=1]`: `{root, entries: CacheEntry[], boxes: Boxes, past, filing, visiting}`
+  (`past`: each box's changes that Undo can take back, oldest first, `{what, at}`)
   for one mockup, oldest first, components included; with `wait=1` once its running filing and
   visit, redraws included, have finished (at most a minute). Levels, the
   tree and planned screens are not stored: `screenTree` and `plannedScreens` in `core/src/tree.ts`

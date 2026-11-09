@@ -39,9 +39,9 @@ export function parseVisit(reply: string): VisitLine[] {
 /** What applying a visit leaves for the server: the redraws to run, in the same change of the boxes (see cache.group). */
 interface Applied { changes: Change[]; refused: string[]; redraws: { key: string; sentence: string; change: Change }[]; group: number }
 
-/** Apply a visit's reply; `sent`: the numbered HTML of each screen it read; `asked`: an Edit's box, whose user entries may change. */
-export function applyVisit(cache: ScreenCache, app: string, reply: string, sent: Map<string, string>, asked?: BoxName | 'notes'): Applied {
-  return cache.group((group) => visitLines(cache, app, reply, sent, group, asked))
+/** Apply a visit's reply; `sent`: the numbered HTML of each screen it read; `ask`: an Edit of a box, whose user entries may change. */
+export function applyVisit(cache: ScreenCache, app: string, reply: string, sent: Map<string, string>, ask?: VisitOptions['ask']): Applied {
+  return cache.group((group) => visitLines(cache, app, reply, sent, group, ask?.box), undefined, ask ? `Edit: ${ask.text}` : 'Visit')
 }
 
 function visitLines(cache: ScreenCache, app: string, reply: string, sent: Map<string, string>, group: number, asked?: BoxName | 'notes'): Applied {
@@ -119,7 +119,7 @@ export async function visitPaper(o: VisitOptions, dropped: () => boolean): Promi
   const user = visitRequest(cache.paper(app, all[0]?.versions.at(-1)?.device), fresh.map((e) => ({ id: e.name ?? HOME_NAME, line: e.action ?? HOME_LINE, html: sent.get(e.name ?? HOME_NAME)! })), ask && { box: BOX_TITLES[ask.box], text: ask.text })
   const { reply, final } = await askBackground(user, o, 8000)
   if (dropped()) return null
-  const applied = applyVisit(cache, app, reply, sent, ask?.box)
+  const applied = applyVisit(cache, app, reply, sent, ask)
   for (const r of applied.refused) (o.log ?? console.warn)(`fixer refused ${r}`)
   const visit: Visit = { at, ...(ask && { ask: ask.text }), ms: Math.round(performance.now() - t0), costUsd: final.costUsd, screens: fresh.length, changes: applied.changes, refused: applied.refused, seen: false }
   cache.noteVisit(app, visit)

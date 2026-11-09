@@ -43,7 +43,9 @@ one, and the other is gone. After that, the user changes a screen by asking for 
 
 ## Toolbar
 
-One bar, 44 px tall, with three parts:
+One bar, 44 px tall, with three parts. A thin vertical line stands between its items: the mockup
+menu | ← Nav → | Rules | Fixer | Components | Data | Theme | zoom. The four menus (mockup, Nav,
+Theme, zoom) look alike: normal weight and the same chevron.
 
 - **Project menu** (left): a button with the mockup's prompt, cut short. Its menu has
   **New mockup…** (opens the generate panel), **Recent mockups** (the last ten, the open one
@@ -62,10 +64,12 @@ One bar, 44 px tall, with three parts:
 - **Rules, Fixer, Components, Data** (right): each moves the view to its box (Fixer to Fixer's
   notes). A number beside it counts the entries filing or the fixer added or changed (for Fixer,
   the fixer's visits) since the user last looked; three seconds after a look, they count as seen
-  and lose their *new* mark. In a window 1,200 px wide or less, the four fold into one **Boxes ▾**
-  menu: each item keeps its number, and the button shows their sum.
-- **Theme** (right, left of the zoom): see Pickers.
-- **Zoom** (right): **−**, the zoom level, **+** and **⤢ Fit screen**. The level opens a menu: Zoom
+  and lose their *new* mark. The box becomes current. In a window 1,200 px wide or less, the four
+  fold into one **Boxes ▾** menu under its button: each item keeps its number, and the button shows
+  their sum.
+- **Theme** (right, left of the zoom): a menu of the themes, the one showing ticked; see Pickers.
+- **Zoom** (right): **−**, the zoom level, **+** and **Fit screen**, the first and last drawn as icons
+  at the size of the text (Fit screen's is four corners pointing out). The level opens a menu: Zoom
   in ⌘+, Zoom out ⌘−, 50%, 100% ⌘0, 200%, Fit all ⇧1, Fit screen ⇧2, Fit screen width ⇧3. The keys
   work anywhere outside a text field (Ctrl in place of ⌘ off a Mac). Under 900 px wide only the
   level stays. The keys also work while a screen has the focus.
@@ -109,7 +113,9 @@ hidden when the user branches.
   50% only the names show. Hovering a name shows it whole.
 - **Current screen**: the one the user last picked, clicked in, or chose in Nav. It has an orange
   outline and its rail at full strength; other screens show their rail on hover. Fit screen uses
-  it.
+  it. A box can be current instead (see Boxes): then Fit screen and Fit screen width fit the box
+  and its rail, top first, and opening the drawer keeps the box in view. A click in a screen makes
+  the screen current again.
 - **Live screens**: a picked screen works: controls that open another screen are blue, in both
   themes; everything else keeps the theme's own ink.
 - **A screen is as tall as its content**, and at least one device screen tall (844 px on a phone),
@@ -156,8 +162,10 @@ says nothing about which is which.
 
 ## Rail
 
-A column of large icon buttons right of each picked screen, kept at 40 px on screen whatever the
-zoom:
+A column of large icon buttons right of each picked screen, at the canvas's scale like the
+screens: 60 px of canvas wide, 40 px buttons at 100%. So a full view packs tight and a rail stays the
+same size beside its screen; far out its buttons are too small to hit, so the user zooms in to
+use them:
 
 - **✎ Edit** opens the drawer on Edit.
 - **↻ Regenerate** makes one new design of the screen in its place, from the screen's prompt, at
@@ -173,8 +181,9 @@ buttons wait (Info still works).
 
 ## Drawer
 
-A 360 px panel docked at the right edge, for the current screen. The canvas gets narrower and
-scrolls so the screen stays fully visible beside it. Esc or ✕ closes it. It has two tabs:
+A 360 px panel docked at the right edge, for the current screen or box (see Boxes for a box's).
+The canvas gets narrower and scrolls so the screen stays fully visible beside it. Esc or ✕ closes
+it. It has two tabs:
 
 - **Edit**: *What should change?* Type it and click **Make the change** (or press Enter): the
   model gets this screen and the request, and returns the same screen with only that change, as a
@@ -187,7 +196,7 @@ scrolls so the screen stays fully visible beside it. Esc or ✕ closes it. It ha
   screen's last filing: *Filing: added light-theme, 1.0 s, ~$0.0015* (or why it failed), and each
   line filing's reply had that code refused, with the reason.
 
-Choosing another screen while the drawer is open shows that screen in it.
+Choosing another screen or box while the drawer is open shows that one in it.
 
 ## Boxes
 
@@ -199,15 +208,20 @@ row is as tall as the first screen, and the rows below start under it; a child t
 the boxes, and another screen with no parent goes right of the boxes. Every model call reads
 Components, Rules and Data in full, so what is in them is what the screens share.
 
-Each box has a rail like a screen's, right of it, at full strength: first its own button (Rules
-**+ Rule**, Fixer's notes **▶ Visit now**, Data **+ Table**; Components has none), then:
+A click in a box (not in a component card) or on its toolbar button makes it current: an orange
+border and its rail at full strength, as a current screen has; other boxes show their rail on
+hover. Each box's rail is like a screen's, right of it: first its own button (Rules **+ Rule**,
+Fixer's notes **▶ Visit now**, Data **+ Table**; Components has none), then:
 
-- **✎ Edit** asks *What should change in Rules?* (or the box's name). The request goes to the
-  fixer as a visit that starts from it: the fixer does what the user asks first, and may then
-  change entries the user wrote in that box; then it tidies up as on any visit. Each change gets
-  its line and Undo in Fixer's notes, under *You asked: …*. While a visit runs, Edit and Visit
-  now wait (+ Rule and + Table do not). An Edit asked for before the first screen is picked says
-  *Wait for Home's pick*.
+- **✎ Edit** opens the drawer on the box: *What should change in Rules?* (or the box's name) and
+  **Make the change**. The request goes to the fixer as a visit that starts from it: the fixer
+  does what the user asks first, and may then change entries the user wrote in that box; then it
+  tidies up as on any visit. Each change gets its line and Undo in Fixer's notes, under *You
+  asked: …*. While a visit runs, Make the change and Visit now wait (+ Rule and + Table do not).
+  An Edit asked for before the first screen is picked says *Wait for Home's pick*. **Past
+  changes** lists, newest first, the changes Undo can take back, each with what it was and when:
+  *Edit: merge the two score rules*, *Visit*, *Filing after home*, *You changed score-direction*.
+  For Fixer's notes it lists the visits (*Visit, 4 changes*), an undone one struck through.
 - **↶ Undo** puts the box back as it was before its last change, whoever made it: the user in
   place, filing, an Edit or a visit (a filing, or a visit with its redraws, is one change). Each box
   keeps its last 10 states; Undo again goes further back. A component the Undo drops leaves its
@@ -216,6 +230,9 @@ Each box has a rail like a screen's, right of it, at full strength: first its ow
   Undo undoes every change of the newest visit not undone yet; a change it cannot undo (the user
   changed the entry since, a full box) is skipped and named in the red pill, its own Undo stays,
   and the next Undo goes to the visit before. It shows only when there is something to undo.
+- **ⓘ Info** opens the drawer on Info: the box's count against its limit, a table's limits, how
+  many entries are the user's, how many are new since the user looked, and what Undo can take back;
+  for Fixer's notes, the visits kept and the picks left before the next one.
 
 - **Components**: small cards like screens, as tall as their content, each with its ID and the line
   that says where it belongs. A screen pastes a component by ID; a changed component (Edit, Undo)
@@ -225,10 +242,12 @@ Each box has a rail like a screen's, right of it, at full strength: first its ow
 - **Rules**: one line each, the ID and one sentence; an entry the user wrote is marked *yours*, in
   Data too. Click the sentence to change it; Enter or a
   click elsewhere saves, Esc puts it back, an empty sentence deletes it. **+ Rule** on the rail
-  asks for a sentence and makes its ID from its first words.
+  adds an empty rule at the end with the cursor in it; its sentence's first words make its ID, and
+  left empty it goes.
 - **Data**: small tables, each with an ID, named columns and rows. Click a cell to change it; a row
   left empty or a column without a name goes when the table saves. **+ row**, **+ column**, ✕, and
-  **+ Table** on the rail, which asks for a name.
+  **+ Table** on the rail, which adds a table with only its name, the cursor in it: the name makes
+  its ID, and it gets the columns *name* and *value* and one empty row. Left empty, it goes.
 - **Limits**, as the manual says: 20 components, 20 rules of at most 120 characters, 10 tables of at
   most 6 columns and 8 rows. A full box takes nothing new; a refused edit says why in the red pill.
   An ID is 1 to 4 lowercase words joined by dashes, unique in its box, and never used again.
@@ -335,7 +354,7 @@ their links with no `@` lead nowhere.
   Switching restyles the screens at once; the model never sees the theme.
 
 Loading the page and picking a model each send a short warm-up request to warm the prompt cache.
-All three choices are remembered in this browser, when they change and again on Generate.
+All three choices are remembered in this browser when they change, and Model and Device again on Generate.
 
 ## Colours
 

@@ -33,6 +33,11 @@ export const isBack = (action: string) => normalizePrompt(action) === 'back'
 /** The manual's limits on the boxes: a full box refuses a new entry. A line is a rule, or where a component belongs. */
 export const LIMITS = { components: 20, rules: 20, data: 10, columns: 6, rows: 8, line: 120 }
 
+/** Undo of a box goes back this many changes; the fixer visits after every VISIT_EVERY picks, and its notes keep VISITS_KEPT visits. */
+export const BOX_STATES = 10
+export const VISIT_EVERY = 5
+export const VISITS_KEPT = 20
+
 /** The boxes in the order they show, by their titles; `notes` is the fixer's notes. */
 export const BOX_TITLES = { rules: 'Rules', notes: 'Fixer\'s notes', components: 'Components', data: 'Data' }
 

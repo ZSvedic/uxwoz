@@ -41,7 +41,8 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
                  the boxes with refusals
   fixer.ts       the fixer's visit: the paper and the screens new since the last one, parse its lines, apply them
                  with refusals and an Undo per change; the redraws are left to the server
-  keys.ts        cache keys: a link by @name, normalize a prompt, "home" means the first screen, `back`; box limits and IDs
+  keys.ts        cache keys: a link by @name, normalize a prompt, "home" means the first screen, `back`; box limits and IDs,
+                 states kept, visits kept and how often
   tree.ts        the tree, worked out: links in each screen (components pasted), @names, planned screens,
                  shortest-path levels, the titles and lines of the paper
   cache.ts       screen cache: find by name, proposals (the open A OR B) and pick, versions and undo, parents,
@@ -55,10 +56,12 @@ src/packages/web/src/
                  /api/box (also undo, a box's Undo and Edit, Visit now), /api/warmup, themes; filing and visits in one chain per mockup, a click
                  waits for it; a visit every 5 picks, its redraws as Edits
   app.ts         browser: generate panel, A OR B streaming, refit and pick, clicks (@names, back), rail tools, drawer
-                 (Edit, Info), the boxes' data and filing's result, toolbar menus and box buttons, ← → trail, errors
+                 (Edit, Info) for a screen or a box, the boxes' data and filing's result, toolbar menus (Theme too) and
+                 box buttons, ← → trail, errors
   canvas.ts      browser: the boxes right of Home, the tree layout (packed rows, line lanes), cards and frames, A OR B sides,
-                 rail, pan and zoom, fits
-  boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes, editing in place, Undo, Export
+                 rails at the canvas's scale, pan and zoom, fits
+  boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes and their rails, editing and adding in
+                 place, Export
   index.html, shell.css   the page around the canvas
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest

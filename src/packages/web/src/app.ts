@@ -1,10 +1,10 @@
 // The browser side: generate panel, canvas, A OR B, clicks, rail tools and drawer, boxes, toolbar.
 
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, markCurrent, pasteComponents, type Device } from '@uxwoz/core/frame'
-import { canonicalAction, isBack, nameWords, normalizePrompt, screenKey, screenRef } from '@uxwoz/core/keys'
+import { BOX_STATES, BOX_TITLES, LIMITS, VISIT_EVERY, VISITS_KEPT, canonicalAction, isBack, nameWords, normalizePrompt, screenKey, screenRef } from '@uxwoz/core/keys'
 import { componentsOf, isComponent, namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
-import type { BoxName, Boxes, CacheEntry, Version } from '@uxwoz/core'
-import { boxesMarkdown, createSide, el, renderSide, type Box, type BoxOp } from './boxes.ts'
+import type { BoxName, Boxes, CacheEntry, Past, Version } from '@uxwoz/core'
+import { boxesMarkdown, countLabel, countOf, createSide, el, markBox, renderSide, visitToUndo, type Box, type BoxOp } from './boxes.ts'
 import { Canvas, MAX_ZOOM, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
 
@@ -12,7 +12,6 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const generate = $<HTMLFormElement>('generate')
 const promptInput = $<HTMLTextAreaElement>('prompt')
 const modelSelect = $<HTMLSelectElement>('model')
-const themeSelect = $<HTMLSelectElement>('theme')
 const deviceSelect = $<HTMLSelectElement>('device')
 const drawer = $('drawer')
 const changeInput = $<HTMLTextAreaElement>('change')
@@ -29,6 +28,8 @@ const state = {
   tree: new Map<string, TreeNode>(),
   /** The screen the user last picked, clicked in, or chose in Nav. */
   current: null as string | null,
+  /** The box clicked or shown since: it is current instead of that screen (its rail, the drawer). */
+  box: null as Box | null,
   making: null as Making | null,
   /** Why a side of an A OR B failed, by card id, so it still shows once the screen is stored. */
   failed: new Map<string, string>(),
@@ -42,9 +43,9 @@ const state = {
   before: null as View | null,
   /** Counts mockups opened, so a slower earlier open gives way to a newer one. */
   starts: 0,
-  /** Rules and Data (components are entries); how many times Undo can put each box back. */
+  /** Rules and Data (components are entries); the changes of each box that Undo can take back, oldest first. */
   boxes: null as Boxes | null,
-  undos: { components: 0, rules: 0, data: 0 } as Record<BoxName, number>,
+  past: { components: [], rules: [], data: [] } as Record<BoxName, Past[]>,
   filing: false,
   visiting: false,
   /** A filed() loop is waiting for filing or a visit to end. */
@@ -52,6 +53,9 @@ const state = {
   /** Counts changes this page applied, so a map fetched before one of them is not applied after it. */
   edits: 0,
   css: {} as Record<string, string>,
+  /** The theme every screen shows in, and the ones to choose from. */
+  theme: 'mockup',
+  themes: [] as { id: string; label: string }[],
 }
 
 const store = {
@@ -59,7 +63,9 @@ const store = {
   set: (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* private mode */ } },
 }
 
-const side = createSide(boxOp)
+const side = createSide(boxOp, (box, tab) => { focusBox(box); openDrawer(tab) })
+// A press in a box makes it current; one in a component card makes that card current instead.
+for (const [name, s] of Object.entries(side.sections)) s.addEventListener('pointerdown', (e) => { if (!(e.target as Element).closest('.card')) focusBox(name as Box) })
 const canvas = new Canvas($('stage'), {
   action: onAction,
   pick,
@@ -117,7 +123,7 @@ function views(): ScreenView[] {
     const v = e.versions.at(-1)
     const making = m?.key === e.key ? m : null
     const revising = state.revising?.key === e.key ? state.revising : null
-    const shown = v && { key: e.key, current: state.current === e.key, undo: e.versions.length > 1, note: revising ? (revising.change ? 'Making the change…' : 'Making a new design…') : '' }
+    const shown = v && { key: e.key, current: state.current === e.key && !state.box, undo: e.versions.length > 1, note: revising ? (revising.change ? 'Making the change…' : 'Making a new design…') : '' }
     const card = v && { id: e.key, width: widthOf(v.device), device: v.device, streaming: !!revising }
     if (isComponent(e)) {
       if (v) out.push({ ...shown!, parent: null, component: true, fresh: !e.seen, cards: [{ ...card!, name: e.name!, idea: e.action ?? '', fit: true }] })
@@ -139,14 +145,14 @@ function views(): ScreenView[] {
 async function draw() {
   state.tree = screenTree(all())
   side.el.hidden = !state.app || !state.entries.size || !state.boxes
-  if (state.boxes) renderSide(side, { boxes: state.boxes, components: components(), undos: state.undos, visiting: state.visiting }, boxOp)
+  if (state.boxes) renderSide(side, { boxes: state.boxes, components: components(), past: state.past, visiting: state.visiting, current: state.box }, boxOp)
   canvas.render(views(), !!state.busy)
   generate.hidden = !!state.app && !generate.classList.contains('open')
   renderDrawer()
   renderToolbar()
-  const theme = themeSelect.value
+  const theme = state.theme
   const css = await themeCss(theme)
-  if (theme !== themeSelect.value) return // a newer draw shows the newer theme
+  if (theme !== state.theme) return // a newer draw shows the newer theme
   // Today's components, so a changed component redraws the screens that paste it.
   const c = componentsOf(all())
   for (const e of state.entries.values()) {
@@ -249,7 +255,7 @@ async function stream(url: string, body: object, what: string, on: (ev: ScreenEv
   draw() // rails and the drawer wait while busy
   let failed = false
   try {
-    const css = await themeCss(themeSelect.value)
+    const css = await themeCss(state.theme)
     let finished = false
     for await (const ev of readEvents(await post(url, body, ctrl.signal))) {
       if (ev.type === 'error') throw new Error(ev.message)
@@ -427,9 +433,13 @@ function onAction(from: string, action: string, label: string) {
   openScreen(prompt, from, label)
 }
 
+/** The current box's element, else the current screen's key. */
+const currentAt = () => (state.box ? side.sections[state.box] : state.current ?? undefined)
+
 function setCurrent(key: string | null) {
-  if (state.current === key) return
+  if (state.current === key && !state.box) return
   state.current = key
+  state.box = null
   saveCurrent()
   draw()
 }
@@ -471,8 +481,8 @@ function walkTrail(dir: 1 | -1) {
   try { goTo(trail.keys[i]!) } finally { trail.moving = false }
 }
 
-function applyMap(map: { entries: CacheEntry[]; boxes?: Boxes; undos?: Record<BoxName, number>; filing?: boolean; visiting?: boolean }) {
-  Object.assign(state, { entries: new Map(map.entries.map((e) => [e.key, e])), boxes: map.boxes ?? state.boxes, undos: map.undos ?? state.undos, filing: !!map.filing, visiting: !!map.visiting })
+function applyMap(map: { entries: CacheEntry[]; boxes?: Boxes; past?: typeof state.past; filing?: boolean; visiting?: boolean }) {
+  Object.assign(state, { entries: new Map(map.entries.map((e) => [e.key, e])), boxes: map.boxes ?? state.boxes, past: map.past ?? state.past, filing: !!map.filing, visiting: !!map.visiting })
   state.edits++
   // Filing or a visit runs (after a reload, say) and nothing waits for it yet.
   if ((state.filing || state.visiting) && !state.waiting) filed()
@@ -502,24 +512,28 @@ async function filed() {
   }
 }
 
-/** A change to the boxes, an Undo, or a visit asked for (an Edit is one); the server answers with the whole mockup. */
-async function boxOp(o: BoxOp | { op: 'seen'; box: Box; ids: string[] }) {
+/** A change to the boxes, an Undo, or a visit asked for (an Edit is one); the server answers with the whole mockup. True when it was done. */
+async function boxOp(o: BoxOp | { op: 'seen'; box: Box; ids: string[] }): Promise<boolean> {
   const app = state.app
-  if (!app) return
+  if (!app) return false
   const res = await post('/api/box', { app, ...o }).catch(() => null)
   const body = await res?.json().catch(() => null)
   // The fixer's Undo sends the map with the changes it could not undo.
   if (body?.entries && app === state.app) applyMap(body)
-  if (!res?.ok || body?.error) { showError(`Could not change the box: ${body?.error ?? 'no answer'}`); draw() }
+  if (res?.ok && !body?.error) return true
+  showError(`Could not change the box: ${body?.error ?? 'no answer'}`)
+  draw()
+  return false
 }
 
 /** What is new in a box since the user last looked: entries by ID, visits by when they started. */
 const unseen = (box: Box): string[] => (((box === 'components' ? components() : box === 'notes' ? state.boxes?.visits : state.boxes?.[box]) ?? []) as { seen?: boolean; id?: string; name?: string; at?: string }[])
   .filter((x) => !x.seen).map((x) => x.id ?? x.name ?? x.at!)
 
-/** A toolbar button: move the view to a box; after a moment its new entries are no longer marked. */
+/** A toolbar button: move the view to a box, which becomes current; after a moment its new entries are no longer marked. */
 function lookAt(box: Box) {
   if (side.el.hidden) return
+  focusBox(box)
   canvas.showBox(side.sections[box])
   // Only the entries new at the look count as seen: one filed meanwhile stays marked.
   const ids = unseen(box)
@@ -540,6 +554,15 @@ $('exportBoxes').addEventListener('click', () => {
 })
 
 // ---- The rail and the drawer
+
+/** Make a box current: its rail at full strength, the drawer on it. The boxes' content is not redrawn, so the press still lands. */
+function focusBox(box: Box) {
+  if (state.box === box) return
+  state.box = box
+  markBox(side, box)
+  canvas.render(views(), !!state.busy)
+  renderDrawer()
+}
 
 function onTool(key: string, tool: string) {
   if (!state.entries.get(key)?.versions.length) return
@@ -610,27 +633,32 @@ function openDrawer(tab: 'edit' | 'info') {
   state.drawer = tab
   renderDrawer()
   if (tab === 'edit') changeInput.focus()
-  // The canvas got narrower: keep the current screen in view beside the drawer.
-  requestAnimationFrame(() => { if (state.current) canvas.reveal(state.current) })
+  // The canvas got narrower: keep the current box or screen in view beside the drawer.
+  requestAnimationFrame(() => { const at = currentAt(); if (at) canvas.reveal(at) })
 }
 
 const closeDrawer = () => { state.drawer = null; renderDrawer() }
 
-/** The drawer shows the current screen: Edit (the change box and the past changes) or Info. */
+/** The drawer shows the current box or screen: Edit (the change box and the past changes) or Info. */
 function renderDrawer() {
-  const e = state.current ? state.entries.get(state.current) : undefined
+  const e = state.current && !state.box ? state.entries.get(state.current) : undefined
   const v = e?.versions.at(-1)
-  const open = !!(state.drawer && e && v)
+  const open = !!(state.drawer && (state.box ? state.boxes : v))
   if (drawer.hidden === open) {
     drawer.hidden = !open
-    if (!open && state.current) requestAnimationFrame(() => canvas.reveal(state.current!))
+    if (!open) requestAnimationFrame(() => { const at = currentAt(); if (at) canvas.reveal(at) })
   }
   if (!open) return
   for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === state.drawer))
   $('editPane').hidden = state.drawer !== 'edit'
   $('infoPane').hidden = state.drawer !== 'info'
+  const box = state.box
+  $('changeLabel').textContent = `What should change${box ? ` in ${BOX_TITLES[box]}` : ''}?`
+  changeInput.placeholder = box ? 'e.g. Merge the two rules about scores' : 'e.g. Show one level indicator, not four'
+  $<HTMLButtonElement>('makeChange').disabled = box ? state.visiting : !!state.busy
+  if (box) return renderBoxDrawer(box, state.boxes!)
+  if (!e || !v) return
   $('drawerName').textContent = labelOf(e)
-  $<HTMLButtonElement>('makeChange').disabled = !!state.busy
   const history = $('history')
   const comp = isComponent(e)
   const node = state.tree.get(e.key)
@@ -670,14 +698,34 @@ function renderDrawer() {
     ...(f ? [['Filing', f.error ? `failed: ${f.error}` : `${[...f.added.map((x) => `added ${x}`), ...f.changed.map((x) => `changed ${x}`)].join(', ') || 'nothing new'}, `
       + `${fmtS(f.ms)}${f.costUsd == null ? '' : `, ~${fmtUsd(f.costUsd)}`}`], ...f.refused.map((r) => ['Refused', r])] as [string, string][] : []),
   ]
-  $('info').replaceChildren(...info.flatMap(([k, val]) => [el('dt', '', k), el('dd', '', val)]))
+  showInfo(info)
+}
+
+const showInfo = (info: [string, string][]) => $('info').replaceChildren(...info.flatMap(([k, val]) => [el('dt', '', k), el('dd', '', val)]))
+const when = (at?: string) => (at ? ` · ${new Date(at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}` : '')
+
+/** A box in the drawer: its Past changes, newest first (the visits, for the fixer's notes), and its counts and limits. */
+function renderBoxDrawer(box: Box, b: Boxes) {
+  $('drawerName').textContent = BOX_TITLES[box]
+  const n = countOf(b, components(), box)
+  const past = box === 'notes' ? (b.visits ?? []).map((x) => [`${x.ask ? `Edit: ${x.ask}` : 'Visit'}, ${x.error ? 'failed' : `${x.changes.length} change${x.changes.length === 1 ? '' : 's'}`}${when(x.at)}`, x.undone ? 'undone' : ''])
+    : state.past[box].map((x) => [x.what + when(x.at), ''])
+  $('history').replaceChildren(...past.length ? past.map(([t, cls]) => el('li', cls, t)).reverse() : [el('li', 'none', 'No changes yet')])
+  showInfo([
+    [box === 'notes' ? 'Visits' : box === 'data' ? 'Tables' : 'Entries', box === 'notes' ? `${n}, the last ${VISITS_KEPT} kept; the next after ${VISIT_EVERY - (b.picks ?? 0) % VISIT_EVERY} more picks`
+      : countLabel(n, box) + (box === 'data' ? `, each at most ${LIMITS.columns} columns and ${LIMITS.rows} rows` : '')],
+    ['New since you looked', String(unseen(box).length)],
+    ['↶ Undo', box === 'notes' ? (visitToUndo(b) ? 'takes back the newest visit not undone' : 'nothing to undo') : `${state.past[box].length} of the last ${BOX_STATES} changes can be taken back`],
+  ])
 }
 
 $('editPane').addEventListener('submit', (ev) => {
   ev.preventDefault()
   const change = changeInput.value.trim()
   if (!change) return changeInput.focus()
-  if (state.current) revise(state.current, change)
+  // Enter sends the form even while its button waits.
+  if (state.box) { if (!state.visiting) boxOp({ op: 'edit', box: state.box, text: change }).then((ok) => { if (ok) changeInput.value = '' }) }
+  else if (state.current) revise(state.current, change)
 })
 /** Enter sends the form; Shift+Enter adds a line. */
 function enterSubmits(input: HTMLTextAreaElement, form: HTMLFormElement) {
@@ -701,7 +749,7 @@ async function start(app: string, make = true) {
   if (n !== state.starts) return // a newer mockup was opened meanwhile
   if (!make && !map.entries.length) { store.set('uxwoz:app', ''); return draw() }
   state.app = app
-  state.drawer = null
+  state.drawer = state.box = null
   state.failed.clear()
   store.set('uxwoz:app', app)
   generate.classList.remove('open')
@@ -731,7 +779,7 @@ function closeMockup() {
   state.busy?.abort()
   restorePickers()
   store.set('uxwoz:app', '')
-  Object.assign(state, { app: null, entries: new Map(), boxes: null, filing: false, current: null, making: null, revising: null, drawer: null, before: null })
+  Object.assign(state, { app: null, entries: new Map(), boxes: null, filing: false, current: null, box: null, making: null, revising: null, drawer: null, before: null })
   resetTrail()
   loadRecent()
   draw()
@@ -740,7 +788,7 @@ function closeMockup() {
 // ---- Wiring
 
 /** The pickers and the name each is kept under in this browser. */
-const PICKERS = [[modelSelect, 'model'], [deviceSelect, 'device'], [themeSelect, 'theme']] as const
+const PICKERS = [[modelSelect, 'model'], [deviceSelect, 'device']] as const
 const keepPicker = (s: HTMLSelectElement, name: string) => store.set(`uxwoz:${name}`, s.value)
 
 generate.addEventListener('submit', (e) => {
@@ -761,17 +809,22 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('.example')) {
 
 
 for (const [s, name] of PICKERS) s.addEventListener('change', () => keepPicker(s, name))
-// While a screen streams, the new theme applies when it finishes.
-themeSelect.addEventListener('change', () => themeCss(themeSelect.value).then(draw).catch((e) => showError(`Could not load the theme: ${e.message}`)))
+
+/** Theme: every screen redraws in it at once (one that streams, when it finishes); kept in this browser. */
+function setTheme(id: string) {
+  state.theme = id
+  store.set('uxwoz:theme', id)
+  themeCss(id).then(draw).catch((e) => showError(`Could not load the theme: ${e.message}`))
+}
 
 /** A zoom from a key or a button: in, out, a level, or a fit. The user's own fits count as moving the canvas, so a refit waiting for sizes does not undo them. */
 function zoomTo(z: string) {
   canvas.moved = performance.now()
   if (z === 'in' || z === 'out') canvas.step(z === 'in' ? 1 : -1)
   else if (z === 'all') canvas.fit()
-  else if (z === 'screen') canvas.fit(state.current ?? undefined, { snug: true })
+  else if (z === 'screen') canvas.fit(currentAt(), { snug: !state.box, top: !!state.box })
   else if (z !== 'width') canvas.setZoom(Number(z))
-  else if (state.current) canvas.fit(state.current, { max: MAX_ZOOM, top: true })
+  else if (currentAt()) canvas.fit(currentAt(), { max: MAX_ZOOM, top: true })
 }
 
 // Zoom keys as in Figma: ⌘+ and ⌘− (Ctrl on other systems), ⌘0 for 100%, ⇧1 fit all, ⇧2 fit screen, ⇧3 fit width.
@@ -828,7 +881,7 @@ function open(app: string) {
 
 // ---- The toolbar: project menu, Nav, zoom
 
-const MENUS: [string, string][] = [['projectButton', 'projectMenu'], ['navButton', 'navMenu'], ['zoomValue', 'zoomMenu'], ['boxesButton', 'boxNav']]
+const MENUS: [string, string][] = [['projectButton', 'projectMenu'], ['navButton', 'navMenu'], ['themeButton', 'themeMenu'], ['zoomValue', 'zoomMenu'], ['boxesButton', 'boxNav']]
 
 function closeMenus() {
   for (const [, m] of MENUS) $(m).hidden = true
@@ -841,6 +894,11 @@ for (const [b, m] of MENUS) $(b).addEventListener('click', () => {
   renderToolbar()
   if (m === 'navMenu') renderNav()
   if (m === 'projectMenu') renderRecentMenu()
+  if (m === 'themeMenu') $(m).replaceChildren(...state.themes.map((t) => {
+    const b = item(t.label, t.id === state.theme ? '✓' : '', () => setTheme(t.id))
+    b.classList.toggle('current', t.id === state.theme)
+    return b
+  }))
   $(m).hidden = false
   $(m).querySelector<HTMLElement>('.current, .item')?.focus()
 })
@@ -887,6 +945,7 @@ function renderToolbar() {
     b.disabled = trailStep(dir) == null
   }
   $('navName').textContent = cur ? labelOf(cur) : 'Screens'
+  $('themeName').textContent = state.themes.find((t) => t.id === state.theme)?.label ?? state.theme
   nav.title = cur ? labelOf(cur) : 'Every screen of this mockup'
   $('exportBoxes').hidden = !app
   // Each box button counts entries new since the user last looked; Boxes (a narrow window's menu of them) shows the sum.
@@ -989,9 +1048,12 @@ async function init() {
     for (const x of list) s.add(new Option(x.label, x.id))
     s.value = list.some((x) => x.id === saved) ? saved! : cfg[`default${name[0]!.toUpperCase()}${name.slice(1)}`]
   }
+  state.themes = cfg.themes
+  const theme = store.get('uxwoz:theme')
+  state.theme = state.themes.some((t) => t.id === theme) ? theme! : cfg.defaultTheme
   warmUp(modelSelect.value)
   loadRecent()
-  await themeCss(themeSelect.value)
+  await themeCss(state.theme)
   // A reload opens the mockup that was open, with its A OR B if one was waiting for a pick.
   const last = store.get('uxwoz:app')
   if (last) return start(last, false)

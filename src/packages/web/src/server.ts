@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import {
   BOX_TITLES, DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, HOME_LINE, HOME_NAME, MODELS, PROPOSALS, ScreenCache, canonicalAction, drawRequest, editRequest,
   fileDecision, generateScreen, isComponent, isDevice, isModelId, normalizePrompt, visitPaper, plannedScreens, promptFromLabel, screenKey, screenRef,
-  warmUp, type BoxName, type CacheEntry, type Device, type GenerateEvent, type Io, type ModelId, type Version, type VisitOptions,
+  VISIT_EVERY, warmUp, type BoxName, type CacheEntry, type Device, type GenerateEvent, type Io, type ModelId, type Version, type VisitOptions,
 } from '@uxwoz/core'
 import index from './index.html'
 
@@ -13,8 +13,6 @@ const THEMES_DIR = resolve(import.meta.dir, '../themes')
 /** Theme ids and labels; the first is the default. `clean` is Pico alone, `mockup` is Pico plus mockup.css. */
 const THEMES = { mockup: 'Mockup (sketch)', clean: 'Clean (Pico)' } as const
 const THEME_FILES = new Set(['pico', 'mockup'])
-/** The fixer visits a mockup after every this many picks. */
-const VISIT_EVERY = 5
 
 /** One line of a /api/screen or /api/revise NDJSON stream (spec/code-contract.md). `meta.variants`: 2, 1 for a revise, 0 for a cache hit. */
 export type ScreenEvent =
@@ -183,7 +181,7 @@ export function createServer(opts: ServerOptions = {}) {
   const filed = (app: string, ms: number) => Promise.race([filings.get(normalizePrompt(app)), Bun.sleep(ms)])
 
   /** One mockup as every reply that carries it sends it: screens, components, boxes, and whether filing or a visit runs. */
-  const mapOf = (app: string) => ({ ...cache.map(app), undos: cache.undos(app), filing: !!filingCount.get(normalizePrompt(app)), visiting: visits.has(normalizePrompt(app)) })
+  const mapOf = (app: string) => ({ ...cache.map(app), past: cache.past(app), filing: !!filingCount.get(normalizePrompt(app)), visiting: visits.has(normalizePrompt(app)) })
 
   /** A deleted mockup's filing is not waited for (its result is dropped anyway), and its visit's redraws stop. */
   const forget = (app: string) => {

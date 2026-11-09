@@ -3,7 +3,7 @@
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { LIMITS, canonicalAction, isId, nameWords, normalizePrompt, screenKey, screenRef } from './keys.ts'
+import { BOX_STATES, LIMITS, VISITS_KEPT, canonicalAction, isId, nameWords, normalizePrompt, screenKey, screenRef } from './keys.ts'
 import { pasteComponents, type Device } from './frame.ts'
 import { HOME_NAME, isComponent, nameFrom, screenList, screenTree, uniqueName } from './tree.ts'
 import type { ModelId } from './models.ts'
@@ -72,9 +72,10 @@ export interface Boxes {
 
 /** A filing: when, on which screen, what it added, changed and refused, its time and cost. */
 export interface Filing { at: string; screen: string; ms: number; costUsd: number | null; added: string[]; changed: string[]; refused: string[]; error?: string }
-/** A box as it was before a change: its entries and the IDs it had used. It keeps the last BOX_STATES. */
-interface BoxState { list: Entry[]; gone: string[] }
-const BOX_STATES = 10
+/** A box as it was before a change (`what` it was, `at` when): its entries and the IDs it had used. It keeps the last BOX_STATES. */
+interface BoxState { list: Entry[]; gone: string[]; what?: string; at?: string }
+/** A change Undo can take back: what it was, when. */
+export type Past = { what: string; at?: string }
 
 /** How to undo one change of the fixer: put an entry back (`over` the one it changed), drop an entry it added, or drop a version it drew. */
 export type Undo = { put: BoxName; entry: Entry; index: number; over?: true } | { drop: BoxName; id: string } | { key: string; createdAt: string }
@@ -100,6 +101,8 @@ export class ScreenCache {
   /** The change running (see group), and the change each box last kept a state for. */
   private change: number | null = null
   private kept = new Map<string, number>()
+  /** What each change is, in words, for a box's Past changes; the outermost group names it. */
+  private whats = new Map<number, string>()
   /** When each key was last deleted, on a counter, so a design still streaming cannot bring it back. */
   private removed = new Map<string, number>()
   private clock = 0
@@ -190,7 +193,7 @@ export class ScreenCache {
   addVersion(key: string, version: Version): CacheEntry | undefined {
     const entry = this.entries.get(key)
     if (!entry?.versions.length) return undefined
-    if (isComponent(entry)) this.keep(entry.app, 'components')
+    if (isComponent(entry)) this.keep(entry.app, 'components', version.feedback ? `Edit of ${entry.name}: ${version.feedback}` : `A new design of ${entry.name}`)
     entry.versions.push(version)
     this.save()
     return entry
@@ -209,31 +212,34 @@ export class ScreenCache {
 
   noteVisit(app: string, v: Visit) {
     const b = this.own(app)
-    b.visits = [...(b.visits ?? []), v].slice(-20)
+    b.visits = [...(b.visits ?? []), v].slice(-VISITS_KEPT)
     this.save()
   }
 
-  /** Run `fn` as one change (or go on with `change`): each box it changes keeps one state for its Undo. */
-  group<T>(fn: (change: number) => T, change?: number): T {
+  /** Run `fn` as one change (or go on with `change`), `what` in words: each box it changes keeps one state for its Undo. */
+  group<T>(fn: (change: number) => T, change?: number, what?: string): T {
     const outer = this.change
     this.change = change ?? outer ?? ++this.clock
+    if (what && !this.whats.has(this.change)) this.whats.set(this.change, what)
+    // A visit's redraws come back to its change later; older names are not needed.
+    if (this.whats.size > 50) this.whats.delete(this.whats.keys().next().value!)
     try { return fn(this.change) } finally { this.change = outer }
   }
 
-  /** Keep a box's state before it changes, once a change, the last BOX_STATES of them. */
-  private keep(app: string, box: BoxName) {
+  /** Keep a box's state before it changes (`what`, unless a group names it), once a change, the last BOX_STATES of them. */
+  private keep(app: string, box: BoxName, what = '') {
     const root = normalizePrompt(app), k = `${root} ${box}`, change = this.change ?? ++this.clock
     if (this.kept.get(k) === change) return
     this.kept.set(k, change)
     const s = this.states.get(root) ?? {}
     this.states.set(root, s)
-    s[box] = [...s[box] ?? [], structuredClone({ list: this.list(app, box), gone: this.boxesOf(app).gone[box] })].slice(-BOX_STATES)
+    s[box] = [...s[box] ?? [], structuredClone({ list: this.list(app, box), gone: this.boxesOf(app).gone[box], what: this.whats.get(change) ?? what, at: new Date().toISOString() })].slice(-BOX_STATES)
   }
 
-  /** How many times Undo can put each box back. */
-  undos(app: string): Record<BoxName, number> {
+  /** Each box's changes that Undo can take back, oldest first: what each was and when. */
+  past(app: string): Record<BoxName, Past[]> {
     const s = this.states.get(normalizePrompt(app))
-    return Object.fromEntries(BOXES.map((b) => [b, s?.[b]?.length ?? 0])) as Record<BoxName, number>
+    return Object.fromEntries(BOXES.map((b) => [b, (s?.[b] ?? []).map((x) => ({ what: x.what ?? 'A change', at: x.at }))])) as Record<BoxName, Past[]>
   }
 
   /** Put a box back as it was before its last change; a component it drops leaves its HTML in place, its ID stays used. Why not, or null. */
@@ -258,13 +264,17 @@ export class ScreenCache {
     if (!v) return 'nothing to undo'
     v.undone = true
     // The last change first, so a change made on top of another is undone before it.
-    const whys = this.group(() => [...v.changes.keys()].reverse().map((i) => this.undoChange(app, v.at, i)))
+    const whys = this.group(() => [...v.changes.keys()].reverse().map((i) => this.undoChange(app, v.at, i)), undefined, 'You undid a visit')
     this.save()
     return whys.find((why) => why && why !== 'nothing to undo') ?? null
   }
 
   /** Undo change `i` of the visit that started `at`. Returns why not, or null. */
   undoChange(app: string, at: string, i: number): string | null {
+    return this.group(() => this.undoOne(app, at, i), undefined, 'You undid a change of the fixer')
+  }
+
+  private undoOne(app: string, at: string, i: number): string | null {
     const b = this.own(app), c = b.visits?.find((v) => v.at === at)?.changes[i], u = c?.undo
     if (!c || !u || c.undone) return 'nothing to undo'
     // An entry already back, or one changed and gone since, counts as undone; so does a version the user already undid.
@@ -318,7 +328,7 @@ export class ScreenCache {
   undo(key: string): CacheEntry | undefined {
     const entry = this.entries.get(key)
     if (!entry || entry.versions.length < 2) return undefined
-    if (isComponent(entry)) this.keep(entry.app, 'components')
+    if (isComponent(entry)) this.keep(entry.app, 'components', `You undid a version of ${entry.name}`)
     entry.versions.pop()
     this.save()
     return entry
@@ -377,7 +387,7 @@ export class ScreenCache {
   addComponent(app: string, id: string, where: string, version: Version, by: Mark['by'], from: Parent | null = null): CacheEntry | string {
     const why = this.refuseNew(app, 'components', id) ?? refuseLine(where)
     if (why) return why
-    this.keep(app, 'components')
+    this.keep(app, 'components', `Added ${id}`)
     const e: CacheEntry = { key: componentKey(app, id), app, action: where.trim(), name: id, parent: from, versions: [version], kind: 'component', ...mark(by) }
     this.entries.set(e.key, e)
     this.save()
@@ -395,7 +405,7 @@ export class ScreenCache {
     const why = op === 'add' ? this.refuseNew(app, box, entry.id) : i < 0 ? `${box} has no ${entry.id}` : null
     const body = op === 'delete' ? null : box === 'rules' ? ruleBody(entry.text) : tableBody(entry.columns, entry.rows)
     if (why || typeof body === 'string') return why ?? (body as string)
-    this.keep(app, box)
+    this.keep(app, box, `${by === 'user' ? 'You' : by === 'fixer' ? 'The fixer' : 'Filing'} ${op === 'add' ? 'added' : op === 'set' ? 'changed' : 'deleted'} ${entry.id}`)
     if (!body) {
       list.splice(i, 1)
       b.gone[box].push(entry.id)
@@ -436,7 +446,7 @@ export class ScreenCache {
     const root = normalizePrompt(entry.app)
     if (isComponent(entry)) {
       // Screens that paste it show nothing in its place; no screen goes with it.
-      this.keep(entry.app, 'components')
+      this.keep(entry.app, 'components', `You deleted ${entry.name}`)
       this.entries.delete(key)
       this.own(entry.app).gone.components.push(entry.name!)
       this.save()

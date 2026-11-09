@@ -17,7 +17,7 @@ input, select, button, textarea { font: inherit; color: inherit; }
 button, select { padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); cursor: pointer; }
 button:disabled { opacity: .45; cursor: default; }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.toolbar :is(button, select), .recent button, .drawer :is(.tabs button, .close) { border-color: transparent; background: none; }
+.toolbar button, .recent button, .drawer :is(.tabs button, .close) { border-color: transparent; background: none; }
 /* Small uppercase headings of menus, the generate panel and the drawer. */
 .menu h3, .generate h3, .pane h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 
@@ -34,10 +34,15 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .toolbar button { padding: 4px 9px; }
 .toolbar button:hover:not(:disabled) { border-color: var(--line); background: var(--bg); }
 #zoomValue { min-width: 5em; font-variant-numeric: tabular-nums; }
-.menu-button { display: inline-flex; gap: 4px; align-items: center; max-width: 100%; min-width: 0; font-weight: 600; }
+.menu-button { display: inline-flex; gap: 4px; align-items: center; max-width: 100%; min-width: 0; }
 .menu-button > span:first-child, .menu .item > span, .recent button span, .card .head > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu .item > span, .recent button span { flex: 1; min-width: 0; }
-.caret { color: var(--muted); font-size: 11px; }
+/* One chevron for every menu; a thin line between the toolbar's items; icons drawn at the size of the text. */
+.caret { flex: none; width: 7px; height: 7px; margin: 0 2px 3px 4px; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.sep { flex: none; width: 1px; height: 20px; margin: 0 4px; background: var(--line); }
+.tb-mid:has(#navButton[hidden]) .sep, .toolbar:not(.has-boxes) .box-sep { display: none; }
+.icon { display: block; width: 1em; height: 1.4em; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+.pop { position: relative; display: flex; align-items: center; }
 #projectButton { max-width: min(36ch, 40vw); }
 #navButton { max-width: min(40ch, 36vw); }
 @media (max-width: 900px) { .wide-only { display: none; } .logo { display: none; } }
@@ -48,6 +53,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .tb-left .menu { left: 0; }
 .tb-mid .menu { left: 50%; transform: translateX(-50%); }
 .tb-right .menu { right: 0; }
+.pop .menu { min-width: 160px; }
 .menu h3 { margin: 8px 8px 2px; font-size: 11px; font-weight: 600; }
 .menu hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .menu .item { display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left; border: 0; background: none; padding: 5px 8px;
@@ -142,12 +148,13 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .or .drop { pointer-events: auto; width: calc(32px / var(--z)); height: calc(32px / var(--z)); padding: 0; border-radius: 50%;
   font-size: calc(14px / var(--z)); color: var(--muted); border-width: calc(1px / var(--z)); }
 
-/* The rail: big icon buttons right of a screen, full strength on the current screen, else on hover. */
-.rail { position: absolute; left: 100%; top: 0; padding-left: calc(10px / var(--z)); display: flex; flex-direction: column;
-  gap: calc(6px / var(--z)); opacity: 0; transition: opacity .15s; }
-.card:hover .rail, .card.current .rail, .rail:focus-within { opacity: 1; }
-.rail .tool { width: calc(40px / var(--z)); height: calc(40px / var(--z)); padding: 0; border-radius: calc(10px / var(--z));
-  border-width: calc(1px / var(--z)); font-size: calc(18px / var(--z)); line-height: 1; color: var(--muted); box-shadow: 0 1px 4px rgba(0, 0, 0, .1); }
+/* The rail: big icon buttons right of a screen or a box, at the canvas's scale (60 px wide), full strength on the
+   current screen or box, else on hover. */
+.rail { position: absolute; left: 100%; top: 0; padding-left: 10px; display: flex; flex-direction: column;
+  gap: 6px; opacity: 0; transition: opacity .15s; }
+.card:hover .rail, .card.current .rail, .box:hover > .rail, .box.current > .rail, .rail:focus-within { opacity: 1; }
+.rail .tool { width: 40px; height: 40px; padding: 0; border-radius: 10px; font-size: 18px; line-height: 1; color: var(--muted);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .1); }
 .rail .tool:hover:not(:disabled) { color: var(--fg); border-color: var(--accent); }
 .rail .tool[data-tool="delete"]:hover:not(:disabled), .or .drop:hover, .menu-foot .danger:hover { color: var(--err); border-color: var(--err); }
 
@@ -168,6 +175,8 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .pane h3 { margin: 10px 0 0; }
 .history { margin: 0; padding-left: 1.8em; display: flex; flex-direction: column; gap: 4px; color: var(--muted); }
 .history li.now { color: var(--fg); }
+.history li.none { list-style: none; }
+.history li.undone { text-decoration: line-through; }
 .history li.now::after { content: " · showing"; color: var(--accent); }
 .info { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
 .info dt { color: var(--muted); }
@@ -175,24 +184,24 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 
 /* The box buttons in the toolbar: each moves the view to its box; the number counts what is new. In a
    narrow window they fold into the Boxes menu. */
-.box-nav { position: static; display: flex; flex-direction: row; min-width: 0; padding: 0; border: 0; box-shadow: none; background: none; gap: 2px; margin-right: 8px; }
+.box-nav { position: static; display: flex; flex-direction: row; align-items: center; min-width: 0; padding: 0; border: 0; box-shadow: none; background: none; gap: 2px; }
 .box-nav button { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; padding: 4px 6px; }
 .box-nav b, #boxesButton b { color: #fff; background: var(--accent); border-radius: 9px; padding: 0 6px; font-size: 11px; }
 .toolbar b:empty, #boxesButton, .toolbar:not(.has-boxes) .box-nav { display: none; }
 .toolbar.has-boxes .box-nav[hidden] { display: flex !important; }
 @media (max-width: 1200px) {
   .toolbar.has-boxes #boxesButton { display: inline-flex; }
-  .box-nav { position: absolute; flex-direction: column; min-width: 200px; padding: 6px; border: 1px solid var(--line);
+  .box-nav { position: absolute; flex-direction: column; align-items: stretch; min-width: 200px; padding: 6px; border: 1px solid var(--line);
     box-shadow: var(--shadow); background: var(--card); margin: 0; }
   .toolbar.has-boxes .box-nav[hidden] { display: none !important; }
   .box-nav button { justify-content: space-between; }
+  .box-nav .sep { display: none; }
 }
-.toolbar select { padding: 4px 2px; }
 
 /* The boxes side by side right of the first screen, at canvas scale: they zoom with the screens. */
-.boxes { position: absolute; display: flex; align-items: flex-start; font-size: 15px; }
+.boxes { position: absolute; display: flex; align-items: flex-start; gap: 120px; font-size: 15px; }
 .box { position: relative; flex: none; display: flex; flex-direction: column; width: 520px; max-height: var(--box-h); padding: 14px 18px 18px; border: 2px solid var(--line); border-radius: 12px; background: var(--card); }
-.box > .rail { opacity: 1; }
+.box.current { border-color: var(--accent); }
 .box h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font-size: 18px; }
 .box h3 small { color: var(--muted); font-weight: 400; font-size: 13px; flex: 1; }
 .box-hint { margin: 0; color: var(--muted); font-size: 13px; }
@@ -206,16 +215,16 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .fresh > b:first-child::after, .card.fresh .name::after { content: " new"; color: var(--accent); font-size: 12px; font-weight: 600; }
 .box-body { min-height: 0; overflow-y: auto; }
 .box-components .box-body { display: flex; flex-direction: column; }
-/* A component card is at least as tall as its rail, so the rail never covers the box below. */
-.box-components .card { position: relative; flex: none; margin-top: calc(62px / var(--z)); min-height: calc(190px / var(--z)); }
-/* Far out, a component card drops its rail, so the row of boxes does not grow as the view zooms out. */
-.surface.far .box-components .card { margin-top: calc(26px / var(--z)); min-height: 0; }
-.surface.far .box-components .rail { display: none; }
+/* A component card is at least as tall as its rail, so the rail never covers the card below; far out, its name is shorter. */
+.box-components .card { position: relative; flex: none; margin-top: calc(62px / var(--z)); min-height: 190px; }
+.surface.far .box-components .card { margin-top: calc(26px / var(--z)); }
 .rule { display: flex; gap: 6px; align-items: baseline; padding: 4px 0; border-top: 1px dashed var(--line); }
 .rule:first-child { border-top: 0; }
 .rule-text { flex: 1; min-width: 0; }
 .rule .box-btn, .table-head .box-btn:last-child { border-color: transparent; background: none; }
 [contenteditable] { outline: none; border-radius: 4px; cursor: text; }
+[data-placeholder]:empty::before { content: attr(data-placeholder); color: var(--muted); }
+.table-head > [contenteditable] { flex: 1; }
 [contenteditable]:hover, [contenteditable]:focus { background: var(--bg); box-shadow: 0 0 0 2px var(--line); }
 .data-table + .data-table { margin-top: 16px; }
 .table-head { display: flex; gap: 6px; align-items: baseline; margin-bottom: 4px; }

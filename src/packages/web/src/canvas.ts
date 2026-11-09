@@ -1,6 +1,6 @@
 // The canvas: every screen on one panning, zooming surface, a tree with a row per level, a first child
 // below its parent when there is room, each parent's lines at a height of their own so they never cross.
-// Names and rails keep their size on screen. Right of the first screen: the boxes (boxes.ts).
+// Names keep their size on screen; rails scale with the canvas. Right of the first screen: the boxes (boxes.ts).
 
 import { DEFAULT_DEVICE, DEVICES, FRAME_SANDBOX, framePage, type Device } from '@uxwoz/core/frame'
 import { button, el, railOf } from './boxes.ts'
@@ -18,7 +18,7 @@ const GAP_X = 120
 const GAP_Y = 150
 /** Room for the OR between two sides. */
 const OR_W = 160
-/** A rail's width and the OR's least width, in pixels on screen. */
+/** A rail's width, in canvas pixels; the OR's least width, in pixels on screen. */
 const RAIL_W = 60
 const OR_MIN = 120
 /** Margin so any screen can be scrolled to the middle. */
@@ -188,7 +188,7 @@ export class Canvas {
     const st = this.stage, r = st.getBoundingClientRect()
     const ax = x == null ? st.clientWidth / 2 : x - r.left, ay = y == null ? st.clientHeight / 2 : y - r.top
     let px = (st.scrollLeft + ax) / this.z, py = (st.scrollTop + ay) / this.z
-    // Names and rails keep their size on screen, so screens shift with the zoom: follow the nearest one.
+    // Names keep their size on screen, so screens shift with the zoom: follow the nearest one.
     const near = this.nearest(px, py), before = near && { ...this.boxes.get(near)! }
     this.applyZoom(z)
     const after = near && this.boxes.get(near)
@@ -217,7 +217,7 @@ export class Canvas {
     this.surface.style.setProperty('--z', String(z))
     this.surface.classList.toggle('far', z < FAR)
     this.stage.style.setProperty('--z', String(z)) // the dot grid behind the canvas scales with it
-    this.layout() // names and rails keep their size on screen, so the room they need changes
+    this.layout() // names keep their size on screen, so the room they need changes
     this.on.zoomed(z)
   }
 
@@ -234,23 +234,23 @@ export class Canvas {
     this.stage.scrollTo({ left: v.left, top: v.top })
   }
 
-  /** A screen's place with the names above it and its rail, a box's place, or the whole tree's without a key. */
+  /** A screen's place with the names above it and its rail, a box's with its rail, or the whole tree's without a key. */
   box(key?: string | HTMLElement): Box | undefined {
-    if (key instanceof HTMLElement) return this.elBox(key)
+    if (key instanceof HTMLElement) return { ...this.elBox(key), w: key.offsetWidth + RAIL_W }
     if (key == null) return this.extent.w ? this.extent : undefined
     const comp = this.cards.get(key)
     const b = this.boxes.get(key) ?? (comp && this.components.contains(comp.el) ? this.elBox(comp.el) : undefined)
     if (!b) return undefined
     const choice = !!this.screens.find((s) => s.key === key)?.cards[0]?.side
     const above = (choice ? IDEA_H : labelH(this.z)) / this.z
-    return { x: b.x, y: b.y - above, w: b.w + (choice ? 0 : RAIL_W / this.z), h: b.h + above }
+    return { x: b.x, y: b.y - above, w: b.w + (choice ? 0 : RAIL_W), h: b.h + above }
   }
 
   /** Zoom and scroll so a screen (or the tree) fills the stage, at most `max`. `top`: fit the width, show the top. `snug`: the height too, at least 60% of the width's fit. */
   fit(key?: string | HTMLElement, { max = 1, top = false, snug = false } = {}) {
     const st = this.stage, m = 48
     if (this.queued) this.layout() // sizes that arrived since the last frame count
-    // Names and rails keep their size on screen, so the box changes with the zoom; a few rounds settle it.
+    // Names keep their size on screen, so the box changes with the zoom; a few rounds settle it.
     for (let i = 0; i < 4; i++) {
       const box = this.box(key)
       if (!box) return
@@ -293,8 +293,8 @@ export class Canvas {
     st.scrollTo({ left: (b.x + b.w / 2) * this.z - st.clientWidth / 2, top, behavior: smooth ? 'smooth' : 'auto' })
   }
 
-  /** Scroll a screen into view if any of it is out of view (its top first, if it is taller than the stage). */
-  reveal(key: string, smooth = true) {
+  /** Scroll a screen or a box into view if any of it is out of view (its top first, if it is taller than the stage). */
+  reveal(key: string | HTMLElement, smooth = true) {
     if (this.queued) this.layout()
     const b = this.box(key)
     if (!b) return
@@ -381,13 +381,12 @@ export class Canvas {
   /** Place the tree and the boxes, size the canvas, draw the lines. */
   private layout() {
     const z = this.z
-    // At a low zoom, rails and the OR need more of the canvas than the fixed gaps give.
-    const gapX = Math.max(GAP_X, (RAIL_W + 24) / z), orW = Math.max(OR_W, OR_MIN / z)
+    // At a low zoom, the OR needs more of the canvas than its fixed room gives.
+    const orW = Math.max(OR_W, OR_MIN / z)
     const screens = this.screens.filter((s) => !s.component)
     // The Components box is as wide as a screen of the mockup and its rail; the boxes' rails go in the gaps.
     const devW = Math.max(DEVICES[DEFAULT_DEVICE].width, ...this.screens.filter((s) => s.component || !s.parent).map((s) => s.cards[0]?.width ?? 0))
-    this.components.parentElement!.style.width = `${devW + 40 + (z < FAR ? 0 : (RAIL_W + 10) / z)}px`
-    this.side.style.gap = `${gapX}px`
+    this.components.parentElement!.style.width = `${devW + 50 + RAIL_W}px`
     const sizes = new Map<string, { w: number; h: number; parts: { id: string; w: number; h: number }[] }>()
     for (const s of screens) {
       const parts = s.cards.map((v) => ({ id: v.id, w: this.cards.get(v.id)!.width, h: v.error ? FAILED_H : this.cards.get(v.id)!.height }))
@@ -431,9 +430,9 @@ export class Canvas {
         const p = parentOf.get(k), first = p != null && kids.get(p)![0] === k
         const x = Math.max(cursor, first ? xs.get(p)! : cursor)
         xs.set(k, x)
-        cursor = x + sizes.get(k)!.w + gapX
-        if (side && k === rows[0]![0]) { sideX = cursor; cursor += this.side.offsetWidth + gapX }
-        maxX = Math.max(maxX, cursor - gapX)
+        cursor = x + sizes.get(k)!.w + GAP_X
+        if (side && k === rows[0]![0]) { sideX = cursor; cursor += this.side.offsetWidth + GAP_X }
+        maxX = Math.max(maxX, cursor - GAP_X)
       }
     }
     // Each bending parent gets its own branch height, the leftmost lowest, so no lines cross; the gap grows.

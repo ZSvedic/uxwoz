@@ -92,7 +92,7 @@ export function boxLines(cache: ScreenCache, app: string, set: (l: BoxLine) => s
 
 /** Apply a filing reply; the screen pastes each new component in its part's place only while `filedHtml` is still its newest. */
 export function applyFiling(cache: ScreenCache, app: string, key: string, filedHtml: string, reply: string, made: Omit<Version, 'html'>): Filed {
-  return cache.group(() => fileLines(cache, app, key, filedHtml, reply, made))
+  return cache.group(() => fileLines(cache, app, key, filedHtml, reply, made), undefined, `Filing after ${cache.get(key)?.name ?? 'a screen'}`)
 }
 
 function fileLines(cache: ScreenCache, app: string, key: string, filedHtml: string, reply: string, made: Omit<Version, 'html'>): Filed {

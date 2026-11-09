@@ -11,7 +11,7 @@
   <div class="tb-left">
     <strong class="logo">UX Woz</strong>
     <button id="projectButton" class="menu-button" aria-haspopup="menu" title="Mockup: new, recent, start over, delete">
-      <span id="projectName">New mockup</span> <span class="caret">▾</span></button>
+      <span id="projectName">New mockup</span> <span class="caret"></span></button>
     <div id="projectMenu" class="menu" role="menu" hidden>
       <button class="item" id="menuNew">＋ New mockup…</button>
       <div id="menuRecent" class="menu-recent"></div>
@@ -23,25 +23,34 @@
     </div>
   </div>
   <div class="tb-mid">
+    <i class="sep"></i>
     <button id="trailBack" class="trail" title="Back to the screen you looked at before (⌘[)" hidden>←</button>
     <button id="navButton" class="menu-button" aria-haspopup="menu" title="Every screen of this mockup" hidden>
-      <span id="navName"></span> <span class="caret">▾</span></button>
+      <span id="navName"></span> <span class="caret"></span></button>
     <button id="trailForward" class="trail" title="Forward again (⌘])" hidden>→</button>
+    <i class="sep"></i>
     <div id="navMenu" class="menu nav-menu" role="menu" hidden></div>
   </div>
   <div class="tb-right">
-    <button id="boxesButton" class="menu-button" aria-haspopup="menu" title="Show a box">Boxes <b id="boxesSum"></b> <span class="caret">▾</span></button>
+    <span class="pop">
+    <button id="boxesButton" class="menu-button" aria-haspopup="menu" title="Show a box">Boxes <b id="boxesSum"></b> <span class="caret"></span></button>
     <span class="box-nav menu" id="boxNav" title="Show a box; the number counts what is new since you last looked" hidden>
-      <button data-box="rules">Rules <b></b></button>
-      <button data-box="notes">Fixer <b></b></button>
-      <button data-box="components">Components <b></b></button>
+      <button data-box="rules">Rules <b></b></button><i class="sep"></i>
+      <button data-box="notes">Fixer <b></b></button><i class="sep"></i>
+      <button data-box="components">Components <b></b></button><i class="sep"></i>
       <button data-box="data">Data <b></b></button>
     </span>
-    <select id="theme" title="Theme: how every screen looks"></select>
-    <button data-zoom="out" class="wide-only" title="Zoom out (⌘−)">−</button>
-    <button id="zoomValue" class="menu-button" aria-haspopup="menu" title="Zoom"><span id="zoomPct">100%</span> <span class="caret">▾</span></button>
-    <button data-zoom="in" class="wide-only" title="Zoom in (⌘+)">+</button>
-    <button data-zoom="screen" class="wide-only" title="Fit screen (⇧2)">⤢</button>
+    </span>
+    <i class="sep box-sep"></i>
+    <span class="pop">
+      <button id="themeButton" class="menu-button" aria-haspopup="menu" title="Theme: how every screen looks"><span id="themeName"></span> <span class="caret"></span></button>
+      <div id="themeMenu" class="menu" role="menu" hidden></div>
+    </span>
+    <i class="sep"></i>
+    <button data-zoom="out" class="wide-only" title="Zoom out (⌘−)"><svg class="icon" viewBox="0 0 16 16"><path d="M3 8h10"/></svg></button>
+    <button id="zoomValue" class="menu-button" aria-haspopup="menu" title="Zoom"><span id="zoomPct">100%</span> <span class="caret"></span></button>
+    <button data-zoom="in" class="wide-only" title="Zoom in (⌘+)"><svg class="icon" viewBox="0 0 16 16"><path d="M3 8h10M8 3v10"/></svg></button>
+    <button data-zoom="screen" class="wide-only" title="Fit screen (⇧2)"><svg class="icon" viewBox="0 0 16 16"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg></button>
     <div id="zoomMenu" class="menu" role="menu" hidden>
       <button class="item" data-zoom="in">Zoom in <kbd>⌘+</kbd></button>
       <button class="item" data-zoom="out">Zoom out <kbd>⌘−</kbd></button>
@@ -72,7 +81,7 @@
     </div>
     <p id="drawerName" class="drawer-name"></p>
     <form id="editPane" class="pane">
-      <label for="change">What should change?</label>
+      <label for="change" id="changeLabel">What should change?</label>
       <textarea id="change" rows="4" maxlength="1000" placeholder="e.g. Show one level indicator, not four"></textarea>
       <button id="makeChange" type="submit" class="primary">Make the change</button>
       <h3>Past changes</h3>

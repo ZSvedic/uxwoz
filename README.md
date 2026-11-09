@@ -24,9 +24,10 @@ adds what the decision settled, in the background; the screen's Info says what i
 rule or a table cell by clicking it; the toolbar's Rules, Fixer, Components and Data buttons move
 the view to each box, and **Export the boxes** in the project menu writes them as markdown. Every 5
 picks the fixer visits: it merges doubles, removes what no screen needs and redraws up to 5
-screens, and Fixer's notes lists each change with an Undo. Each box has a rail: **+ Rule**, **▶
-Visit now** or **+ Table**, then **✎ Edit** (ask the fixer for a change in that box) and **↶ Undo**
-(the box as it was before its last change). The Theme picker is in the toolbar.
+screens, and Fixer's notes lists each change with an Undo. Each box has a rail like a screen's: **+ Rule**
+(in place), **▶ Visit now** or **+ Table** (in place), then **✎ Edit** (the drawer: ask the fixer for
+a change in that box, and its past changes), **↶ Undo** (the box as it was before its last change)
+and **ⓘ Info**. The Theme menu is in the toolbar.
 
 Generated screens are cached in `temp/screen-cache.json`. To make a mockup again from scratch,
 open it and choose **Start over** in the project menu (top left); **Delete** removes it. To clear the whole cache, stop the server,
