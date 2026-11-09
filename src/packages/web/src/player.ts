@@ -3,7 +3,7 @@
 // Each visit sends its trip (the screens seen, the dead controls clicked) as it changes.
 
 import { DEVICES, FRAME_SANDBOX, framePage, markCurrent, pasteComponents, type Device } from '@uxwoz/core/frame'
-import { isBack, screenKey, screenRef } from '@uxwoz/core/keys'
+import { linkTarget } from '@uxwoz/core/keys'
 import { el } from './boxes.ts'
 
 interface Screen { key: string; name: string; title: string; html: string; device?: Device; parent: string | null }
@@ -93,10 +93,8 @@ function show(key: string, push = true) {
 function go(action: string, label: string) {
   const s = current()
   if (!s) return
-  const ref = screenRef(action)
-  const to = isBack(action) ? byKey.get(s.parent ?? map.root)
-    : ref?.name === 'home' ? byKey.get(map.root)
-      : ref ? byName.get(ref.name) : byKey.get(screenKey(map.app, action))
+  const t = linkTarget(action)
+  const to = !t ? undefined : 'back' in t ? byKey.get(s.parent ?? map.root) : t.name === 'home' ? byKey.get(map.root) : byName.get(t.name)
   if (to && to.key === s.key) return
   if (to) return show(to.key)
   trip.dead.push(label || 'a control')

@@ -145,16 +145,26 @@ can spend model credits.
   edit link, from the hidden routes `/_player` and `/_app`; 404 for a revoked link. A visitor's
   routes: `GET /api/s/:token/map` → `{role, app, root, components, screens: {key, name, title, html,
   device, parent}[]}` (picked screens' newest versions and their tree parents only; it counts an
-  open), `POST /api/s/:token/feedback {visitor, name, kind, screen, text?, about?, up?, label?}` (403
-  for a view link; 400 for a text over 1,000 characters or empty but a thumb; 404 for a screen not
-  in the mockup), `POST /api/s/:token/trip {id, visitor, name, screens, dead}` (replaces the trip
-  with that id). An edit link's page sends `x-uxwoz-share: <token>` on every `/api` call: it may
-  reach only its mockup (403), not the share routes or `/api/delete-app` (403), and `/api/apps`
-  lists only its mockup. A new screen that is not a cache hit, `/api/revise`, and `/api/box` with
-  `edit` or `visit` count against `cap` once answered OK; past it, 429 *This link's budget is used
-  up.* With `UXWOZ_OWNER` set, `/` and every `/api` route but `/api/s/*` need the cookie
+  open in memory; a GET never writes the file), `POST /api/s/:token/feedback {visitor, name, kind,
+  screen, text?, about?, up?, label?}` (400 for a text over 1,000 characters or empty but a thumb;
+  404 for a screen not in the mockup), `POST /api/s/:token/trip {id, visitor, name, screens, dead}`
+  (replaces the trip with that id; at most 50 screens and 50 dead clicks). Both are 403 for a view
+  link. A mockup keeps 500 of each: comments, thumbs, answers (dead controls and Done), trips. These
+  two save the file at most once a second. Every request body is at most 64 KB (`maxRequestBodySize`).
+- **An edit link**: its page sends `x-uxwoz-share: <token>` on every `/api` call. It may use
+  `/api/config`, `/api/apps` (its mockup only), `/api/map`, `/api/screen`, `/api/pick`,
+  `/api/revise`, `/api/undo`, `/api/box` and `/api/delete`, each for its own mockup only: the mockup
+  is a GET's `?app=`, or a POST body's `app` or the first part of its `key`; a POST whose `app` or
+  `key` is not a string, or whose `?app=` names another mockup than its body, is 403. It may not use
+  `/api/share`, `/api/shares`, `/api/unshare`, `/api/delete-app`, `/api/warmup`, or `/api/delete` of
+  its first screen (all 403). Its budget (`cap`) counts each call that makes a model work: a new
+  screen that is not a cache hit, a pick (its filing), `/api/revise`, and `/api/box` with `edit` or
+  `visit`. A unit is taken before the call and given back when the call is refused; past the cap,
+  429 *This link's budget is used up.*
+- **The owner**: with `UXWOZ_OWNER` set, `/` and every `/api` route but `/api/s/*` need the cookie
   `uxwoz_owner=<secret>` (401 on the API, a one-line 403 page on `/`); `/?owner=<secret>` sets it
-  and redirects to `/`.
+  (`HttpOnly; SameSite=Lax`, and `Secure` over https) and redirects to `/`. The server fetches the
+  pages it proxies from itself (`127.0.0.1` and its port), never from the request's Host.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
   `pico.css` followed by `mockup.css`.
 

@@ -372,8 +372,13 @@ export class ScreenCache {
     return b
   }
 
-  /** A mockup's share links, feedback and trips, to read or change; stored once changed and saved. */
+  /** A mockup's share links, feedback and trips, to read: empty ones for a mockup that has none. */
   sharedOf(app: string): Shared {
+    return this.shared.get(normalizePrompt(app)) ?? { shares: [], feedback: [], trips: [] }
+  }
+
+  /** A mockup's share links, feedback and trips, to change: stored from now on. */
+  ownShared(app: string): Shared {
     const root = normalizePrompt(app)
     let s = this.shared.get(root)
     if (!s) this.shared.set(root, (s = { shares: [], feedback: [], trips: [] }))

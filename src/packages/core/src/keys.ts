@@ -30,6 +30,14 @@ export function screenKey(app: string, action: string | null): string {
 /** True for the action that goes back to the screen that opened this one: `back`. */
 export const isBack = (action: string) => normalizePrompt(action) === 'back'
 
+/** Where a control's action leads in the player: back, a screen by name (`home` too), or nowhere (plain text, as in the app). */
+export function linkTarget(action: string): { back: true } | { name: string } | null {
+  if (isBack(action)) return { back: true }
+  if (!canonicalAction(action)) return { name: 'home' }
+  const ref = screenRef(action)
+  return ref ? { name: ref.name } : null
+}
+
 /** The manual's limits on the boxes: a full box refuses a new entry. A line is a rule, or where a component belongs. */
 export const LIMITS = { components: 20, rules: 20, data: 10, columns: 6, rows: 8, line: 120 }
 

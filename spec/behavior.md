@@ -367,27 +367,29 @@ browser and says what they think. Nothing is real-time and nobody signs in: a li
   - **View**: the player (below). A control with no drawn screen behind it says *Not designed yet*.
     Nothing is generated, so a viewer costs nothing.
   - **Comment**: the player plus feedback (below).
-  - **Edit**: the whole app on that mockup only, without the project menu. It has a budget (20 by
-    default) of new screens and changes it may ask for (an Edit, Regenerate, an Edit of a box, Visit
-    now), since they cost the owner's credits; the link shows how much is used. Past it, the red pill
+  - **Edit**: the whole app on that mockup only, without the project menu; it cannot delete the
+    first screen. It has a budget (20 by default) of model calls (a new screen, a pick, an Edit,
+    Regenerate, an Edit of a box, Visit now), since they cost the owner's credits; the link shows
+    how much is used. Past it, the red pill
     says *This link's budget is used up*.
 - **The player** shows one screen at a time in its device frame, in the Mockup theme, components
   pasted, its name on top, **← Back** and the trail of names (each one clickable). A click on a
-  control opens the screen it names; `back` goes to the screen it hangs under. A desktop screen
+  control opens the screen it names; `back` goes to the screen it hangs under; a control whose
+  action names no screen (plain words) leads nowhere, as in the app. A desktop screen
   shrinks to fit a phone.
 - **Feedback** (comment links), in a bar under the screen: 👍 and 👎 for the screen (a visitor's
   newest counts), **Comment on this screen** (with an optional part: **Pick a part** and click it in
   the screen, and its words fill *About*), and **Done**, which asks *Would you use this? Why or why
   not?*. A dead control asks *Not designed yet. What did you expect here?* and keeps the control's
   words. The visitor's name is asked once in each form, optional, and kept in the browser.
-- **Trips**: the player sends each visit's screens, in order, and the dead controls clicked, as they
-  change.
+- **Trips** (comment links): the player sends each visit's screens, in order, and the dead controls
+  clicked, as they change (the first 50 of each).
 - **What the owner sees**: **Feedback** (project menu) opens the same pane at *Feedback*: by screen,
   the newest first, with its thumbs (*👍 2 · 👎 1*) and each comment and dead-control answer with the
   visitor's name; then the answers to *Would you use this?*; then the trips, as
   *Ana: Home → Nights → Settings, 1 dead click (Pair watch)*. A screen's Info lists its thumbs and
-  comments too. A mockup keeps its last 500 feedback entries and 500 trips; a text is at most 1,000
-  characters. Deleting the mockup, or Start over, deletes its links and feedback.
+  comments too. A mockup keeps its last 500 comments, 500 thumbs, 500 answers and 500 trips; a text
+  is at most 1,000 characters. Deleting the mockup, or Start over, deletes its links and feedback.
 - **The owner** (`UXWOZ_OWNER`): when set, the app and its API answer only a browser that opened
   `/?owner=<secret>` once (it keeps a cookie); others see *This UX Woz is private.* Share links work
   for everyone. Unset, the app is as before.

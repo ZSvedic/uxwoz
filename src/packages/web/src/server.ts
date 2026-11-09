@@ -306,6 +306,8 @@ export function createServer(opts: ServerOptions = {}) {
     hostname: process.env.UXWOZ_HOST ?? '127.0.0.1',
     // Bun closes connections idle for 10 s by default; a screen may take up to 20 s.
     idleTimeout: 30,
+    // No request needs more; a bigger one is refused before it is read.
+    maxRequestBodySize: 64 * 1024,
     development: process.env.NODE_ENV !== 'production',
     routes: guard({
       '/': index,

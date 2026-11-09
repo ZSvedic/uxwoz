@@ -87,7 +87,7 @@ async function deleteApp(again: boolean) {
   const app = state.app
   if (!app) return
   const n = state.entries.size - components().length
-  const what = `${n === 1 ? 'the only screen of this mockup' : `all ${n} screens of this mockup`} and its boxes (components, rules, data)`
+  const what = `${n === 1 ? 'the only screen of this mockup' : `all ${n} screens of this mockup`} and its boxes (components, rules, data), with its reviewer links and their feedback`
   if (!confirm(again ? `Start over? This deletes ${what} and makes its first screen again.` : `Delete ${what}?`)) return
   state.busy?.abort()
   const res = await post('/api/delete-app', { app }).catch(() => null)

@@ -79,7 +79,7 @@ const modelLabel = (id: string) => [...modelSelect.options].find((o) => o.value 
 
 export function openDrawer(tab: 'edit' | 'info' | 'share') {
   state.drawer = tab
-  loadShared()
+  if (tab === 'share' || (tab === 'info' && !state.box)) loadShared()
   renderDrawer()
   if (tab === 'edit') changeInput.focus()
   // The canvas got narrower: keep the current box or screen in view beside the drawer.
