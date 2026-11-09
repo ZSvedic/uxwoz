@@ -1,6 +1,8 @@
 # Design variants: UX Woz as a game
 
 This folder holds three looks for the app around the screens, so the user can pick one by trying it.
+On 2026-11-09 the user kept C and asked for two Wizard of Oz variants in place of the first A and B
+(a sticker book and a sketchbook; git history has them).
 It does not change the app: the mockup screens stay wobbly sketches, and no file here is loaded by `src/`.
 
 ## Try them
@@ -14,34 +16,40 @@ Open each file in a browser, then:
 4. Click the speaker to mute. Sounds start only after a first click; the browser makes them on the
    fly with the Web Audio API, so there are no audio files.
 
-Every file is one self-contained HTML page under 20 KB. The only outside request is a Google Font,
+Every file is one self-contained HTML page of about 20 KB. The only outside request is a Google Font,
 which a real build would copy into `themes/`. All three follow the system's light or dark mode, slow
 their motion for `prefers-reduced-motion`, and fit a 375 px phone.
 
-## A: Sticker book (`variant-a.html`)
+## A: Wizard (`variant-a.html`)
 
-The app is a page of candy stickers: thick ink outlines, hard offset shadows, buttons that press in.
+A wizard video game. The canvas is a night sky in both modes and the white screens glow on it like lit
+windows; light mode puts the chrome on parchment, dark mode makes it deep indigo.
 
-- **Palette, light:** cream `#fff6e5`, ink `#2b2340`, tomato `#ff5a36`, sun `#ffc531`, teal `#1fb5a8`, grape `#7b5cff`.
-- **Palette, dark:** plum `#1d1730`, card `#2a2145`, cream ink `#fff3dc`, tomato `#ff7a59`, sun `#ffd45c`, teal `#3fd3c4`.
-- **Logo:** a smiling tilted star; wordmark *UX Woz* in Baloo 2, with *Woz* in tomato.
-- **Layout:** today's layout. The top toolbar turns sun yellow; the drawer slides in from the right.
-- **Animation:** a red PICKED! starburst slaps onto the chosen design; the other peels off and falls.
-- **Sounds:** a two-note coin blip on pick, a rising swoop when the drawer opens.
-- **Cost:** about +3 KB on `shell.css`. Mostly new tokens, borders and shadows on rules that already exist.
+- **Palette, light:** sky `#0b1030` to `#1b2160`, parchment `#f6ecd2`, ink `#2a1f3d`, blue `#2f5bff`, green `#17a364`, ember `#ff6a2b`, gold `#f5c542`.
+- **Palette, dark:** the same sky, chrome `#1a1f4a`, text `#e6e4ff`, blue `#6f8cff`, green `#34d38a`, ember `#ff7a3d`, gold `#ffd166`.
+- **Logo:** a wizard hat with a star, as inline SVG; wordmark in Cinzel Decorative, *Woz* in ember. The top right
+  shows the hat as a favicon at 16 and 32 px, and the 🧙 emoji as the other candidate.
+- **Layout:** tools in a spellbook rail on the left (a bottom bar on a phone), the trail as a blue ribbon banner,
+  boxes as spell cards with a glowing edge, the drawer as a scroll that unrolls between gold rods.
+- **Animation:** the chosen screen glows gold, levitates and throws star sparks; the other dissolves into green motes.
+- **Sounds:** a rising chime on pick, a tinkle on the hover preview, a whoosh when the scroll opens.
+- **Cost:** about +4 KB on `shell.css`: the rail, the glow borders and the sky.
 
-## B: Sketchbook (`variant-b.html`)
+## B: Oz (`variant-b.html`)
 
-The app is a ruled notebook in blue pen by day and a chalkboard by night, so it matches the sketches it holds.
+Baum's 1900 book drawn like Denslow, in a game: flat colour, heavy black outlines, the Emerald City by day and the
+throne room by night. Nothing from the film.
 
-- **Palette, light:** paper `#fbf8f0`, rules `#d6e2f5`, margin red `#e2574c`, pen blue `#2f5bd3`, graphite `#3b3b3b`, highlighter `#fff275`.
-- **Palette, dark:** chalkboard `#1f2b26`, chalk `#eef0e8`, chalk blue `#8fb8ff`, chalk pink `#f5a3b5`, dull highlighter `#6d6526`.
-- **Logo:** a pencil drawing a wavy W over a red underline; wordmark in Caveat. Body text in Patrick Hand.
-- **Layout:** tools move to a left rail with tooltips, the trail becomes a pencilled label on the page,
-  and the drawer becomes a bottom sheet with a grab handle. Boxes are punched index cards.
-- **Animation:** a pen draws a circle round the chosen design and scribbles red across the other.
-- **Sounds:** a pencil scratch (filtered noise) on pick, a page flip when the sheet opens.
-- **Cost:** about +4 KB. The toolbar rules are rewritten as a rail, so part of it is a swap.
+- **Palette, light:** emerald `#2e9e62`, glow `#5cc98c`, gate `#0c5a35`, parchment `#fbf3dc`, ink `#111111`, brick gold `#f2c230`, poppy `#e0302a`, silver `#c7ccd3`.
+- **Palette, dark:** marble `#04120b`, glow `#17553a`, gate `#06190f`, parchment `#f1e6c6`, gold `#e3b324`, poppy `#ff4d3d`, silver `#9aa4b1`.
+- **Logo:** the great Head of Oz in a parchment arch, as inline SVG; wordmark in Federant, *Woz* in poppy. The
+  toolbar shows the Head as a favicon at 16 and 32 px.
+- **Layout:** the toolbar is the emerald city gate with a silver trail; a yellow brick road runs down the left with the
+  levels as brick signs; screens sit in silver spectacle lenses; boxes are signboards, the fixer's note a scroll, and the
+  drawer is the curtain parting on the little man's controls.
+- **Animation:** the Head drops above the chosen lens and spotlights it in a gold frame; a curtain falls over the other.
+- **Sounds:** a brassy Oz voice with a gong on pick, a curtain swish for the drawer, a glass chime as lenses appear.
+- **Cost:** about +5 KB: the brick road, the lenses and the curtain are all new.
 
 ## C: Tabletop (`variant-c.html`)
 
@@ -66,23 +74,22 @@ These go under a new heading **Design**:
 - **No design tweak without a request.** Change colours, spacing, fonts, motion or sounds only when the
   user asked for that change. A fix for a bug keeps the look as it is.
 
-## Judge's notes, 2026-11-09 night
+## Judge's notes, 2026-11-09 evening
 
-I (the lead agent) opened all three in the browser pane at 800 px, light and dark, and clicked
-Pick in C. Screenshots are in `shots/` (`a-light.jpg`, `a-dark.jpg` and so on, and
-`current-app.jpg` for today's look). My order: B, then A, then C.
+I (the lead agent) opened A and B in the browser pane at 800 px, light and dark, and clicked Pick A in each.
+Screenshots are in `shots/` (`a-light.jpg`, `a-dark.jpg`, `b-light.jpg`, `b-dark.jpg`, and `c-*.jpg` from the night).
+The user had already put C first among the earlier three; these two are the Wizard of Oz answers to it.
 
-- **A, Sticker book.** Reads clearly, keeps today's layout, so it is the cheapest to apply and the
-  least to relearn. The thick ink outlines and hard shadows compete with the sketch frames: two
-  loud things on one canvas. Dark mode is good. Pick if you want colour with no UX change.
-- **B, Sketchbook.** The one that fits the product: screens are sketches, the boxes are index cards,
-  the fixer "visits the paper", and here the whole app is paper. The left rail frees the top, the
-  chalkboard dark mode is calm. The handwritten titles cost legibility on small text; keep the
-  hand font for headings only. Pick if you want the app to feel of one piece with the mockups.
-- **C, Tabletop.** The most "game": dealt cards, a wooden command bar, pinned notes. The gingham
-  light background is busy behind sketches (the green felt is fine). The floating bar hides the
-  bottom of the canvas on a phone, and it is the biggest CSS change. Pick if play matters more
-  than reading.
+- **A, Wizard.** The dark sky does what was asked: the white screens pop, in both modes. The spell cards with a
+  glowing edge are readable and the rail keeps the top clear. The hat reads at 16 px because the silhouette is one
+  shape with a brim. Weak spot: Cinzel Decorative on headings is a fantasy cliché, and "light mode" is still a dark
+  app, so a user who expects a white canvas by day will not get one.
+- **B, Oz.** The one with a story: the gate, the brick road, the lenses and the curtain all come from the book, and
+  the drawer as the curtain is the best metaphor of the five variants for what UX Woz is. The Head is clear at 32 px
+  and still a face at 16 px. Weak spots: the Head in the toolbar is small, the spotlight tints the chosen mockup
+  yellow for a moment, and the striped curtain over the lost design is loud.
+- **C, Tabletop** stands as in the night's notes: the most "game", the busiest light background, the biggest CSS
+  change.
 
-What each needs before it is real: fonts copied into `themes/`, the sounds behind a setting that
-is off by default, and the `shell.css` cap above.
+Checked: no console errors, Pick A, ↺ and ✎ in both. Not checked by ear: the sounds. The builders report the
+375 px phone layout fine in both.
