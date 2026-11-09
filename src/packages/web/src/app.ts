@@ -194,7 +194,7 @@ function streamInto(id: string, css: string, bare = false) {
   }
   return {
     push: (text: string) => { raw += text; build(false) },
-    cancel: () => { clearTimeout(timer); timer = undefined; canvas.forgetLoad(id) },
+    cancel: () => { clearTimeout(timer); timer = undefined },
   }
 }
 type StreamRenderer = ReturnType<typeof streamInto>

@@ -111,7 +111,6 @@ interface Card {
   shown: { html: string; final: boolean; css: string } | null
   /** The final screen has reported its size since it was shown. */
   sized: boolean
-  onLoad: (() => void) | null
 }
 
 const RAIL: [string, string, string][] = [
@@ -353,26 +352,13 @@ export class Canvas {
     this.layout()
   }
 
-  /** Put a screen into a card's frame; `onLoad` runs once the frame has loaded it. */
-  show(id: string, html: string, final: boolean, css: string, onLoad?: () => void) {
-    const c = this.cards.get(id)
-    if (!c) return
-    if (onLoad) c.onLoad = onLoad
-    const s = c.shown
-    if (s && s.html === html && s.final === final && s.css === css) {
-      // Nothing to reload, so no load event will come: report it as loaded now.
-      if (onLoad) requestAnimationFrame(() => this.loaded(c))
-      return
-    }
+  /** Put a screen into a card's frame, unless it shows it already. */
+  show(id: string, html: string, final: boolean, css: string) {
+    const c = this.cards.get(id), s = c?.shown
+    if (!c || (s && s.html === html && s.final === final && s.css === css)) return
     c.shown = { html, final, css }
     c.sized = false
     c.frame.srcdoc = framePage(html, css, final, c.view?.device, c.view?.fit)
-  }
-
-  /** Drop the callback waiting for a card's next load, once its stream is cancelled. */
-  forgetLoad(id: string) {
-    const c = this.cards.get(id)
-    if (c) c.onLoad = null
   }
 
   /** A card takes another id, keeping its frame: the picked side becomes the screen. */
@@ -542,19 +528,12 @@ export class Canvas {
     const root = el('article', 'card', head, screen, error, rail)
     const c: Card = {
       el: root, name, idea, more, note, screen, frame, shield, error, rail, tools, key, view: null,
-      width: 0, height: START_H, shown: null, sized: false, onLoad: null,
+      width: 0, height: START_H, shown: null, sized: false,
     }
     shield.addEventListener('click', () => { if (c.view?.side?.pickable) this.on.pick(c.key, c.view.side.index) })
-    frame.addEventListener('load', () => this.loaded(c))
     parent.append(root)
     this.cards.set(id, c)
     return c
-  }
-
-  private loaded(c: Card) {
-    const cb = c.onLoad
-    c.onLoad = null
-    cb?.()
   }
 
   /** Screens report their size, clicks and scroll gestures (see the frame script). */
