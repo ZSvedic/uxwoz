@@ -4,6 +4,8 @@
 import { describe, expect, test } from 'bun:test'
 import { MAX_REDRAWS, ScreenCache, applyVisit, numberParts, parseVisit, type Fetch, type Version } from '@uxwoz/core'
 import { createServer } from '@uxwoz/web/src/server.ts'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const ver = (html: string, createdAt = '2026-11-08T00:00:00Z'): Version => ({
   html, model: 'claude-haiku-5.5', servedModel: null, createdAt,
@@ -76,6 +78,94 @@ describe('a visit\'s reply', () => {
   })
 })
 
+describe('the forms an Edit of a box needs', () => {
+  test('filing\'s rule, table and row lines are read as box lines', () => {
+    expect(parseVisit('change rule a: New.\ntable t: x | y\nrow t: 1 | 2\nchange table t: x\nchange component c from part 2: x').map((l) => [l.op, l.f?.kind, l.a]))
+      .toEqual([['box', 'rule', 'a'], ['box', 'table', 't'], ['box', 'row', 't'], ['box', 'table', 't'], ['bad', 'component', 'c']])
+  })
+
+  test('a visit changes a rule and a table, adds a table with its rows, and redraws a component; each change has its Undo', () => {
+    const { cache, visit } = paper()
+    const out = visit(['change rule score-scale: Scores run from 0 to 100.', 'note: The app scores in percent.', 'change table devices: name | kind', 'row devices: Watch | wrist',
+      'table plans: plan | price', 'row plans: Free | $0', 'row plans: Pro | $5', 'redraw back: make it bigger'].join('\n'))
+    expect(out.refused).toEqual([])
+    expect(out.changes.map((c) => [c.text, c.note])).toEqual([['changed rule score-scale: Scores run from 0 to 100.', 'The app scores in percent.'],
+      ['changed table devices', undefined], ['added table plans', undefined], ['redrawing back: make it bigger', undefined]])
+    expect(cache.boxesOf('Snore').data).toMatchObject([{ id: 'devices', columns: ['name', 'kind'], rows: [['Watch', 'wrist']], by: 'fixer' }, { id: 'plans', rows: [['Free', '$0'], ['Pro', '$5']] }])
+    expect(out.redraws.map((r) => r.key)).toEqual([cache.component('Snore', 'back')!.key])
+    cache.noteVisit('Snore', { at: 'v', ms: 1, costUsd: 0, screens: 2, changes: out.changes, refused: [], seen: false })
+    expect(cache.undoChange('Snore', 'v', 0)).toBeNull()
+    expect(cache.undoChange('Snore', 'v', 1)).toBeNull()
+    expect(rules(cache)).toEqual(['score-scale', 'score-range', 'calm'])
+    expect(cache.boxesOf('Snore').rules[0]!.text).toBe('Scores run from 0 to 10.')
+    expect(cache.boxesOf('Snore').data[0]).toMatchObject({ columns: ['name'], rows: [['Watch']] })
+  })
+
+  test('what the user wrote changes only in the box the user asked about; bad lines are refused with a reason', () => {
+    const { cache, visit } = paper()
+    const lines = 'change rule calm: Screens shout.\nremove calm\nchange rule nope: x\nrow devices: Phone'
+    expect(visit(lines).refused.map((r) => r.split('": ')[1])).toEqual(['calm was written by the user', 'calm was written by the user', 'rules has no nope', 'no table above it'])
+    const sent = new Map<string, string>()
+    expect(applyVisit(cache, 'Snore', 'change rule calm: Screens whisper.', sent, 'data').refused).toHaveLength(1)
+    expect(applyVisit(cache, 'Snore', 'change rule calm: Screens whisper.', sent, 'rules').changes.map((c) => c.text)).toEqual(['changed rule calm: Screens whisper.'])
+    expect(applyVisit(cache, 'Snore', 'remove calm', sent, 'rules').changes).toHaveLength(1)
+  })
+})
+
+describe('the Undo of a box', () => {
+  test('a box goes back as it was before its last change, whoever made it; a visit is one change; it keeps the last 10', () => {
+    const { cache, visit } = paper()
+    expect(cache.undos('Snore')).toEqual({ components: 1, rules: 3, data: 1 })
+    visit('remove score-range\nadd rule big: Text is big.\nremove devices')
+    expect(cache.undos('Snore')).toEqual({ components: 1, rules: 4, data: 2 })
+    expect(cache.undoBox('Snore', 'rules')).toBeNull()
+    expect(rules(cache)).toEqual(['score-scale', 'score-range', 'calm'])
+    expect(cache.boxesOf('Snore').gone.rules).toEqual([])
+    expect(cache.boxesOf('Snore').data).toHaveLength(0)
+    cache.setBox('Snore', 'set', 'rules', { id: 'calm', text: 'Quiet.' }, 'user')
+    expect(cache.undoBox('Snore', 'rules')).toBeNull()
+    expect(cache.boxesOf('Snore').rules[2]!.text).toBe('Screens speak calmly.')
+    for (let i = 0; i < 12; i++) cache.setBox('Snore', 'add', 'rules', { id: `r${i}`, text: 'x' }, 'user')
+    expect(cache.undos('Snore').rules).toBe(10)
+    while (!cache.undoBox('Snore', 'rules'));
+    expect(rules(cache)).toEqual(['score-scale', 'score-range', 'calm', 'r0', 'r1'])
+    expect(cache.undoBox('Snore', 'rules')).toBe('nothing to undo')
+  })
+
+  test('Components go back too: a removed component returns, a new version goes', () => {
+    const { cache, visit } = paper()
+    visit('remove back')
+    expect(cache.component('Snore', 'back')).toBeUndefined()
+    expect(cache.undoBox('Snore', 'components')).toBeNull()
+    const back = cache.component('Snore', 'back')!
+    cache.addVersion(back.key, ver('<a>Back</a>'))
+    expect(cache.undoBox('Snore', 'components')).toBeNull()
+    expect(cache.component('Snore', 'back')!.versions).toHaveLength(1)
+  })
+
+  test('Undo on the fixer\'s notes undoes the newest visit not undone yet, every change of it', () => {
+    const { cache, visit } = paper()
+    cache.noteVisit('Snore', { at: 'v1', ms: 1, costUsd: 0, screens: 1, changes: visit('add rule big: Big.').changes, refused: [], seen: false })
+    cache.noteVisit('Snore', { at: 'v2', ms: 1, costUsd: 0, screens: 1, changes: visit('remove score-range\nremove devices').changes, refused: [], seen: false })
+    expect(cache.undoVisit('Snore')).toBeNull()
+    expect(rules(cache)).toEqual(['score-scale', 'score-range', 'calm', 'big'])
+    expect(cache.boxesOf('Snore').data).toHaveLength(1)
+    expect(cache.undoVisit('Snore')).toBeNull()
+    expect(rules(cache)).toEqual(['score-scale', 'score-range', 'calm'])
+    expect(cache.undoVisit('Snore')).toBe('nothing to undo')
+  })
+
+  test('the states are saved with the cache', () => {
+    const file = join(tmpdir(), `uxwoz-states-${Date.now()}.json`)
+    const a = new ScreenCache(file)
+    a.pick(a.propose('Snore', null, 0, ver(HOME))!.key, 0)
+    a.setBox('Snore', 'add', 'rules', { id: 'big', text: 'Big.' }, 'user')
+    const b = new ScreenCache(file)
+    expect(b.undoBox('Snore', 'rules')).toBeNull()
+    expect(b.boxesOf('Snore').rules).toEqual([])
+  })
+})
+
 describe('the Undo of each change', () => {
   test('each change undoes once: entries come back, an added one goes, a redraw\'s version is dropped', () => {
     const { cache, home, visit } = paper()
@@ -128,19 +218,20 @@ const terra = (text: string) => new Response(sse({ type: 'response.output_text.d
 function provider(reply: string) {
   let open = () => {}
   const gate = new Promise<void>((r) => { open = r })
-  const asked: string[] = []
+  const asked: string[] = [], inputs: string[] = []
   const fetch: Fetch = async (_url, init) => {
     const body = JSON.parse(String(init?.body))
     if (body.model === 'gpt-6.1-terra') {
       const user: string = body.input
       const visit = user.endsWith('Visit the paper as the overnight fixer.')
       asked.push(visit ? 'visit' : 'file')
+      inputs.push(user)
       if (visit) await gate
       return terra(visit ? reply : 'nothing')
     }
     return new Response(sse({ model: 'anthropic/claude-haiku-5.5', choices: [{ delta: { content: `<title>S</title><h1>${body.messages[1].content.includes('add a Back') ? 'redrawn' : 'S'}</h1>` }, finish_reason: 'stop' }], usage: { cost: 0.001 } }))
   }
-  return { fetch, open, asked }
+  return { fetch, open, asked, inputs }
 }
 
 async function withServer(reply: string, run: (s: { post: (p: string, b: object) => Promise<Response>; map: (wait?: boolean) => Promise<any>; p: ReturnType<typeof provider>; cache: ScreenCache }) => Promise<void>) {
@@ -220,6 +311,27 @@ describe('the visit in the server', () => {
       expect((await map(true)).boxes).toMatchObject({ rules: [] })
       expect((await map()).boxes.visits).toBeUndefined()
     }))
+  })
+
+  test('an Edit of a box is a visit that starts from the user\'s request; Undo of the box puts it back', () => {
+    return withServer('change rule calm: Screens whisper.', async ({ post, map, p, cache }) => {
+      await picks(post, 1)
+      await map(true)
+      cache.setBox('Snore', 'add', 'rules', { id: 'calm', text: 'Screens speak calmly.' }, 'user')
+      expect((await post('/api/box', { app: 'Snore', op: 'edit', box: 'rules', text: '' })).status).toBe(400)
+      expect((await (await post('/api/box', { app: 'Snore', op: 'edit', box: 'rules', text: 'quieter' })).json()).visiting).toBe(true)
+      expect((await post('/api/box', { app: 'Snore', op: 'edit', box: 'rules', text: 'again' })).status).toBe(409)
+      p.open()
+      const m = await map(true)
+      expect(p.inputs.at(-1)).toEndWith('The user asks for this change in Rules: "quieter"\n\nVisit the paper as the overnight fixer.')
+      expect(m.boxes.visits[0]).toMatchObject({ ask: 'quieter', changes: [{ text: 'changed rule calm: Screens whisper.' }] })
+      expect(m.undos.rules).toBe(2)
+      const back = await (await post('/api/box', { app: 'Snore', op: 'undo-box', box: 'rules' })).json()
+      expect(back.boxes.rules).toMatchObject([{ id: 'calm', text: 'Screens speak calmly.', by: 'user' }])
+      expect((await (await post('/api/box', { app: 'Snore', op: 'undo-box', box: 'notes' })).json()).boxes.visits[0].changes[0].undone).toBe(true)
+      expect((await post('/api/box', { app: 'Snore', op: 'undo-box', box: 'notes' })).status).toBe(400)
+      expect((await post('/api/box', { app: 'Snore', op: 'undo-box', box: 'toString' })).status).toBe(400)
+    })
   })
 
   test('a redraw of a screen the user changed during the visit is skipped; a failed visit leaves its screens to the next one', () => {

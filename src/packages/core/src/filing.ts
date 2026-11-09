@@ -2,7 +2,7 @@
 // in plain lines; code applies them to the boxes and refuses, with a reason, any line that breaks
 // the manual's limits. A new component takes the part's HTML, and the screen pastes it there.
 
-import { refuseLine, type Boxes, type ScreenCache, type Version } from './cache.ts'
+import { refuseLine, type Filing, type ScreenCache, type Version } from './cache.ts'
 import { LIMITS, normalizePrompt } from './keys.ts'
 import { elementEnd, type Device } from './frame.ts'
 import { FILING_MODEL, MODELS } from './models.ts'
@@ -62,41 +62,59 @@ export interface Filed { added: string[]; changed: string[]; refused: string[] }
 
 const cells = (text: string) => text.split('|').map((c) => c.trim())
 
+/** A rule or a table read from filing's forms, to store. */
+export interface BoxLine { box: 'rules' | 'data'; change: boolean; entry: { id: string; text?: string; columns?: string[]; rows?: string[][] }; line: string }
+
+/**
+ * Read filing's rule, table and row lines in order: a rule goes to `set` at once, a table once its
+ * rows have come (`flush` after the last line). `set` stores one and says why not, or null.
+ */
+export function boxLines(cache: ScreenCache, app: string, set: (l: BoxLine) => string | null, refuse: (line: string, why: string) => void) {
+  let table: { id: string; columns: string[]; rows: string[][]; lines: string[]; change: boolean; line: string } | null = null
+  const flush = () => {
+    const t = table
+    table = null
+    if (t && set({ box: 'data', change: t.change, entry: { id: t.id, columns: t.columns, rows: t.rows }, line: t.line })) for (const r of t.lines) refuse(r, `table ${t.id} was refused`)
+  }
+  /** False for a line of another form. */
+  const read = (l: FilingLine): boolean => {
+    if (l.kind !== 'row') flush()
+    if (l.kind === 'rule') set({ box: 'rules', change: l.change, entry: { id: l.id, text: l.text }, line: l.line })
+    else if (l.kind === 'table') table = { id: l.id, columns: cells(l.text), rows: [], lines: [], change: l.change, line: l.line }
+    else if (l.kind !== 'row') return false
+    // A row belongs to the table above it, unless it names another table in Data.
+    else if (!table) refuse(l.line, 'no table above it')
+    else if (l.id !== table.id && cache.boxesOf(app).data.some((x) => x.id === l.id)) refuse(l.line, `table ${l.id} is not the one above it`)
+    else if (cells(l.text).length !== table.columns.length) refuse(l.line, `table ${table.id} has ${table.columns.length} columns`)
+    else if (table.rows.length >= LIMITS.rows) refuse(l.line, `a table has at most ${LIMITS.rows} rows`)
+    else table.rows.push(cells(l.text)), table.lines.push(l.line)
+    return true
+  }
+  return { read, flush }
+}
+
 /**
  * Apply a filing reply to the boxes of `app`. `filedHtml` is the screen's HTML as it was filed; the
  * screen pastes each new component in its part's place only while that HTML is still its newest.
  */
 export function applyFiling(cache: ScreenCache, app: string, key: string, filedHtml: string, reply: string, made: Omit<Version, 'html'>): Filed {
+  return cache.group(() => fileLines(cache, app, key, filedHtml, reply, made))
+}
+
+function fileLines(cache: ScreenCache, app: string, key: string, filedHtml: string, reply: string, made: Omit<Version, 'html'>): Filed {
   const numbered = numberParts(filedHtml)
   const out: Filed = { added: [], changed: [], refused: [] }
   const refuse = (line: string, why: string) => out.refused.push(`"${line}": ${why}`)
   const cuts: { start: number; end: number; id: string }[] = []
-  let table: { id: string; columns: string[]; rows: string[][]; lines: string[]; change: boolean; line: string } | null = null
   const done = (why: string | null, line: string, id: string, change: boolean) => (why ? refuse(line, why) : (change ? out.changed : out.added).push(id))
-  const flush = () => {
-    if (!table) return
-    const t = table
-    table = null
-    const why = cache.setBox(app, t.change ? 'set' : 'add', 'data', { id: t.id, columns: t.columns, rows: t.rows }, 'filing')
-    done(why, t.line, t.id, t.change)
-    if (why) for (const r of t.lines) refuse(r, `table ${t.id} was refused`)
-  }
+  const boxes = boxLines(cache, app, (l) => {
+    const why = cache.setBox(app, l.change ? 'set' : 'add', l.box, l.entry, 'filing')
+    done(why, l.line, l.entry.id, l.change)
+    return why
+  }, refuse)
   for (const l of parseFiling(reply)) {
-    if (l.kind !== 'row') flush()
-    if (l.kind === 'nothing') continue
+    if (boxes.read(l) || l.kind === 'nothing') continue
     if (l.kind === 'bad') { refuse(l.line, 'not one of the forms'); continue }
-    if (l.kind === 'rule') { done(cache.setBox(app, l.change ? 'set' : 'add', 'rules', { id: l.id, text: l.text }, 'filing'), l.line, l.id, l.change); continue }
-    if (l.kind === 'table') { table = { id: l.id, columns: cells(l.text), rows: [], lines: [], change: l.change, line: l.line }; continue }
-    if (l.kind === 'row') {
-      const t = table as { id: string; columns: string[]; rows: string[][]; lines: string[] } | null
-      // A row belongs to the table above it, unless it names another table in Data.
-      if (!t) refuse(l.line, 'no table above it')
-      else if (l.id !== t.id && cache.boxesOf(app).data.some((x) => x.id === l.id)) refuse(l.line, `table ${l.id} is not the one above it`)
-      else if (cells(l.text).length !== t.columns.length) refuse(l.line, `table ${t.id} has ${t.columns.length} columns`)
-      else if (t.rows.length >= LIMITS.rows) refuse(l.line, `a table has at most ${LIMITS.rows} rows`)
-      else t.rows.push(cells(l.text)), t.lines.push(l.line)
-      continue
-    }
     // A component: the outer HTML of part N.
     const p = partAt(numbered, l.part!)
     if (!p) { refuse(l.line, `the screen has no part ${l.part}`); continue }
@@ -107,7 +125,7 @@ export function applyFiling(cache: ScreenCache, app: string, key: string, filedH
     if (l.change) {
       const c = cache.component(app, l.id)
       why = !c ? `components has no ${l.id}` : refuseLine(l.text)
-      if (c && !why) { Object.assign(c, { action: l.text, by: 'filing', at: made.createdAt, seen: false }); cache.addVersion(c.key, version) }
+      if (c && !why) { cache.addVersion(c.key, version); Object.assign(c, { action: l.text, by: 'filing', at: made.createdAt, seen: false }) }
     } else {
       const r = cache.addComponent(app, l.id, l.text, version, 'filing', { key, label: 'a part' })
       if (typeof r === 'string') why = r
@@ -115,7 +133,7 @@ export function applyFiling(cache: ScreenCache, app: string, key: string, filedH
     done(why, l.line, l.id, l.change)
     if (!why) cuts.push({ start, end, id: l.id })
   }
-  flush()
+  boxes.flush()
   if (cuts.length && cache.get(key)?.versions.at(-1)?.html === filedHtml) {
     let html = numbered
     for (const c of cuts.sort((a, b) => b.start - a.start)) html = `${html.slice(0, c.start)}<div data-component="${c.id}"></div>${html.slice(c.end)}`
@@ -124,7 +142,6 @@ export function applyFiling(cache: ScreenCache, app: string, key: string, filedH
   return out
 }
 
-export type FilingRun = NonNullable<Boxes['filed']>
 
 export interface FileOptions {
   cache: ScreenCache
@@ -136,7 +153,7 @@ export interface FileOptions {
 }
 
 /** File one decision: ask the filing model, apply its lines, note the run in the boxes. Null when the screen or its mockup went meanwhile. */
-export async function fileDecision(o: FileOptions): Promise<FilingRun | null> {
+export async function fileDecision(o: FileOptions): Promise<Filing | null> {
   const entry = o.cache.get(o.key), v = entry?.versions.at(-1)
   if (!entry || !v) return null
   const { app } = entry
@@ -148,8 +165,8 @@ export async function fileDecision(o: FileOptions): Promise<FilingRun | null> {
   const made = backgroundVersion(final.servedModel, v.device)
   const filed = applyFiling(o.cache, app, o.key, filedHtml, reply, made)
   for (const r of filed.refused) (o.log ?? console.warn)(`filing refused ${r}`)
-  const run: FilingRun = { ...filed, at: made.createdAt, screen: entry.name ?? HOME_NAME, ms: Math.round(performance.now() - t0), costUsd: final.costUsd }
-  o.cache.noteFiling(app, run)
+  const run: Filing = { ...filed, at: made.createdAt, screen: entry.name ?? HOME_NAME, ms: Math.round(performance.now() - t0), costUsd: final.costUsd }
+  o.cache.noteFiling(o.key, run)
   return run
 }
 

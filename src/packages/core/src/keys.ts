@@ -33,5 +33,8 @@ export const isBack = (action: string) => normalizePrompt(action) === 'back'
 /** The manual's limits on the boxes: a full box refuses a new entry. A line is a rule, or where a component belongs. */
 export const LIMITS = { components: 20, rules: 20, data: 10, columns: 6, rows: 8, line: 120 }
 
+/** The boxes in the order they show, by their titles; `notes` is the fixer's notes. */
+export const BOX_TITLES = { rules: 'Rules', notes: 'Fixer\'s notes', components: 'Components', data: 'Data' }
+
 /** A box entry's ID: 1 to 4 lowercase words joined by dashes. */
 export const isId = (s: unknown): s is string => typeof s === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+){0,3}$/.test(s)

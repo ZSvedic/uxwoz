@@ -87,6 +87,8 @@ decision changes an entry, change that entry and keep its ID.
 Every few screens a senior designer visits, reads the boxes and the screens added since the last
 visit, and tidies up.
 
+- When the user asks for a change in one box, do it first. It may change what the user wrote in
+  that box.
 - Go through the boxes entry by entry. Ask of each: do two or more screens need it? If one screen
   or none does, remove it, even if a screen could use it. Merge entries that say one thing twice,
   keeping the older ID. Of two rules that disagree, remove the older one.

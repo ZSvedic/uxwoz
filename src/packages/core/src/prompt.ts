@@ -95,6 +95,8 @@ decision changes an entry, change that entry and keep its ID.
 Every few screens a senior designer visits, reads the boxes and the screens added since the last
 visit, and tidies up.
 
+- When the user asks for a change in one box, do it first. It may change what the user wrote in
+  that box.
 - Go through the boxes entry by entry. Ask of each: do two or more screens need it? If one screen
   or none does, remove it, even if a screen could use it. Merge entries that say one thing twice,
   keeping the older ID. Of two rules that disagree, remove the older one.
@@ -147,10 +149,15 @@ A visit ends with "Visit the paper as the overnight fixer." Reply to it with pla
 merge ID into ID
 remove ID
 add rule ID: one sentence
+change rule ID: the new sentence
 add component ID from screen-id part N: where it belongs
+table ID: column | column | ...
+change table ID: column | column | ...
+row ID: value | value | ...
 redraw screen-id: one sentence that says what to change
+redraw component-id: one sentence that says what to change
 note: why, for the change above it
-The parts of each screen carry numbers, like data-part="7": name a part by its screen and its number. Every text after a colon is at most 120 characters. A visit redraws at most 5 screens: pick the ones that matter most.`
+The parts of each screen carry numbers, like data-part="7": name a part by its screen and its number. A table's rows follow it, and a changed table takes the rows that follow it. Every text after a colon is at most 120 characters. A visit redraws at most 5 screens and components: pick the ones that matter most. When the user asks for a change in one box, the request comes just before the visit's last line.`
 
 /** Asked of one side of every A OR B (a random one), so the two designs are not near copies. */
 export const ALTERNATIVE_REQUEST = "Design this as a clearly different alternative to the obvious layout: arrange this screen's content another way, not just the wording."
@@ -212,8 +219,8 @@ export function fileRequest(p: Paper, screen: Shown, decision: { other: string }
     + `${'change' in decision ? 'The screen after the change' : 'The user picked this variant'}:\n${screen.html}\n\n${second}\n\nFile what this decision settles.`
 }
 
-/** A fixer's visit: the screens added or changed since the last one (all on the first), parts numbered. */
-export const visitRequest = (p: Paper, screens: Shown[]) => `${paperText(p)}\n\nThe screens added or changed since your last visit, oldest first, ${screens.length} of them:\n\n`
-  + `${screens.map((s) => `--- ${s.id} (${s.line})\n${s.html}`).join('\n\n') || '(none)'}\n\nVisit the paper as the overnight fixer.`
+/** A fixer's visit: the screens added or changed since the last one (all on the first), parts numbered; for an Edit of a box, the user's request. */
+export const visitRequest = (p: Paper, screens: Shown[], ask?: { box: string; text: string }) => `${paperText(p)}\n\nThe screens added or changed since your last visit, oldest first, ${screens.length} of them:\n\n`
+  + `${screens.map((s) => `--- ${s.id} (${s.line})\n${s.html}`).join('\n\n') || '(none)'}\n\n${ask ? `The user asks for this change in ${ask.box}: "${ask.text}"\n\n` : ''}Visit the paper as the overnight fixer.`
 
 export const WARMUP_REQUEST = 'Reply with OK.'

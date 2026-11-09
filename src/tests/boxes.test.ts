@@ -204,7 +204,8 @@ describe('filing in the server', () => {
       expect((await (await fetch(new URL('/api/map?app=Snore', url))).json()).filing).toBe(true)
       setTimeout(p.open, 50)
       const map = await (await fetch(new URL('/api/map?app=Snore&wait=1', url))).json()
-      expect(map).toMatchObject({ filing: false, boxes: { rules: [{ id: 'quiet-nights', by: 'filing', seen: false }], filed: { screen: 'home', added: ['quiet-nights'] } } })
+      expect(map).toMatchObject({ filing: false, boxes: { rules: [{ id: 'quiet-nights', by: 'filing', seen: false }] }, undos: { rules: 1 } })
+      expect(map.entries[0].filed).toMatchObject({ screen: 'home', added: ['quiet-nights'] })
     })
   })
 

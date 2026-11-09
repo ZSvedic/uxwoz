@@ -72,9 +72,10 @@ describe('web server', () => {
   test('filing runs on Terra in the background; the map with wait=1 holds what it filed', async () => {
     const map = await (await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}&wait=1`, server.url))).json()
     expect(map.filing).toBe(false)
-    expect(map.boxes.filed).toMatchObject({ screen: 'home' })
-    expect(map.boxes.filed.error).toBeUndefined()
-    expect(map.boxes.filed.costUsd).toBeGreaterThan(0)
+    const filed = map.entries.find((e: { name: string }) => e.name === 'home').filed
+    expect(filed).toMatchObject({ screen: 'home' })
+    expect(filed.error).toBeUndefined()
+    expect(filed.costUsd).toBeGreaterThan(0)
   }, 60_000)
 
   test('a click opens a new screen under its name, with the prompt of its link and the click as its parent', async () => {
