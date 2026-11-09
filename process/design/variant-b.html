@@ -1,0 +1,220 @@
+<!doctype html>
+<!--
+  Variant B, "Sketchbook": the whole app is a ruled notebook page in light mode and a chalkboard in dark mode, drawn in blue pen.
+  Layout: tools on a left rail, the drawer as a bottom sheet, the trail as a pencilled label on the page. Signature animation:
+  a pen circles the design you pick and scribbles out the other. Sounds: a pencil scratch on pick, a page flip when the sheet opens.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UX Woz, variant B</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&amp;family=Patrick+Hand&amp;display=swap">
+<style>
+:root{--paper:#fbf8f0;--rule:#d6e2f5;--margin:#e2574c;--ink:#2f5bd3;--lead:#3b3b3b;--muted:#8a8578;--hl:#fff275;--pink:#f2a7b6;--card:#fffdf8;
+  --rail:#f1ead8;--shade:0 1px 0 rgba(0,0,0,.04),0 8px 18px -8px rgba(60,50,20,.25);color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--paper:#1f2b26;--rule:#2b3a33;--margin:#b8574e;--ink:#8fb8ff;--lead:#eef0e8;--muted:#9fb0a6;
+  --hl:#6d6526;--pink:#f5a3b5;--card:#25332d;--rail:#18221e;--shade:0 8px 18px -8px rgba(0,0,0,.6)}}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;height:100vh;display:flex;overflow:hidden;background:var(--paper);color:var(--lead);font:18px/1.3 "Patrick Hand","Comic Sans MS",cursive}
+button,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:2px solid var(--lead);border-radius:255px 15px 225px 15px/15px 225px 15px 255px;padding:2px 12px}
+button:hover{background:var(--hl)}
+.ink{color:var(--ink);border-color:var(--ink)}
+/* the left rail */
+.rail{flex:none;width:68px;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0;background:var(--rail);border-right:2px dashed var(--muted);z-index:4}
+.rail .logo{display:flex;flex-direction:column;align-items:center;margin-bottom:8px;color:var(--ink);text-decoration:none}
+.rail .logo svg{width:44px;height:44px}
+.rail .logo span{font:700 17px/1 Caveat,cursive;margin-top:-2px}
+.tool{width:50px;height:50px;padding:0;display:grid;place-items:center;border:2px solid transparent;position:relative}
+.tool:hover{border-color:var(--lead);background:var(--hl)}
+.tool svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tool[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:58px;top:12px;white-space:nowrap;background:var(--card);border:2px solid var(--lead);padding:0 8px;
+  border-radius:255px 15px 225px 15px/15px 225px 15px 255px;font-size:16px;z-index:9}
+.tool b{position:absolute;top:2px;right:2px;font:700 12px/16px system-ui;background:var(--margin);color:#fff;border-radius:50%;width:16px;height:16px}
+.rail .spacer{flex:1}
+.mute.off{color:var(--muted)}.mute.off .wave{display:none}
+/* the page */
+.main{flex:1;min-width:0;position:relative;display:flex;flex-direction:column}
+.stage{flex:1;overflow:auto;padding:70px 16px 120px 56px;
+  background:linear-gradient(90deg,transparent 38px,var(--margin) 38px,var(--margin) 40px,transparent 40px),repeating-linear-gradient(transparent 0 29px,var(--rule) 29px 30px),var(--paper)}
+.trail{position:absolute;top:12px;left:56px;display:flex;align-items:center;gap:6px;font:700 26px/1 Caveat,cursive;color:var(--ink);z-index:3;background:var(--paper);padding:2px 8px}
+.trail button{border:0;font-size:24px;padding:0 6px}
+.trail .name{background:linear-gradient(transparent 55%,var(--hl) 55% 90%,transparent 90%)}
+.board{display:flex;flex-direction:column;gap:50px}
+.lvl{display:flex;flex-wrap:wrap;gap:40px 60px;align-items:flex-start}
+h3{margin:0 0 6px;font:700 26px/1 Caveat,cursive;color:var(--ink)}
+h3 small{font:16px "Patrick Hand",cursive;color:var(--muted)}
+.card{position:relative}
+.pair{display:flex;gap:8px;align-items:center}
+.or{font:700 34px Caveat,cursive;color:var(--margin);transform:rotate(-6deg)}
+.prop{position:relative;width:clamp(128px,36vw,190px);display:flex;flex-direction:column;gap:6px;cursor:pointer}
+.idea{font-size:17px;min-height:44px;line-height:1.15}
+.frame{border:2.5px solid var(--lead);border-radius:28px 22px 30px 24px/24px 30px 22px 28px;padding:7px;background:var(--card);box-shadow:var(--shade)}
+.frame .scr{min-height:250px;border-radius:16px}
+.pick{align-self:center;color:var(--ink);border-color:var(--ink)}
+/* The signature animation: a pen circle around the pick, a scribble across the other. */
+.mark{position:absolute;inset:-6px -16px -10px -16px;pointer-events:none;overflow:visible}
+.mark path{fill:none;stroke:var(--ink);stroke-width:4;stroke-linecap:round;stroke-dasharray:1400;stroke-dashoffset:1400}
+.mark .scrib{stroke:var(--margin);stroke-width:5}
+.prop.circle .ring{animation:draw .7s cubic-bezier(.5,0,.3,1) forwards}
+.prop.peek .ring{animation:draw .7s cubic-bezier(.5,0,.3,1) forwards,gone .4s 1s forwards}
+.prop.cross .scrib{animation:draw .5s .25s ease-out forwards}
+.prop.cross{animation:gone .4s .9s forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes gone{to{opacity:0}}
+@media (prefers-reduced-motion:reduce){.prop,.prop *{animation-duration:.01s!important;animation-delay:0s!important}}
+.again{margin-top:12px;color:var(--ink);border-color:var(--ink)}
+.tools{display:flex;gap:6px;margin-top:8px}
+.tools button{padding:0 10px}
+.small{width:clamp(150px,40vw,180px)}
+/* the boxes: index cards with punched holes and ruled lines */
+.boxes{display:flex;flex-direction:column;gap:26px;width:min(300px,100%)}
+.box{position:relative;padding:8px 14px 10px 30px;background:repeating-linear-gradient(transparent 0 25px,var(--rule) 25px 26px) 0 34px,var(--card);
+  border:1.5px solid var(--muted);box-shadow:var(--shade);font-size:17px}
+.box::before{content:"";position:absolute;left:9px;top:12px;bottom:12px;width:9px;background:radial-gradient(circle,var(--paper) 4px,transparent 4.5px) 0 0/9px 30px}
+.box:nth-child(1){transform:rotate(-1deg)}.box:nth-child(2){transform:rotate(.8deg)}.box:nth-child(3){transform:rotate(-.5deg)}
+.box h4{margin:0 0 4px;font:700 24px/1 Caveat,cursive;color:var(--margin)}
+.box ol{margin:0;padding-left:20px}
+.box code{font:inherit;color:var(--ink);background:linear-gradient(transparent 60%,var(--hl) 60%)}
+.box table{border-collapse:collapse;width:100%}.box td,.box th{border-bottom:1.5px solid var(--lead);padding:0 6px;text-align:left}
+.box small{color:var(--muted)}
+.undo{font-size:15px;padding:0 8px;color:var(--ink);border-color:var(--ink)}
+/* the bottom sheet */
+.sheet{position:absolute;left:0;right:0;bottom:0;height:min(46vh,380px);background:var(--card);border-top:2.5px solid var(--lead);
+  border-radius:24px 24px 0 0;box-shadow:0 -12px 30px -12px rgba(0,0,0,.35);padding:8px 16px 16px;z-index:6;transform:translateY(105%);
+  transition:transform .35s cubic-bezier(.2,1.2,.4,1);display:flex;flex-direction:column;gap:8px}
+.sheet.open{transform:none}
+.grab{align-self:center;width:54px;height:6px;border-radius:3px;background:var(--muted);border:0;padding:0}
+.sheet .row{display:flex;gap:8px;align-items:center}
+.sheet .on{background:var(--hl)}
+.sheet .x{margin-left:auto}
+.sheet .cols{display:flex;gap:18px;flex:1;min-height:0;flex-wrap:wrap}
+.sheet .cols>*{flex:1 1 260px}
+textarea{width:100%;border:2px solid var(--lead);border-radius:14px 8px 16px 10px/10px 16px 8px 14px;padding:8px;background:var(--paper)}
+.sheet ol{margin:0;padding-left:22px;color:var(--muted)}
+/* the generate panel: a torn page */
+.gen{position:absolute;inset:0;display:grid;place-items:center;background:rgba(30,30,20,.3);z-index:8}
+.gen form{width:min(480px,calc(100% - 32px));background:var(--card);padding:18px 18px 22px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shade);
+  transform:rotate(-1deg);clip-path:polygon(0 3%,8% 0,20% 2%,35% 0,50% 2%,66% 0,80% 2%,100% 0,100% 100%,0 100%)}
+.gen h2{margin:0;font:700 32px Caveat,cursive;color:var(--ink)}
+.gen .row{display:flex;gap:8px;flex-wrap:wrap}.gen select{border:2px solid var(--lead);border-radius:10px;background:var(--card)}
+/* the mockup screens: a sketch, untouched by the chrome's theme */
+.scr{background:#fff;color:#222;font:11px/1.3 "Comic Sans MS","Comic Neue",cursive;padding:8px}
+.scr .w{border:1.5px solid #333;border-radius:255px 15px 225px 15px/15px 225px 15px 255px;padding:5px 7px;margin:5px 0}
+.scr b{font-size:13px}.scr .btn{text-align:center;background:#eef3ff;color:#2457c5}
+.scr .big{width:100px;height:100px;margin:10px auto;display:grid;place-items:center;border-radius:50% 46% 52% 48%/48% 52% 46% 50%;border:2px solid #333;font-size:16px}
+.scr .bars{display:flex;gap:3px;align-items:flex-end;height:40px}.scr .bars i{flex:1;background:#999;border-radius:3px 2px 0 0}
+.scr .tabbar{display:flex;justify-content:space-around;border-top:1.5px solid #333;margin-top:8px;padding-top:4px;color:#2457c5}
+@media (max-width:720px){.rail{width:54px}.tool{width:42px;height:42px}.rail .logo span{display:none}.rail .logo svg{width:36px;height:36px}
+  .hide-s{display:none}.stage{padding:64px 16px 120px 46px;background-position:-8px 0,0 0,0 0}.trail{left:40px;font-size:22px}.pair{gap:2px}.or{font-size:26px}}
+</style>
+</head>
+<body>
+<nav class="rail" aria-label="Tools">
+  <a class="logo" href="#" title="UX Woz">
+    <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 30c3-12 6-14 8-6s3 12 6 2 5-14 8-4 4 10 7 0" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><g transform="rotate(40 36 14)"><rect x="32" y="2" width="8" height="22" rx="1.5" fill="#fff275" stroke="#3b3b3b" stroke-width="2"/><path d="M32 24l4 7 4-7z" fill="#f2a7b6" stroke="#3b3b3b" stroke-width="2" stroke-linejoin="round"/><rect x="32" y="2" width="8" height="5" fill="#e2574c" stroke="#3b3b3b" stroke-width="2"/></g><path d="M6 40q16-5 32 0" fill="none" stroke="#e2574c" stroke-width="2.5" stroke-linecap="round"/></svg>
+    <span>UX Woz</span>
+  </a>
+  <button class="tool" id="newBtn" data-tip="New mockup"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button class="tool" data-tip="Every screen"><svg viewBox="0 0 24 24"><path d="M5 4v16M5 8h6M5 16h6M15 8h4M15 16h4"/></svg></button>
+  <button class="tool" data-tip="Rules"><svg viewBox="0 0 24 24"><path d="M6 6h12M6 12h12M6 18h8"/></svg><b>2</b></button>
+  <button class="tool" data-tip="Fixer's notes"><svg viewBox="0 0 24 24"><path d="M14 4l6 6-9 9H5v-6z"/></svg><b>1</b></button>
+  <button class="tool hide-s" data-tip="Data"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 10v9"/></svg></button>
+  <button class="tool hide-s" data-tip="Theme: Sketch"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 1.5-2s0-2 1.5-2H18a3 3 0 0 0 3-3c0-6-4-11-9-11z"/><circle cx="8" cy="11" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16" cy="11" r="1"/></svg></button>
+  <button class="tool hide-s" id="zoom" data-tip="Zoom: 100%"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="M15 15l5 5M8 10h4M10 8v4"/></svg></button>
+  <span class="spacer"></span>
+  <button class="tool mute" id="mute" data-tip="Sounds on" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></button>
+</nav>
+<div class="main">
+  <div class="trail"><button title="Back">←</button><span class="name">NiceSnore · L1 Home</span><button title="Forward">→</button></div>
+  <main class="stage"><div class="board" id="board">
+    <div class="lvl">
+      <div class="card">
+        <h3>L1 Home <small>pick one</small></h3>
+        <div class="pair">
+          <div class="prop">
+            <div class="idea">Last night first, chart below</div>
+            <div class="frame"><div class="scr">
+              <b>NiceSnore</b><div class="w">Last night<br><b>7 h 12 m</b> · 14 snores</div>
+              <div class="w"><div class="bars"><i style="height:30%"></i><i style="height:70%"></i><i style="height:45%"></i><i style="height:90%"></i><i style="height:20%"></i><i style="height:55%"></i></div></div>
+              <div class="w btn">Start night</div><div class="w btn">Nights</div>
+              <div class="tabbar"><span>Home</span><span>Nights</span><span>Settings</span></div></div></div>
+            <button class="pick">✓ Pick A</button>
+          </div>
+          <div class="or">or</div>
+          <div class="prop">
+            <div class="idea">One big Sleep button on top</div>
+            <div class="frame"><div class="scr">
+              <b>NiceSnore</b><div class="big">Sleep</div>
+              <div class="w">Snores last night: <b>14</b></div><div class="w btn">See all nights</div>
+              <div class="tabbar"><span>Home</span><span>Nights</span><span>Settings</span></div></div></div>
+            <button class="pick">✓ Pick B</button>
+          </div>
+        </div>
+        <button class="again" id="again" hidden>↺ Show A or B again</button>
+      </div>
+      <div class="boxes">
+        <div class="box"><h4>Rules</h4><ol><li><code>snore-count</code> Snores show as a count per night</li><li><code>tab-bar</code> Every screen pastes the tab bar</li></ol></div>
+        <div class="box"><h4>Data</h4><table><tr><th>night</th><th>sleep</th><th>snores</th></tr><tr><td>Mon</td><td>7:12</td><td>14</td></tr><tr><td>Tue</td><td>6:40</td><td>22</td></tr></table></div>
+        <div class="box"><h4>Fixer's notes</h4>merged <code>snores</code> into <code>snore-count</code>; redrew Nights <button class="undo">Undo</button><br><small>21:14 · $0.004</small></div>
+      </div>
+    </div>
+    <div class="lvl">
+      <div class="card small"><h3>L2 Nights</h3>
+        <div class="frame"><div class="scr"><b>Nights</b><div class="w">Mon · 7:12 · 14 snores</div><div class="w">Tue · 6:40 · 22 snores</div><div class="w">Wed · 7:55 · 9 snores</div><div class="tabbar"><span>Home</span><span>Nights</span><span>Settings</span></div></div></div>
+        <div class="tools"><button data-edit title="Edit">✎</button><button title="Make again">↻</button><button data-edit title="Info">ⓘ</button><button title="Delete">✕</button></div></div>
+      <div class="card small"><h3>L2 Settings</h3>
+        <div class="frame"><div class="scr"><b>Settings</b><div class="w">Alarm when loud ☐</div><div class="w">Mic sensitivity ━━●━</div><div class="w">Dark at night ☑</div><div class="tabbar"><span>Home</span><span>Nights</span><span>Settings</span></div></div></div>
+        <div class="tools"><button data-edit title="Edit">✎</button><button title="Make again">↻</button><button data-edit title="Info">ⓘ</button><button title="Delete">✕</button></div></div>
+    </div>
+  </div></main>
+  <section class="sheet" id="sheet" aria-label="Edit">
+    <button class="grab" id="grab" title="Close" aria-label="Close"></button>
+    <div class="row"><button class="on">✎ Edit</button><button>ⓘ Info</button><strong style="font:700 24px Caveat,cursive;color:var(--ink)">L2 Nights</strong><button class="x" id="close" title="Close (Esc)">✕</button></div>
+    <div class="cols">
+      <div><textarea rows="3" aria-label="What should change?" placeholder="What should change? e.g. a moon next to quiet nights"></textarea>
+        <button class="ink" style="margin-top:6px">Make the change</button></div>
+      <div><strong>Past changes</strong><ol><li>Show the snore count per night</li></ol></div>
+    </div>
+  </section>
+  <div class="gen" id="gen" hidden><form onsubmit="return false">
+    <h2>What should we mock up?</h2>
+    <textarea rows="3" aria-label="Prompt">A sleep tracker that counts snores</textarea>
+    <div class="row"><select aria-label="Model"><option>Haiku</option><option>Luna</option><option>Sol</option></select><select aria-label="Device"><option>Phone</option><option>Desktop</option></select></div>
+    <button class="ink" id="go">Generate</button></form></div>
+</div>
+<script>
+// The pen marks: one hand-drawn ring and one scribble per design.
+const MARK='<svg class="mark" viewBox="0 0 200 400" preserveAspectRatio="none"><path class="ring" d="M120 8C40 2 6 60 8 200s30 196 96 192 92-60 90-200S170 2 70 14"/><path class="scrib" d="M20 120L180 90 30 200 175 170 25 290 170 260 40 360"/></svg>';
+const props=[...document.querySelectorAll(".prop")];props.forEach(p=>p.insertAdjacentHTML("beforeend",MARK));
+// Sounds: made on the fly from noise, only after a click has opened the audio.
+let ac=null,muted=false;
+function snd(play,fromClick){if(muted)return;if(!ac){if(!fromClick)return;ac=new (window.AudioContext||window.webkitAudioContext)()}if(ac.state==="suspended")ac.resume();play(ac)}
+function noise(a,dur){const b=a.createBuffer(1,a.sampleRate*dur,a.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const s=a.createBufferSource();s.buffer=b;return s}
+const scratch=a=>{const s=noise(a,.35),f=a.createBiquadFilter(),g=a.createGain(),t=a.currentTime;f.type="bandpass";f.frequency.value=3200;f.Q.value=1.2;
+  g.gain.setValueAtTime(0,t);for(let i=0;i<5;i++){g.gain.linearRampToValueAtTime(.18,t+i*.06+.02);g.gain.linearRampToValueAtTime(.03,t+i*.06+.05)}g.gain.linearRampToValueAtTime(0,t+.33);
+  s.connect(f).connect(g).connect(a.destination);s.start()};
+const flip=a=>{const s=noise(a,.3),f=a.createBiquadFilter(),g=a.createGain(),t=a.currentTime;f.type="highpass";f.frequency.setValueAtTime(400,t);f.frequency.exponentialRampToValueAtTime(5000,t+.22);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.22,t+.04);g.gain.exponentialRampToValueAtTime(.001,t+.28);s.connect(f).connect(g).connect(a.destination);s.start()};
+const again=document.getElementById("again"),or=document.querySelector(".or");let picked=false;
+function play(el,cls){el.classList.remove("peek","circle");void el.offsetWidth;el.classList.add(cls)}
+props.forEach(p=>{
+  p.querySelector(".pick").addEventListener("mouseenter",()=>{if(!picked)play(p,"peek")});
+  p.addEventListener("click",()=>{if(picked)return;picked=true;play(p,"circle");snd(scratch,true);
+    const others=props.filter(q=>q!==p);others.forEach(q=>q.classList.add("cross"));
+    setTimeout(()=>{others.forEach(q=>q.hidden=true);or.hidden=true;again.hidden=false},1350)})});
+again.onclick=()=>{picked=false;again.hidden=true;or.hidden=false;props.forEach(q=>{q.hidden=false;q.className="prop"})};
+const sheet=document.getElementById("sheet"),closeSheet=()=>sheet.classList.remove("open");
+document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{sheet.classList.add("open");snd(flip,true)});
+document.getElementById("close").onclick=closeSheet;document.getElementById("grab").onclick=closeSheet;
+const mute=document.getElementById("mute");
+mute.onclick=()=>{muted=!muted;mute.classList.toggle("off",muted);mute.setAttribute("aria-pressed",muted);mute.dataset.tip=muted?"Muted":"Sounds on"};
+const gen=document.getElementById("gen");document.getElementById("newBtn").onclick=()=>{gen.hidden=false;snd(flip,true)};
+document.getElementById("go").onclick=()=>{gen.hidden=true;again.click()};
+gen.onclick=e=>{if(e.target===gen)gen.hidden=true};
+let z=1;document.getElementById("zoom").onclick=e=>{z=z===1?.75:1;e.currentTarget.dataset.tip="Zoom: "+Math.round(z*100)+"%";const b=document.getElementById("board");b.style.transformOrigin="0 0";b.style.transform=`scale(${z})`};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheet();gen.hidden=true}});
+</script>
+</body>
+</html>
