@@ -11,10 +11,10 @@ import index from './index.html'
 
 const THEMES_DIR = resolve(import.meta.dir, '../themes')
 /** Theme ids and labels; the first is the default. `clean` is Pico alone, `mockup` is Pico plus mockup.css. */
-export const THEMES = { mockup: 'Mockup (sketch)', clean: 'Clean (Pico)' } as const
+const THEMES = { mockup: 'Mockup (sketch)', clean: 'Clean (Pico)' } as const
 const THEME_FILES = new Set(['pico', 'mockup'])
 /** The fixer visits a mockup after every this many picks. */
-export const VISIT_EVERY = 5
+const VISIT_EVERY = 5
 
 /** One line of a /api/screen or /api/revise NDJSON stream (spec/code-contract.md). `meta.variants`: 2, 1 for a revise, 0 for a cache hit. */
 export type ScreenEvent =
@@ -25,7 +25,7 @@ export type ScreenEvent =
   | { type: 'done'; entry: CacheEntry; filing?: boolean }
   | { type: 'error'; message: string }
 
-export interface ServerOptions extends Io {
+interface ServerOptions extends Io {
   port?: number
   cache?: ScreenCache
   /** Picks the side that is asked for a clearly different design; Math.random by default. */

@@ -4,7 +4,7 @@
 import { MODELS, type ModelConfig, type ModelId } from './models.ts'
 
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>
-export type Env = Record<string, string | undefined>
+type Env = Record<string, string | undefined>
 /** How a call reaches the world: a fetch and an env to use instead of the real ones (tests), and a log. */
 export interface Io { fetch?: Fetch; env?: Env; log?: (msg: string) => void }
 
@@ -18,9 +18,9 @@ export interface FinalEvent {
   costUsd: number | null
 }
 
-export type StreamEvent = { type: 'text'; text: string } | FinalEvent
+type StreamEvent = { type: 'text'; text: string } | FinalEvent
 
-export interface StreamOptions extends Io {
+interface StreamOptions extends Io {
   model: ModelId
   system: string
   user: string
@@ -135,7 +135,7 @@ async function* streamOpenAI(cfg: ModelConfig, o: StreamOptions, f: Fetch, env: 
   yield final
 }
 
-export function estimateCost(cfg: ModelConfig, f: FinalEvent): number | null {
+function estimateCost(cfg: ModelConfig, f: FinalEvent): number | null {
   const p = cfg.pricePerMTok
   if (!p || f.inputTokens == null || f.outputTokens == null) return null
   const cached = f.cachedInputTokens ?? 0

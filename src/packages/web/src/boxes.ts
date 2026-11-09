@@ -93,7 +93,7 @@ export function createSide(op: (o: BoxOp) => void): Side {
   return { el: root, components: sections.components.querySelector('.box-body')!, sections, rails }
 }
 
-export interface SideView { boxes: Boxes; components: CacheEntry[]; undos: Record<BoxName, number>; visiting: boolean }
+interface SideView { boxes: Boxes; components: CacheEntry[]; undos: Record<BoxName, number>; visiting: boolean }
 
 /** True while the user types in a field inside `box`. */
 const typing = (box: HTMLElement) => document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable && box.contains(document.activeElement)

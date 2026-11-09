@@ -175,7 +175,7 @@ export interface Paper {
 }
 
 /** A screen or component as a request shows it: its ID, its one line, its stored HTML. */
-export interface Shown { id: string; line: string; html: string }
+interface Shown { id: string; line: string; html: string }
 
 const list = (xs: string[], sep = '\n') => (xs.length ? xs.join(sep) : '(none)')
 const byUser = (x: { by?: string }) => (x.by === 'user' ? ' (by the user)' : '')

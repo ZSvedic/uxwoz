@@ -8,9 +8,9 @@ import { SYSTEM_PROMPT, WARMUP_REQUEST } from './prompt.ts'
 import { ProviderError, streamModel, type Io } from './providers.ts'
 
 /** A slower screen is useless, and keep-alive comments can stall a stream, so this is an overall deadline. */
-export const DEADLINE_MS = 20_000
+const DEADLINE_MS = 20_000
 
-export interface GenerateOptions extends Io {
+interface GenerateOptions extends Io {
   /** The user message: the paper and the job (drawRequest or editRequest). */
   user: string
   model: ModelId

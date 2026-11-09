@@ -38,7 +38,7 @@ const labelH = (z: number) => (z < FAR ? NAME_H : LABEL_H)
 /** Line corner radius. */
 const BEND = 10
 const SVG_NS = 'http://www.w3.org/2000/svg'
-export const MIN_ZOOM = 0.1
+const MIN_ZOOM = 0.1
 export const MAX_ZOOM = 2
 const STEPS = [0.1, 0.15, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2]
 
@@ -74,7 +74,7 @@ export interface ScreenView {
   fresh?: boolean
 }
 
-export interface CanvasHandlers {
+interface CanvasHandlers {
   /** A click in a picked screen on a control that opens another screen. */
   action: (key: string, prompt: string, label: string) => void
   pick: (key: string, side: number) => void

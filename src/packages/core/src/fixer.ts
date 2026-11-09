@@ -13,7 +13,7 @@ import { HOME_LINE, HOME_NAME, isComponent } from './tree.ts'
 export const MAX_REDRAWS = 5
 
 /** `box`: one of filing's rule, table and row lines, in `f`. */
-export interface VisitLine { op: 'merge' | 'remove' | 'component' | 'redraw' | 'note' | 'box' | 'bad'; a: string; b: string; part: number; text: string; line: string; f?: FilingLine }
+interface VisitLine { op: 'merge' | 'remove' | 'component' | 'redraw' | 'note' | 'box' | 'bad'; a: string; b: string; part: number; text: string; line: string; f?: FilingLine }
 
 // Each form's groups are the same four: two IDs, a part number, a text.
 const FORMS: [VisitLine['op'], RegExp][] = [
@@ -37,7 +37,7 @@ export function parseVisit(reply: string): VisitLine[] {
 }
 
 /** What applying a visit leaves for the server: the redraws to run, in the same change of the boxes (see cache.group). */
-export interface Applied { changes: Change[]; refused: string[]; redraws: { key: string; sentence: string; change: Change }[]; group: number }
+interface Applied { changes: Change[]; refused: string[]; redraws: { key: string; sentence: string; change: Change }[]; group: number }
 
 /** Apply a visit's reply; `sent`: the numbered HTML of each screen it read; `asked`: an Edit's box, whose user entries may change. */
 export function applyVisit(cache: ScreenCache, app: string, reply: string, sent: Map<string, string>, asked?: BoxName | 'notes'): Applied {

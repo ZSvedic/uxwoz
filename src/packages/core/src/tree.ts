@@ -26,7 +26,7 @@ export function componentsOf(entries: CacheEntry[]): Record<string, string> {
 }
 
 /** The newest HTML of a screen with its components pasted, as the user sees it; '' while its A OR B is open. */
-export const shownHtml = (e: CacheEntry, components: Record<string, string>) => {
+const shownHtml = (e: CacheEntry, components: Record<string, string>) => {
   const v = e.versions.at(-1)
   return v ? pasteComponents(v.html, components) : ''
 }

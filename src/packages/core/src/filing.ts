@@ -10,7 +10,7 @@ import { ProviderError, streamModel, type FinalEvent, type Io } from './provider
 import { HOME_LINE, HOME_NAME } from './tree.ts'
 
 /** Filing runs in the background, so it may take longer than a screen. */
-export const FILING_DEADLINE_MS = 60_000
+const FILING_DEADLINE_MS = 60_000
 
 const BLOCKS = 'header|footer|nav|section|article|aside|main|form|fieldset|table|ul|ol|div|p|h1|h2|h3|h4|figure|details|svg|label|button|a|select|progress'
 
@@ -63,7 +63,7 @@ export interface Filed { added: string[]; changed: string[]; refused: string[] }
 const cells = (text: string) => text.split('|').map((c) => c.trim())
 
 /** A rule or a table read from filing's forms, to store. */
-export interface BoxLine { box: 'rules' | 'data'; change: boolean; entry: EntryBody; line: string }
+interface BoxLine { box: 'rules' | 'data'; change: boolean; entry: EntryBody; line: string }
 
 /** Read rule, table and row lines in order: a rule goes to `set` at once, a table once its rows have come (`flush` at the end). */
 export function boxLines(cache: ScreenCache, app: string, set: (l: BoxLine) => string | null, refuse: (line: string, why: string) => void) {
@@ -137,7 +137,7 @@ function fileLines(cache: ScreenCache, app: string, key: string, filedHtml: stri
 }
 
 
-export interface FileOptions extends Io {
+interface FileOptions extends Io {
   cache: ScreenCache
   key: string
   decision: { other: string } | { change: string }

@@ -31,7 +31,7 @@ export interface Version {
 }
 
 /** The screen and click that first made a screen. */
-export interface Parent { key: string; label: string }
+interface Parent { key: string; label: string }
 
 export interface CacheEntry {
   key: string
@@ -54,7 +54,7 @@ export interface CacheEntry {
 }
 
 /** Who last wrote a box entry and when, and whether the user has looked at it since. */
-export interface Mark { by: 'filing' | 'fixer' | 'user'; at: string; seen: boolean }
+interface Mark { by: 'filing' | 'fixer' | 'user'; at: string; seen: boolean }
 export interface Rule extends Mark { id: string; text: string }
 export interface Table extends Mark { id: string; columns: string[]; rows: string[][] }
 export type BoxName = 'components' | 'rules' | 'data'
@@ -73,8 +73,8 @@ export interface Boxes {
 /** A filing: when, on which screen, what it added, changed and refused, its time and cost. */
 export interface Filing { at: string; screen: string; ms: number; costUsd: number | null; added: string[]; changed: string[]; refused: string[]; error?: string }
 /** A box as it was before a change: its entries and the IDs it had used. It keeps the last BOX_STATES. */
-export interface BoxState { list: Entry[]; gone: string[] }
-export const BOX_STATES = 10
+interface BoxState { list: Entry[]; gone: string[] }
+const BOX_STATES = 10
 
 /** How to undo one change of the fixer: put an entry back (`over` the one it changed), drop an entry it added, or drop a version it drew. */
 export type Undo = { put: BoxName; entry: Entry; index: number; over?: true } | { drop: BoxName; id: string } | { key: string; createdAt: string }
