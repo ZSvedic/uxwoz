@@ -3,9 +3,9 @@
 
 import { join, resolve } from 'node:path'
 import {
-  DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, HOME_LINE, HOME_NAME, MODELS, PROPOSALS, ScreenCache, canonicalAction, drawRequest, editRequest,
+  BOX_TITLES, DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, HOME_LINE, HOME_NAME, MODELS, PROPOSALS, ScreenCache, canonicalAction, drawRequest, editRequest,
   fileDecision, generateScreen, isComponent, isDevice, isModelId, normalizePrompt, visitPaper, plannedScreens, promptFromLabel, screenKey, screenRef,
-  warmUp, type BoxName, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type Version,
+  warmUp, type BoxName, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type Version, type VisitOptions,
 } from '@uxwoz/core'
 import index from './index.html'
 
@@ -110,7 +110,7 @@ export function createServer(opts: ServerOptions = {}) {
 
   /** The background job running for each mockup, by root key: filings and the fixer's visits run one after another. */
   const filings = new Map<string, Promise<unknown>>()
-  /** How many filings each mockup has in its chain, for the line above the boxes. */
+  /** How many filings each mockup has in its chain. */
   const filingCount = new Map<string, number>()
   const count = (root: string, n: number) => filingCount.set(root, (filingCount.get(root) ?? 0) + n)
 
@@ -131,7 +131,7 @@ export function createServer(opts: ServerOptions = {}) {
       .then((run) => run && log(`filed ${run.screen} in ${(run.ms / 1000).toFixed(1)} s for $${run.costUsd?.toFixed(4)}: added ${run.added.join(', ') || 'nothing'}, changed ${run.changed.join(', ') || 'nothing'}, refused ${run.refused.length}`))
       .catch((err) => {
         log(`filing failed: ${message(err)}`)
-        if (cache.get(root) && !cache.removedSince(root, since)) cache.noteFiling(e.app, { at: new Date().toISOString(), screen: e.name ?? HOME_NAME, ms: Math.round(performance.now() - t0), costUsd: null, added: [], changed: [], refused: [], error: message(err) })
+        if (cache.get(root) && !cache.removedSince(root, since)) cache.noteFiling(key, { at: new Date().toISOString(), screen: e.name ?? HOME_NAME, ms: Math.round(performance.now() - t0), costUsd: null, added: [], changed: [], refused: [], error: message(err) })
       })
       .finally(() => count(root, -1))
     return true
@@ -141,16 +141,16 @@ export function createServer(opts: ServerOptions = {}) {
   const visits = new Map<string, Promise<unknown>>(), stops = new Map<string, AbortController>()
 
   /**
-   * A visit of the fixer in the mockup's chain, dropped when the mockup goes meanwhile. Its redraws are
-   * Edits that file nothing, skipped for a screen changed since the visit began. A pick that comes
-   * while a visit runs brings none: the next visit reads its screen.
+   * A visit of the fixer in the mockup's chain, dropped when the mockup goes meanwhile; `ask` makes it
+   * an Edit of a box. Its redraws are Edits that file nothing, skipped for a screen changed since the
+   * visit began. A pick that comes while a visit runs brings none: the next visit reads its screen.
    */
-  function visit(app: string): boolean {
+  function visit(app: string, ask?: VisitOptions['ask']): boolean {
     const root = normalizePrompt(app)
     if (!cache.get(root)?.versions.length || visits.has(root)) return false
     const since = cache.now(), t0 = performance.now(), stop = new AbortController()
     stops.set(root, stop)
-    const p = chain(root, () => visitPaper({ cache, app, fetch: opts.fetch, env: opts.env, log }, () => cache.removedSince(root, since)))
+    const p = chain(root, () => visitPaper({ cache, app, ask, fetch: opts.fetch, env: opts.env, log }, () => cache.removedSince(root, since)))
       .then(async (r) => {
         if (!r) return log('visit dropped: the mockup changed meanwhile')
         let cost = r.visit.costUsd ?? 0
@@ -169,7 +169,7 @@ export function createServer(opts: ServerOptions = {}) {
       })
       .catch((err) => {
         log(`visit failed: ${message(err)}`)
-        if (cache.get(root) && !cache.removedSince(root, since)) cache.noteVisit(app, { at: new Date().toISOString(), ms: Math.round(performance.now() - t0), costUsd: null, screens: 0, changes: [], refused: [], error: message(err), seen: false })
+        if (cache.get(root) && !cache.removedSince(root, since)) cache.noteVisit(app, { at: new Date().toISOString(), ...(ask && { ask: ask.text }), ms: Math.round(performance.now() - t0), costUsd: null, screens: 0, changes: [], refused: [], error: message(err), seen: false })
       })
       .finally(() => { if (visits.get(root) === p) visits.delete(root); if (stops.get(root) === stop) stops.delete(root) })
     visits.set(root, p)
@@ -179,7 +179,7 @@ export function createServer(opts: ServerOptions = {}) {
   const filed = (app: string, ms: number) => Promise.race([filings.get(normalizePrompt(app)), Bun.sleep(ms)])
 
   /** One mockup as every reply that carries it sends it: screens, components, boxes, and whether filing or a visit runs. */
-  const mapOf = (app: string) => ({ ...cache.map(app), filing: !!filingCount.get(normalizePrompt(app)), visiting: visits.has(normalizePrompt(app)) })
+  const mapOf = (app: string) => ({ ...cache.map(app), undos: cache.undos(app), filing: !!filingCount.get(normalizePrompt(app)), visiting: visits.has(normalizePrompt(app)) })
 
   /** A deleted mockup's filing is not waited for (its result is dropped anyway), and its visit's redraws stop. */
   const forget = (app: string) => {
@@ -279,9 +279,9 @@ export function createServer(opts: ServerOptions = {}) {
       for await (const ev of generateScreen({ user, model, device, signal, fetch: opts.fetch, env: opts.env })) {
         if (ev.type === 'chunk') { yield { type: 'chunk', variant: 0, text: ev.text }; continue }
         const version: Version = { ...ev.version, ...(change && { feedback: change }), ...(fixer && { by: 'fixer' as const }) }
-        // A component the user changed is the user's now.
-        if (isComponent(entry)) Object.assign(entry, { by: 'user', at: version.createdAt, seen: true })
         const stored = cache.addVersion(key, version)
+        // A component the user changed is the user's now.
+        if (isComponent(entry)) Object.assign(entry, { by: fixer ? 'fixer' : 'user', at: version.createdAt, seen: !fixer })
         if (signal.aborted) return
         if (!stored) { yield { type: 'error', message: 'this screen was deleted while it was being changed' }; return }
         yield { type: 'version', variant: 0, version }
@@ -386,19 +386,22 @@ export function createServer(opts: ServerOptions = {}) {
         POST: api(async (b) => {
           const app = appOf(b)
           if (!cache.get(screenKey(app, null))) return json({ error: 'no such mockup' }, 404)
-          const box = b?.box as BoxName, op = b?.op
-          if (op === 'seen' && ['components', 'rules', 'data', 'notes'].includes(box)) cache.markSeen(app, box, Array.isArray(b?.ids) ? b.ids.map(String) : undefined)
-          else if (op === 'undo') {
-            const why = cache.undoChange(app, String(b?.at ?? ''), Number(b?.i))
-            if (why) return json({ error: why }, 400)
-          }
-          else if ((box === 'rules' || box === 'data') && ['add', 'set', 'delete'].includes(op)) {
+          const box = b?.box as BoxName | 'notes', op = b?.op, any = Object.hasOwn(BOX_TITLES, String(box))
+          let why: string | null = null
+          if (op === 'seen' && any) cache.markSeen(app, box, Array.isArray(b?.ids) ? b.ids.map(String) : undefined)
+          else if (op === 'undo') why = cache.undoChange(app, String(b?.at ?? ''), Number(b?.i))
+          // Undo of a whole box: the fixer's notes undo their newest visit.
+          else if (op === 'undo-box' && any) why = box === 'notes' ? cache.undoVisit(app) : cache.undoBox(app, box)
+          else if (op === 'edit' && any) {
+            const text = typeof b?.text === 'string' ? b.text.trim() : ''
+            if (!text || text.length > 1000) return json({ error: 'text must be 1-1000 characters' }, 400)
+            if (!visit(app, { box, text })) return json({ error: 'The fixer is visiting now: try again when it is done.' }, 409)
+          } else if ((box === 'rules' || box === 'data') && ['add', 'set', 'delete'].includes(op)) {
             // A new entry's ID comes from its words: the rule's sentence, or the table's name.
             const id = op === 'add' ? cache.freeId(app, box, String(b?.text ?? b?.id ?? '')) : String(b?.id ?? '')
-            const why = cache.setBox(app, op, box, { id, text: b?.text, columns: b?.columns, rows: b?.rows }, 'user')
-            if (why) return json({ error: why }, 400)
+            why = cache.setBox(app, op, box, { id, text: b?.text, columns: b?.columns, rows: b?.rows }, 'user')
           } else return json({ error: 'unknown box or op' }, 400)
-          return json(mapOf(app))
+          return why ? json({ error: why }, 400) : json(mapOf(app))
         }),
       },
       '/api/apps': () => json({ apps: cache.apps() }),

@@ -177,20 +177,21 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .info dt { color: var(--muted); }
 .info dd { margin: 0; overflow-wrap: anywhere; }
 
-/* The box buttons in the toolbar: each moves the view to its box; the number counts what is new. */
+/* The box buttons in the toolbar: each moves the view to its box; the number counts what is new. They
+   fold into the Boxes menu where the toolbar runs out of room (.fold). */
 .box-nav { display: flex; gap: 2px; margin-right: 8px; }
-.box-nav button { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; }
-.box-nav b { color: #fff; background: var(--accent); border-radius: 9px; padding: 0 6px; font-size: 11px; }
-.box-nav b:empty { display: none; }
+.box-nav button { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; padding: 4px 6px; }
+.box-nav b, #boxesButton b, #boxesMenu b { color: #fff; background: var(--accent); border-radius: 9px; padding: 0 6px; font-size: 11px; }
+.toolbar b:empty, .fold .box-nav, .toolbar:not(.fold) #boxesButton { display: none; }
+.toolbar select { padding: 4px 2px; border-color: transparent; background: none; }
 
-/* The boxes column left of the first screen, at canvas scale: it zooms with the screens. */
-.boxes { position: absolute; display: flex; flex-direction: column; gap: 28px; font-size: 15px; }
-.box { padding: 14px 18px 18px; border: 2px solid var(--line); border-radius: 12px; background: var(--card); }
+/* The boxes side by side right of the first screen, at canvas scale: they zoom with the screens. */
+.boxes { position: absolute; display: flex; align-items: flex-start; font-size: 15px; }
+.box { position: relative; flex: none; width: 520px; padding: 14px 18px 18px; border: 2px solid var(--line); border-radius: 12px; background: var(--card); }
+.box > .rail { opacity: 1; }
 .box h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font-size: 18px; }
 .box h3 small { color: var(--muted); font-weight: 400; font-size: 13px; flex: 1; }
-.box-hint, .box-status { margin: 0; color: var(--muted); font-size: 13px; }
-.box-status { padding: 0 4px; }
-.box-refused { margin: -20px 0 0; padding: 0 4px 0 22px; color: var(--muted); font-size: 12px; }
+.box-hint { margin: 0; color: var(--muted); font-size: 13px; }
 .box-btn { padding: 1px 8px; font-size: 12px; color: var(--muted); }
 .box-btn:hover { color: var(--fg); border-color: var(--accent); }
 /* An entry added since the user last looked at its box. */
@@ -203,7 +204,9 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .box-components .box-body { display: flex; flex-direction: column; }
 /* A component card is at least as tall as its rail, so the rail never covers the box below. */
 .box-components .card { position: relative; margin-top: calc(62px / var(--z)); min-height: calc(190px / var(--z)); }
-.surface.far .box-components .card { margin-top: calc(26px / var(--z)); }
+/* Far out, a component card drops its rail, so the row of boxes does not grow as the view zooms out. */
+.surface.far .box-components .card { margin-top: calc(26px / var(--z)); min-height: 0; }
+.surface.far .box-components .rail { display: none; }
 .rule { display: flex; gap: 6px; align-items: baseline; padding: 4px 0; border-top: 1px dashed var(--line); }
 .rule:first-child { border-top: 0; }
 .rule-text { flex: 1; min-width: 0; }

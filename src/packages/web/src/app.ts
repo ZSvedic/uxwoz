@@ -4,7 +4,7 @@
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, markCurrent, pasteComponents, type Device } from '@uxwoz/core/frame'
 import { canonicalAction, isBack, nameWords, normalizePrompt, screenKey, screenRef } from '@uxwoz/core/keys'
 import { componentsOf, isComponent, namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
-import type { Boxes, CacheEntry, Version } from '@uxwoz/core'
+import type { BoxName, Boxes, CacheEntry, Version } from '@uxwoz/core'
 import { boxesMarkdown, createSide, renderSide, type Box, type BoxOp } from './boxes.ts'
 import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
@@ -50,6 +50,8 @@ const state = {
   starts: 0,
   /** Rules and Data (components are entries), and whether filing or a fixer visit runs. */
   boxes: null as Boxes | null,
+  /** How many times Undo can put each box back. */
+  undos: { components: 0, rules: 0, data: 0 } as Record<BoxName, number>,
   filing: false,
   visiting: false,
   /** A filed() loop is waiting for filing or a visit to end. */
@@ -64,7 +66,7 @@ const store = {
   set: (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* private mode */ } },
 }
 
-const side = createSide()
+const side = createSide(boxOp)
 const canvas = new Canvas($('stage'), {
   action: onAction,
   pick,
@@ -153,7 +155,7 @@ function views(): ScreenView[] {
 async function draw() {
   state.tree = screenTree([...state.entries.values()])
   side.el.hidden = !state.app || !state.entries.size || !state.boxes
-  if (state.boxes) renderSide(side, { boxes: state.boxes, components: components(), filing: state.filing, visiting: state.visiting }, boxOp)
+  if (state.boxes) renderSide(side, { boxes: state.boxes, components: components(), undos: state.undos, visiting: state.visiting }, boxOp)
   canvas.render(views(), !!state.busy)
   generate.hidden = !!state.app && !generate.classList.contains('open')
   renderDrawer()
@@ -500,9 +502,10 @@ async function reloadMap() {
   applyMap(await res.json())
 }
 
-function applyMap(map: { entries: CacheEntry[]; boxes?: Boxes; filing?: boolean; visiting?: boolean }) {
+function applyMap(map: { entries: CacheEntry[]; boxes?: Boxes; undos?: Record<BoxName, number>; filing?: boolean; visiting?: boolean }) {
   state.entries = new Map(map.entries.map((e) => [e.key, e]))
   state.boxes = map.boxes ?? state.boxes
+  state.undos = map.undos ?? state.undos
   state.filing = !!map.filing
   state.visiting = !!map.visiting
   state.edits++
@@ -537,7 +540,7 @@ async function filed() {
   }
 }
 
-/** A change to the boxes, or a visit asked for; the server answers with the whole mockup. */
+/** A change to the boxes, an Undo, or a visit asked for (an Edit is one); the server answers with the whole mockup. */
 async function boxOp(o: BoxOp | { op: 'seen'; box: Box; ids: string[] }) {
   const app = state.app
   if (!app) return
@@ -560,7 +563,7 @@ function lookAt(box: Box) {
   if (ids.length) setTimeout(() => boxOp({ op: 'seen', box, ids }), 3000)
 }
 
-for (const b of document.querySelectorAll<HTMLButtonElement>('[data-box]')) b.addEventListener('click', () => lookAt(b.dataset.box as Box))
+for (const b of document.querySelectorAll<HTMLButtonElement>('[data-box]')) b.addEventListener('click', () => { closeMenus(); lookAt(b.dataset.box as Box) })
 
 /** Export: the three boxes as a markdown file. */
 $('exportBoxes').addEventListener('click', () => {
@@ -707,7 +710,7 @@ function renderDrawer() {
   }).reverse())
   const node = state.tree.get(e.key)
   const parent = node?.parent ? state.entries.get(node.parent) : undefined
-  const from = comp && e.parent ? state.entries.get(e.parent.key) : undefined
+  const from = comp && e.parent ? state.entries.get(e.parent.key) : undefined, f = e.filed
   const info: [string, string][] = comp ? [
     ['Component', e.name!],
     ['Where it belongs', e.action ?? '–'],
@@ -734,6 +737,9 @@ function renderDrawer() {
     ['Finish', v.finishReason ?? '–'],
     ['Size', `${v.html.length.toLocaleString()} characters`],
     ['Prompt', e.action ?? e.app],
+    // What filing made of the screen's last decision, and the lines it refused.
+    ...(f ? [['Filing', f.error ? `failed: ${f.error}` : `${[...f.added.map((x) => `added ${x}`), ...f.changed.map((x) => `changed ${x}`)].join(', ') || 'nothing new'}, `
+      + `${fmtS(f.ms)}${f.costUsd == null ? '' : `, ~${fmtUsd(f.costUsd)}`}`], ...f.refused.map((r) => ['Refused', r])] as [string, string][] : []),
   ]
   $('info').replaceChildren(...info.flatMap(([k, val]) => {
     const dt = document.createElement('dt'), dd = document.createElement('dd')
@@ -926,7 +932,7 @@ function open(app: string) {
 
 // ---- The toolbar: project menu, Nav, zoom
 
-const MENUS: [string, string][] = [['projectButton', 'projectMenu'], ['navButton', 'navMenu'], ['zoomValue', 'zoomMenu']]
+const MENUS: [string, string][] = [['projectButton', 'projectMenu'], ['navButton', 'navMenu'], ['zoomValue', 'zoomMenu'], ['boxesButton', 'boxesMenu']]
 
 function closeMenus() {
   for (const [, m] of MENUS) $(m).hidden = true
@@ -986,14 +992,27 @@ function renderToolbar() {
   $('navName').textContent = cur ? labelOf(cur) : 'Screens'
   nav.title = cur ? labelOf(cur) : 'Every screen of this mockup'
   $('exportBoxes').hidden = !app
-  // Each box button counts entries new since the user last looked.
-  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-box]')) {
+  // Each box button counts entries new since the user last looked; the Boxes menu shows their sum.
+  let sum = 0
+  for (const b of document.querySelectorAll<HTMLButtonElement>('.box-nav [data-box], #boxesMenu [data-box]')) {
     const n = unseen(b.dataset.box as Box).length
     b.hidden = side.el.hidden
     b.querySelector('b')!.textContent = n ? String(n) : ''
+    if (b.closest('.box-nav')) sum += n
   }
+  $('boxesButton').hidden = side.el.hidden
+  $('boxesSum').textContent = sum ? String(sum) : ''
+  fold()
   if (!$('navMenu').hidden) renderNav()
 }
+
+/** The box buttons fold into the Boxes menu where the toolbar runs out of room for them. */
+function fold() {
+  const tb = $('toolbar')
+  tb.classList.remove('fold')
+  tb.classList.toggle('fold', tb.querySelector<HTMLElement>('.tb-right')!.offsetWidth > tb.querySelector<HTMLElement>('.tb-left')!.offsetWidth + 1)
+}
+new ResizeObserver(fold).observe($('toolbar'))
 
 /** Every screen as an indented tree, planned screens greyed (a click makes one), the current path marked. */
 function renderNav() {

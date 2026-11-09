@@ -1,10 +1,10 @@
 // The canvas: every screen on one panning, zooming surface, laid out as a tree. Each level is a row;
 // a first child sits below its parent when there is room. Each parent's lines branch at a height of
 // their own, so lines never cross. A new screen shows as A OR B; a click on a finished side picks it.
-// Names and rails keep their size on screen at any zoom. Left of the tree: the boxes column (boxes.ts).
+// Names and rails keep their size on screen at any zoom. Right of the first screen: the boxes (boxes.ts).
 
 import { DEFAULT_DEVICE, DEVICES, FRAME_SANDBOX, framePage, type Device } from '@uxwoz/core/frame'
-import { el } from './boxes.ts'
+import { el, railOf } from './boxes.ts'
 
 /** Bounds on a reported height, so a broken screen cannot make a huge frame; components may be shorter. */
 const MIN_SCREEN_H = 160
@@ -146,7 +146,7 @@ export class Canvas {
   /** The surface's CSS zoom. Its own coordinates (positions, lines) are unzoomed. */
   private z = 1
 
-  /** `stage` scrolls (its content is replaced on first render); `side` is the boxes column; component cards go in `components`. */
+  /** `stage` scrolls (its content is replaced on first render); `side` holds the boxes; component cards go in `components`. */
   constructor(private stage: HTMLElement, private on: CanvasHandlers, private side: HTMLElement, private components: HTMLElement) {
     this.lines.classList.add('lines')
     this.surface.append(this.lines, side)
@@ -292,7 +292,7 @@ export class Canvas {
     return { x, y, w: el.offsetWidth, h: el.offsetHeight }
   }
 
-  /** Move the view to a box of the side column: its width fits (at most 100%), its top shows. */
+  /** Move the view to a box: its width fits (at most 100%), its top shows. */
   showBox(el: HTMLElement) {
     this.moved = performance.now()
     if (this.queued) this.layout()
@@ -430,17 +430,16 @@ export class Canvas {
     return { w: c.width, h: c.view?.error ? FAILED_H : c.height }
   }
 
-  /** Place the boxes column and the tree, size the canvas, draw the lines. */
+  /** Place the tree and the boxes, size the canvas, draw the lines. */
   private layout() {
     const z = this.z
     // At a low zoom, rails and the OR need more of the canvas than the fixed gaps give.
     const gapX = Math.max(GAP_X, (RAIL_W + 24) / z), orW = Math.max(OR_W, OR_MIN / z)
     const screens = this.screens.filter((s) => !s.component)
-    // The boxes column is as wide as a screen of the mockup and its rail.
+    // The Components box is as wide as a screen of the mockup and its rail; the boxes' rails go in the gaps.
     const devW = Math.max(DEVICES[DEFAULT_DEVICE].width, ...this.screens.filter((s) => s.component || !s.parent).map((s) => s.cards[0]?.width ?? 0))
-    const sideW = this.side.hidden ? 0 : devW + 40 + (RAIL_W + 10) / z
-    Object.assign(this.side.style, { left: `${PAD}px`, top: `${PAD}px`, width: `${sideW}px` })
-    const left = PAD + (sideW && sideW + gapX)
+    this.components.parentElement!.style.width = `${devW + 40 + (z < FAR ? 0 : (RAIL_W + 10) / z)}px`
+    this.side.style.gap = `${gapX}px`
     const sizes = new Map<string, { w: number; h: number; parts: { id: string; w: number; h: number }[] }>()
     for (const s of screens) {
       const parts = s.cards.map((v) => ({ id: v.id, ...this.size(this.cards.get(v.id)!) }))
@@ -469,18 +468,21 @@ export class Canvas {
     const rows: string[][] = [roots.filter((r) => depth.get(r) === 0)]
     while (rows.at(-1)!.length) rows.push(rows.at(-1)!.flatMap((k) => (kids.get(k) ?? []).filter((c) => depth.get(c) === rows.length)))
     rows.pop()
-    // Across: side by side, a first child below its parent when that place is free.
+    // Across: side by side, a first child below its parent when that place is free. The boxes go
+    // right of the first screen and its rail, in its row.
     this.boxes.clear()
     const xs = new Map<string, number>()
-    let maxX = sideW ? PAD + sideW : PAD
+    const side = !this.side.hidden && rows.length > 0
+    let maxX = PAD, sideX = PAD
     for (const row of rows) {
-      let cursor = left
+      let cursor = PAD
       for (const k of row) {
         const p = this.parentOf.get(k), first = p != null && kids.get(p)![0] === k
         const x = Math.max(cursor, first ? xs.get(p)! : cursor)
         xs.set(k, x)
         cursor = x + sizes.get(k)!.w + gapX
-        maxX = Math.max(maxX, x + sizes.get(k)!.w)
+        if (side && k === rows[0]![0]) { sideX = cursor; cursor += this.side.offsetWidth + gapX }
+        maxX = Math.max(maxX, cursor - gapX)
       }
     }
     // Each bending parent gets its own branch height, the leftmost lowest, so no lines cross; the gap grows.
@@ -492,7 +494,7 @@ export class Canvas {
       return bending.length
     })
     // Each row holds the names above its screens, which keep their size on screen.
-    const rowH = rows.map((row) => Math.max(...row.map((k) => sizes.get(k)!.h)))
+    const rowH = rows.map((row, d) => Math.max(d || !side ? 0 : this.side.offsetHeight, ...row.map((k) => sizes.get(k)!.h)))
     const above = (d: number) => (rows[d]!.some((k) => sizes.get(k)!.parts.length > 1) ? IDEA_H : labelH(z)) / z
     const rowY: number[] = []
     let y = PAD
@@ -506,9 +508,8 @@ export class Canvas {
       this.boxes.set(k, { x: xs.get(k)!, y: rowY[d]!, w: sizes.get(k)!.w, h: sizes.get(k)!.h })
       this.rowBottom.set(k, rowY[d]! + rowH[d]!)
     }))
-    const lastGap = rows.length ? GAP_Y + Math.max(0, lanesIn.at(-1)! - 1) * lane : 0
-    const sideH = sideW ? this.side.offsetHeight : 0
-    y = Math.max(y - lastGap, PAD + sideH)
+    y -= rows.length ? GAP_Y + Math.max(0, lanesIn.at(-1)! - 1) * lane : 0
+    Object.assign(this.side.style, { left: `${sideX}px`, top: `${rowY[0] ?? PAD}px` })
     this.extent = { x: PAD, y: PAD, w: Math.max(0, maxX - PAD), h: Math.max(0, y - PAD) }
     for (const s of screens) {
       const b = this.boxes.get(s.key)
@@ -600,17 +601,7 @@ export class Canvas {
     shield.append(el('span', 'pick-hint', 'Pick this design'))
     screen.append(frame, shield)
     const error = el('div', 'error-box')
-    const rail = el('div', 'rail')
-    const tools = RAIL.map(([tool, icon, tip]) => {
-      const b = el('button', 'tool', icon) as HTMLButtonElement
-      b.type = 'button'
-      b.title = tip
-      b.dataset.tool = tool
-      b.setAttribute('aria-label', tip.split(':')[0]!)
-      b.addEventListener('click', () => this.on.tool(c.key, tool))
-      rail.append(b)
-      return b
-    })
+    const { el: rail, tools } = railOf(RAIL, (tool) => this.on.tool(c.key, tool))
     root.append(head, screen, error, rail)
     const c: Card = {
       el: root, name, idea, more, note, screen, frame, shield, error, rail, undo: tools[2]!, tools, key, view: null,

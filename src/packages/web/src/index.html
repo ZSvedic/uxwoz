@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="./shell.css">
 </head>
 <body>
-<header class="toolbar">
+<header class="toolbar" id="toolbar">
   <div class="tb-left">
     <strong class="logo">UX Woz</strong>
     <button id="projectButton" type="button" class="menu-button" aria-haspopup="menu" title="Mockup: new, recent, start over, delete">
@@ -30,12 +30,20 @@
     <div id="navMenu" class="menu nav-menu" role="menu" hidden></div>
   </div>
   <div class="tb-right zoom">
-    <span class="box-nav">
-      <button type="button" data-box="components" title="Show the Components box; the number counts what is new since you last looked">Components <b></b></button>
-      <button type="button" data-box="rules" title="Show the Rules box; the number counts what is new since you last looked">Rules <b></b></button>
-      <button type="button" data-box="data" title="Show the Data box; the number counts what is new since you last looked">Data <b></b></button>
-      <button type="button" data-box="notes" title="Show the fixer's notes; the number counts its visits since you last looked">Notes <b></b></button>
+    <span class="box-nav" title="Show a box; the number counts what is new since you last looked">
+      <button type="button" data-box="rules">Rules <b></b></button>
+      <button type="button" data-box="notes">Fixer <b></b></button>
+      <button type="button" data-box="components">Components <b></b></button>
+      <button type="button" data-box="data">Data <b></b></button>
     </span>
+    <button id="boxesButton" type="button" class="menu-button" aria-haspopup="menu" title="Show a box; the numbers count what is new since you last looked">Boxes <b id="boxesSum"></b> <span class="caret">▾</span></button>
+    <div id="boxesMenu" class="menu" role="menu" hidden>
+      <button type="button" class="item" data-box="rules"><span>Rules</span><b></b></button>
+      <button type="button" class="item" data-box="notes"><span>Fixer's notes</span><b></b></button>
+      <button type="button" class="item" data-box="components"><span>Components</span><b></b></button>
+      <button type="button" class="item" data-box="data"><span>Data</span><b></b></button>
+    </div>
+    <select id="theme" title="Theme: how every screen looks"></select>
     <button id="zoomOut" type="button" class="wide-only" title="Zoom out (⌘−)">−</button>
     <button id="zoomValue" type="button" class="menu-button" aria-haspopup="menu" title="Zoom"><span id="zoomPct">100%</span> <span class="caret">▾</span></button>
     <button id="zoomIn" type="button" class="wide-only" title="Zoom in (⌘+)">+</button>
@@ -85,7 +93,6 @@
     <div class="gen-row">
       <label>Model <select id="model"></select></label>
       <label>Device <select id="device" title="What the mockup's screens are designed for"></select></label>
-      <label>Theme <select id="theme"></select></label>
     </div>
     <button id="go" type="submit" class="primary go">Generate</button>
     <div class="gen-list">
