@@ -129,8 +129,7 @@ export class Canvas {
   /** The OR of each open A OR B, by screen key. */
   private ors = new Map<string, HTMLElement>()
   private screens: ScreenView[] = []
-  /** From the last layout: each screen's parent and row bottom, each parent's branch height (0 highest). */
-  private parentOf = new Map<string, string>()
+  /** From the last layout: each screen's row bottom, each parent's branch height (0 highest). */
   private rowBottom = new Map<string, number>()
   private lanes = new Map<string, number>()
   /** Each screen's place from the last layout, in canvas pixels. */
@@ -176,8 +175,6 @@ export class Canvas {
       stage.addEventListener('pointerup', up)
     })
   }
-
-  get zoom() { return this.z }
 
   /** When the user last scrolled, dragged or zoomed the canvas (performance.now()); fits do not count. */
   moved = 0
@@ -326,12 +323,7 @@ export class Canvas {
         if (c.width !== v.width) { c.width = v.width; c.frame.style.width = `${v.width}px` }
         // A component card flows in its box: only its width is set.
         if (s.component) c.el.style.width = c.screen.style.width = `${v.width}px`
-        c.el.classList.toggle('fresh', !!s.fresh)
-        c.el.classList.toggle('side', !!v.side)
-        c.el.classList.toggle('pickable', !!v.side?.pickable)
-        c.el.classList.toggle('streaming', v.streaming)
-        c.el.classList.toggle('failed', !!v.error)
-        c.el.classList.toggle('current', s.current && !v.side)
+        for (const [cls, on] of Object.entries({ fresh: s.fresh, side: v.side, pickable: v.side?.pickable, streaming: v.streaming, current: s.current && !v.side })) c.el.classList.toggle(cls, !!on)
         c.name.textContent = v.name
         c.name.title = v.name
         c.name.hidden = !v.name
@@ -425,11 +417,11 @@ export class Canvas {
     const keys = new Set(screens.map((s) => s.key))
     const kids = new Map<string, string[]>()
     const roots: string[] = []
-    this.parentOf.clear()
+    const parentOf = new Map<string, string>()
     for (const s of screens) {
       if (s.parent && keys.has(s.parent) && s.parent !== s.key) {
         kids.set(s.parent, [...(kids.get(s.parent) ?? []), s.key])
-        this.parentOf.set(s.key, s.parent)
+        parentOf.set(s.key, s.parent)
       } else roots.push(s.key)
     }
     const depth = new Map<string, number>()
@@ -455,7 +447,7 @@ export class Canvas {
     for (const row of rows) {
       let cursor = PAD
       for (const k of row) {
-        const p = this.parentOf.get(k), first = p != null && kids.get(p)![0] === k
+        const p = parentOf.get(k), first = p != null && kids.get(p)![0] === k
         const x = Math.max(cursor, first ? xs.get(p)! : cursor)
         xs.set(k, x)
         cursor = x + sizes.get(k)!.w + gapX
