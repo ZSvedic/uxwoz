@@ -172,7 +172,7 @@ export function renderToolbar() {
   $('navName').textContent = cur ? labelOf(cur) : 'Screens'
   $('themeName').textContent = state.themes.find((t) => t.id === state.theme)?.label ?? state.theme
   nav.title = cur ? labelOf(cur) : 'Every screen of this mockup'
-  $('exportBoxes').hidden = !app
+  $('exportBoxes').hidden = $('exportProject').hidden = !app
   // Each box button counts entries new since the user last looked; Boxes (a narrow window's menu of them) shows the sum.
   let sum = 0
   for (const b of document.querySelectorAll<HTMLButtonElement>('[data-box]')) {
@@ -189,3 +189,9 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('[data-zoom]')) b.a
 
 export const warmUp = (model: string) => post('/api/warmup', { model }).catch(() => {})
 modelSelect.addEventListener('change', () => warmUp(modelSelect.value))
+
+/** Export project: the whole mockup as a zip for a coding or design agent, downloaded from the server. */
+const exportProject = item('⇩ Export project…', 'zip', () => { if (state.app) location.href = `/api/export?app=${encodeURIComponent(state.app)}` })
+exportProject.id = 'exportProject'
+exportProject.title = 'Download the prompt, the boxes and every screen as a zip, to hand to a coding or design agent'
+$('exportBoxes').after(exportProject)

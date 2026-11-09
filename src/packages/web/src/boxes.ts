@@ -3,7 +3,7 @@
 // Export writes markdown.
 
 import type { BoxName, Boxes, CacheEntry, Table } from '@uxwoz/core'
-import { BOX_TITLES, LIMITS } from '@uxwoz/core/keys'
+import { BOX_TITLES, LIMITS, tableMarkdown } from '@uxwoz/core/keys'
 
 /** A box: the three the models read, and the fixer's notes. */
 export type Box = BoxName | 'notes'
@@ -167,12 +167,11 @@ function tableView(t: Table, op: (o: BoxOp) => void): HTMLElement {
 
 /** The three boxes as markdown, for Export. */
 export function boxesMarkdown(app: string, components: CacheEntry[], b: Boxes): string {
-  const row = (r: string[]) => `| ${r.map((c) => c.replace(/\|/g, '\\|')).join(' | ')} |`
   return [
     `# Boxes of ${app}`, '', '## Components', '',
     ...components.flatMap((c) => [`### ${c.name}`, '', `Where it belongs: ${c.action ?? ''}`, '', '```html', c.versions.at(-1)?.html ?? '', '```', '']),
     '## Rules', '', ...b.rules.map((r) => `- **${r.id}**: ${r.text}`), '',
     '## Data', '',
-    ...b.data.flatMap((t) => [`### ${t.id}`, '', row(t.columns), row(t.columns.map(() => '---')), ...t.rows.map(row), '']),
+    ...b.data.flatMap((t) => [`### ${t.id}`, '', ...tableMarkdown(t), '']),
   ].join('\n')
 }

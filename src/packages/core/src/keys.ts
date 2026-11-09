@@ -43,3 +43,9 @@ export const BOX_TITLES = { rules: 'Rules', notes: 'Fixer\'s notes', components:
 
 /** A box entry's ID: 1 to 4 lowercase words joined by dashes. */
 export const isId = (s: unknown): s is string => typeof s === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+){0,3}$/.test(s)
+
+/** A Data table as markdown lines: the columns, the rule under them, the rows; a | in a cell is escaped. */
+export function tableMarkdown(t: { columns: string[]; rows: string[][] }): string[] {
+  const row = (r: string[]) => `| ${r.map((c) => c.replace(/\|/g, '\\|')).join(' | ')} |`
+  return [row(t.columns), row(t.columns.map(() => '---')), ...t.rows.map(row)]
+}

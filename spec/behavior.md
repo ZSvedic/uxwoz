@@ -50,7 +50,7 @@ Theme, zoom) look alike: normal weight and the same chevron.
 - **Project menu** (left): a button with the mockup's prompt, cut short. Its menu has
   **New mockup…** (opens the generate panel), **Recent mockups** (the last ten, the open one
   ticked; choosing one opens it), and, with a mockup open, **⇩ Export the boxes** (a markdown file
-  of Components, Rules and Data), **↺ Start over** (deletes every screen and the boxes, and makes
+  of Components, Rules and Data), **⇩ Export project…** (a zip, see Export below), **↺ Start over** (deletes every screen and the boxes, and makes
   the first screen again) and **✕ Delete** (deletes the mockup). Both ask first.
 - **Nav** (middle): names the current screen (*L2 Camera ▾*). Its menu lists every screen as an
   indented tree, each with the control that opened it (*via Camera*), the path to the current
@@ -75,6 +75,22 @@ Theme, zoom) look alike: normal weight and the same chevron.
   level stays. The keys also work while a screen has the focus.
 
 Menus close on Esc, on a press outside them, or on a click into a screen.
+
+### Export
+
+Once a mockup is final, **Export project…** downloads it as one zip (*nicesnore-a-snore-app-with-recording-as.zip*)
+for a coding agent or a design agent to build the real front end from. It holds the product, not
+the process: no fixer's notes, no design that was not picked, no older versions.
+
+- `HANDOFF.md`: one page for the agent: what the folder is, that the rules bind, that the data is
+  sample data to seed with, that the screens' structure and navigation are the spec and the sketch
+  look is not, the build order (components, then screens from Home outward), and a prompt to paste.
+- `README.md`: the prompt as typed, the device, the model, and the screen tree: each screen with
+  its one line and the controls that lead to it. Planned screens are listed as *Not drawn yet*.
+- `rules.md`, `data.md` (the tables), `components.md` (each with where it belongs and its HTML).
+- `screens/<name>.html`: each drawn screen as a page of its own, components pasted, the Mockup
+  theme inside it, as wide as its device. It opens from disk: a control that names a drawn screen
+  opens that page, `back` goes back, any other control does nothing. Home is `home.html`.
 
 ## Generate panel
 
