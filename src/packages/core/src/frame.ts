@@ -65,6 +65,7 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     if (zoom) e.preventDefault()
     parent.postMessage({ uxwoz: 'key', key: e.key, code: e.code, shift: e.shiftKey, mod }, '*')
   })
+  // The mouse's back and forward buttons walk the app's screens, not away from the page.
   addEventListener('mouseup', (e) => {
     if (e.button !== 3 && e.button !== 4) return
     e.preventDefault()
@@ -77,6 +78,7 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     const prompt = el.getAttribute('data-action')
     if (prompt) { e.preventDefault(); go(prompt, labelOf(el)) }
   }, true)
+  // A followed link would show another page in the frame.
   window.addEventListener('click', (e) => { if (e.target instanceof Element && e.target.closest('a[href]')) e.preventDefault() })
   document.addEventListener('submit', (e) => {
     const p = e.target.getAttribute('data-action') || e.submitter?.getAttribute('data-action')
@@ -109,7 +111,7 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
   }
   addEventListener('load', () => { report(); new ResizeObserver(report).observe(document.body) })
   addEventListener('wheel', (e) => {
-    e.preventDefault()
+    e.preventDefault() // a pinch arrives as Ctrl+wheel
     if (e.ctrlKey || e.metaKey) parent.postMessage({ uxwoz: 'zoom', dy: e.deltaY, x: e.clientX, y: e.clientY }, '*')
     else parent.postMessage({ uxwoz: 'wheel', dx: e.deltaX, dy: e.deltaY }, '*')
   }, { passive: false })

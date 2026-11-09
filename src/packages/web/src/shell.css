@@ -28,7 +28,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .tb-left { gap: 8px; min-width: 0; }
 .tb-mid { justify-content: center; min-width: 0; }
 .tb-right { justify-content: flex-end; }
-.toolbar .trail { border: 0; padding: 2px 8px; font-size: 18px; line-height: 1; }
+.toolbar .trail { border: 0; font-size: 18px; line-height: 1; }
 .trail:disabled { opacity: .3; }
 .logo { font-size: 15px; white-space: nowrap; color: var(--accent); }
 .toolbar button { padding: 4px 9px; }
@@ -68,7 +68,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 /* The workspace: the canvas, the generate panel over it, the drawer at the right. */
 .workspace { flex: 1; min-height: 0; display: flex; position: relative; }
 .canvas-area { flex: 1; min-width: 0; min-height: 0; position: relative; display: flex; }
-.stage { flex: 1; min-width: 0; min-height: 0; position: relative; overflow: auto;
+.stage { flex: 1; min-width: 0; min-height: 0; position: relative; overflow: auto; outline: none;
   --z: 1; background: var(--bg) radial-gradient(circle, var(--dot) 1.2px, transparent 1.4px) 0 0 / calc(24px * var(--z)) calc(24px * var(--z));
   background-attachment: local; }
 .stage.panning { cursor: grabbing; }

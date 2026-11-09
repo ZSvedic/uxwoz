@@ -1,5 +1,5 @@
 // The system prompt: the canvas manual verbatim, then how to reply (a test keeps it equal to
-// spec/prompt-screen.md). Its bytes key every cassette: a change means `bun run test:record`.
+// spec/prompt-screen.md; the source is process/plans/2026-11-06-canvas-manual.md). Its bytes key every cassette: a change means `bun run test:record`.
 
 import { LIMITS } from './keys.ts'
 import { DEVICES, type Device } from './frame.ts'

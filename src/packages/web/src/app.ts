@@ -246,6 +246,7 @@ async function stream(url: string, body: object, what: string, on: (ev: ScreenEv
   state.busy?.abort()
   const ctrl = new AbortController()
   state.busy = ctrl
+  draw() // rails and the drawer wait while busy
   let failed = false
   try {
     const css = await themeCss(themeSelect.value)
@@ -555,7 +556,6 @@ async function revise(key: string, change: string | null) {
   if (!e?.versions.length) return
   if (state.busy) return hint()
   state.revising = { key, change }
-  draw()
   let frame: StreamRenderer | null = null
   await stream('/api/revise', { key, change, model: modelSelect.value, device: deviceSelect.value }, change ? 'make the change' : 'make a new design', (ev, css) => {
     if (ev.type === 'chunk') (frame ??= streamInto(key, css, isComponent(e))).push(ev.text)
