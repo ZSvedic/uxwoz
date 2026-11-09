@@ -6,7 +6,7 @@ import { BOXES, idOf, refuseLine } from './cache.ts'
 import { askBackground, backgroundVersion, boxLines, numberParts, parseFiling, partOf, type FilingLine } from './filing.ts'
 import { BOX_TITLES } from './keys.ts'
 import { visitRequest } from './prompt.ts'
-import type { Fetch } from './providers.ts'
+import type { Io } from './providers.ts'
 import { HOME_LINE, HOME_NAME, isComponent } from './tree.ts'
 
 /** A visit redraws at most this many screens. */
@@ -106,7 +106,7 @@ function visitLines(cache: ScreenCache, app: string, reply: string, sent: Map<st
 }
 
 /** `ask`: an Edit of a box, the user's request the visit starts from. */
-export interface VisitOptions { cache: ScreenCache; app: string; ask?: { box: BoxName | 'notes'; text: string }; fetch?: Fetch; env?: Record<string, string | undefined>; log?: (msg: string) => void }
+export interface VisitOptions extends Io { cache: ScreenCache; app: string; ask?: { box: BoxName | 'notes'; text: string } }
 
 /** One visit: ask, apply, keep the note. Null when `dropped()` says, as the reply comes, that the mockup went. */
 export async function visitPaper(o: VisitOptions, dropped: () => boolean): Promise<{ visit: Visit } & Pick<Applied, 'redraws' | 'group'> | null> {

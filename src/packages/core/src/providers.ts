@@ -4,6 +4,9 @@
 import { MODELS, type ModelConfig, type ModelId } from './models.ts'
 
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>
+export type Env = Record<string, string | undefined>
+/** How a call reaches the world: a fetch and an env to use instead of the real ones (tests), and a log. */
+export interface Io { fetch?: Fetch; env?: Env; log?: (msg: string) => void }
 
 export interface FinalEvent {
   type: 'final'
@@ -17,14 +20,12 @@ export interface FinalEvent {
 
 export type StreamEvent = { type: 'text'; text: string } | FinalEvent
 
-export interface StreamOptions {
+export interface StreamOptions extends Io {
   model: ModelId
   system: string
   user: string
   maxTokens?: number
   signal?: AbortSignal
-  fetch?: Fetch
-  env?: Record<string, string | undefined>
 }
 
 const noFinal = (): FinalEvent => ({ type: 'final', servedModel: null, finishReason: null, inputTokens: null, cachedInputTokens: null, outputTokens: null, costUsd: null })
@@ -47,7 +48,7 @@ async function* sseData(body: ReadableStream<Uint8Array>): AsyncGenerator<string
   if (buf.startsWith('data:')) yield buf.slice(5).trim()
 }
 
-function key(env: Record<string, string | undefined>, name: string): string {
+function key(env: Env, name: string): string {
   const v = env[name]
   if (!v) throw new ProviderError(`${name} is not set in the root .env`)
   return v
@@ -67,7 +68,7 @@ async function post(f: Fetch, url: string, body: unknown, headers: Record<string
   return res.body
 }
 
-async function* streamOpenRouter(cfg: ModelConfig, o: StreamOptions, f: Fetch, env: Record<string, string | undefined>) {
+async function* streamOpenRouter(cfg: ModelConfig, o: StreamOptions, f: Fetch, env: Env) {
   const body = {
     model: cfg.model,
     stream: true,
@@ -102,7 +103,7 @@ async function* streamOpenRouter(cfg: ModelConfig, o: StreamOptions, f: Fetch, e
   yield final
 }
 
-async function* streamOpenAI(cfg: ModelConfig, o: StreamOptions, f: Fetch, env: Record<string, string | undefined>) {
+async function* streamOpenAI(cfg: ModelConfig, o: StreamOptions, f: Fetch, env: Env) {
   const body = {
     model: cfg.model,
     stream: true,

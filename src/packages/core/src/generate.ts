@@ -5,20 +5,18 @@ import { extractFragment, screenIdea, screenName } from './frame.ts'
 import type { Device } from './frame.ts'
 import { MODELS, type ModelId } from './models.ts'
 import { SYSTEM_PROMPT, WARMUP_REQUEST } from './prompt.ts'
-import { ProviderError, streamModel, type Fetch } from './providers.ts'
+import { ProviderError, streamModel, type Io } from './providers.ts'
 
 /** A slower screen is useless, and keep-alive comments can stall a stream, so this is an overall deadline. */
 export const DEADLINE_MS = 20_000
 
-export interface GenerateOptions {
+export interface GenerateOptions extends Io {
   /** The user message: the paper and the job (drawRequest or editRequest). */
   user: string
   model: ModelId
   /** The device the request designs for, stored with the version. */
   device?: Device
   signal?: AbortSignal
-  fetch?: Fetch
-  env?: Record<string, string | undefined>
 }
 
 export type GenerateEvent = { type: 'chunk'; text: string } | { type: 'done'; version: Version }
@@ -64,7 +62,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
 }
 
 /** One short request with the same system prompt, so the provider's prompt cache is warm for the session. */
-export async function warmUp(model: ModelId, opts: { fetch?: Fetch; env?: Record<string, string | undefined> } = {}) {
+export async function warmUp(model: ModelId, opts: Io = {}) {
   const stream = streamModel({
     model, system: SYSTEM_PROMPT, user: WARMUP_REQUEST, maxTokens: 16,
     signal: AbortSignal.timeout(DEADLINE_MS), ...opts,

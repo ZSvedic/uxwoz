@@ -65,7 +65,6 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .nav-menu .item.path, .nav-menu .item.path b { color: var(--accent); }
 .nav-menu .item.current { font-weight: 700; background: var(--bg); }
 .nav-menu .item.planned { color: var(--muted); font-style: italic; }
-.nav-menu .via { color: var(--muted); font-size: 12px; }
 
 /* The workspace: the canvas, the generate panel over it, the drawer at the right. */
 .workspace { flex: 1; min-height: 0; display: flex; position: relative; }

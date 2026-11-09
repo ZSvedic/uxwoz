@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import {
   BOX_TITLES, DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, HOME_LINE, HOME_NAME, MODELS, PROPOSALS, ScreenCache, canonicalAction, drawRequest, editRequest,
   fileDecision, generateScreen, isComponent, isDevice, isModelId, normalizePrompt, visitPaper, plannedScreens, promptFromLabel, screenKey, screenRef,
-  warmUp, type BoxName, type CacheEntry, type Device, type Fetch, type GenerateEvent, type ModelId, type Version, type VisitOptions,
+  warmUp, type BoxName, type CacheEntry, type Device, type GenerateEvent, type Io, type ModelId, type Version, type VisitOptions,
 } from '@uxwoz/core'
 import index from './index.html'
 
@@ -25,12 +25,9 @@ export type ScreenEvent =
   | { type: 'done'; entry: CacheEntry; filing?: boolean }
   | { type: 'error'; message: string }
 
-export interface ServerOptions {
+export interface ServerOptions extends Io {
   port?: number
   cache?: ScreenCache
-  fetch?: Fetch
-  env?: Record<string, string | undefined>
-  log?: (msg: string) => void
   /** Picks the side that is asked for a clearly different design; Math.random by default. */
   random?: () => number
   /** How long a new screen or a change waits for a running filing before it goes on without it. */
