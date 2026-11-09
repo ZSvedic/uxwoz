@@ -1,0 +1,210 @@
+<!doctype html>
+<!--
+  Variant A, "Sticker book": candy colours, chunky ink outlines and hard offset shadows, like stickers on a page.
+  Layout: the familiar top toolbar and a right drawer. Signature animation: a PICKED! sticker slaps onto the chosen design.
+  Sounds: a two-note coin blip on pick, a soft swoop when the drawer opens. Static mock with faked content.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UX Woz, variant A</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&amp;display=swap">
+<style>
+:root{--bg:#fff6e5;--dot:#efd9b0;--card:#fffdf7;--ink:#2b2340;--edge:#2b2340;--muted:#7a6f86;--tomato:#ff5a36;--sun:#ffc531;--teal:#1fb5a8;--grape:#7b5cff;
+  --bar:#ffc531;--soft:0 10px 30px rgba(43,35,64,.15);color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--bg:#1d1730;--dot:#352a5c;--card:#2a2145;--ink:#fff3dc;--edge:#0d0a18;--muted:#b3a8c9;--tomato:#ff7a59;--sun:#ffd45c;
+  --teal:#3fd3c4;--grape:#a08bff;--bar:#3a2d63;--soft:0 10px 30px rgba(0,0,0,.45)}}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;height:100vh;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);color:var(--ink);font:500 15px/1.35 "Baloo 2",system-ui,sans-serif}
+button,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:2px solid var(--edge);background:var(--card);border-radius:12px;padding:3px 10px;box-shadow:3px 3px 0 var(--edge);transition:transform .08s,box-shadow .08s}
+button:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--edge)}
+button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--edge)}
+.primary{background:var(--tomato);color:#fff;font-weight:800}
+/* toolbar */
+.tb{flex:none;height:56px;display:flex;align-items:center;gap:8px;padding:0 12px;background:var(--bar);border-bottom:3px solid var(--edge);position:relative;z-index:5}
+.logo{display:flex;align-items:center;gap:6px;font-weight:800;font-size:22px;letter-spacing:-.02em;white-space:nowrap}
+.logo svg{width:34px;height:34px;flex:none}
+.tb .grow{flex:1}
+.mb::after{content:"";display:inline-block;width:7px;height:7px;margin:0 0 3px 8px;border:solid currentColor;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+.chip{display:inline-flex;gap:6px;align-items:center}
+.chip b{background:var(--tomato);color:#fff;border-radius:99px;min-width:20px;padding:0 6px;font-size:12px;line-height:20px}
+.round{width:36px;height:36px;padding:0;border-radius:50%;display:grid;place-items:center;flex:none}
+.round svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.mute.off{background:var(--muted);color:var(--card)}
+/* workspace */
+.ws{flex:1;min-height:0;display:flex;position:relative}
+.stage{flex:1;overflow:auto;background:var(--bg) radial-gradient(circle,var(--dot) 2px,transparent 2.5px) 0 0/28px 28px;padding:28px 16px 80px}
+.board{display:flex;flex-direction:column;gap:46px;transform-origin:0 0;transition:transform .25s}
+.lvl{display:flex;flex-wrap:wrap;gap:36px 70px;align-items:flex-start}
+.tag{display:inline-block;background:var(--grape);color:#fff;font-weight:800;border-radius:8px;padding:0 8px;margin-right:6px;font-size:13px;border:2px solid var(--edge)}
+.card{position:relative;background:var(--card);border:3px solid var(--edge);border-radius:20px;padding:12px;box-shadow:6px 6px 0 var(--edge)}
+.card h3{margin:0 0 8px;font-size:17px;display:flex;align-items:center}
+.pair{display:flex;gap:10px;align-items:center}
+.or{font-weight:800;font-size:26px;color:var(--tomato);transform:rotate(-8deg);text-shadow:2px 2px 0 var(--edge)}
+.prop{position:relative;display:flex;flex-direction:column;gap:6px;width:clamp(130px,38vw,190px);cursor:pointer}
+.prop .idea{font-weight:700;font-size:14px;min-height:38px}
+.prop .pick{align-self:center;background:var(--teal);color:#fff;font-weight:800}
+.phone{border:3px solid var(--edge);border-radius:22px;padding:6px;background:#2b2340}
+.phone .scr{border-radius:14px;min-height:260px}
+.stamp{position:absolute;top:70px;left:50%;width:120px;height:120px;margin-left:-60px;pointer-events:none;opacity:0}
+.stamp svg{width:100%;height:100%}
+/* The signature animation: the sticker slaps on, the other design peels away. */
+.prop.slap .stamp{animation:slap .55s cubic-bezier(.2,1.6,.4,1) forwards}
+.prop.slap .phone{animation:bump .55s}
+.prop.peek .stamp{animation:slap .55s cubic-bezier(.2,1.6,.4,1) forwards,fade .4s .9s forwards}
+.prop.peel{animation:peel .6s ease-in forwards}
+@keyframes slap{0%{opacity:0;transform:scale(2.6) rotate(-40deg)}60%{opacity:1}100%{opacity:1;transform:scale(1) rotate(-12deg)}}
+@keyframes fade{to{opacity:0}}
+@keyframes bump{30%{transform:scale(.95)}60%{transform:scale(1.04) rotate(-1deg)}100%{transform:none}}
+@keyframes peel{30%{transform:rotate(4deg) translateY(-6px)}100%{transform:rotate(22deg) translate(60px,260px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.prop,.prop *{animation-duration:.01s!important}}
+.again{margin-top:10px}
+.rail{position:absolute;right:-54px;top:10px;display:flex;flex-direction:column;gap:6px}
+.rail button{width:38px;height:38px;padding:0;font-size:17px;border-radius:12px}
+.rail button:first-child{background:var(--sun);color:#2b2340}
+.small{width:clamp(150px,40vw,180px)}
+/* the boxes: sticker notes with a coloured header strip */
+.boxes{display:flex;flex-direction:column;gap:22px;width:min(300px,100%)}
+.box{background:var(--card);border:3px solid var(--edge);border-radius:16px;padding:10px 12px;box-shadow:5px 5px 0 var(--edge)}
+.box h4{margin:-10px -12px 8px;padding:4px 12px;border-radius:12px 12px 0 0;border-bottom:3px solid var(--edge);font-size:15px;color:#fff}
+.b-rules h4{background:var(--grape)}.b-data h4{background:var(--teal)}.b-fix h4{background:var(--tomato)}
+.box ul{margin:0;padding-left:18px}.box li{margin:3px 0}
+.box code{font-weight:700;color:var(--grape)}
+.box table{border-collapse:collapse;width:100%;font-size:13px}
+.box td,.box th{border:2px solid var(--edge);padding:2px 6px;text-align:left}
+.box small{color:var(--muted)}
+.undo{font-size:12px;padding:0 8px;margin-left:6px;box-shadow:2px 2px 0 var(--edge)}
+/* the drawer */
+.drawer{position:absolute;top:0;right:0;bottom:0;width:min(360px,100%);background:var(--card);border-left:3px solid var(--edge);padding:14px;z-index:6;
+  transform:translateX(105%);transition:transform .3s cubic-bezier(.3,1.4,.5,1);display:flex;flex-direction:column;gap:10px;box-shadow:var(--soft)}
+.drawer.open{transform:none}
+.tabs{display:flex;gap:6px}.tabs .on{background:var(--grape);color:#fff}
+.drawer textarea,.gen textarea{width:100%;border:3px solid var(--edge);border-radius:14px;padding:8px;background:var(--bg)}
+.drawer ol{margin:0;padding-left:20px;color:var(--muted)}
+.x{margin-left:auto}
+/* the generate panel */
+.gen{position:absolute;inset:0;display:grid;place-items:center;background:rgba(43,35,64,.35);z-index:8}
+.gen form{width:min(460px,calc(100% - 32px));background:var(--card);border:3px solid var(--edge);border-radius:22px;padding:18px;box-shadow:8px 8px 0 var(--edge);display:flex;flex-direction:column;gap:10px}
+.gen h2{margin:0;font-size:24px}
+.gen .row{display:flex;gap:8px;flex-wrap:wrap}.gen select{border:2px solid var(--edge);border-radius:10px;padding:3px 6px;background:var(--card)}
+/* the mockup screens: a sketch, untouched by the chrome's theme */
+.scr{background:#fff;color:#222;font:11px/1.3 "Comic Sans MS","Comic Neue",cursive;padding:8px}
+.scr .w{border:1.5px solid #333;border-radius:255px 15px 225px 15px/15px 225px 15px 255px;padding:5px 7px;margin:5px 0}
+.scr b{font-size:13px}.scr .btn{text-align:center;background:#eef3ff;color:#2457c5}
+.scr .big{width:100px;height:100px;margin:10px auto;display:grid;place-items:center;border-radius:50% 46% 52% 48%/48% 52% 46% 50%;border:2px solid #333;font-size:16px}
+.scr .bars{display:flex;gap:3px;align-items:flex-end;height:40px}.scr .bars i{flex:1;background:#999;border-radius:3px 2px 0 0}
+.scr .tabbar{display:flex;justify-content:space-around;border-top:1.5px solid #333;margin-top:8px;padding-top:4px;color:#2457c5}
+@media (max-width:720px){.hide-s{display:none}.logo>span{display:none}.tb{gap:6px;padding:0 8px}.rail{position:static;flex-direction:row;margin-top:8px}
+  .lvl{gap:30px}.small{margin-left:0!important}.pair{gap:4px}.or{font-size:20px}}
+</style>
+</head>
+<body>
+<header class="tb">
+  <div class="logo" title="UX Woz">
+    <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 2l4.6 9.3 10.3 1.5-7.4 7.3 1.7 10.2L20 25.5l-9.2 4.8 1.7-10.2-7.4-7.3 10.3-1.5z" fill="#ffc531" stroke="#2b2340" stroke-width="2.5" stroke-linejoin="round" transform="rotate(-8 20 20)"/><path d="M12 34q8 5 16 0" fill="none" stroke="#ff5a36" stroke-width="3" stroke-linecap="round"/><circle cx="17" cy="16" r="1.8" fill="#2b2340"/><circle cx="23.5" cy="15" r="1.8" fill="#2b2340"/></svg>
+    <span>UX <span style="color:var(--tomato)">Woz</span></span>
+  </div>
+  <button class="mb" id="proj" title="Mockup: new, recent, start over">NiceSnore</button>
+  <span class="grow"></span>
+  <button class="round hide-s" title="Back">←</button>
+  <button class="mb">L1 Home</button>
+  <button class="round hide-s" title="Forward">→</button>
+  <span class="grow"></span>
+  <button class="chip hide-s">Rules <b>2</b></button>
+  <button class="chip hide-s">Fixer <b>1</b></button>
+  <button class="chip hide-s">Data</button>
+  <button class="mb hide-s">Sketch</button>
+  <button class="hide-s" id="zoom" title="Zoom">100%</button>
+  <button class="round mute" id="mute" title="Sounds on: click to mute" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></button>
+</header>
+<div class="ws">
+  <main class="stage"><div class="board" id="board">
+    <div class="lvl">
+      <div class="card" id="home">
+        <h3><span class="tag">L1</span> Home: pick one</h3>
+        <div class="pair">
+          <div class="prop">
+            <div class="idea">Last night first, chart below</div>
+            <div class="phone"><div class="scr">
+              <b>NiceSnore</b><div class="w">Last night<br><b>7 h 12 m</b> · 14 snores</div>
+              <div class="w"><div class="bars"><i style="height:30%"></i><i style="height:70%"></i><i style="height:45%"></i><i style="height:90%"></i><i style="height:20%"></i><i style="height:55%"></i></div></div>
+              <div class="w btn">Start night</div><div class="w btn">Nights</div>
+              <div class="tabbar"><span>Home</span><span>Nights</span><span>Settings</span></div></div></div>
+            <div class="stamp"></div>
+            <button class="pick">Pick A</button>
+          </div>
+          <div class="or">OR</div>
+          <div class="prop">
+            <div class="idea">One big Sleep button on top</div>
+            <div class="phone"><div class="scr">
+              <b>NiceSnore</b><div class="big">Sleep</div>
+              <div class="w">Snores last night: <b>14</b></div><div class="w btn">See all nights</div>
+              <div class="tabbar"><span>Home</span><span>Nights</span><span>Settings</span></div></div></div>
+            <div class="stamp"></div>
+            <button class="pick">Pick B</button>
+          </div>
+        </div>
+        <button class="again" id="again" hidden>↺ Show A OR B again</button>
+      </div>
+      <div class="boxes">
+        <div class="box b-rules"><h4>Rules</h4><ul><li><code>snore-count</code> Snores show as a count per night</li><li><code>tab-bar</code> Every screen pastes the tab bar</li></ul></div>
+        <div class="box b-data"><h4>Data</h4><table><tr><th>night</th><th>sleep</th><th>snores</th></tr><tr><td>Mon</td><td>7:12</td><td>14</td></tr><tr><td>Tue</td><td>6:40</td><td>22</td></tr></table></div>
+        <div class="box b-fix"><h4>Fixer's notes</h4>merged <code>snores</code> into <code>snore-count</code>; redrew Nights <button class="undo">Undo</button><br><small>21:14 · $0.004</small></div>
+      </div>
+    </div>
+    <div class="lvl">
+      <div class="card small"><h3><span class="tag">L2</span> Nights</h3>
+        <div class="phone"><div class="scr"><b>Nights</b><div class="w">Mon · 7:12 · 14 snores</div><div class="w">Tue · 6:40 · 22 snores</div><div class="w">Wed · 7:55 · 9 snores</div><div class="tabbar"><span>Home</span><span>Nights</span><span>Settings</span></div></div></div>
+        <div class="rail"><button data-edit title="Edit">✎</button><button title="Make again">↻</button><button data-edit title="Info">ⓘ</button><button title="Delete">✕</button></div></div>
+      <div class="card small"><h3><span class="tag">L2</span> Settings</h3>
+        <div class="phone"><div class="scr"><b>Settings</b><div class="w">Alarm when loud ☐</div><div class="w">Mic sensitivity ━━●━</div><div class="w">Dark at night ☑</div><div class="tabbar"><span>Home</span><span>Nights</span><span>Settings</span></div></div></div>
+        <div class="rail"><button data-edit title="Edit">✎</button><button title="Make again">↻</button><button data-edit title="Info">ⓘ</button><button title="Delete">✕</button></div></div>
+    </div>
+  </div></main>
+  <aside class="drawer" id="drawer" aria-label="Edit">
+    <div class="tabs"><button class="on">✎ Edit</button><button>ⓘ Info</button><button class="x" id="close" title="Close (Esc)">✕</button></div>
+    <strong>L2 Nights</strong>
+    <label for="chg">What should change?</label>
+    <textarea id="chg" rows="4" placeholder="e.g. Show a moon next to quiet nights"></textarea>
+    <button class="primary">Make the change</button>
+    <h4 style="margin:6px 0 0">Past changes</h4><ol><li>Show the snore count per night</li></ol>
+  </aside>
+  <div class="gen" id="gen" hidden><form onsubmit="return false">
+    <h2>What should we mock up?</h2>
+    <textarea rows="3" aria-label="Prompt">A sleep tracker that counts snores</textarea>
+    <div class="row"><select aria-label="Model"><option>Haiku</option><option>Luna</option><option>Sol</option></select><select aria-label="Device"><option>Phone</option><option>Desktop</option></select></div>
+    <button class="primary" id="go">Generate</button></form></div>
+</div>
+<script>
+const STAMP='<svg viewBox="0 0 120 120"><path d="M60 4l12 22 24-6-4 24 22 12-20 14 8 24-24-2-10 22-12-20-22 10 2-24-22-10 18-16-10-22 24 2z" fill="#ff5a36" stroke="#2b2340" stroke-width="4" stroke-linejoin="round"/><text x="60" y="68" text-anchor="middle" font-family="Baloo 2,sans-serif" font-weight="800" font-size="21" fill="#fff">PICKED!</text></svg>';
+document.querySelectorAll(".stamp").forEach(s=>s.innerHTML=STAMP);
+// Sounds: made on the fly, only after a click has opened the audio.
+let ac=null,muted=false;
+function snd(play,fromClick){if(muted)return;if(!ac){if(!fromClick)return;ac=new (window.AudioContext||window.webkitAudioContext)()}if(ac.state==="suspended")ac.resume();play(ac)}
+function tone(a,f,t,d,type,vol){const o=a.createOscillator(),g=a.createGain(),s=a.currentTime+t;o.type=type;o.frequency.setValueAtTime(f,s);
+  g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(vol,s+.01);g.gain.exponentialRampToValueAtTime(.001,s+d);o.connect(g).connect(a.destination);o.start(s);o.stop(s+d+.02);return o}
+const coin=a=>{tone(a,988,0,.09,"square",.05);tone(a,1319,.08,.25,"square",.05)};
+const swoop=a=>{tone(a,300,0,.25,"triangle",.1).frequency.exponentialRampToValueAtTime(900,a.currentTime+.18)};
+const props=[...document.querySelectorAll(".prop")],again=document.getElementById("again"),or=document.querySelector(".or");let picked=false;
+function play(el,cls){el.classList.remove("peek","slap");void el.offsetWidth;el.classList.add(cls)}
+props.forEach(p=>{
+  p.querySelector(".pick").addEventListener("mouseenter",()=>{if(!picked){play(p,"peek");snd(coin,false)}});
+  p.addEventListener("click",()=>{if(picked)return;picked=true;play(p,"slap");snd(coin,true);
+    const others=props.filter(q=>q!==p);others.forEach(q=>q.classList.add("peel"));
+    setTimeout(()=>{others.forEach(q=>q.hidden=true);or.hidden=true;again.hidden=false},620)})});
+again.onclick=()=>{picked=false;again.hidden=true;or.hidden=false;props.forEach(q=>{q.hidden=false;q.className="prop"})};
+const drawer=document.getElementById("drawer");
+document.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{drawer.classList.add("open");snd(swoop,true)});
+document.getElementById("close").onclick=()=>drawer.classList.remove("open");
+const mute=document.getElementById("mute");
+mute.onclick=()=>{muted=!muted;mute.classList.toggle("off",muted);mute.setAttribute("aria-pressed",muted);mute.title=muted?"Muted: click for sounds":"Sounds on: click to mute";mute.querySelector(".wave").style.display=muted?"none":""};
+const gen=document.getElementById("gen");document.getElementById("proj").onclick=()=>gen.hidden=false;
+document.getElementById("go").onclick=()=>{gen.hidden=true;again.click();snd(swoop,true)};
+gen.onclick=e=>{if(e.target===gen)gen.hidden=true};
+let z=1;document.getElementById("zoom").onclick=e=>{z=z===1?.75:1;e.target.textContent=Math.round(z*100)+"%";document.getElementById("board").style.transform=`scale(${z})`};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){drawer.classList.remove("open");gen.hidden=true}});
+</script>
+</body>
+</html>
