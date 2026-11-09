@@ -27,7 +27,6 @@ interface Making { key: string; parent: string | null; device: Device; sides: Si
 
 const state = {
   app: null as string | null,
-  /** Every screen, by key, as the server last sent it. */
   entries: new Map<string, CacheEntry>(),
   /** Each screen's level and parent, worked out on every draw. */
   tree: new Map<string, TreeNode>(),
@@ -40,16 +39,14 @@ const state = {
   picking: false,
   /** A picked screen getting a new version: an Edit with `change`, else a Regenerate. */
   revising: null as { key: string; change: string | null } | null,
-  /** The open drawer tab; it shows the current screen. */
   drawer: null as 'edit' | 'info' | null,
   busy: null as AbortController | null,
   /** The view before an A OR B was fitted, to go back to after the pick. */
   before: null as View | null,
   /** Counts mockups opened, so a slower earlier open gives way to a newer one. */
   starts: 0,
-  /** Rules and Data (components are entries), and whether filing or a fixer visit runs. */
+  /** Rules and Data (components are entries); how many times Undo can put each box back. */
   boxes: null as Boxes | null,
-  /** How many times Undo can put each box back. */
   undos: { components: 0, rules: 0, data: 0 } as Record<BoxName, number>,
   filing: false,
   visiting: false,
@@ -248,6 +245,7 @@ async function* readEvents(res: Response): AsyncGenerator<ScreenEvent> {
   }
 }
 
+const mapOf = (app: string, wait = false) => fetch(`/api/map?app=${encodeURIComponent(app)}${wait ? '&wait=1' : ''}`)
 const post = (url: string, body: object, signal?: AbortSignal) =>
   fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal })
 
@@ -486,7 +484,7 @@ function walkTrail(dir: 1 | -1) {
 async function reloadMap() {
   const app = state.app
   if (!app) return
-  const res = await fetch(`/api/map?app=${encodeURIComponent(app)}`).catch(() => null)
+  const res = await mapOf(app).catch(() => null)
   if (!res?.ok || state.app !== app) return
   applyMap(await res.json())
 }
@@ -511,7 +509,7 @@ async function filed() {
   try {
     for (let tries = 0, wait = true; tries < 40 && app && app === state.app; tries++, wait = false) {
       const n = state.edits
-      const res = await fetch(`/api/map?app=${encodeURIComponent(app)}${wait ? '&wait=1' : ''}`).catch(() => null)
+      const res = await mapOf(app, wait).catch(() => null)
       if (app !== state.app) return
       const map = res?.ok ? await res.json() : null
       if (map && n === state.edits && !state.busy && !state.picking) {
@@ -538,8 +536,8 @@ async function boxOp(o: BoxOp | { op: 'seen'; box: Box; ids: string[] }) {
 }
 
 /** What is new in a box since the user last looked: entries by ID, visits by when they started. */
-const unseen = (box: Box): string[] => box === 'components' ? components().filter((e) => !e.seen).map((e) => e.name!)
-  : box === 'notes' ? (state.boxes?.visits ?? []).filter((v) => !v.seen).map((v) => v.at) : state.boxes?.[box].filter((x) => !x.seen).map((x) => x.id) ?? []
+const unseen = (box: Box): string[] => (((box === 'components' ? components() : box === 'notes' ? state.boxes?.visits : state.boxes?.[box]) ?? []) as { seen?: boolean; id?: string; name?: string; at?: string }[])
+  .filter((x) => !x.seen).map((x) => x.id ?? x.name ?? x.at!)
 
 /** A toolbar button: move the view to a box; after a moment its new entries are no longer marked. */
 function lookAt(box: Box) {
@@ -727,7 +725,7 @@ async function start(app: string, make = true) {
   stopMaking()
   state.before = null
   const n = ++state.starts
-  const res = await fetch(`/api/map?app=${encodeURIComponent(app)}`)
+  const res = await mapOf(app)
   if (!res.ok) throw new Error(`could not load the mockup: HTTP ${res.status}`)
   const map = await res.json() as { entries: CacheEntry[] }
   if (n !== state.starts) return // a newer mockup was opened meanwhile

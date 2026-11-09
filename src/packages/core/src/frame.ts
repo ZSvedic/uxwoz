@@ -47,16 +47,15 @@ export const isDevice = (v: unknown): v is Device => typeof v === 'string' && Ob
 // and the frame never navigates. While the screen streams (`final` false), controls do nothing.
 const bootstrap = (final: boolean, vh: number) => `(() => {
   const final = ${final}
-  // Only a real click may open a screen, so a screen's script cannot start paid generations by itself.
+  // Only a real click opens a screen: a script cannot start paid generations.
   const go = (prompt, label) => {
     if (!final || typeof prompt !== 'string' || !prompt.trim()) return
     if (navigator.userActivation && !navigator.userActivation.isActive) return
     parent.postMessage({ uxwoz: 'action', prompt: prompt.trim().slice(0, 500), label: String(label || '').slice(0, 80) }, '*')
   }
-  // What the control says, shown between the two screens it joins.
   const labelOf = (el) => el ? (el.getAttribute('aria-label') || el.textContent || el.value || '').trim().replace(/\\s+/g, ' ') : ''
   addEventListener('pointerdown', () => parent.postMessage({ uxwoz: 'touch' }, '*'), true)
-  // The app's zoom keys, ⌘[ ⌘] and Esc work while a screen has the focus too; the fit keys not in a text field.
+  // The app's keys work while a screen has the focus.
   addEventListener('keydown', (e) => {
     const mod = e.metaKey || e.ctrlKey
     const field = e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)
@@ -66,7 +65,6 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     if (zoom) e.preventDefault()
     parent.postMessage({ uxwoz: 'key', key: e.key, code: e.code, shift: e.shiftKey, mod }, '*')
   })
-  // The mouse's back and forward buttons walk the app's screens instead of leaving the page.
   addEventListener('mouseup', (e) => {
     if (e.button !== 3 && e.button !== 4) return
     e.preventDefault()
@@ -79,15 +77,14 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     const prompt = el.getAttribute('data-action')
     if (prompt) { e.preventDefault(); go(prompt, labelOf(el)) }
   }, true)
-  // A link never leaves the screen: the frame would show another page.
   window.addEventListener('click', (e) => { if (e.target instanceof Element && e.target.closest('a[href]')) e.preventDefault() })
   document.addEventListener('submit', (e) => {
     const p = e.target.getAttribute('data-action') || e.submitter?.getAttribute('data-action')
     if (p) { e.preventDefault(); go(p, labelOf(e.submitter) || labelOf(e.target.querySelector('button,[type=submit]'))) }
   }, true)
-  // A sandboxed form submit would blank the frame; the model's own handlers run first.
+  // A sandboxed submit would blank the frame; the model's handlers run first.
   window.addEventListener('submit', (e) => e.preventDefault())
-  // vh units become pixels of the device's height (see VIEWPORT_H), again before each measure.
+  // vh units become pixels of the device's height, again before each measure.
   const vhToPx = (css) => css.replace(/(-?\\d*\\.?\\d+)[dsl]?vh\\b/g, (m, n) => (parseFloat(n) * ${vh / 100}) + 'px')
   const fixVh = () => {
     for (const el of document.querySelectorAll('main [style*="vh"], main[style*="vh"]')) {
@@ -111,7 +108,6 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     if (h + 'x' + w !== last) { last = h + 'x' + w; parent.postMessage({ uxwoz: 'size', height: h, width: w }, '*') }
   }
   addEventListener('load', () => { report(); new ResizeObserver(report).observe(document.body) })
-  // Ctrl/Cmd + scroll (and a pinch, which arrives as one) zooms the canvas around the pointer.
   addEventListener('wheel', (e) => {
     e.preventDefault()
     if (e.ctrlKey || e.metaKey) parent.postMessage({ uxwoz: 'zoom', dy: e.deltaY, x: e.clientX, y: e.clientY }, '*')
