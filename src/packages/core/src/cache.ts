@@ -84,6 +84,15 @@ export interface Change { text: string; note?: string; undo?: Undo; undone?: boo
 /** One visit of the fixer; `ask`: the user's request, for an Edit of a box. */
 export interface Visit { at: string; ask?: string; undone?: boolean; ms: number; costUsd: number | null; screens: number; changes: Change[]; refused: string[]; error?: string; seen: boolean }
 
+/** A share link of a mockup: its role, its cap on the screens and changes it may ask for (edit links), and how much it was used. */
+export interface Share { token: string; role: 'view' | 'comment' | 'edit'; createdAt: string; cap?: number; used: number; opens: number }
+/** What a visitor of a share link said: a comment (`about` a part), a thumb, the answer at a dead control, or the closing answer. */
+export interface Feedback { at: string; visitor: string; name: string; screen: string; title: string; kind: 'comment' | 'thumb' | 'dead' | 'done'; text?: string; about?: string; up?: boolean; label?: string }
+/** One visit of a share link: the screens seen in order and the dead controls clicked. */
+export interface Trip { id: string; visitor: string; name: string; at: string; screens: string[]; dead: string[] }
+/** A mockup's share links and what came back through them. */
+export interface Shared { shares: Share[]; feedback: Feedback[]; trips: Trip[] }
+
 export const BOXES: BoxName[] = ['components', 'rules', 'data']
 export const idOf = (x: Entry) => ('id' in x ? x.id : x.name!)
 const emptyBoxes = (): Boxes => ({ rules: [], data: [], gone: { components: [], rules: [], data: [] } })
@@ -98,6 +107,7 @@ export class ScreenCache {
   private entries = new Map<string, CacheEntry>()
   private boxes = new Map<string, Boxes>()
   private states = new Map<string, Partial<Record<BoxName, BoxState[]>>>()
+  private shared = new Map<string, Shared>()
   /** The change running (see group), and the change each box last kept a state for. */
   private change: number | null = null
   private kept = new Map<string, number>()
@@ -124,6 +134,7 @@ export class ScreenCache {
       for (const e of data.entries as CacheEntry[]) if (e.name || e.key === normalizePrompt(e.app)) this.entries.set(e.key, { name: HOME_NAME, ...e })
       for (const [root, b] of Object.entries(data.boxes ?? {})) this.boxes.set(root, b as Boxes)
       for (const [root, s] of Object.entries(data.states ?? {})) this.states.set(root, s as Record<BoxName, BoxState[]>)
+      for (const [root, s] of Object.entries(data.shared ?? {})) this.shared.set(root, s as Shared)
     } catch (err) {
       this.entries.clear()
       const aside = `${file}.corrupt-${Date.now()}`
@@ -361,6 +372,25 @@ export class ScreenCache {
     return b
   }
 
+  /** A mockup's share links, feedback and trips, to read: empty ones for a mockup that has none. */
+  sharedOf(app: string): Shared {
+    return this.shared.get(normalizePrompt(app)) ?? { shares: [], feedback: [], trips: [] }
+  }
+
+  /** A mockup's share links, feedback and trips, to change: stored from now on. */
+  ownShared(app: string): Shared {
+    const root = normalizePrompt(app)
+    let s = this.shared.get(root)
+    if (!s) this.shared.set(root, (s = { shares: [], feedback: [], trips: [] }))
+    return s
+  }
+
+  /** The share link with this token, and the mockup's first screen key. */
+  share(token: string): { root: string; share: Share } | undefined {
+    for (const [root, s] of this.shared) for (const share of s.shares) if (share.token === token) return { root, share }
+    return undefined
+  }
+
   /** A box's entries, oldest first. */
   list(app: string, box: BoxName): Entry[] {
     return box === 'components' ? this.mockup(app).filter(isComponent) : this.boxesOf(app)[box]
@@ -479,7 +509,8 @@ export class ScreenCache {
     for (const e of gone) { this.entries.delete(e.key); this.tomb(e.key) }
     const boxes = this.boxes.delete(root)
     this.states.delete(root)
-    if (gone.length || boxes) this.save()
+    const shared = this.shared.delete(root)
+    if (gone.length || boxes || shared) this.save()
     return gone.filter((e) => !isComponent(e)).length
   }
 
@@ -498,7 +529,7 @@ export class ScreenCache {
     mkdirSync(dirname(this.file), { recursive: true })
     // Write a temp file, then rename, so a crash never leaves half a cache file.
     const tmp = `${this.file}.tmp`
-    writeFileSync(tmp, JSON.stringify({ version: FORMAT, entries: [...this.entries.values()], boxes: Object.fromEntries(this.boxes), states: Object.fromEntries(this.states) }, null, 1))
+    writeFileSync(tmp, JSON.stringify({ version: FORMAT, entries: [...this.entries.values()], boxes: Object.fromEntries(this.boxes), states: Object.fromEntries(this.states), shared: Object.fromEntries(this.shared) }, null, 1))
     renameSync(tmp, this.file)
   }
 }

@@ -31,7 +31,8 @@ GET /api/map?app=A%20coffee%20shop%20ordering%20app&wait=1      (answers once fi
   no Node or Bun APIs.
 - `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`
   as the entry, `state.ts`, `screens.ts`, `nav.ts`, `drawer.ts`, `toolbar.ts`, `net.ts`, `canvas.ts`,
-  `boxes.ts`, `shell.css`, bundled by Bun's HTML import), and the themes in `themes/`.
+  `boxes.ts`, `sharing.ts`, `shell.css`, bundled by Bun's HTML import), the player (`player.html`,
+  `player.ts`), the share routes (`share.ts`), and the themes in `themes/`.
 
 There are no runtime dependencies; `@types/bun` and `typescript` are dev-only.
 
@@ -144,6 +145,33 @@ can spend model credits.
   a mockup with no first screen. A component is deleted with `/api/delete`, changed with
   `/api/revise`, undone with `/api/undo`.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
+- **Sharing** (`web/src/share.ts`): `POST /api/share {app, role, cap?}` makes a link (`role` view,
+  comment or edit; `cap` 1-1,000, default 20, edit only) and answers the `Share` with its `url`; 404
+  before the first pick. `GET /api/shares?app=` → `{shares, feedback, trips}`. `POST /api/unshare
+  {token}` (404 if unknown). `GET /s/:token` serves the player (`player.html`), or the app for an
+  edit link, from the hidden routes `/_player` and `/_app`; 404 for a revoked link. A visitor's
+  routes: `GET /api/s/:token/map` → `{role, app, root, components, screens: {key, name, title, html,
+  device, parent}[]}` (picked screens' newest versions and their tree parents only; it counts an
+  open in memory; a GET never writes the file), `POST /api/s/:token/feedback {visitor, name, kind,
+  screen, text?, about?, up?, label?}` (400 for a text over 1,000 characters or empty but a thumb;
+  404 for a screen not in the mockup), `POST /api/s/:token/trip {id, visitor, name, screens, dead}`
+  (replaces the trip with that id; at most 50 screens and 50 dead clicks). Both are 403 for a view
+  link. A mockup keeps 500 of each: comments, thumbs, answers (dead controls and Done), trips. These
+  two save the file at most once a second. Every request body is at most 64 KB (`maxRequestBodySize`).
+- **An edit link**: its page sends `x-uxwoz-share: <token>` on every `/api` call. It may use
+  `/api/config`, `/api/apps` (its mockup only), `/api/map`, `/api/screen`, `/api/pick`,
+  `/api/revise`, `/api/undo`, `/api/box` and `/api/delete`, each for its own mockup only: the mockup
+  is a GET's `?app=`, or a POST body's `app` or the first part of its `key`; a POST whose `app` or
+  `key` is not a string, or whose `?app=` names another mockup than its body, is 403. It may not use
+  `/api/share`, `/api/shares`, `/api/unshare`, `/api/delete-app`, `/api/warmup`, or `/api/delete` of
+  its first screen (all 403). Its budget (`cap`) counts each call that makes a model work: a new
+  screen that is not a cache hit, a pick (its filing), `/api/revise`, and `/api/box` with `edit` or
+  `visit`. A unit is taken before the call and given back when the call is refused; past the cap,
+  429 *This link's budget is used up.*
+- **The owner**: with `UXWOZ_OWNER` set, `/` and every `/api` route but `/api/s/*` need the cookie
+  `uxwoz_owner=<secret>` (401 on the API, a one-line 403 page on `/`); `/?owner=<secret>` sets it
+  (`HttpOnly; SameSite=Lax`, and `Secure` over https) and redirects to `/`. The server fetches the
+  pages it proxies from itself (`127.0.0.1` and its port), never from the request's Host.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
   `pico.css` followed by `mockup.css`.
 
@@ -162,6 +190,8 @@ only from a card's own frame.
 { uxwoz: 'wheel', dx, dy }           // scroll over the screen: dy and dx scroll the canvas
 { uxwoz: 'zoom', dy, x, y }          // Ctrl/Cmd + scroll or a pinch over the screen, at (x, y) in
                                      // the frame: zooms the canvas around that point
+{ uxwoz: 'part', text }              // the player's Pick a part: the words of the part clicked after
+                                     // the player sent the frame { uxwoz: 'name-part' }
 ```
 
 ## Types
@@ -194,6 +224,10 @@ Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | nul
              name?; idea?; feedback?; by?: 'fixer' }
              // name comes from the model's <title>, idea from its <meta name="idea">;
              // feedback is the Edit request that made this version, by: 'fixer' when a visit asked
+Shared     { shares: Share[]; feedback: Feedback[]; trips: Trip[] }   // per mockup, in the cache file under `shared`
+Share      { token; role: 'view' | 'comment' | 'edit'; createdAt; cap?; used; opens }   // token: 32 hex characters
+Feedback   { at; visitor; name; screen: key; title; kind: 'comment' | 'thumb' | 'dead' | 'done'; text?; about?; up?; label? }
+Trip       { id; visitor; name; at; screens: string[]; dead: string[] }   // the last 500 feedback and trips are kept
 TreeNode   { level; parent: key | null; label }
              // from screenTree: level 1 is the first screen, the fewest clicks from it otherwise
 VoiceState 'off' | 'asleep' | 'awake' | 'countdown'   // web/src/voice.ts, the microphone's state
@@ -218,7 +252,8 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 | `OPENAI_API_KEY` | GPT-6 Luna, GPT-6.1 Sol, GPT-6.1 Terra (filing, the fixer) |
 | `PORT` | server port, default 3000 |
 | `UXWOZ_HOST` | listen address, default `127.0.0.1` |
-| `UXWOZ_CACHE_FILE` | screen cache `{version: 5, entries, boxes, states}`, default `temp/screen-cache.json` |
+| `UXWOZ_CACHE_FILE` | screen cache `{version: 5, entries, boxes, states, shared}`, default `temp/screen-cache.json` |
+| `UXWOZ_OWNER` | the owner's secret: when set, only a browser with its cookie uses the app (see Sharing) |
 | `UXWOZ_RECORD` | `1` makes tests call the live APIs and rewrite `cassettes/` |
 
 ## Tests
@@ -226,4 +261,4 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 `bun test` runs `src/tests/*.test.ts`. Model calls go through `tests/cassette.ts`, which replays
 `cassettes/<test file name>.json` keyed by a hash of URL and request body; `tests/no-network.ts` makes any
 other non-localhost call throw. A test file that calls models has a cassette of the same name;
-`cut-off.test.ts`, `races.test.ts`, `boxes.test.ts` and `fixer.test.ts` use a fake provider instead.
+`cut-off.test.ts`, `races.test.ts`, `boxes.test.ts`, `fixer.test.ts` and `share.test.ts` use a fake provider instead.

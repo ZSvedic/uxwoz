@@ -174,6 +174,7 @@ export function renderToolbar() {
   $('themeName').textContent = state.themes.find((t) => t.id === state.theme)?.label ?? state.theme
   nav.title = cur ? labelOf(cur) : 'Every screen of this mockup'
   $('exportBoxes').hidden = $('exportProject').hidden = !app
+  $('shareMenu').hidden = $('feedbackMenu').hidden = !app
   // Each box button counts entries new since the user last looked; Boxes (a narrow window's menu of them) shows the sum.
   let sum = 0
   for (const b of document.querySelectorAll<HTMLButtonElement>('[data-box]')) {

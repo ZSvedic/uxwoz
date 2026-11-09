@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UX Woz mockup</title>
+<style>
+  :root { --ink: #1f2329; --muted: #6b7280; --line: #e3e5e8; --accent: #c2410c; --bg: #f4f4f2; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 14px/1.4 system-ui, -apple-system, sans-serif; color: var(--ink); background: var(--bg); }
+  .bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: #fff; border-bottom: 1px solid var(--line); }
+  .where { flex: 1; min-width: 0; }
+  .where b { display: block; font-size: 16px; }
+  .trail { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .trail button { border: 0; background: none; padding: 0; color: inherit; font: inherit; cursor: pointer; text-decoration: underline; }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 6px 12px; color: var(--ink); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.on { border-color: var(--accent); background: #fff3ec; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .stage { display: flex; justify-content: center; padding: 16px 16px 96px; }
+  .fit { position: relative; }
+  .device { position: absolute; top: 0; left: 0; transform-origin: top left; background: #fff; box-shadow: 0 2px 12px rgba(0, 0, 0, .12); border-radius: 8px; overflow: hidden; }
+  .device iframe { display: block; width: 100%; border: 0; }
+  .tools { position: fixed; bottom: 0; left: 0; right: 0; z-index: 2; display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 10px 16px; background: #fff; border-top: 1px solid var(--line); }
+  .toast { position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%); z-index: 3; background: var(--ink); color: #fff; padding: 8px 14px; border-radius: 20px; }
+  .note { max-width: 420px; margin: 80px auto; text-align: center; color: var(--muted); font-size: 16px; }
+  dialog { border: 1px solid var(--line); border-radius: 10px; padding: 16px; width: min(420px, calc(100vw - 32px)); }
+  dialog p { margin: 0 0 10px; font-weight: 600; }
+  dialog label { display: block; margin: 8px 0 4px; color: var(--muted); font-size: 12px; }
+  dialog input, dialog textarea { width: 100%; font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row input { flex: 1; }
+  .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<header class="bar">
+  <button id="back" title="Back to the screen before" disabled>← Back</button>
+  <div class="where"><b id="name">Loading…</b><div id="trail" class="trail"></div></div>
+</header>
+<main class="stage" id="stage"><div class="fit" id="fit"><div class="device" id="device"><iframe id="frame" title="Mockup screen"></iframe></div></div></main>
+<div id="note" class="note" hidden></div>
+<footer id="tools" class="tools" hidden>
+  <button id="up" title="I like this screen">👍</button>
+  <button id="down" title="I do not like this screen">👎</button>
+  <button id="comment">Comment on this screen</button>
+  <button id="done" class="primary">Done</button>
+</footer>
+<div id="toast" class="toast" role="status" hidden></div>
+<dialog id="ask">
+  <form id="askForm" method="dialog">
+    <p id="askQ"></p>
+    <div id="aboutRow">
+      <label for="about">About a part (optional)</label>
+      <div class="row"><input id="about" maxlength="120"><button type="button" id="pickPart" title="Click the part in the screen">Pick a part</button></div>
+    </div>
+    <label for="askText">Your answer</label>
+    <textarea id="askText" rows="4" maxlength="1000"></textarea>
+    <label for="who">Your name (optional)</label>
+    <input id="who" maxlength="60">
+    <div class="actions"><button type="button" id="askCancel">Cancel</button><button type="submit" class="primary">Send</button></div>
+  </form>
+</dialog>
+<script type="module" src="./player.ts"></script>
+</body>
+</html>

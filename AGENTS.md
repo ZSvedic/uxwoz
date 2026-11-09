@@ -73,6 +73,11 @@ src/packages/web/src/
                  rails at the canvas's scale, pan and zoom, fits
   boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes and their rails, editing and adding in
                  place, Export
+  share.ts       share links per role, the player's map, feedback and trips, an edit link's scope and cap, the
+                 owner's gate (UXWOZ_OWNER); `guard` wraps server.ts's routes
+  sharing.ts     browser: the drawer's Share and feedback pane, a screen's feedback in Info, an edit link's token
+                 on every API call
+  player.html, player.ts   the player at /s/<token>: one screen in its device frame, Back, the trail, feedback, trips
   index.html, shell.css   the page around the canvas
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest

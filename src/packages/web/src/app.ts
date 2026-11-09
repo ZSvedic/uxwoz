@@ -13,6 +13,7 @@ import { mapOf, post, showError, themeCss } from './net.ts'
 import { applyMap, currentKey, resetTrail, setCurrent } from './nav.ts'
 import { all, components, dropChoice, draw, fitChoice, fitScreenSoon, onAction, openScreen, pick, stopMaking } from './screens.ts'
 import { PICKERS, closeMenus, loadRecent, openGenerate, warmUp } from './toolbar.ts'
+import { editLinkApp, shareToken } from './sharing.ts'
 import { $, deviceSelect, generate, modelSelect, promptInput, state, store } from './state.ts'
 
 export const side = createSide(boxOp, (box, tab) => { focusBox(box); openDrawer(tab) })
@@ -86,7 +87,7 @@ async function deleteApp(again: boolean) {
   const app = state.app
   if (!app) return
   const n = state.entries.size - components().length
-  const what = `${n === 1 ? 'the only screen of this mockup' : `all ${n} screens of this mockup`} and its boxes (components, rules, data)`
+  const what = `${n === 1 ? 'the only screen of this mockup' : `all ${n} screens of this mockup`} and its boxes (components, rules, data), with its reviewer links and their feedback`
   if (!confirm(again ? `Start over? This deletes ${what} and makes its first screen again.` : `Delete ${what}?`)) return
   state.busy?.abort()
   const res = await post('/api/delete-app', { app }).catch(() => null)
@@ -112,7 +113,7 @@ async function init() {
   loadRecent()
   await themeCss(state.theme)
   // A reload opens the mockup that was open, with its A OR B if one was waiting for a pick.
-  const last = store.get('uxwoz:app')
+  const last = shareToken ? await editLinkApp() : store.get('uxwoz:app')
   if (last) return start(last, false)
   draw()
   promptInput.focus()

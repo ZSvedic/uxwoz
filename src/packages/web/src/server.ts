@@ -9,6 +9,8 @@ import {
 } from '@uxwoz/core'
 import { exportRoute } from './export.ts'
 import index from './index.html'
+import player from './player.html'
+import { sharing } from './share.ts'
 
 const THEMES_DIR = resolve(import.meta.dir, '../themes')
 /** Theme ids and labels; the first is the default. `clean` is Pico alone, `mockup` is Pico plus mockup.css. */
@@ -298,14 +300,17 @@ export function createServer(opts: ServerOptions = {}) {
     return { model, device }
   }
 
+  const { guard } = sharing(cache, api, { app: index, player })
   return Bun.serve({
     port: opts.port ?? Number(process.env.PORT ?? 3000),
     // Only this machine: the API spends the owner's model credits.
     hostname: process.env.UXWOZ_HOST ?? '127.0.0.1',
     // Bun closes connections idle for 10 s by default; a screen may take up to 20 s.
     idleTimeout: 30,
+    // No request needs more; a bigger one is refused before it is read.
+    maxRequestBodySize: 64 * 1024,
     development: process.env.NODE_ENV !== 'production',
-    routes: {
+    routes: guard({
       '/': index,
       '/themes/:name': (req) => {
         const name = req.params.name.replace(/\.css$/, '')
@@ -423,7 +428,7 @@ export function createServer(opts: ServerOptions = {}) {
           return new Response(null, { status: 204 })
         }),
       },
-    },
+    }),
     fetch: () => new Response('Not found', { status: 404 }),
   })
 }
