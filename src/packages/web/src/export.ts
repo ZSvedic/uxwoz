@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import {
-  DEVICES, HOME_NAME, LEGACY_WIDTH, MODELS, NAV_CSS, SCREEN_CSS, componentsOf, isComponent, linksIn, normalizePrompt, pasteComponents,
+  DEVICES, HOME_NAME, LEGACY_WIDTH, VIEWPORT_H, MODELS, NAV_CSS, SCREEN_CSS, componentsOf, isComponent, linksIn, normalizePrompt, pasteComponents,
   plannedScreens, screenKey, screenName, screenTree, tableMarkdown, zip, type Boxes, type CacheEntry, type ScreenCache, type ZipFile,
 } from '@uxwoz/core'
 
@@ -49,12 +49,23 @@ const linkScript = (files: Record<string, string>) => `(() => {
 export function screenPage(e: CacheEntry, components: Record<string, string>, css: string, files: Record<string, string>): string {
   const v = e.versions.at(-1)!
   const d = v.device && DEVICES[v.device]
-  // A transform makes the screen hold its fixed bars (a bottom tab bar), as the app's frame does.
-  const size = `body > main { max-width: ${d ? d.width : LEGACY_WIDTH}px; margin: 0 auto; transform: translateZ(0);${d ? ` min-height: ${d.height}px;` : ''} }`
+  // The screen sits centred on a grey page, as wide as its device and at least as tall. A transform
+  // makes it hold its fixed bars (a bottom tab bar), as the app's frame does.
+  const size = `html, body { background: #e4e4e4; } body { margin: 0; padding: 24px 0; }
+body > main { max-width: ${d ? d.width : LEGACY_WIDTH}px; margin: 0 auto; transform: translateZ(0); background: var(--pico-background-color, #fff);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, .15); min-height: ${d ? d.height : VIEWPORT_H}px; }`
+  const html = vhToPx(pasteComponents(v.html, components), d ? d.height : VIEWPORT_H)
   return `<!doctype html><html data-theme="light"><head><meta charset="utf-8">`
     + `<meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(titleOf(e))}</title>`
     + `<style>${css.replace(/<\/style/gi, '<\\/style')}</style><style>${SCREEN_CSS}\n${NAV_CSS}\n${size}</style>`
-    + `<script>${linkScript(files)}</script></head><body><main>${pasteComponents(v.html, components)}</main></body></html>\n`
+    + `<script>${linkScript(files)}</script></head><body><main>${html}</main></body></html>\n`
+}
+
+/** vh units in the screen's styles become pixels of the device's height, as the app's frame turns them, so the page looks the same on any window. */
+export function vhToPx(html: string, height: number): string {
+  const px = (css: string) => css.replace(/(-?\d*\.?\d+)[dsl]?vh\b/g, (_, n: string) => `${parseFloat(n) * height / 100}px`)
+  return html.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi, (_, a: string, css: string, b: string) => a + px(css) + b)
+    .replace(/(\sstyle\s*=\s*)("[^"]*"|'[^']*')/gi, (_, a: string, s: string) => a + px(s))
 }
 
 /** README.md: the prompt, devices and models, the screen tree with the controls that lead to each screen, the screens not drawn yet. */
@@ -155,7 +166,9 @@ export const exportRoute = (cache: ScreenCache) => (req: Request): Response => {
   const first = entries.find((e) => e.key === screenKey(app, null))
   const files = first && exportFiles(first.app, entries, boxes, themeCss())
   if (!files) return Response.json({ error: 'no such mockup' }, { status: 404 })
-  return new Response(zip(files), { headers: {
-    'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${slugOf(first.app)}.zip"`, 'Cache-Control': 'no-store',
+  // One folder named like the zip, so unzip makes one folder.
+  const slug = slugOf(first.app)
+  return new Response(zip(files.map((f) => ({ ...f, name: `${slug}/${f.name}` }))), { headers: {
+    'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="${slug}.zip"`, 'Cache-Control': 'no-store',
   } })
 }

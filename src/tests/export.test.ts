@@ -55,7 +55,7 @@ describe('export project', () => {
   let server: ReturnType<typeof createServer>
   beforeAll(() => {
     const cache = new ScreenCache()
-    const home = cache.pick(cache.propose(APP, null, 0, ver('<title>Tonight</title><div data-component="tab-bar"></div><h1>Tonight</h1><button data-action="@report: The sleep report">Report</button><a data-action="@alarm: Set an alarm">Alarm</a>'))!.key, 0)!
+    const home = cache.pick(cache.propose(APP, null, 0, ver('<title>Tonight</title><div data-component="tab-bar"></div><h1>Tonight</h1><section style="height:50vh">Sleep well</section><button data-action="@report: The sleep report">Report</button><a data-action="@alarm: Set an alarm">Alarm</a>'))!.key, 0)!
     cache.pick(cache.propose(APP, '@report: The sleep report', 0, ver('<title>Sleep report</title><div data-component="tab-bar"></div><h1>Report</h1>'), { key: home.key, label: 'Report' })!.key, 0)
     cache.addComponent(APP, 'tab-bar', 'bottom of every screen', ver('<nav class="tabs"><a data-action="@home">Home</a></nav>'), 'filing')
     cache.setBox(APP, 'add', 'rules', { id: 'calm', text: 'Use calm colors.' }, 'user')
@@ -70,9 +70,13 @@ describe('export project', () => {
     expect(res.status).toBe(200)
     expect(res.headers.get('content-type')).toBe('application/zip')
     expect(res.headers.get('content-disposition')).toBe('attachment; filename="a-tiny-sleep-tracker.zip"')
-    const files = unzip(new Uint8Array(await res.arrayBuffer()))
-    expect(Object.keys(files).sort()).toEqual(['HANDOFF.md', 'README.md', 'components.md', 'data.md', 'rules.md', 'screens/home.html', 'screens/report.html'])
+    const raw = unzip(new Uint8Array(await res.arrayBuffer()))
+    expect(Object.keys(raw).sort()).toEqual(['HANDOFF.md', 'README.md', 'components.md', 'data.md', 'rules.md', 'screens/home.html', 'screens/report.html'].map((n) => `a-tiny-sleep-tracker/${n}`))
+    const files = Object.fromEntries(Object.entries(raw).map(([n, t]) => [n.replace('a-tiny-sleep-tracker/', ''), t]))
     const home = files['screens/home.html']!
+    // As in the app's frame: vh is pixels of the phone's 844 px height, and the page is at least that tall.
+    expect(home).toContain('<section style="height:422px">')
+    expect(home).toContain('min-height: 844px')
     expect(home).toContain('<nav class="tabs">')
     expect(home).not.toContain('data-component="tab-bar"></div>')
     expect(home).toContain('--pico-') // the theme inlined
