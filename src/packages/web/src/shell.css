@@ -183,11 +183,12 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .box-nav button { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; padding: 4px 6px; }
 .box-nav b, #boxesButton b { color: #fff; background: var(--accent); border-radius: 9px; padding: 0 6px; font-size: 11px; }
 .toolbar b:empty, #boxesButton, .toolbar:not(.boxes) .box-nav { display: none; }
+.toolbar.boxes .box-nav[hidden] { display: flex !important; }
 @media (max-width: 1200px) {
   .toolbar.boxes #boxesButton { display: inline-flex; }
   .box-nav { position: absolute; flex-direction: column; min-width: 200px; padding: 6px; border: 1px solid var(--line);
     box-shadow: var(--shadow); background: var(--card); margin: 0; }
-  .box-nav[hidden] { display: none; }
+  .toolbar.boxes .box-nav[hidden] { display: none !important; }
   .box-nav button { justify-content: space-between; }
 }
 .toolbar select { padding: 4px 2px; border-color: transparent; background: none; }
