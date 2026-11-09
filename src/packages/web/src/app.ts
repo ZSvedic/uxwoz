@@ -13,6 +13,7 @@ import { mapOf, post, showError, themeCss } from './net.ts'
 import { applyMap, currentKey, resetTrail, setCurrent } from './nav.ts'
 import { all, components, dropChoice, draw, fitChoice, fitScreenSoon, onAction, openScreen, pick, stopMaking } from './screens.ts'
 import { PICKERS, closeMenus, loadRecent, openGenerate, warmUp } from './toolbar.ts'
+import { editLinkApp, shareToken } from './sharing.ts'
 import { $, deviceSelect, generate, modelSelect, promptInput, state, store } from './state.ts'
 
 export const side = createSide(boxOp, (box, tab) => { focusBox(box); openDrawer(tab) })
@@ -112,7 +113,7 @@ async function init() {
   loadRecent()
   await themeCss(state.theme)
   // A reload opens the mockup that was open, with its A OR B if one was waiting for a pick.
-  const last = store.get('uxwoz:app')
+  const last = shareToken ? await editLinkApp() : store.get('uxwoz:app')
   if (last) return start(last, false)
   draw()
   promptInput.focus()

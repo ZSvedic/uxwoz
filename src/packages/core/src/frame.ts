@@ -55,6 +55,17 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
   }
   const labelOf = (el) => el ? (el.getAttribute('aria-label') || el.textContent || el.value || '').trim().replace(/\\s+/g, ' ') : ''
   addEventListener('pointerdown', () => parent.postMessage({ uxwoz: 'touch' }, '*'), true)
+  // The player's comment mode: after { uxwoz: 'name-part' }, the next click names the part clicked instead of using it.
+  let naming = false
+  addEventListener('message', (e) => { if (e.source === parent && e.data && e.data.uxwoz === 'name-part') naming = true })
+  addEventListener('click', (e) => {
+    if (!naming) return
+    naming = false
+    e.preventDefault(); e.stopImmediatePropagation()
+    const t = e.target instanceof Element ? e.target.closest('[data-action],[aria-label],button,a,label,h1,h2,h3,h4,li,td,th,p,input,select') || e.target : null
+    const text = labelOf(t) || (t ? t.tagName.toLowerCase() : '')
+    parent.postMessage({ uxwoz: 'part', text: text.length > 60 ? text.slice(0, 57) + '…' : text }, '*')
+  }, true)
   // The app's keys work while a screen has the focus.
   addEventListener('keydown', (e) => {
     const mod = e.metaKey || e.ctrlKey

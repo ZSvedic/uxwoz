@@ -232,3 +232,14 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .data-table table { border-collapse: collapse; width: 100%; font-size: 13px; }
 .data-table th, .data-table td { border: 1px solid var(--line); padding: 3px 6px; text-align: left; height: 1.6em; }
 .data-table th { color: var(--muted); font-weight: 600; }
+
+/* The Share pane: links per role, then the feedback by screen and the trips. */
+.share-pane select { width: 100%; }
+.share-pane select, .share-pane input { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+.share-cap input { width: 5em; }
+.share-links, .feedback { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.share-link .share-url { display: block; width: 100%; margin: 4px 0; font-size: 12px; }
+.share-link button { margin-right: 6px; }
+.share-pane h4 { margin: 8px 0 0; font-size: 13px; }
+.share-pane small, .share-pane .none { color: var(--muted); }
+.share-pane li.none { list-style: none; }

@@ -199,7 +199,7 @@ describe('screen cache', () => {
       expect(cache.boxesOf('Cafe')).toMatchObject({ rules: [], data: [] })
       screen(cache, 'Cafe', 'Cart', '<h1>Cart</h1>', { key: 'cafe', label: 'Cart' })
       const saved = JSON.parse(readFileSync(file, 'utf8'))
-      expect(Object.keys(saved)).toEqual(['version', 'entries', 'boxes', 'states'])
+      expect(Object.keys(saved)).toEqual(['version', 'entries', 'boxes', 'states', 'shared'])
     }
     // An old screen with no name yet goes; a first screen with none is home.
     writeFileSync(file, JSON.stringify({ version: 4, entries: [{ ...entry, name: undefined }, { key: 'cafe » cart', app: 'Cafe', action: 'Cart', parent: null, versions: [], proposals: [null, null] }] }))

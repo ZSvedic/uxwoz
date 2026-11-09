@@ -10,6 +10,7 @@ import { fmtS, fmtUsd, post, showError } from './net.ts'
 import { applyMap, currentAt, setCurrent } from './nav.ts'
 import { components, draw, ideaOf, labelOf, pastedOn, removeScreen, revise, undo, views } from './screens.ts'
 import { closeMenus } from './toolbar.ts'
+import { loadShared, renderShare, screenFeedback } from './sharing.ts'
 import { $, changeInput, drawer, enterSubmits, modelSelect, state } from './state.ts'
 
 /** A change to the boxes, an Undo, or a visit asked for (an Edit is one); the server answers with the whole mockup. True when it was done. */
@@ -76,8 +77,9 @@ export function onTool(key: string, tool: string) {
 
 const modelLabel = (id: string) => [...modelSelect.options].find((o) => o.value === id)?.text ?? id
 
-export function openDrawer(tab: 'edit' | 'info') {
+export function openDrawer(tab: 'edit' | 'info' | 'share') {
   state.drawer = tab
+  loadShared()
   renderDrawer()
   if (tab === 'edit') changeInput.focus()
   // The canvas got narrower: keep the current box or screen in view beside the drawer.
@@ -90,7 +92,7 @@ export const closeDrawer = () => { state.drawer = null; renderDrawer() }
 export function renderDrawer() {
   const e = state.current && !state.box ? state.entries.get(state.current) : undefined
   const v = e?.versions.at(-1)
-  const open = !!(state.drawer && (state.box ? state.boxes : v))
+  const open = !!(state.drawer && (state.drawer === 'share' ? state.app : state.box ? state.boxes : v))
   if (drawer.hidden === open) {
     drawer.hidden = !open
     if (!open) requestAnimationFrame(() => { const at = currentAt(); if (at) canvas.reveal(at) })
@@ -99,6 +101,8 @@ export function renderDrawer() {
   for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === state.drawer))
   $('editPane').hidden = state.drawer !== 'edit'
   $('infoPane').hidden = state.drawer !== 'info'
+  $('sharePane').hidden = state.drawer !== 'share'
+  if (state.drawer === 'share') return renderShare()
   const box = state.box
   $('changeLabel').textContent = `What should change${box ? ` in ${BOX_TITLES[box]}` : ''}?`
   changeInput.placeholder = box ? 'e.g. Merge the two rules about scores' : 'e.g. Show one level indicator, not four'
@@ -144,6 +148,8 @@ export function renderDrawer() {
     // What filing made of the screen's last decision, and the lines it refused.
     ...(f ? [['Filing', f.error ? `failed: ${f.error}` : `${[...f.added.map((x) => `added ${x}`), ...f.changed.map((x) => `changed ${x}`)].join(', ') || 'nothing new'}, `
       + `${fmtS(f.ms)}${f.costUsd == null ? '' : `, ~${fmtUsd(f.costUsd)}`}`], ...f.refused.map((r) => ['Refused', r])] as [string, string][] : []),
+    // What reviewers said about it through a comment link.
+    ...screenFeedback(e.key),
   ]
   showInfo(info)
 }

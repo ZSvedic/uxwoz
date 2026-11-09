@@ -8,6 +8,8 @@ import {
   VISIT_EVERY, warmUp, type BoxName, type CacheEntry, type Device, type GenerateEvent, type Io, type ModelId, type Version, type VisitOptions,
 } from '@uxwoz/core'
 import index from './index.html'
+import player from './player.html'
+import { sharing } from './share.ts'
 
 const THEMES_DIR = resolve(import.meta.dir, '../themes')
 /** Theme ids and labels; the first is the default. `clean` is Pico alone, `mockup` is Pico plus mockup.css. */
@@ -297,6 +299,7 @@ export function createServer(opts: ServerOptions = {}) {
     return { model, device }
   }
 
+  const { guard } = sharing(cache, api, { app: index, player })
   return Bun.serve({
     port: opts.port ?? Number(process.env.PORT ?? 3000),
     // Only this machine: the API spends the owner's model credits.
@@ -304,7 +307,7 @@ export function createServer(opts: ServerOptions = {}) {
     // Bun closes connections idle for 10 s by default; a screen may take up to 20 s.
     idleTimeout: 30,
     development: process.env.NODE_ENV !== 'production',
-    routes: {
+    routes: guard({
       '/': index,
       '/themes/:name': (req) => {
         const name = req.params.name.replace(/\.css$/, '')
@@ -421,7 +424,7 @@ export function createServer(opts: ServerOptions = {}) {
           return new Response(null, { status: 204 })
         }),
       },
-    },
+    }),
     fetch: () => new Response('Not found', { status: 404 }),
   })
 }
