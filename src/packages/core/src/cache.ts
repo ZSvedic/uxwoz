@@ -78,13 +78,15 @@ export interface BoxState { list: (Rule | Table | CacheEntry)[]; gone: string[] 
 /** How many states each box keeps for its Undo. */
 export const BOX_STATES = 10
 
-/** How to undo one change of the fixer: put an entry back (over the one it changed), drop an entry it added, or drop a version it drew. */
-export type Undo = { put: BoxName; entry: Rule | Table | CacheEntry; index: number } | { drop: BoxName; id: string } | { key: string; createdAt: string }
+/** How to undo one change of the fixer: put an entry back (`over` the one it changed), drop an entry it added, or drop a version it drew. */
+export type Undo = { put: BoxName; entry: Rule | Table | CacheEntry; index: number; over?: true } | { drop: BoxName; id: string } | { key: string; createdAt: string }
 /** One change of a visit, in words (`merged a into b`), with the fixer's note on why. */
 export interface Change { text: string; note?: string; undo?: Undo; undone?: boolean }
 /** One visit of the fixer: when it started, what the user asked (an Edit of a box), how many screens it read, what it changed and refused, its time and cost. */
-export interface Visit { at: string; ask?: string; ms: number; costUsd: number | null; screens: number; changes: Change[]; refused: string[]; error?: string; seen: boolean }
+export interface Visit { at: string; ask?: string; undone?: boolean; ms: number; costUsd: number | null; screens: number; changes: Change[]; refused: string[]; error?: string; seen: boolean }
 
+const BOXES: BoxName[] = ['components', 'rules', 'data']
+const idOf = (x: Rule | Table | CacheEntry) => ('id' in x ? x.id : x.name!)
 const emptyBoxes = (): Boxes => ({ rules: [], data: [], gone: { components: [], rules: [], data: [] } })
 const componentKey = (app: string, id: string) => `${normalizePrompt(app)} » #${id}`
 
@@ -219,13 +221,13 @@ export class ScreenCache {
   }
 
   /**
-   * Run `fn` as one change: each box it changes keeps one state for its Undo. A box changed outside
-   * a group keeps a state at each change.
+   * Run `fn` as one change (`change`, to go on with one): each box it changes keeps one state for
+   * its Undo. A box changed outside a group keeps a state at each change.
    */
-  group<T>(fn: () => T): T {
+  group<T>(fn: (change: number) => T, change?: number): T {
     const outer = this.change
-    this.change ??= ++this.clock
-    try { return fn() } finally { this.change = outer }
+    this.change = change ?? outer ?? ++this.clock
+    try { return fn(this.change) } finally { this.change = outer }
   }
 
   /** Keep a box's state before it changes, once a change, the last BOX_STATES of them. */
@@ -241,54 +243,73 @@ export class ScreenCache {
   /** How many times Undo can put each box back. */
   undos(app: string): Record<BoxName, number> {
     const s = this.states.get(normalizePrompt(app))
-    return { components: s?.components?.length ?? 0, rules: s?.rules?.length ?? 0, data: s?.data?.length ?? 0 }
+    return Object.fromEntries(BOXES.map((b) => [b, s?.[b]?.length ?? 0])) as Record<BoxName, number>
   }
 
-  /** Put a box back as it was before its last change, whoever made it. Returns why not, or null. */
+  /**
+   * Put a box back as it was before its last change, whoever made it. A component it drops leaves its
+   * HTML in the screens that paste it; no ID it drops is used again. Returns why not, or null.
+   */
   undoBox(app: string, box: BoxName): string | null {
     const st = this.states.get(normalizePrompt(app))?.[box]?.pop()
     if (!st) return 'nothing to undo'
-    const b = this.own(app)
-    if (box === 'components') {
-      for (const e of this.list(app, box) as CacheEntry[]) this.entries.delete(e.key)
-      for (const e of st.list as CacheEntry[]) this.entries.set(e.key, e)
-    } else b[box] = st.list as Rule[] & Table[]
-    b.gone[box] = st.gone
+    const b = this.own(app), then = new Set(st.list.map(idOf)), gone = new Set([...st.gone, ...b.gone[box]])
+    for (const x of this.list(app, box)) {
+      if (!then.has(idOf(x))) { gone.add(idOf(x)); if (box === 'components') this.inline(app, x as CacheEntry) }
+      if (box === 'components') this.entries.delete((x as CacheEntry).key)
+    }
+    if (box === 'components') for (const e of st.list as CacheEntry[]) this.entries.set(e.key, e)
+    else b[box] = st.list as Rule[] & Table[]
+    b.gone[box] = [...gone].filter((x) => !then.has(x))
     this.save()
     return null
   }
 
-  /** Undo every change of the newest visit that has one left to undo. Returns why not, or null. */
+  /**
+   * Undo every change of the newest visit not undone yet; a change that cannot be undone is skipped
+   * (its own Undo stays), so the next Undo goes to the visit before. Returns the first why not, or null.
+   */
   undoVisit(app: string): string | null {
-    const v = this.boxesOf(app).visits?.findLast((x) => x.changes.some((c) => c.undo && !c.undone))
+    const v = this.boxesOf(app).visits?.findLast((x) => !x.undone && x.changes.some((c) => c.undo && !c.undone))
     if (!v) return 'nothing to undo'
+    v.undone = true
     // The last change first, so a change made on top of another is undone before it.
-    return this.group(() => [...v.changes.keys()].reverse().map((i) => this.undoChange(app, v.at, i)).find((why) => why && why !== 'nothing to undo') ?? null)
+    const whys = this.group(() => [...v.changes.keys()].reverse().map((i) => this.undoChange(app, v.at, i)))
+    this.save()
+    return whys.find((why) => why && why !== 'nothing to undo') ?? null
   }
 
   /** Undo change `i` of the visit that started `at`. Returns why not, or null. */
   undoChange(app: string, at: string, i: number): string | null {
     const b = this.own(app), c = b.visits?.find((v) => v.at === at)?.changes[i], u = c?.undo
     if (!c || !u || c.undone) return 'nothing to undo'
+    // An entry already back, or one changed and gone since, counts as undone; so does a version the user already undid.
     if ('put' in u) {
-      // A merge, a remove or a change: the entry comes back where it was, with its ID.
-      const e = u.entry, id = 'id' in e ? e.id : e.name!, ids = this.ids(app, u.put), here = ids.indexOf(id)
-      if (here < 0 && ids.length >= LIMITS[u.put]) return `${u.put} is full (${LIMITS[u.put]})`
-      this.keep(app, u.put)
-      if (u.put === 'components') {
-        const all = [...this.entries.values()], at = all.indexOf(all.filter(isComponent)[u.index]!)
-        if (here < 0) all.splice(at < 0 ? all.length : at, 0, e as CacheEntry)
-        this.entries = new Map(all.map((x) => [x.key, x.key === (e as CacheEntry).key ? e as CacheEntry : x]))
-      } else (b[u.put] as (Rule | Table)[]).splice(here < 0 ? u.index : here, here < 0 ? 0 : 1, e as Rule & Table)
-      b.gone[u.put] = b.gone[u.put].filter((x) => x !== id)
+      // A merge, a remove or a change (`over`): the entry comes back where it was, with its ID.
+      const e = u.entry, id = idOf(e), list = this.list(app, u.put), here = list.findIndex((x) => idOf(x) === id)
+      if ((here >= 0) === !u.over) { /* nothing left to undo */ }
+      else if (u.over && list[here]!.by !== 'fixer') return `you changed ${id} since`
+      else if (!u.over && list.length >= LIMITS[u.put]) return `${u.put} is full (${LIMITS[u.put]})`
+      else {
+        this.keep(app, u.put)
+        if (u.put === 'components') {
+          const all = [...this.entries.values()], at = all.indexOf(all.filter(isComponent)[u.index]!)
+          if (here < 0) all.splice(at < 0 ? all.length : at, 0, e as CacheEntry)
+          this.entries = new Map(all.map((x) => [x.key, x.key === (e as CacheEntry).key ? e as CacheEntry : x]))
+        } else (b[u.put] as (Rule | Table)[]).splice(here < 0 ? u.index : here, here < 0 ? 0 : 1, e as Rule & Table)
+        b.gone[u.put] = b.gone[u.put].filter((x) => x !== id)
+      }
     } else if ('drop' in u) {
-      if ((u.drop === 'components' ? this.component(app, u.id) : (b[u.drop] as (Rule | Table)[]).find((r) => r.id === u.id))?.by === 'user') return `you changed ${u.id} since`
-      const why = u.drop === 'components' ? this.removeComponent(app, u.id) : this.setBox(app, 'delete', u.drop, { id: u.id }, 'user')
+      const now = this.list(app, u.drop).find((x) => idOf(x) === u.id)
+      if (now?.by === 'user') return `you changed ${u.id} since`
+      const why = !now ? null : u.drop === 'components' ? this.removeComponent(app, u.id) : this.setBox(app, 'delete', u.drop, { id: u.id }, 'user')
       if (why) return why
     } else {
       const e = this.entries.get(u.key), n = e?.versions.findIndex((v) => v.createdAt === u.createdAt) ?? -1
-      // A version the user already undid counts as undone.
-      if (e && n >= 0 && e.versions.length > 1) e.versions.splice(n, 1)
+      if (e && n >= 0 && e.versions.length > 1) {
+        if (isComponent(e)) this.keep(e.app, 'components')
+        e.versions.splice(n, 1)
+      }
     }
     c.undone = true
     this.save()
@@ -297,11 +318,17 @@ export class ScreenCache {
 
   /** Remove a component and leave its HTML in each entry that pastes it, so they look the same. Returns why not, or null. */
   removeComponent(app: string, id: string): string | null {
-    const c = this.component(app, id), html = c?.versions.at(-1)?.html
+    const c = this.component(app, id)
     if (!c) return `components has no ${id}`
-    for (const e of this.mockup(normalizePrompt(app))) { const v = e.versions.at(-1); if (v && html != null) v.html = pasteComponents(v.html, { [id]: html }, 1) }
+    this.inline(app, c)
     this.delete(c.key)
     return null
+  }
+
+  /** Each screen that pastes component `c` gets its HTML in place, so it looks the same without it. */
+  private inline(app: string, c: CacheEntry) {
+    const html = c.versions.at(-1)?.html
+    for (const e of this.mockup(normalizePrompt(app))) { const v = e.versions.at(-1); if (v && html != null) v.html = pasteComponents(v.html, { [c.name!]: html }, 1) }
   }
 
   undo(key: string): CacheEntry | undefined {
@@ -346,7 +373,7 @@ export class ScreenCache {
   }
 
   private ids(app: string, box: BoxName): string[] {
-    return this.list(app, box).map((x) => ('id' in x ? x.id : x.name!))
+    return this.list(app, box).map(idOf)
   }
 
   /** A free ID for a new entry, from its words: up to 3 of them, then -2, -3… if taken or used before. */

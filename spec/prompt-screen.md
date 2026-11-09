@@ -211,7 +211,7 @@ The parts of the chosen variant carry numbers, like data-part="7": name a part b
 A visit ends with "Visit the paper as the overnight fixer." Reply to it with plain lines, one change per line, no markdown and no prose, in these forms only:
 merge ID into ID
 remove ID
-add rule ID: one sentence
+rule ID: one sentence
 change rule ID: the new sentence
 add component ID from screen-id part N: where it belongs
 table ID: column | column | ...

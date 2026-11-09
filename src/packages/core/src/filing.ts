@@ -51,7 +51,7 @@ export function parseFiling(reply: string): FilingLine[] {
     if (/^nothing$/i.test(line)) return { kind: 'nothing', change: false, id: '', part: null, text: '', line }
     const c = line.match(/^(change\s+)?component\s+(\S+)\s+from\s+part\s+(\d+)\s*:\s*(.+)$/i)
     if (c) return { kind: 'component', change: !!c[1], id: c[2]!, part: Number(c[3]), text: c[4]!.trim(), line }
-    const r = line.match(/^(change\s+)?(rule|table|row)\s+(\S+?)\s*:\s*(.+)$/i)
+    const r = line.match(/^(?:add\s+)?(change\s+)?(rule|table|row)\s+(\S+?)\s*:\s*(.+)$/i)
     if (r) return { kind: r[2]!.toLowerCase() as FilingLine['kind'], change: !!r[1], id: r[3]!, part: null, text: r[4]!.trim(), line }
     return { kind: 'bad', change: false, id: '', part: null, text: '', line }
   })

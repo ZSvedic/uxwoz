@@ -2,7 +2,7 @@
 // of each change, and the visit in the server: every 5 picks, on demand, in the chain with filing
 // (no cassette: a fake provider).
 import { describe, expect, test } from 'bun:test'
-import { MAX_REDRAWS, ScreenCache, applyVisit, numberParts, parseVisit, type Fetch, type Version } from '@uxwoz/core'
+import { MAX_REDRAWS, ScreenCache, applyFiling, applyVisit, backgroundVersion, numberParts, parseVisit, type Fetch, type Version } from '@uxwoz/core'
 import { createServer } from '@uxwoz/web/src/server.ts'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -32,7 +32,7 @@ const rules = (cache: ScreenCache) => cache.boxesOf('Snore').rules.map((r) => r.
 describe('a visit\'s reply', () => {
   test('each line is read as one of the forms; anything else is bad', () => {
     expect(parseVisit('merge a into b\nremove c\nadd rule d: One sentence.\nadd component e from home part 3: every screen\nredraw home: Paste e.\nnote: why\nI tidied up').map((l) => [l.op, l.a, l.b, l.part, l.text]))
-      .toEqual([['merge', 'a', 'b', 0, ''], ['remove', 'c', '', 0, ''], ['rule', 'd', '', 0, 'One sentence.'], ['component', 'e', 'home', 3, 'every screen'],
+      .toEqual([['merge', 'a', 'b', 0, ''], ['remove', 'c', '', 0, ''], ['box', 'd', '', 0, 'One sentence.'], ['component', 'e', 'home', 3, 'every screen'],
         ['redraw', 'home', '', 0, 'Paste e.'], ['note', '', '', 0, 'why'], ['bad', '', '', 0, '']])
   })
 
@@ -120,7 +120,8 @@ describe('the Undo of a box', () => {
     expect(cache.undos('Snore')).toEqual({ components: 1, rules: 4, data: 2 })
     expect(cache.undoBox('Snore', 'rules')).toBeNull()
     expect(rules(cache)).toEqual(['score-scale', 'score-range', 'calm'])
-    expect(cache.boxesOf('Snore').gone.rules).toEqual([])
+    // An ID the Undo drops is never used again; one it restores is free of `gone`.
+    expect(cache.boxesOf('Snore').gone.rules).toEqual(['big'])
     expect(cache.boxesOf('Snore').data).toHaveLength(0)
     cache.setBox('Snore', 'set', 'rules', { id: 'calm', text: 'Quiet.' }, 'user')
     expect(cache.undoBox('Snore', 'rules')).toBeNull()
@@ -163,6 +164,67 @@ describe('the Undo of a box', () => {
     const b = new ScreenCache(file)
     expect(b.undoBox('Snore', 'rules')).toBeNull()
     expect(b.boxesOf('Snore').rules).toEqual([])
+  })
+})
+
+describe('fixes after review', () => {
+  test('Undo of Components after filing took tab-bar from Home leaves Home showing the tab bar', () => {
+    const cache = new ScreenCache()
+    const home = cache.pick(cache.propose('Snore', null, 0, ver(HOME))!.key, 0)!
+    applyFiling(cache, 'Snore', home.key, HOME, 'component tab-bar from part 2: every main screen', backgroundVersion(null))
+    expect(cache.get(home.key)!.versions[0]!.html).toContain('data-component="tab-bar"')
+    expect(cache.undoBox('Snore', 'components')).toBeNull()
+    expect(cache.component('Snore', 'tab-bar')).toBeUndefined()
+    expect(cache.get(home.key)!.versions[0]!.html).toBe(HOME)
+    expect(cache.boxesOf('Snore').gone.components).toEqual(['tab-bar'])
+  })
+
+  test('a visit redraws a component the user wrote only in an Edit of Components', () => {
+    const { cache } = paper()
+    cache.addComponent('Snore', 'mine', 'x', ver('<a>Mine</a>'), 'user')
+    const sent = new Map<string, string>()
+    expect(applyVisit(cache, 'Snore', 'redraw mine: bigger', sent).refused.map((r) => r.split('": ')[1])).toEqual(['mine was written by the user'])
+    expect(applyVisit(cache, 'Snore', 'redraw mine: bigger', sent, 'components').redraws).toHaveLength(1)
+  })
+
+  test('the fixer\'s Undo skips what is already back or gone and never gets stuck on one visit', () => {
+    const { cache, visit } = paper()
+    cache.noteVisit('Snore', { at: 'v1', ms: 1, costUsd: 0, screens: 1, changes: visit('remove devices').changes, refused: [], seen: false })
+    const v2 = visit('remove score-range\nadd rule big: Big.\nchange rule score-scale: Fixer.')
+    cache.noteVisit('Snore', { at: 'v2', ms: 1, costUsd: 0, screens: 1, changes: v2.changes, refused: [], seen: false })
+    cache.setBox('Snore', 'add', 'rules', { id: 'score-range-2', text: 'x' }, 'user')
+    expect(cache.undoChange('Snore', 'v2', 0)).toBeNull() // score-range back by hand
+    cache.setBox('Snore', 'delete', 'rules', { id: 'big' }, 'user') // big gone already
+    cache.setBox('Snore', 'set', 'rules', { id: 'score-scale', text: 'Mine.' }, 'user')
+    expect(cache.undoVisit('Snore')).toBe('you changed score-scale since')
+    expect(cache.boxesOf('Snore').rules.find((r) => r.id === 'score-scale')!.text).toBe('Mine.')
+    expect(cache.undoVisit('Snore')).toBeNull() // on to the visit before
+    expect(cache.boxesOf('Snore').data).toHaveLength(1)
+    expect(cache.undoVisit('Snore')).toBe('nothing to undo')
+  })
+
+  test('a note\'s Undo of a change refuses once the entry is no longer the fixer\'s', () => {
+    const { cache, visit } = paper()
+    cache.noteVisit('Snore', { at: 'v', ms: 1, costUsd: 0, screens: 1, changes: visit('change rule score-scale: Fixer.').changes, refused: [], seen: false })
+    cache.setBox('Snore', 'set', 'rules', { id: 'score-scale', text: 'Filing.' }, 'filing')
+    expect(cache.undoChange('Snore', 'v', 0)).toBe('you changed score-scale since')
+  })
+
+  test('the redraws of a visit join its one Undo step; undoing a redraw through its note keeps a state', () => {
+    const { cache, visit } = paper()
+    const out = visit('add component bar from home part 2: every screen\nredraw back: bigger')
+    const back = cache.component('Snore', 'back')!
+    const states = cache.undos('Snore').components
+    cache.group(() => cache.addVersion(back.key, ver('<a>BACK</a>', 't9')), out.group)
+    expect(cache.undos('Snore').components).toBe(states)
+    out.changes[1]!.undo = { key: back.key, createdAt: 't9' }
+    cache.noteVisit('Snore', { at: 'v', ms: 1, costUsd: 0, screens: 1, changes: out.changes, refused: [], seen: false })
+    expect(cache.undoChange('Snore', 'v', 1)).toBeNull()
+    expect(cache.undos('Snore').components).toBe(states + 1)
+    expect(cache.undoBox('Snore', 'components')).toBeNull()
+    expect(cache.undoBox('Snore', 'components')).toBeNull()
+    expect(cache.component('Snore', 'bar')).toBeUndefined()
+    expect(cache.component('Snore', 'back')!.versions).toHaveLength(1)
   })
 })
 
@@ -277,10 +339,10 @@ describe('the visit in the server', () => {
 
   test('Visit now runs one on demand; a filing asked for meanwhile waits for it; the second visit sees only what changed', () => {
     return withServer('add rule big: Text is big.', async ({ post, map, p }) => {
-      expect((await post('/api/visit', { app: 'Snore' })).status).toBe(404)
+      expect((await post('/api/box', { app: 'Snore', op: 'visit' })).status).toBe(404)
       await picks(post, 2)
       await map(true)
-      expect((await (await post('/api/visit', { app: 'Snore' })).json()).visiting).toBe(true)
+      expect((await (await post('/api/box', { app: 'Snore', op: 'visit' })).json()).visiting).toBe(true)
       await (await post('/api/screen', { app: 'Snore', action: '@s9: nine', from: 'snore', label: 'S9' })).text()
       await post('/api/pick', { key: 'snore » @s9', index: 0 })
       expect(p.asked.at(-1)).toBe('visit') // the pick's filing waits in the chain
@@ -288,7 +350,7 @@ describe('the visit in the server', () => {
       const m = await map(true)
       expect(p.asked.slice(-2)).toEqual(['visit', 'file'])
       expect(m.boxes.visits[0]).toMatchObject({ screens: 2, changes: [{ text: 'added rule big: Text is big.', undo: { drop: 'rules', id: 'big' } }] })
-      await post('/api/visit', { app: 'Snore' })
+      await post('/api/box', { app: 'Snore', op: 'visit' })
       expect((await map(true)).boxes.visits[1]).toMatchObject({ screens: 1, refused: ['"add rule big: Text is big.": rules already has or had big'] })
     })
   })
@@ -297,14 +359,14 @@ describe('the visit in the server', () => {
     return withServer('add rule big: Text is big.\nredraw s1: x', async ({ post, map, p }) => {
       await picks(post, 2)
       await map(true)
-      await post('/api/visit', { app: 'Snore' })
+      await post('/api/box', { app: 'Snore', op: 'visit' })
       await post('/api/delete', { key: 'snore » @s1' })
       p.open()
       expect((await map(true)).boxes.visits[0]).toMatchObject({ changes: [{ text: 'added rule big: Text is big.' }], refused: ['"redraw s1: x": no screen s1'] })
     }).then(() => withServer('add rule big: Text is big.', async ({ post, map, p }) => {
       await picks(post, 2)
       await map(true)
-      await post('/api/visit', { app: 'Snore' })
+      await post('/api/box', { app: 'Snore', op: 'visit' })
       await post('/api/delete-app', { app: 'Snore' })
       await picks(post, 1)
       p.open()
@@ -328,9 +390,26 @@ describe('the visit in the server', () => {
       expect(m.undos.rules).toBe(2)
       const back = await (await post('/api/box', { app: 'Snore', op: 'undo-box', box: 'rules' })).json()
       expect(back.boxes.rules).toMatchObject([{ id: 'calm', text: 'Screens speak calmly.', by: 'user' }])
-      expect((await (await post('/api/box', { app: 'Snore', op: 'undo-box', box: 'notes' })).json()).boxes.visits[0].changes[0].undone).toBe(true)
-      expect((await post('/api/box', { app: 'Snore', op: 'undo-box', box: 'notes' })).status).toBe(400)
+      // The rule is the user's again, so the visit's Undo skips it, says why, and is done with that visit.
+      const undone = await (await post('/api/box', { app: 'Snore', op: 'undo-box', box: 'notes' })).json()
+      expect(undone).toMatchObject({ error: 'you changed calm since', boxes: { visits: [{ undone: true }] } })
+      expect((await (await post('/api/box', { app: 'Snore', op: 'undo-box', box: 'notes' })).json()).error).toBe('nothing to undo')
       expect((await post('/api/box', { app: 'Snore', op: 'undo-box', box: 'toString' })).status).toBe(400)
+    })
+  })
+
+  test('a 409 says why; a 5-pick visit that lands during a visit runs after it', () => {
+    return withServer('', async ({ post, map, p }) => {
+      await (await post('/api/screen', { app: 'Snore' })).text()
+      expect(await (await post('/api/box', { app: 'Snore', op: 'edit', box: 'rules', text: 'x' })).json()).toEqual({ error: 'Wait for Home\'s pick.' })
+      await post('/api/pick', { key: 'snore', index: 0 })
+      await map(true)
+      await post('/api/box', { app: 'Snore', op: 'visit' })
+      await picks(post, 4, 1)
+      p.open()
+      await map(true)
+      await Bun.sleep(50)
+      expect(p.asked.filter((x) => x === 'visit')).toHaveLength(2)
     })
   })
 
@@ -338,7 +417,7 @@ describe('the visit in the server', () => {
     return withServer('redraw home: add a Back', async ({ post, map, p, cache }) => {
       await picks(post, 2)
       await map(true)
-      await post('/api/visit', { app: 'Snore' })
+      await post('/api/box', { app: 'Snore', op: 'visit' })
       cache.addVersion('snore', ver('<h1>mine</h1>', new Date(Date.now() + 1000).toISOString()))
       p.open()
       const m = await map(true)
@@ -346,7 +425,7 @@ describe('the visit in the server', () => {
       expect(m.entries[0].versions.at(-1).html).toBe('<h1>mine</h1>')
       // A failed visit does not count as the last one: the next reads the same screens again.
       cache.noteVisit('Snore', { at: new Date(Date.now() + 5000).toISOString(), ms: 1, costUsd: null, screens: 0, changes: [], refused: [], error: 'cut off', seen: false })
-      await post('/api/visit', { app: 'Snore' })
+      await post('/api/box', { app: 'Snore', op: 'visit' })
       expect((await map(true)).boxes.visits.at(-1).screens).toBe(1)
     })
   })

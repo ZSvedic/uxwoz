@@ -14,13 +14,12 @@ import { HOME_LINE, HOME_NAME, isComponent } from './tree.ts'
 export const MAX_REDRAWS = 5
 
 /** `box`: one of filing's rule, table and row lines, in `f`. */
-export interface VisitLine { op: 'merge' | 'remove' | 'rule' | 'component' | 'redraw' | 'note' | 'box' | 'bad'; a: string; b: string; part: number; text: string; line: string; f?: FilingLine }
+export interface VisitLine { op: 'merge' | 'remove' | 'component' | 'redraw' | 'note' | 'box' | 'bad'; a: string; b: string; part: number; text: string; line: string; f?: FilingLine }
 
 // Each form's groups are the same four: two IDs, a part number, a text.
 const FORMS: [VisitLine['op'], RegExp][] = [
   ['merge', /^merge\s+(\S+)\s+into\s+(\S+)()()$/i],
   ['remove', /^remove\s+(\S+)()()()$/i],
-  ['rule', /^add\s+rule\s+(\S+?)()()\s*:\s*(.+)$/i],
   ['component', /^add\s+component\s+(\S+)\s+from\s+(\S+)\s+part\s+(\d+)\s*:\s*(.+)$/i],
   ['redraw', /^redraw\s+(\S+?)()()\s*:\s*(.+)$/i],
   ['note', /^note()()()\s*:\s*(.+)$/i],
@@ -38,19 +37,19 @@ export function parseVisit(reply: string): VisitLine[] {
   })
 }
 
-/** What applying a visit leaves for the server: the redraws to run. */
-export interface Applied { changes: Change[]; refused: string[]; redraws: { key: string; sentence: string; change: Change }[] }
+/** What applying a visit leaves for the server: the redraws to run, in the same change of the boxes (see cache.group). */
+export interface Applied { changes: Change[]; refused: string[]; redraws: { key: string; sentence: string; change: Change }[]; group: number }
 
 /**
  * Apply a visit's reply to the boxes of `app`; `sent` holds the numbered HTML of each screen it read,
  * by ID. `asked`: the box of an Edit, whose entries by the user may change.
  */
 export function applyVisit(cache: ScreenCache, app: string, reply: string, sent: Map<string, string>, asked?: BoxName | 'notes'): Applied {
-  return cache.group(() => visitLines(cache, app, reply, sent, asked))
+  return cache.group((group) => visitLines(cache, app, reply, sent, group, asked))
 }
 
-function visitLines(cache: ScreenCache, app: string, reply: string, sent: Map<string, string>, asked?: BoxName | 'notes'): Applied {
-  const out: Applied = { changes: [], refused: [], redraws: [] }
+function visitLines(cache: ScreenCache, app: string, reply: string, sent: Map<string, string>, group: number, asked?: BoxName | 'notes'): Applied {
+  const out: Applied = { changes: [], refused: [], redraws: [], group }
   const refuse = (line: string, why: string) => out.refused.push(`"${line}": ${why}`)
   const screens = new Map(cache.map(app).entries.filter((e) => !isComponent(e)).map((e) => [e.name ?? HOME_NAME, e]))
   let last = null as Change | null
@@ -79,7 +78,7 @@ function visitLines(cache: ScreenCache, app: string, reply: string, sent: Map<st
     const list: (Rule | Table)[] = cache.boxesOf(app)[l.box], index = list.findIndex((x) => x.id === l.entry.id), old = list[index]
     const why = l.change && old?.by === 'user' && l.box !== asked ? `${l.entry.id} was written by the user` : cache.setBox(app, l.change ? 'set' : 'add', l.box, l.entry, 'fixer')
     if (why) refuse(l.line, why)
-    else did({ text: `${l.change ? 'changed' : 'added'} ${l.box === 'rules' ? `rule ${l.entry.id}: ${l.entry.text}` : `table ${l.entry.id}`}`, undo: l.change ? { put: l.box, entry: old!, index } : { drop: l.box, id: l.entry.id } })
+    else did({ text: `${l.change ? 'changed' : 'added'} ${l.box === 'rules' ? `rule ${l.entry.id}: ${l.entry.text}` : `table ${l.entry.id}`}`, undo: l.change ? { put: l.box, entry: old!, index, over: true } : { drop: l.box, id: l.entry.id } })
     return why
   }, refuse)
   for (const l of parseVisit(reply)) {
@@ -88,7 +87,6 @@ function visitLines(cache: ScreenCache, app: string, reply: string, sent: Map<st
     if (l.op === 'note') { if (last && !last.note) last.note = l.text; continue }
     last = null
     if (l.op === 'box') boxes.read(l.f!)
-    else if (l.op === 'rule') boxes.read({ kind: 'rule', change: false, id: l.a, part: null, text: l.text, line: l.line })
     else if (l.op === 'remove') remove(l.a, `removed ${l.a}`, l.line)
     else if (l.op === 'merge') {
       const a = find(l.a), b = find(l.b)
@@ -103,9 +101,9 @@ function visitLines(cache: ScreenCache, app: string, reply: string, sent: Map<st
       const e = why ?? cache.addComponent(app, l.a, l.text, { ...backgroundVersion(null, s!.versions.at(-1)?.device), html: part! }, 'fixer', { key: s!.key, label: 'a part' })
       if (typeof e === 'string') refuse(l.line, e); else did({ text: `added component ${l.a} from ${l.b}`, undo: { drop: 'components', id: l.a } })
     } else {
-      // A redraw of a screen, or of a component.
+      // A redraw of a screen, or of a component (one the user wrote only in an Edit of Components).
       const s = screens.get(l.a) ?? cache.component(app, l.a)
-      const why = !s ? `no screen ${l.a}` : !s.versions.length ? `${l.a} is waiting for a pick` : out.redraws.some((r) => r.key === s.key) ? `${l.a} is redrawn once a visit` : out.redraws.length >= MAX_REDRAWS ? `a visit redraws at most ${MAX_REDRAWS} screens` : refuseLine(l.text)
+      const why = !s ? `no screen ${l.a}` : s.by === 'user' && asked !== 'components' ? `${l.a} was written by the user` : !s.versions.length ? `${l.a} is waiting for a pick` : out.redraws.some((r) => r.key === s.key) ? `${l.a} is redrawn once a visit` : out.redraws.length >= MAX_REDRAWS ? `a visit redraws at most ${MAX_REDRAWS} screens` : refuseLine(l.text)
       if (why) refuse(l.line, why)
       else out.redraws.push({ key: s!.key, sentence: l.text, change: did({ text: `redrawing ${l.a}: ${l.text}` }) })
     }
@@ -118,7 +116,7 @@ function visitLines(cache: ScreenCache, app: string, reply: string, sent: Map<st
 export interface VisitOptions { cache: ScreenCache; app: string; ask?: { box: BoxName | 'notes'; text: string }; fetch?: Fetch; env?: Record<string, string | undefined>; log?: (msg: string) => void }
 
 /** One visit: ask, apply, keep the note. Null when `dropped()` says, as the reply comes, that the mockup went. */
-export async function visitPaper(o: VisitOptions, dropped: () => boolean): Promise<{ visit: Visit; redraws: Applied['redraws'] } | null> {
+export async function visitPaper(o: VisitOptions, dropped: () => boolean): Promise<{ visit: Visit } & Pick<Applied, 'redraws' | 'group'> | null> {
   const { cache, app, ask } = o
   const all = cache.map(app).entries.filter((e) => !isComponent(e) && e.versions.length)
   const lastAt = cache.boxesOf(app).visits?.filter((v) => !v.error).at(-1)?.at ?? ''
@@ -132,5 +130,5 @@ export async function visitPaper(o: VisitOptions, dropped: () => boolean): Promi
   for (const r of applied.refused) (o.log ?? console.warn)(`fixer refused ${r}`)
   const visit: Visit = { at, ...(ask && { ask: ask.text }), ms: Math.round(performance.now() - t0), costUsd: final.costUsd, screens: fresh.length, changes: applied.changes, refused: applied.refused, seen: false }
   cache.noteVisit(app, visit)
-  return { visit, redraws: applied.redraws }
+  return { visit, redraws: applied.redraws, group: applied.group }
 }
