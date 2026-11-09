@@ -896,7 +896,7 @@ function renderToolbar() {
     b.querySelector('b')!.textContent = n ? String(n) : ''
     sum += n
   }
-  $('toolbar').classList.toggle('boxes', !side.el.hidden)
+  $('toolbar').classList.toggle('has-boxes', !side.el.hidden)
   $('boxesSum').textContent = sum ? String(sum) : ''
   if (!$('navMenu').hidden) renderNav()
 }
