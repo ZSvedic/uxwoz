@@ -36,7 +36,7 @@ export function railOf(tools: string[][], run: (tool: string) => void) {
 }
 
 /** Text the user types in place: Enter or leaving the field saves it, Esc puts it back. */
-function editable(e: HTMLElement, save: (text: string) => void) {
+function editable<E extends HTMLElement>(e: E, save: (text: string) => void): E {
   e.contentEditable = 'plaintext-only'
   e.spellcheck = false
   const was = () => e.dataset.was ?? ''
@@ -49,6 +49,7 @@ function editable(e: HTMLElement, save: (text: string) => void) {
     const t = (e.textContent ?? '').replace(/\s+/g, ' ').trim()
     if (t !== was().trim()) save(t)
   })
+  return e
 }
 
 const HINTS: Record<Box, string> = {
@@ -112,32 +113,18 @@ export function renderSide(side: Side, v: SideView, op: (o: BoxOp) => void) {
     }
   }
   const rules = side.sections.rules.querySelector<HTMLElement>('.box-body')!
-  if (!typing(rules)) rules.replaceChildren(...v.boxes.rules.map((r) => {
-    const li = el('div', `rule${r.seen ? '' : ' fresh'}`)
-    const text = el('span', 'rule-text', r.text)
-    editable(text, (t) => op(t ? { op: 'set', box: 'rules', id: r.id, text: t } : { op: 'delete', box: 'rules', id: r.id }))
-    li.append(el('b', '', `${r.id}:`), ' ', text, yours(r), button('✕', `Delete rule ${r.id}`, () => op({ op: 'delete', box: 'rules', id: r.id })))
-    return li
-  }))
+  if (!typing(rules)) rules.replaceChildren(...v.boxes.rules.map((r) => el('div', `rule${r.seen ? '' : ' fresh'}`, el('b', '', `${r.id}:`), ' ',
+    editable(el('span', 'rule-text', r.text), (t) => op(t ? { op: 'set', box: 'rules', id: r.id, text: t } : { op: 'delete', box: 'rules', id: r.id })),
+    yours(r), button('✕', `Delete rule ${r.id}`, () => op({ op: 'delete', box: 'rules', id: r.id })))))
   const data = side.sections.data.querySelector<HTMLElement>('.box-body')!
   if (!typing(data)) data.replaceChildren(...v.boxes.data.map((t) => tableView(t, op)))
   // The fixer's notes, newest visit first: what it changed, each with an Undo, and what code refused.
-  side.sections.notes.querySelector('.box-body')!.replaceChildren(...visits.map((x) => {
-    const d = el('div', `visit${x.seen ? '' : ' fresh'}`)
-    const cost = x.costUsd == null ? '' : ` · ~$${x.costUsd.toFixed(4)}`
-    d.append(el('b', '', new Date(x.at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })), x.ask ? ` You asked: "${x.ask}".` : '',
-      el('span', '', x.error ? ` The visit failed: ${x.error}` : ` Read ${x.screens} screens, ${x.changes.length ? `made ${x.changes.length} changes` : 'changed nothing'} · ${(x.ms / 1000).toFixed(1)} s${cost}`))
-    const ul = el('ul')
-    x.changes.forEach((c, i) => {
-      const li = el('li', c.undone ? 'undone' : '', c.text)
-      if (c.note) li.append(el('small', '', ` ${c.note}`))
-      if (c.undo && !c.undone) li.append(' ', button('Undo', 'Undo this change', () => op({ op: 'undo', at: x.at, i })))
-      ul.append(li)
-    })
-    for (const r of x.refused) ul.append(el('li', 'refused', `Refused ${r}`))
-    d.append(ul)
-    return d
-  }))
+  side.sections.notes.querySelector('.box-body')!.replaceChildren(...visits.map((x) => el('div', `visit${x.seen ? '' : ' fresh'}`,
+    el('b', '', new Date(x.at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })), x.ask ? ` You asked: "${x.ask}".` : '',
+    el('span', '', x.error ? ` The visit failed: ${x.error}` : ` Read ${x.screens} screens, ${x.changes.length ? `made ${x.changes.length} changes` : 'changed nothing'} · ${(x.ms / 1000).toFixed(1)} s${x.costUsd == null ? '' : ` · ~$${x.costUsd.toFixed(4)}`}`),
+    el('ul', '', ...x.changes.map((c, i) => el('li', c.undone ? 'undone' : '', c.text, c.note ? el('small', '', ` ${c.note}`) : '',
+      ...c.undo && !c.undone ? [' ', button('Undo', 'Undo this change', () => op({ op: 'undo', at: x.at, i }))] : [])),
+    ...x.refused.map((r) => el('li', 'refused', `Refused ${r}`))))))
 }
 
 /** An entry the user wrote is marked: filing and the fixer leave it alone. */
@@ -149,7 +136,6 @@ function tableView(t: Table, op: (o: BoxOp) => void): HTMLElement {
     button('+ row', 'Add a row', () => set(t.columns, [...t.rows, t.columns.map(() => '')])),
     button('+ column', 'Add a column', () => set([...t.columns, `column ${t.columns.length + 1}`], t.rows.map((r) => [...r, '']))),
     button('✕', `Delete table ${t.id}`, () => op({ op: 'delete', box: 'data', id: t.id })))
-  const table = el('table')
   // Each cell saves the whole table: rows left empty and columns without a name go.
   const save = () => {
     const read = (tr: Element) => [...tr.children].map((c) => (c.textContent ?? '').trim())
@@ -158,15 +144,7 @@ function tableView(t: Table, op: (o: BoxOp) => void): HTMLElement {
     if (!keep.length) return op({ op: 'delete', box: 'data', id: t.id })
     set(keep.map((i) => cols[i]!), rows.map((r) => keep.map((i) => r[i] ?? '')).filter((r) => r.some(Boolean)))
   }
-  for (const [i, r] of [t.columns, ...t.rows].entries()) {
-    const tr = el('tr')
-    for (const c of r) {
-      const cell = el(i ? 'td' : 'th', '', c)
-      editable(cell, save)
-      tr.append(cell)
-    }
-    table.append(tr)
-  }
+  const table = el('table', '', ...[t.columns, ...t.rows].map((r, i) => el('tr', '', ...r.map((c) => editable(el(i ? 'td' : 'th', '', c), save)))))
   return el('div', `data-table${t.seen ? '' : ' fresh'}`, head, table)
 }
 
