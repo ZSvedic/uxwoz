@@ -99,3 +99,17 @@ The repo is organized by lifecycle; the tree is in [README.md](README.md#project
 From `src/`: `bun test` (offline, under a second) and `bun run typecheck`. For UI changes, also look
 at the running app. Bun's `--hot` dev server cannot pick up a newly added frontend file: restart
 `bun run dev` after adding one.
+
+## Design
+
+- **`shell.css` stays under 300 lines and 24 KB.** A change that crosses the cap removes something first.
+- **No design tweak without a request.** Change colours, spacing, fonts, motion or sounds only when the
+  user asked for that change. A bug fix keeps the look as it is. The design variants the user chooses
+  from are in `process/design/`.
+
+## Before a change
+
+Read the file you change and its line in the code map, plus the section of `spec/behavior.md` or
+`spec/code-contract.md` it implements. Read neighbours only when the change crosses into them. A
+change that must touch `app.ts`, `screens.ts`, `server.ts` and `canvas.ts` at once is a sign to stop
+and ask.
