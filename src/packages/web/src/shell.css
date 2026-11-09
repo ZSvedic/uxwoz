@@ -120,7 +120,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .card .head.open .idea { display: block; }
 /* Zoomed far out, a screen shows only its name. */
 .surface.far .card:not(.side) .idea-row { display: none; }
-.card .more { flex: none; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+.card .more { flex: none; padding: 0; border: 0; background: none; color: var(--accent); }
 .card .more:hover { text-decoration: underline; }
 .card .note { color: var(--accent); font-weight: 600; }
 .card.streaming .screen { opacity: .8; }

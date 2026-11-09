@@ -591,18 +591,14 @@ async function undo(key: string) {
   draw()
 }
 
-/** How many other screens a delete takes with it: those the first screen would no longer reach. */
-function goesWith(key: string): number {
-  const rest = screenTree(all().filter((e) => e.key !== key))
-  return [...state.tree.keys()].filter((k) => k !== key && state.entries.has(k) && !rest.has(k)).length
-}
-
 /** Delete a screen, after asking. Screens only it leads to go too; the first screen takes the mockup. */
 async function removeScreen(key: string) {
   const e = state.entries.get(key)
   if (!e || state.busy || !state.app) return
   const root = screenKey(state.app, null) === key
-  const n = isComponent(e) ? pastedOn(e.name!).length : goesWith(key)
+  // The screens that paste a component, or the screens the first screen would no longer reach.
+  const rest = screenTree(all().filter((x) => x.key !== key))
+  const n = isComponent(e) ? pastedOn(e.name!).length : [...state.tree.keys()].filter((k) => k !== key && state.entries.has(k) && !rest.has(k)).length
   const what = isComponent(e) ? `the component ${e.name}? ${n ? `The ${n === 1 ? 'screen' : `${n} screens`} that paste it show nothing in its place.` : 'No screen pastes it.'}`
     : root ? `${labelOf(e)}, the first screen? That deletes the whole mockup.`
     : `${labelOf(e)}${n ? ` and the ${n === 1 ? 'screen' : `${n} screens`} only it leads to` : ''}?`
