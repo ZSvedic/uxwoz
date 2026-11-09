@@ -390,10 +390,6 @@ export class Canvas {
     requestAnimationFrame(() => { this.queued = false; this.layout() })
   }
 
-  private size(c: Card) {
-    return { w: c.width, h: c.view?.error ? FAILED_H : c.height }
-  }
-
   /** Place the tree and the boxes, size the canvas, draw the lines. */
   private layout() {
     const z = this.z
@@ -406,7 +402,7 @@ export class Canvas {
     this.side.style.gap = `${gapX}px`
     const sizes = new Map<string, { w: number; h: number; parts: { id: string; w: number; h: number }[] }>()
     for (const s of screens) {
-      const parts = s.cards.map((v) => ({ id: v.id, ...this.size(this.cards.get(v.id)!) }))
+      const parts = s.cards.map((v) => ({ id: v.id, w: this.cards.get(v.id)!.width, h: v.error ? FAILED_H : this.cards.get(v.id)!.height }))
       const w = parts.reduce((t, p) => t + p.w, 0) + orW * (parts.length - 1)
       sizes.set(s.key, { w, h: Math.max(...parts.map((p) => p.h)), parts })
     }
@@ -499,23 +495,8 @@ export class Canvas {
     this.surface.style.width = `${w}px`
     this.surface.style.height = `${h}px`
     this.drawLines(kids)
-    this.queueMore()
-  }
-
-  private moreQueued = false
-
-  /** Show "more" by each idea cut off at two lines; the room it has changes with the zoom. */
-  private queueMore() {
-    if (this.moreQueued) return
-    this.moreQueued = true
-    requestAnimationFrame(() => {
-      this.moreQueued = false
-      for (const c of this.cards.values()) {
-        if (c.view?.side) { c.more.hidden = true; continue }
-        const open = c.more.textContent === 'less'
-        c.more.hidden = !open && c.idea.scrollHeight <= c.idea.clientHeight + 1
-      }
-    })
+    // Show "more" by each idea cut off at two lines; the room it has changes with the zoom.
+    requestAnimationFrame(() => { for (const c of this.cards.values()) c.more.hidden = !!c.view?.side || (c.more.textContent !== 'less' && c.idea.scrollHeight <= c.idea.clientHeight + 1) })
   }
 
   /** A line from each screen to its parent: straight down, else an elbow at the parent's branch height. */
