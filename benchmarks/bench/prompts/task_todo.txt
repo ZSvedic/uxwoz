@@ -1,7 +1,0 @@
-Create a compact todo list app with:
-- A text input labelled "New task" and an "Add" button; clicking Add (or pressing Enter) appends the typed task and clears the input. Empty tasks are ignored.
-- Each task shows its text, a checkbox to mark it done, and a "Delete" button that removes it.
-- A filter with three options: All, Active and Done.
-- A counter showing how many tasks are not done, e.g. "2 items left".
-- Start with three tasks: "Buy milk" (not done), "Write report" (done) and "Call Alice" (not done).
-- Every change updates the list, the filter and the counter immediately.

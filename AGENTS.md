@@ -65,14 +65,13 @@ src/packages/web/src/
   index.html, shell.css   the page around the canvas
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
-src/scripts/                 live experiments, run by hand: paper-*.ts (the paper test, build step 1 of the paper canvas plan),
-                             fixer-reply.ts (Terra's raw reply to a visit of a cache file)
+src/scripts/fixer-reply.ts   run by hand: Terra's raw reply to a visit of a cache file
 ```
 
 ## Do not read (large or generated)
 
-`cassettes/*.json`, `benchmarks/data/`, `src/packages/web/themes/pico.css`, `src/bun.lock`,
-`temp/`. Search them with grep if you must.
+`cassettes/*.json`, `src/packages/web/themes/pico.css`, `src/bun.lock`, `temp/`, and
+`process/journal/` beyond its latest file. Search them with grep if you must.
 
 ## Layout rules
 
@@ -85,8 +84,6 @@ The repo is organized by lifecycle; the tree is in [README.md](README.md#project
 - **`cassettes/` is recorded data**: the model replies the tests replay, one JSON per test file.
   The prompt bytes are part of every key, so a prompt change means `bun run test:record` (live
   calls, a few cents). Never delete casually.
-- **`benchmarks/`** is a self-contained Python tool (FastAPI + Playwright, `uv`) that imports no app
-  code; see [benchmarks/README.md](benchmarks/README.md).
 - **`temp/`** is git-ignored scratch; the dev server's screen cache lives there.
 
 ## Before you commit

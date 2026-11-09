@@ -53,16 +53,14 @@ prompt or the request shape, re-record them (live calls, a few cents):
 cd src && bun run test:record
 ```
 
-`bun run typecheck` checks the types. The Python UI generation benchmark has its own instructions in
-[benchmarks/README.md](benchmarks/README.md).
+`bun run typecheck` checks the types.
 
 ## Project layout
 
 ```
 spec/        what the app does: behavior, UI generation, code contract, prompts
-src/         the app (bun workspace): packages/core (engine), packages/web (server + page), tests/, scripts/ (live experiments)
+src/         the app (bun workspace): packages/core (engine), packages/web (server + page), tests/, scripts/ (one debugging script)
 cassettes/   recorded model replies the tests replay
-benchmarks/  the lite UI generation benchmark (Python) and its data
 process/     product brief, writing style, journal
 temp/        local scratch, ignored by git (the screen cache lives here)
 ```

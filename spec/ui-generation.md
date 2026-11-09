@@ -7,7 +7,7 @@ which models to call with which settings. It does not own the product flow, cach
 ## Example
 
 The app sends the system prompt in [prompt-screen.md](prompt-screen.md) (the canvas manual, then
-how to reply, with the benchmark's HTML and Pico rules from `benchmarks/bench/prompts/system.txt`)
+how to reply, with the HTML and Pico rules that came from the October benchmark)
 and the paper with the screen to draw. The model streams back one HTML fragment, ending in one
 `<script>`:
 
@@ -70,7 +70,8 @@ read text and positions, so a theme that moves elements can change the scale che
 
 ## Models
 
-All three were measured on 2026-10-22/23 with the lite benchmark (`benchmarks/`).
+All three were measured on 2026-10-22/23 with the lite benchmark, a Python tool deleted on
+2026-11-09 (git history has it under `benchmarks/`).
 
 | Model | Call | Score | Correct | Time | $/screen |
 |---|---|---:|---:|---:|---:|
