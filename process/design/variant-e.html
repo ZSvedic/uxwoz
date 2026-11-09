@@ -1,0 +1,284 @@
+<!doctype html>
+<!--
+  Variant E, "Sleek glyph": the wizard of A, made a 2026 AI product. A dark canvas with a slow aurora and a faint dot grid;
+  every panel is frosted glass with a 1 px light edge. Layout: a slim glass top bar, a glass rail of tools on the left
+  (a bottom bar on a phone), the trail as a glowing rune line with a dot per level, boxes as glass cards with a violet to
+  cyan top line, the drawer as a glass panel that slides in from the right. Pick: a sharp violet-cyan ring expands and
+  fades from the chosen screen, then a steady glow stays; the other greys out and sinks. Sounds: a synth shimmer on pick,
+  a soft blip on the hover preview, a filtered whoosh for the drawer and the New panel.
+  Light: canvas #1d2457 to #0d1030, glass #f3f4ffd9, raised #e4e6fb, edge #ffffffb3, text #15172e, muted #5c608a,
+         violet #7c4dff, cyan #00a5c8, ember #ff6b2c, field #ffffff.
+  Dark:  canvas #080a1f to #030414, glass #141834cc, raised #23284a, edge #ffffff26, text #e9eaff, muted #9ca1d4,
+         violet #a78bfa, cyan #22d3ee, ember #ff7a3d, field #0c0f27.
+  Font: Space Grotesk for everything, the system monospace for IDs. Design sheet: below the canvas (Design sheet ↓).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UX Woz, variant E</title>
+<link rel="icon" id="fav" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='a' x2='1' y2='1'%3E%3Cstop stop-color='%238b5cf6'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x2='1'%3E%3Cstop stop-color='%236d28d9'/%3E%3Cstop offset='1' stop-color='%230891b2'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M18 2l7.5 18h-19z' fill='url(%23a)'/%3E%3Crect x='2' y='21' width='28' height='6' rx='3' fill='url(%23b)'/%3E%3Cpath d='M26.5 2l1.1 3.4 3.4 1.1-3.4 1.1-1.1 3.4-1.1-3.4L22 6.5l3.4-1.1z' fill='%23ff6b2c'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&amp;display=swap">
+<script>
+// One list of tokens: it writes the CSS variables and the design sheet's swatches. [name, what, role, light, dark]
+const T=[["cv","canvas","canvas","#1d2457","#080a1f"],["cv2","canvas, deep","canvas","#0d1030","#030414"],["gl","glass","surface","#f3f4ffd9","#141834cc"],
+["gl2","glass, raised","","#e4e6fb","#23284a"],["edge","glass edge","","#ffffffb3","#ffffff26"],["tx","text","text","#15172e","#e9eaff"],["mu","muted","","#5c608a","#9ca1d4"],
+["vi","violet","accent","#7c4dff","#a78bfa"],["cy","cyan","second accent","#00a5c8","#22d3ee"],["em","ember","highlight","#ff6b2c","#ff7a3d"],["in","field","","#ffffff","#0c0f27"]];
+const vars=i=>T.map(t=>`--${t[0]}:${t[i]}`).join(";");
+document.head.append(Object.assign(document.createElement("style"),{textContent:`:root{${vars(3)}}@media (prefers-color-scheme:dark){:root{${vars(4)}}}`}));
+</script>
+<style>
+:root{color-scheme:dark;--ln:#8088c040;--lift:0 18px 40px -16px #000c}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;height:100vh;overflow:hidden;color:var(--tx);font:15px/1.45 "Space Grotesk",system-ui,sans-serif;background:linear-gradient(160deg,var(--cv),var(--cv2))}
+button,select,textarea{font:inherit;color:inherit}button{cursor:pointer}
+code,.mono{font:500 12.5px ui-monospace,SFMono-Regular,Menlo,monospace}
+.glass,.label,.tools button,.sec{background:var(--gl);border:1px solid var(--edge);-webkit-backdrop-filter:blur(18px) saturate(1.5);backdrop-filter:blur(18px) saturate(1.5);box-shadow:var(--lift)}
+.aur{position:fixed;inset:-25%;pointer-events:none;background:radial-gradient(38% 30% at 30% 30%,#7c4dff45,#0000 70%),radial-gradient(34% 28% at 75% 62%,#22d3ee30,#0000 70%),radial-gradient(28% 22% at 45% 92%,#ff6b2c1c,#0000 70%);animation:aur 40s ease-in-out infinite alternate}
+@keyframes aur{to{transform:translate(7%,-5%) rotate(10deg) scale(1.1)}}
+.stage{position:absolute;inset:0;overflow:auto;padding:80px 16px 40px 104px;background:radial-gradient(#ffffff12 1px,#0000 1.5px) 0 0/26px 26px}
+.board{display:flex;flex-direction:column;gap:54px;transform-origin:0 0;transition:transform .25s}
+.lvl{display:flex;flex-wrap:wrap;gap:40px 64px;align-items:flex-start}
+.top{position:fixed;top:10px;left:10px;right:10px;height:50px;display:flex;align-items:center;gap:14px;padding:0 10px;z-index:6;border-radius:14px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:19px;letter-spacing:-.03em;white-space:nowrap}.logo svg{width:30px;height:30px;flex:none}
+.wm span{background:linear-gradient(90deg,var(--vi),var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
+.trail{display:flex;align-items:center;gap:2px;font-size:14px;white-space:nowrap}
+.trail button,.rail button,.x{border:0;background:none;border-radius:9px;padding:4px 7px}.trail button:hover,.x:hover{background:var(--gl2)}
+.rune{position:relative;display:flex;gap:20px;padding:0 8px;align-items:center}
+.rune::before,.prog{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:linear-gradient(90deg,var(--vi),var(--cy));box-shadow:0 0 6px var(--cy)}
+.rune i{position:relative;width:9px;height:9px;border-radius:50%;background:var(--in);border:1.5px solid var(--cy)}.rune i.on{background:var(--cy);box-shadow:0 0 8px var(--cy)}
+.fav{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--mu);padding:3px 8px;border:1px solid var(--ln);border-radius:9px}.fav span{display:flex;align-items:center;gap:4px}
+.sec{border-radius:99px;padding:5px 14px;box-shadow:none;background:var(--gl2);white-space:nowrap}.sec:hover{border-color:var(--vi)}
+.rail{position:fixed;top:72px;left:10px;width:74px;display:flex;flex-direction:column;gap:2px;padding:8px 6px;z-index:5;border-radius:16px}
+.rail button{position:relative;padding:6px 2px;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.1;color:var(--mu)}
+.rail button:hover{background:var(--gl2);color:var(--tx)}.rail em{font-style:normal;font-size:18px;color:var(--tx)}
+.rail .new,.go,.seg .on{background:linear-gradient(135deg,#7c4dff,#0a9cc0);color:#fff;border:0}
+.rail .new{width:44px;height:44px;margin:0 auto 6px;border-radius:14px;justify-content:center;box-shadow:0 0 18px #7c4dff88}.rail .new em{color:#fff;font-size:26px;line-height:1}
+.badge{position:absolute;top:1px;right:7px;min-width:16px;padding:0 4px;border-radius:99px;background:var(--vi);color:#fff;font-size:10px;line-height:16px;font-weight:700}
+.mute svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}.off{opacity:.5}.off .wave{display:none}
+.label{display:inline-flex;gap:6px;margin-bottom:12px;padding:3px 12px;border-radius:99px;font-size:13px;box-shadow:none}.label i{font-style:normal;font-weight:700;color:var(--vi)}
+.pair{position:relative;display:flex;gap:12px;align-items:center}
+.prog{top:auto;bottom:-14px;opacity:0;transform-origin:0}.prog.run{animation:prog .7s ease-out}
+@keyframes prog{0%{opacity:1;transform:scaleX(0)}70%{opacity:1}100%{transform:none;opacity:0}}
+.or{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:50%;color:#fff;font-weight:700;font-size:13px;border:1.5px solid transparent;
+  background:linear-gradient(#0c0f27,#0c0f27) padding-box,linear-gradient(135deg,#a78bfa,#22d3ee) border-box;box-shadow:0 0 16px #7c4dff66}
+.prop{position:relative;width:clamp(126px,37vw,190px);display:flex;flex-direction:column;gap:10px;align-items:center}
+.idea{font-weight:500;font-size:14px;min-height:40px;color:#e9eaff;align-self:stretch}
+.pc{position:relative;width:100%;cursor:pointer;border-radius:16px;padding:6px;background:#fff;box-shadow:0 0 0 1px #fff4,0 0 30px #8fa0ff40,var(--lift);transition:transform .3s,box-shadow .4s}
+.pc .scr{border-radius:10px;min-height:250px}
+.ring{position:absolute;inset:-4px;border-radius:20px;padding:2px;background:linear-gradient(135deg,#8b5cf6,#22d3ee);pointer-events:none;opacity:0;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.pick{border:0;border-radius:99px;padding:6px 20px;background:linear-gradient(#ff9156,var(--em));color:#fff;font-weight:700;box-shadow:inset 0 0 0 1px #fff5,0 6px 18px -4px #ff6b2c}
+.pick:active{transform:translateY(1px)}
+/* Pick: a ring is cast from the chosen screen and a glow stays; the other greys out and sinks back. */
+.pc.summon{animation:summon .6s ease-out both}.prop:nth-of-type(3) .pc.summon{animation-delay:.12s}
+.pc.lift{transform:translateY(-4px)}.pc.lift .ring{animation:peek 1s ease-out}
+.pc.won{box-shadow:0 0 0 2px #8b5cf6,0 0 28px #7c4dffaa,0 0 64px #22d3ee55;transform:translateY(-4px)}
+.pc.won .ring{animation:cast .9s cubic-bezier(.15,.7,.2,1)}.pc.won .ring+.ring{animation-delay:.14s}
+.pc.lost{animation:lost .7s ease-in forwards}
+@keyframes summon{0%{opacity:0;transform:translateY(14px);filter:blur(8px)}}
+@keyframes peek{40%{opacity:.7;transform:scale(1.03)}100%{opacity:0;transform:scale(1.08)}}
+@keyframes cast{0%{opacity:1;transform:none}100%{opacity:0;transform:scale(1.3)}}
+@keyframes lost{to{filter:grayscale(1) brightness(.45);transform:translateY(18px) scale(.92);opacity:0}}
+.again{margin-top:22px}
+.small{width:clamp(150px,40vw,180px)}.small .pc{cursor:default}
+.tools{display:flex;gap:6px;margin-top:12px}
+.tools button{width:34px;height:34px;border-radius:50%;font-size:14px;box-shadow:none}.tools button:hover{box-shadow:0 0 14px var(--vi)}
+.boxes{display:flex;flex-direction:column;gap:20px;width:min(300px,100%)}
+.box{position:relative;overflow:hidden;padding:14px 16px;border-radius:16px;font-size:14px}
+.box::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,var(--vi),var(--cy));box-shadow:0 0 10px var(--cy)}
+.box.note::before{background:linear-gradient(90deg,var(--em),var(--vi))}
+.box h4,h3{margin:0 0 6px;font-size:15px;font-weight:700;letter-spacing:-.01em}
+.box ol,.drawer ol{margin:0;padding-left:18px}.box code{color:var(--vi)}
+.box table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--ln);padding:2px 6px;text-align:left}
+small{color:var(--mu)}
+.undo{border:0;border-radius:99px;padding:1px 10px;background:var(--tx);color:var(--in);font-size:12px}
+.drawer{position:fixed;top:72px;right:10px;bottom:10px;width:min(360px,calc(100% - 20px));z-index:7;border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;overflow:auto;
+  transform:translateX(calc(100% + 24px));visibility:hidden;transition:transform .45s cubic-bezier(.2,.8,.2,1),visibility 0s .45s}
+.drawer.open{transform:none;visibility:visible;transition:transform .45s cubic-bezier(.2,.8,.2,1)}
+.row{display:flex;gap:6px;align-items:center}.x{margin-left:auto}
+.seg{display:flex;gap:2px;padding:3px;border-radius:99px;background:var(--gl2)}.seg button{border:0;background:none;border-radius:99px;padding:3px 12px}
+hr{width:100%;border:0;height:1px;margin:2px 0;background:linear-gradient(90deg,#0000,var(--vi),var(--cy),#0000);box-shadow:0 0 6px var(--vi)}
+h2{margin:0;font-size:21px;letter-spacing:-.02em}
+textarea,select{border:1px solid var(--ln);border-radius:12px;background:var(--in);color:var(--tx)}textarea{width:100%;padding:8px 10px}select{padding:5px 8px}
+textarea:focus,select:focus{outline:2px solid var(--vi);outline-offset:1px}
+.go{align-self:flex-start;border-radius:99px;padding:7px 18px;font-weight:700;box-shadow:0 6px 18px -6px #7c4dff}
+.gen{position:fixed;inset:0;display:grid;place-items:center;background:#03041299;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);z-index:8}
+.gen form{width:min(460px,calc(100% - 32px));border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:12px}
+/* the design sheet */
+.sheet{margin-top:90px;max-width:940px;border-radius:20px;padding:20px 22px;scroll-margin-top:72px;display:flex;flex-direction:column;gap:14px}
+.sheet h2{font-size:26px}.sr{display:flex;flex-wrap:wrap;gap:18px;align-items:center}.sr>div{display:flex;flex-direction:column;gap:5px;align-items:flex-start}
+.cap{font-size:11px;color:var(--mu)}
+.sws{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(250px,100%),1fr));gap:10px;width:100%}
+.sw{display:flex;gap:8px;align-items:center;font-size:13px}.sw i{width:30px;height:30px;flex:none;border-radius:8px;border:1px solid var(--ln)}.sw .mono{font-size:11px;display:block;color:var(--mu)}
+.role{color:var(--vi);font-weight:700}
+.tile{background:linear-gradient(160deg,var(--cv),var(--cv2));padding:14px 0 0 14px;border-radius:14px;width:150px;height:110px;overflow:hidden}.tile .pc{width:260px;cursor:default}
+.mo{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}.mo button{border:0;border-radius:99px;padding:0 9px;margin-right:6px;background:var(--gl2);color:var(--vi)}
+/* the mockup screens, as in variant A */
+.scr{background:#fff;color:#222;font:11px/1.3 "Comic Sans MS","Comic Neue",cursive;padding:8px}
+.scr .w{border:1.5px solid #333;border-radius:255px 15px 225px 15px/15px 225px 15px 255px;padding:5px 7px;margin:5px 0}
+.scr b{font-size:13px}.scr .btn{text-align:center;background:#eef3ff;color:#2457c5}
+.scr .big{width:100px;height:100px;margin:10px auto;display:grid;place-items:center;border-radius:50% 46% 52% 48%/48% 52% 46% 50%;border:2px solid #333;font-size:16px}
+.scr .bars{display:flex;gap:3px;align-items:flex-end;height:40px}.scr .bars i{flex:1;background:#999;border-radius:3px 2px 0 0}
+.scr .tabbar{display:flex;justify-content:space-around;border-top:1.5px solid #333;margin-top:8px;padding-top:4px;color:#2457c5}
+@media (prefers-reduced-motion:reduce){.aur,.prog{animation:none!important}.pc,.ring,.drawer{animation-duration:.01s!important;animation-delay:0s!important;transition-duration:.01s!important}}
+@media (max-width:720px){.hide-s{display:none!important}.top{gap:6px;padding:0 6px}.logo{font-size:16px;gap:5px}.logo svg{width:26px;height:26px}.rune{gap:14px;padding:0 5px}
+  .fav{padding:2px 4px;font-size:0;gap:0}.sec{padding:4px 9px}.stage{padding:76px 12px 100px}.pair{gap:6px}.or{width:34px;height:34px;font-size:12px}
+  .rail{top:auto;bottom:10px;right:10px;width:auto;flex-direction:row;justify-content:space-around;align-items:center}.rail .new{width:40px;height:40px;margin:0}.badge{top:-3px;right:-4px}
+  .drawer{top:68px;bottom:84px}.sheet{padding:16px}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="ga" x2="1" y2="1"><stop stop-color="#8b5cf6"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
+  <linearGradient id="gb" x2="1"><stop stop-color="#6d28d9"/><stop offset="1" stop-color="#0891b2"/></linearGradient>
+  <symbol id="hat" viewBox="0 0 32 32"><path d="M18 2l7.5 18h-19z" fill="url(#ga)"/><rect x="2" y="21" width="28" height="6" rx="3" fill="url(#gb)"/>
+  <path d="M26.5 2l1.1 3.4 3.4 1.1-3.4 1.1-1.1 3.4-1.1-3.4L22 6.5l3.4-1.1z" fill="#ff6b2c"/></symbol></defs></svg>
+<div class="aur"></div>
+<header class="top glass">
+  <div class="logo" title="UX Woz"><svg aria-hidden="true"><use href="#hat"/></svg><span class="wm">UX <span>Woz</span></span></div>
+  <nav class="trail" aria-label="Trail"><button title="Back">←</button><button class="hide-s" title="Mockup: recent, start over">NiceSnore ›</button>
+    <span class="rune" title="Levels"><i class="on" title="L1"></i><i title="L2"></i></span><button>L1 Home ▾</button><button title="Forward">→</button></nav>
+  <div class="fav" title="Favicon"><span><img id="f16" width="16" height="16" alt="glyph 16">16</span><span class="hide-s"><img id="f32" width="32" height="32" alt="glyph 32">32</span></div>
+  <button class="sec" id="sheetBtn" title="Scroll to the design sheet"><span class="hide-s">Design sheet </span>↓</button>
+</header>
+<main class="stage" id="stage"><div class="board" id="board">
+  <div class="lvl">
+    <div>
+      <span class="label"><i>L1</i> Home · two spells</span>
+      <div class="pair">
+        <div class="prop">
+          <div class="idea">Last night first, chart below</div>
+          <div class="pc"><div class="scr">
+            <b>NiceSnore</b><div class="w">Last night<br><b>7 h 12 m</b> · 14 snores</div>
+            <div class="w"><div class="bars"><i style="height:30%"></i><i style="height:70%"></i><i style="height:45%"></i><i style="height:90%"></i><i style="height:20%"></i><i style="height:55%"></i></div></div>
+            <div class="w btn">Start night</div><div class="w btn">Nights</div>
+            <div class="tabbar"><span>Home</span><span>Nights</span><span>Settings</span></div></div></div>
+          <button class="pick">Pick A</button>
+        </div>
+        <div class="or">OR</div>
+        <div class="prop">
+          <div class="idea">One big Sleep button on top</div>
+          <div class="pc"><div class="scr">
+            <b>NiceSnore</b><div class="big">Sleep</div>
+            <div class="w">Snores last night: <b>14</b></div><div class="w btn">See all nights</div>
+            <div class="tabbar"><span>Home</span><span>Nights</span><span>Settings</span></div></div></div>
+          <button class="pick">Pick B</button>
+        </div>
+        <div class="prog" id="prog"></div>
+      </div>
+      <button class="sec again" id="again" hidden>↺ Cast A OR B again</button>
+    </div>
+    <div class="boxes">
+      <div class="box glass"><h4>Rules</h4><ol><li><code>snore-count</code> Snores show as a count per night</li><li><code>tab-bar</code> Every screen pastes the tab bar</li></ol></div>
+      <div class="box glass"><h4>Data</h4><table><tr><th>night</th><th>sleep</th><th>snores</th></tr><tr><td>Mon</td><td>7:12</td><td>14</td></tr><tr><td>Tue</td><td>6:40</td><td>22</td></tr></table></div>
+      <div class="box glass note"><h4>Fixer's note</h4>merged <code>snores</code> into <code>snore-count</code>; redrew Nights <button class="undo">Undo</button><br><small>21:14 · $0.004</small></div>
+    </div>
+  </div>
+  <div class="lvl">
+    <div class="small"><span class="label"><i>L2</i> Nights</span>
+      <div class="pc"><div class="scr"><b>Nights</b><div class="w">Mon · 7:12 · 14 snores</div><div class="w">Tue · 6:40 · 22 snores</div><div class="w">Wed · 7:55 · 9 snores</div><div class="tabbar"><span>Home</span><span>Nights</span><span>Settings</span></div></div></div>
+      <div class="tools"></div></div>
+    <div class="small"><span class="label"><i>L2</i> Settings</span>
+      <div class="pc"><div class="scr"><b>Settings</b><div class="w">Alarm when loud ☐</div><div class="w">Mic sensitivity ━━●━</div><div class="w">Dark at night ☑</div><div class="tabbar"><span>Home</span><span>Nights</span><span>Settings</span></div></div></div>
+      <div class="tools"></div></div>
+  </div>
+</div>
+<section class="sheet glass" id="sheet" aria-label="Design sheet">
+  <h2>Design sheet</h2>
+  <hr><h3>Logo</h3>
+  <div class="sr"><div><svg width="96" height="96"><use href="#hat"/></svg><span class="cap">96 px</span></div><div><svg width="48" height="48"><use href="#hat"/></svg><span class="cap">48 px</span></div>
+    <div><svg width="24" height="24"><use href="#hat"/></svg><span class="cap">24 px</span></div><div><img class="fi" width="32" height="32" alt="favicon 32"><span class="cap">favicon 32</span></div>
+    <div><img class="fi" width="16" height="16" alt="favicon 16"><span class="cap">favicon 16</span></div><div class="logo"><svg><use href="#hat"/></svg><span class="wm">UX <span>Woz</span></span></div></div>
+  <hr><h3>Colours</h3><p class="cap" style="margin:0">Each token: light, then dark.</p>
+  <div class="sws" id="sws"></div>
+  <hr><h3>Type</h3>
+  <div class="sr" style="align-items:flex-start;flex-direction:column;gap:10px">
+    <div><span class="cap">Display: Space Grotesk 700</span><h2>Cast the first screen</h2></div>
+    <div><span class="cap">Body: Space Grotesk 400</span><span style="max-width:460px">The fixer merged two rules and redrew the Nights screen. Undo puts both rules back and keeps the old drawing.</span></div>
+    <div><span class="cap">Mono: the system monospace, for IDs</span><code>snore-count</code></div></div>
+  <hr><h3>Controls</h3>
+  <div class="sr"><div><button class="pick">Pick A</button><span class="cap">Pick</span></div><div><button class="sec">↺ Cast again</button><span class="cap">secondary</span></div>
+    <div><button class="undo">Undo</button><span class="cap">Undo pill</span></div>
+    <div><nav class="rail" style="position:static;width:74px;padding:4px"><button><em>§</em>Rules<b class="badge">2</b></button></nav><span class="cap">tool + count</span></div>
+    <div><select aria-label="Model"><option>Haiku</option><option>Luna</option></select><span class="cap">select</span></div>
+    <div><textarea rows="2" aria-label="Sample">Show a moon</textarea><span class="cap">textarea</span></div>
+    <div><div class="or">OR</div><span class="cap">OR badge</span></div><div><span class="label" style="margin:0"><i>L2</i> Nights</span><span class="cap">level label</span></div></div>
+  <hr><h3>Surfaces</h3>
+  <div class="sr" style="align-items:flex-start"><div class="box glass" style="width:250px"><h4>Rules</h4><ol><li><code>tab-bar</code> Every screen pastes the tab bar</li></ol></div>
+    <div><div class="glass row" style="width:300px;padding:10px;border-radius:14px"><div class="seg"><button class="on">✎ Edit</button><button>ⓘ Info</button></div><button class="x">✕</button></div><span class="cap">drawer header</span></div>
+    <div><div class="tile"><div class="pc"><div class="scr"><b>Nights</b><div class="w">Mon · 7:12 · 14 snores</div></div></div></div><span class="cap">device frame corner</span></div></div>
+  <hr><h3>Motion and sound</h3>
+  <ul class="mo">
+    <li>Cast: screens rise out of a blur while a rune line runs under the pair, 0.6 s.</li>
+    <li>Hover Pick: the screen lifts 4 px and a faint ring peeks out, 1 s.</li>
+    <li>Pick: two violet-cyan rings expand and fade, a steady glow stays; the other greys out and sinks, 0.9 s.</li>
+    <li>Drawer: slides in from the right, 0.45 s. Aurora: the canvas glow drifts on a 40 s loop.</li>
+    <li>Reduced motion: no aurora, no rune line, every move is instant.</li>
+    <li><button data-s="shimmer">▶</button>Shimmer on pick: six rising synth notes with a gliding overtone.</li>
+    <li><button data-s="blip">▶</button>Blip on the hover preview: one soft high note.</li>
+    <li><button data-s="whoosh">▶</button>Whoosh for the drawer and the New panel: filtered noise, quiet.</li></ul>
+</section></main>
+<nav class="rail glass" aria-label="Tools">
+  <button class="new" id="newBtn" title="New mockup"><em>+</em></button>
+  <button><em>§</em>Rules<b class="badge">2</b></button><button><em>✧</em>Fixer<b class="badge">1</b></button><button><em>▦</em>Data</button>
+  <button class="hide-s"><em>✎</em>Sketch</button><button id="zoom"><em>⌕</em>100%</button>
+  <button class="mute" id="mute" title="Sounds on: click to mute" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>Sound</button>
+</nav>
+<aside class="drawer glass" id="drawer" aria-label="Edit">
+  <div class="row"><div class="seg"><button class="on">✎ Edit</button><button>ⓘ Info</button></div><button class="x" id="close" title="Close (Esc)">✕</button></div>
+  <hr><h2>L2 Nights</h2>
+  <label for="chg">What should change?</label>
+  <textarea id="chg" rows="4" placeholder="e.g. Show a moon next to quiet nights"></textarea>
+  <button class="go">Make the change</button>
+  <strong>Past changes</strong><ol><li>Show the snore count per night</li></ol>
+</aside>
+<div class="gen" id="gen" hidden><form class="glass" onsubmit="return false">
+  <h2>What should we conjure?</h2><hr>
+  <textarea rows="3" aria-label="Prompt">A sleep tracker that counts snores</textarea>
+  <div class="row"><select aria-label="Model"><option>Haiku</option><option>Luna</option><option>Sol</option></select><select aria-label="Device"><option>Phone</option><option>Desktop</option></select></div>
+  <button class="go" id="go">Cast the first screen</button></form></div>
+<script>
+const $=id=>document.getElementById(id),Q=q=>[...document.querySelectorAll(q)];
+$("f16").src=$("f32").src=$("fav").href;Q(".fi").forEach(i=>i.src=$("fav").href);
+$("sws").innerHTML=T.map(t=>`<div class="sw"><i style="background:${t[3]}"></i><i style="background:${t[4]}"></i><span>${t[1]}${t[2]?` <span class="role">· ${t[2]}</span>`:""}<span class="mono">--${t[0]} ${t[3]} / ${t[4]}</span></span></div>`).join("");
+// Sounds: made on the fly, only after a click has opened the audio.
+let ac=null,muted=false;
+function snd(play,fromClick){if(muted)return;if(!ac){if(!fromClick)return;ac=new AudioContext}ac.resume();play(ac)}
+const tone=(a,f,t0,d,v,type,f2)=>{const o=a.createOscillator(),g=a.createGain(),t=a.currentTime+t0;o.type=type;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+.01);g.gain.exponentialRampToValueAtTime(.0005,t+d);o.connect(g).connect(a.destination);o.start(t);o.stop(t+d+.05)};
+const S={shimmer:a=>[0,4,7,11,14,19].forEach((s,i)=>{const f=622*2**(s/12);tone(a,f,i*.045,.7,.06,"triangle");tone(a,f*1.006,i*.045+.01,.5,.025,"sine",f*1.5)}),
+  blip:a=>tone(a,1800,0,.14,.04,"sine",2500),
+  whoosh:a=>{const n=a.sampleRate*.45|0,b=a.createBuffer(1,n,a.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.sin(Math.PI*i/n);
+    const s=a.createBufferSource(),f=a.createBiquadFilter(),g=a.createGain(),t=a.currentTime;s.buffer=b;f.type="lowpass";f.Q.value=.8;f.frequency.setValueAtTime(350,t);
+    f.frequency.exponentialRampToValueAtTime(2200,t+.2);f.frequency.exponentialRampToValueAtTime(500,t+.45);g.gain.value=.16;s.connect(f).connect(g).connect(a.destination);s.start(t)}};
+Q("[data-s]").forEach(b=>b.onclick=()=>snd(S[b.dataset.s],true));
+const props=Q(".prop"),again=$("again"),or=Q(".or")[0];let picked=false;
+Q(".pair .pc").forEach(pc=>pc.insertAdjacentHTML("beforeend",'<i class="ring"></i><i class="ring"></i>'));
+function play(el,cls){el.classList.remove("summon","lift","won","lost");void el.offsetWidth;el.classList.add(cls)}
+function castAll(withSound){picked=false;again.hidden=true;or.hidden=false;props.forEach(p=>{p.hidden=false;play(p.querySelector(".pc"),"summon")});
+  const g=$("prog");g.classList.remove("run");void g.offsetWidth;g.classList.add("run");if(withSound)snd(S.whoosh,true)}
+props.forEach(p=>{const pc=p.querySelector(".pc"),btn=p.querySelector(".pick");
+  const pick=()=>{if(picked)return;picked=true;play(pc,"won");snd(S.shimmer,true);
+    const others=props.filter(q=>q!==p);others.forEach(q=>play(q.querySelector(".pc"),"lost"));
+    setTimeout(()=>{others.forEach(q=>q.hidden=true);or.hidden=true;again.hidden=false},700)};
+  pc.addEventListener("click",pick);btn.addEventListener("click",pick);
+  btn.addEventListener("mouseenter",()=>{if(!picked){play(pc,"lift");snd(S.blip,false)}});
+  btn.addEventListener("mouseleave",()=>{if(!picked)pc.classList.remove("lift")})});
+again.onclick=()=>castAll(true);
+castAll(false);
+Q(".tools").forEach(t=>t.innerHTML='<button data-edit title="Edit">✎</button><button title="Make again">↻</button><button data-edit title="Info">ⓘ</button><button title="Delete">✕</button>');
+const drawer=$("drawer");
+Q("[data-edit]").forEach(b=>b.onclick=()=>{drawer.classList.add("open");snd(S.whoosh,true)});
+$("close").onclick=()=>drawer.classList.remove("open");
+const mute=$("mute");
+mute.onclick=()=>{muted=!muted;mute.classList.toggle("off",muted);mute.setAttribute("aria-pressed",muted);mute.title=muted?"Muted: click for sounds":"Sounds on: click to mute"};
+const gen=$("gen");$("newBtn").onclick=()=>{gen.hidden=false;snd(S.whoosh,true)};
+$("go").onclick=()=>{gen.hidden=true;castAll(true)};
+gen.onclick=e=>{if(e.target===gen)gen.hidden=true};
+$("sheetBtn").onclick=()=>$("sheet").scrollIntoView({behavior:matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth"});
+let z=1;$("zoom").onclick=e=>{z=z===1?.75:1;e.currentTarget.lastChild.textContent=Math.round(z*100)+"%";$("board").style.transform=`scale(${z})`};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){drawer.classList.remove("open");gen.hidden=true}});
+</script>
+</body>
+</html>

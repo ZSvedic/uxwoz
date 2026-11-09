@@ -7,13 +7,16 @@
   Light: sky #0b1030 to #1b2160, parchment #f6ecd2, ink #2a1f3d, blue #2f5bff, green #17a364, ember #ff6a2b, gold #f5c542.
   Dark: same sky, chrome #1a1f4a, edge #2e3680, text #e6e4ff, blue #6f8cff, green #34d38a, ember #ff7a3d, gold #ffd166.
   Font: Cinzel Decorative for the wordmark and headings, the system font for the rest.
+  Logo: a wizard hat: a wide oval brim, a tall cone whose tip bends right, a green band, a gold star. The favicon is the
+  same hat with a gold band and no star. Below the canvas, the design sheet (the "Design sheet" button scrolls to it) shows
+  the logo, colours, type, controls, surfaces, motion and sounds, in the same rows as every variant.
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>UX Woz, variant A</title>
-<link rel="icon" id="fav" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M12.5 .5Q7 2 3 12h10Q9.5 6 12.5.5z' fill='%232f5bff'/%3E%3Crect y='11' width='16' height='4.5' rx='2.2' fill='%23172a8f'/%3E%3Cpath d='M8 5.2l1 2 2 .9-2 .9-1 2-1-2-2-.9 2-.9z' fill='%23f5c542'/%3E%3C/svg%3E">
+<link rel="icon" id="fav" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' stroke='%230b1030' stroke-width='2' stroke-linejoin='round'%3E%3Cellipse cx='20' cy='32.5' rx='18.5' ry='5.5' fill='%23172a8f'/%3E%3Cpath d='M9 31L17 9Q20 2 27 4Q31 5 34 10Q29 7 24.5 9.5L31 31Q20 35.5 9 31z' fill='%232f5bff'/%3E%3Cpath d='M10.4 27Q20 30.5 29.6 27L31 31Q20 35.5 9 31z' fill='%23f5c542'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&amp;display=swap">
 <style>
 :root{--sky1:#1b2160;--sky2:#0b1030;--ch:#f6ecd2;--ch2:#eadbb4;--edge:#c9ad72;--ink:#2a1f3d;--muted:#6d5f7c;--blue:#2f5bff;--green:#17a364;--ember:#ff6a2b;--gold:#f5c542;
@@ -28,7 +31,7 @@ h2,h4,.crest b{font-family:"Cinzel Decorative",serif}
 .board{display:flex;flex-direction:column;gap:54px;transform-origin:0 0;transition:transform .25s}
 .lvl{display:flex;flex-wrap:wrap;gap:40px 64px;align-items:flex-start}
 .top{position:fixed;top:0;left:0;right:0;height:60px;display:flex;align-items:center;gap:14px;padding:0 14px;z-index:6;background:var(--ch);border-bottom:2px solid var(--edge);box-shadow:var(--lift)}
-.crest{display:flex;align-items:center;gap:6px;flex:none}.crest svg{width:38px;height:40px;flex:none}
+.crest{display:flex;align-items:center;gap:6px;flex:none}.crest svg{width:40px;height:40px;flex:none}
 .crest b{font-size:23px;white-space:nowrap}.crest b span{color:var(--ember)}
 .ribbon{display:flex;align-items:center;gap:2px;padding:4px 18px;background:var(--blue);color:#fff;font-weight:700;clip-path:polygon(0 0,100% 0,96% 50%,100% 100%,0 100%,4% 50%);white-space:nowrap}
 .ribbon button{padding:2px 8px}
@@ -36,10 +39,10 @@ h2,h4,.crest b{font-family:"Cinzel Decorative",serif}
 .fav i{font-style:normal;font-size:16px}.fav span{display:flex;align-items:center;gap:4px}
 .rail{position:fixed;top:72px;left:12px;width:80px;display:flex;flex-direction:column;align-items:stretch;gap:3px;padding:8px 6px;z-index:5;border-radius:10px 16px 16px 10px;
   background:var(--ch);border:2px solid var(--edge);border-left:7px solid var(--blue);box-shadow:var(--lift)}
-.rail button,.ribbon button{border:0;background:none}.rail button{position:relative;padding:5px 2px;border-radius:9px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.1}
-.rail em{font-style:normal;font-size:18px}.rail button:hover{background:var(--ch2)}
+.rail button,.ribbon button,.tb{border:0;background:none}.rail button,.tb{position:relative;padding:5px 2px;border-radius:9px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.1}
+.rail em,.tb em{font-style:normal;font-size:18px}.rail button:hover{background:var(--ch2)}
 .rail .new{background:radial-gradient(#ffb07a,var(--ember));color:#fff;border-radius:50%;width:50px;height:50px;margin:0 auto 6px;justify-content:center;box-shadow:0 0 14px var(--ember)}.new em{font:700 30px/1 system-ui}
-.rail b{position:absolute;top:0;right:6px;padding:0 5px;border-radius:99px;background:var(--gold);color:#2a1f00;font-size:11px;line-height:16px}
+.rail b,.tb b{position:absolute;top:0;right:6px;padding:0 5px;border-radius:99px;background:var(--gold);color:#2a1f00;font-size:11px;line-height:16px}
 .mute svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
 .off{opacity:.55}.off .wave{display:none}
 .label,.again,.tools button{background:var(--ch);border:1px solid var(--edge);box-shadow:var(--lift)}
@@ -89,8 +92,8 @@ small{color:var(--muted)}
   clip-path:inset(0 0 100% 0);transition:clip-path .5s ease-in-out;box-shadow:var(--lift)}
 .scroll.open{visibility:visible;transition:none}.scroll.open .paper{clip-path:inset(0 -20px -20px)}.scroll.open::after{transform:none}
 .row{display:flex;gap:6px;align-items:center}
-.scroll .row button{border:1px solid var(--edge);border-radius:99px;padding:3px 12px;background:none}
-.scroll .row .on{background:var(--blue);border-color:var(--blue);color:#fff}
+.scroll .row button,.hdr button{border:1px solid var(--edge);border-radius:99px;padding:3px 12px;background:none}
+.scroll .row .on,.hdr .on{background:var(--blue);border-color:var(--blue);color:#fff}
 .x{margin-left:auto}
 h2{margin:0;font-size:21px}
 textarea,select{border:2px solid var(--edge);border-radius:10px;background:#fffdf6;color:#2a1f3d}textarea{width:100%;padding:8px}
@@ -98,6 +101,20 @@ textarea,select{border:2px solid var(--edge);border-radius:10px;background:#fffd
 .gen{position:fixed;inset:0;display:grid;place-items:center;background:#05082099;z-index:8}
 .gen form{width:min(460px,calc(100% - 32px));background:var(--ch);border-radius:16px;padding:20px;border:2px solid var(--blue);box-shadow:0 0 40px var(--blue)}
 .gen h2{font-size:24px}.gen .row{gap:8px}.gen select{border-radius:8px}
+/* the design sheet, below the canvas */
+.tosheet{flex:none;border:1px solid var(--edge);border-radius:99px;padding:3px 10px;background:var(--ch2);font-size:13px}
+.sheet{margin-top:70px;max-width:760px;background:var(--ch);border:2px solid var(--edge);border-radius:14px;padding:18px 20px;box-shadow:var(--lift)}
+.sheet h2{font-size:26px}.sheet h3{margin:18px 0 8px;font:700 15px/1.2 "Cinzel Decorative",serif;color:var(--ember);border-bottom:1px solid var(--edge);padding-bottom:4px}
+.sr{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}.sr>span{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;color:var(--muted)}
+.sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.sw div{display:flex;flex-direction:column;gap:2px;font:12px ui-monospace,monospace}.sw p{margin:0;display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--edge)}
+.sw p i{flex:1;font:10px/26px ui-monospace,monospace;text-align:center;font-style:normal}.sw em{font:italic 12px system-ui;color:var(--ember)}
+.mono{font:600 13px ui-monospace,monospace;color:var(--blue)}
+.sheet .tb{width:64px;border:1px solid var(--edge);border-radius:9px}
+.hdr{display:flex;gap:6px;align-items:center;width:300px;max-width:100%;padding:8px;background:var(--ch);border:1px solid var(--edge);border-radius:8px}
+.corner{width:150px;height:96px;overflow:hidden}.corner .pc{cursor:default}
+.play{border:1px solid var(--edge);border-radius:50%;width:28px;height:28px;background:var(--ch2);margin-right:8px}
+.sheet ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 /* the mockup screens, as in variant C */
 .scr{background:#fff;color:#222;font:11px/1.3 "Comic Sans MS","Comic Neue",cursive;padding:8px}
 .scr .w{border:1.5px solid #333;border-radius:255px 15px 225px 15px/15px 225px 15px 255px;padding:5px 7px;margin:5px 0}
@@ -105,7 +122,7 @@ textarea,select{border:2px solid var(--edge);border-radius:10px;background:#fffd
 .scr .big{width:100px;height:100px;margin:10px auto;display:grid;place-items:center;border-radius:50% 46% 52% 48%/48% 52% 46% 50%;border:2px solid #333;font-size:16px}
 .scr .bars{display:flex;gap:3px;align-items:flex-end;height:40px}.scr .bars i{flex:1;background:#999;border-radius:3px 2px 0 0}
 .scr .tabbar{display:flex;justify-content:space-around;border-top:1.5px solid #333;margin-top:8px;padding-top:4px;color:#2457c5}
-@media (max-width:720px){.hide-s{display:none!important}.top{gap:8px;padding:0 8px}.crest b{font-size:19px}.crest svg{width:30px}.ribbon{padding:4px 12px;font-size:13px}.fav{gap:6px;padding:2px 4px;font-size:0}
+@media (max-width:720px){.hide-s{display:none!important}.top{gap:8px;padding:0 8px}.crest b{font-size:19px}.crest svg{width:32px;height:32px}.ribbon{padding:4px 12px;font-size:13px}.fav{gap:6px;padding:2px 4px;font-size:0}
   .stage{padding:72px 12px 96px}.pair{gap:6px}.or{width:34px;height:34px;font-size:13px}
   .rail{top:auto;bottom:10px;left:10px;right:10px;width:auto;flex-direction:row;justify-content:space-around;border-left-width:2px;border-bottom:6px solid var(--blue)}
   .rail .new{width:42px;height:42px;margin:0}.scroll{top:68px}}
@@ -114,11 +131,12 @@ textarea,select{border:2px solid var(--edge);border-radius:10px;background:#fffd
 <body>
 <header class="top">
   <div class="crest" title="UX Woz">
-    <svg viewBox="0 0 38 40" aria-hidden="true"><path d="M31 2Q18 6 9 31h22Q22 18 31 2z" fill="#2f5bff"/><path d="M12.5 25h16.5l1 4H11z" fill="#17a364"/><path d="M19 12l1.5 3 3.2 1-3.2 1.2L19 20.5l-1.3-3.3-3.2-1.2 3.2-1z" fill="#f5c542"/><path d="M25.5 21.5a3 3 0 1 1 1-5.6 2.4 2.4 0 1 0-1 5.6z" fill="#ffd166"/><rect x="1" y="29.5" width="36" height="8" rx="4" fill="#172a8f"/></svg>
+    <svg viewBox="0 0 40 40" aria-hidden="true" stroke="#0b1030" stroke-width="1.6" stroke-linejoin="round"><ellipse cx="20" cy="32.5" rx="18.5" ry="5" fill="#172a8f"/><path d="M9 31L17 9Q20 2 27 4Q31 5 34 10Q29 7 24.5 9.5L31 31Q20 35.5 9 31z" fill="#2f5bff"/><path d="M10.4 27Q20 30.5 29.6 27L31 31Q20 35.5 9 31z" fill="#17a364"/><path d="M20 14l1.3 3.7 3.7 1.3-3.7 1.3L20 24l-1.3-3.7-3.7-1.3 3.7-1.3z" fill="#f5c542"/></svg>
     <b>UX <span>Woz</span></b>
   </div>
   <nav class="ribbon" aria-label="Trail"><button title="Back">←</button><button class="hide-s" title="Mockup: recent, start over">NiceSnore ›</button><button>L1 Home ▾</button><button title="Forward">→</button></nav>
   <div class="fav"><span><img id="f16" width="16" height="16" alt="hat 16">16</span><span class="hide-s"><img id="f32" width="32" height="32" alt="hat 32">32</span><span><i>🧙</i>emoji</span></div>
+  <button class="tosheet" id="toSheet" title="Scroll to the design sheet"><span class="hide-s">Design </span>sheet ↓</button>
 </header>
 <main class="stage"><div class="board" id="board">
   <div class="lvl">
@@ -160,7 +178,32 @@ textarea,select{border:2px solid var(--edge);border-radius:10px;background:#fffd
       <div class="pc"><div class="scr"><b>Settings</b><div class="w">Alarm when loud ☐</div><div class="w">Mic sensitivity ━━●━</div><div class="w">Dark at night ☑</div><div class="tabbar"><span>Home</span><span>Nights</span><span>Settings</span></div></div></div>
       <div class="tools"></div></div>
   </div>
-</div></main>
+</div>
+<section class="sheet" id="sheet" aria-label="Design sheet">
+  <h2>Design sheet</h2>
+  <h3>Logo</h3>
+  <div class="sr"><span id="l96">96</span><span id="l48">48</span><span id="l24">24</span><span><img id="s32" width="32" height="32" alt="favicon 32">favicon 32</span><span><img id="s16" width="16" height="16" alt="favicon 16">favicon 16</span><span class="crest"><b>UX <span>Woz</span></b>wordmark</span></div>
+  <h3>Colours</h3><small>Each swatch: light mode left, dark mode right.</small>
+  <div class="sw" id="sw"></div>
+  <h3>Type</h3>
+  <ul><li><h2>Cinzel Decorative</h2><small>Display: wordmark, headings</small></li>
+  <li>System UI, the body font. A sleep tracker that counts snores shows last night first,<br>with a chart of the week below it. <small>(system-ui, 15 px)</small></li>
+  <li><span class="mono">snore-count</span> <span class="mono">tab-bar</span> <small>ui-monospace, for IDs</small></li></ul>
+  <h3>Controls</h3>
+  <div class="sr"><button class="pick">Pick A</button><button class="again" style="margin:0">↺ Summon again</button><button class="undo">Undo</button>
+    <button class="tb"><em>📜</em>Rules<b>2</b></button><select aria-label="Model sample"><option>Haiku</option><option>Sol</option></select>
+    <textarea rows="2" style="width:180px" aria-label="Sample">Show a moon</textarea><div class="or">OR</div><div class="label" style="margin:0"><i>L1</i> Home</div></div>
+  <h3>Surfaces</h3>
+  <div class="sr" style="align-items:flex-start"><div class="box" style="width:240px"><h4>Rules</h4><ol><li><code>snore-count</code> A count per night</li></ol></div>
+    <div class="hdr"><button class="on">✎ Edit</button><button>ⓘ Info</button><button class="x">✕</button></div>
+    <div class="corner"><div class="pc"><div class="scr"><b>Nights</b><div class="w">Mon · 7:12</div></div></div></div></div>
+  <h3>Motion and sound</h3>
+  <ul><li><b>Pick:</b> the chosen screen glows gold, rises and throws sparks (1.1 s); the other blurs into motes (0.8 s).</li>
+  <li><b>Drawer:</b> the scroll unrolls from its top rod in 0.5 s.</li>
+  <li><button class="play" data-s="chime" title="Play">▶</button><b>Chime</b> on pick: five rising bells.</li>
+  <li><button class="play" data-s="tinkle" title="Play">▶</button><b>Tinkle</b> on hovering Pick and on Summon again: two high bells.</li>
+  <li><button class="play" data-s="whoosh" title="Play">▶</button><b>Whoosh</b> when the drawer opens: rising filtered noise.</li></ul>
+</section></main>
 <nav class="rail" aria-label="Spellbook">
   <button class="new" id="newBtn" title="New mockup"><em>+</em></button>
   <button><em>📜</em>Rules<b>2</b></button><button><em>🦉</em>Fixer<b>1</b></button><button><em>▦</em>Data</button>
@@ -217,6 +260,13 @@ $("go").onclick=()=>{gen.hidden=true;summonAll(true)};
 gen.onclick=e=>{if(e.target===gen)gen.hidden=true};
 let z=1;$("zoom").onclick=e=>{z=z===1?.75:1;e.currentTarget.lastChild.textContent=Math.round(z*100)+"%";$("board").style.transform=`scale(${z})`};
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){hand.classList.remove("open");gen.hidden=true}});
+const hat=document.querySelector(".crest svg");[96,48,24].forEach(n=>{const h=hat.cloneNode(true);h.setAttribute("width",n);h.setAttribute("height",n);$("l"+n).prepend(h)});
+$("s16").src=$("s32").src=$("fav").href;
+$("toSheet").onclick=()=>$("sheet").scrollIntoView({behavior:"smooth"});
+[["sky1","#1b2160","#1b2160","canvas top"],["sky2","#0b1030","#0b1030","canvas"],["ch","#f6ecd2","#1a1f4a","surface (chrome)"],["ch2","#eadbb4","#252b63","surface, hover"],["edge","#c9ad72","#2e3680","edges"],
+ ["ink","#2a1f3d","#e6e4ff","text"],["muted","#6d5f7c","#a4a6d6","quiet text"],["ember","#ff6a2b","#ff7a3d","accent (Pick)"],["blue","#2f5bff","#6f8cff","second accent"],["green","#17a364","#34d38a","OR"],["gold","#f5c542","#ffd166","highlight"]]
+ .forEach(([n,l,d,role])=>$("sw").insertAdjacentHTML("beforeend",`<div><p><i style="background:${l};color:${l<"#8"?"#fff":"#000"}">${l}</i><i style="background:${d};color:${d<"#8"?"#fff":"#000"}">${d}</i></p>--${n} <em>${role}</em></div>`));
+Q(".play").forEach(b=>b.onclick=()=>snd({chime,tinkle,whoosh}[b.dataset.s],true));
 </script>
 </body>
 </html>
