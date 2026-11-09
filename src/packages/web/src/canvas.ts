@@ -298,13 +298,10 @@ export class Canvas {
     const b = this.box(key)
     if (!b) return
     const st = this.stage, z = this.z, m = 24
-    const l = b.x * z, t = b.y * z, r = (b.x + b.w) * z, btm = (b.y + b.h) * z
-    const inX = l >= st.scrollLeft + m && r <= st.scrollLeft + st.clientWidth - m
-    const inY = t >= st.scrollTop + m && btm <= st.scrollTop + st.clientHeight - m
-    if (inX && inY) return
-    const left = inX ? st.scrollLeft : r - l > st.clientWidth - 2 * m ? l - m : (l + r) / 2 - st.clientWidth / 2
-    const top = inY ? st.scrollTop : btm - t > st.clientHeight - 2 * m ? t - m : (t + btm) / 2 - st.clientHeight / 2
-    st.scrollTo({ left, top, behavior: smooth ? 'smooth' : 'auto' })
+    // Per axis: stay when it is in view, else show its start (when it does not fit) or its middle.
+    const axis = (lo: number, hi: number, at: number, size: number) => (lo >= at + m && hi <= at + size - m ? at : hi - lo > size - 2 * m ? lo - m : (lo + hi) / 2 - size / 2)
+    const left = axis(b.x * z, (b.x + b.w) * z, st.scrollLeft, st.clientWidth), top = axis(b.y * z, (b.y + b.h) * z, st.scrollTop, st.clientHeight)
+    if (left !== st.scrollLeft || top !== st.scrollTop) st.scrollTo({ left, top, behavior: smooth ? 'smooth' : 'auto' })
   }
 
   /** Draw the screens. Cards are kept and only moved, so unchanged screens do not reload. */
@@ -538,7 +535,10 @@ export class Canvas {
         const x1 = a.x + LINE_X, y1 = a.y + a.h, x2 = b.x + (Math.abs(b.x - a.x) < 1 ? LINE_X : ENTRY_X), y2 = b.y - (choice ? IDEA_H : labelH(z)) / z - 6 / z
         const lane = Math.max(LANE / z, 10) * (this.lanes.get(p) ?? 0)
         const mid = Math.min((this.rowBottom.get(p) ?? y1) + GAP_Y / 2 + lane, y2 - 1)
-        parts.push(svgEl('path', { d: elbow(x1, y1, x2, mid, y2), class: 'line' }))
+        const path = document.createElementNS(SVG_NS, 'path')
+        path.setAttribute('d', elbow(x1, y1, x2, mid, y2))
+        path.setAttribute('class', 'line')
+        parts.push(path)
       }
     }
     svg.replaceChildren(...parts)
@@ -607,12 +607,6 @@ export class Canvas {
       this.on.action(c.key, d.prompt.slice(0, 500), typeof d.label === 'string' ? d.label.slice(0, 80) : '')
     }
   }
-}
-
-function svgEl(tag: string, attrs: Record<string, string>): SVGElement {
-  const e = document.createElementNS(SVG_NS, tag)
-  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v)
-  return e
 }
 
 /** Down from (x1, y1) to y, across to x2, down to y2, with rounded corners; straight when x1 is x2. */
