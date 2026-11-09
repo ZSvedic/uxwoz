@@ -145,6 +145,42 @@ gives the size of the code before and after.
    The code stays under 220 KB (219.5 KB on 2026-11-09, after the fixer wording merged): moving
    Theme and dropping the filing line and the head buttons pay for part of it.
 
+7. **The user's second feedback of 2026-11-09.** One look and feel for screens and boxes, and a
+   tidier toolbar.
+   - **Code size.** The 220 KB cap below was this plan's guard against growing back to 249 KB, and
+     step 6 met it (218.3 KB). From step 7 on there is no cap: each step reports its size before
+     and after, and a cut pass like step 6's runs once the app code passes 240 KB.
+   - **One Edit for boxes and screens.** Today a box's ✎ and its **+ Rule** and **+ Table** use the
+     browser's own prompt (*localhost:3000 says*). Box ✎ opens the drawer instead, on that box:
+     *What should change in Rules?*, **Make the change**, and **Past changes**, newest first, made
+     from the box's kept states (*Edit: merge the two score rules*, *Visit*, *Filing after home*,
+     *You changed score-direction*), like a screen's versions. Info shows the box's counts and
+     limits. **+ Rule** and **+ Table** add an empty entry in place with the cursor in it, as
+     editing in place works today; leaving it empty removes it. No `prompt()` is left in the app.
+   - **One rail.** A box's rail shows like a screen's: at full strength on the current box or
+     screen, on hover for the others. Clicking a box or its toolbar button makes it current.
+     (Step 6 kept box rails always on only because + Rule and + Table used to be always visible.)
+   - **Toolbar.**
+     - A thin vertical line between the toolbar's items, so each button's edges are clear: the
+       mockup menu | ← L1 Home → | Rules | Fixer | Components | Data | Theme | zoom.
+     - One look for the four menus (mockup, screen, theme, zoom): normal weight, the same larger
+       chevron. Theme becomes a menu button like the others instead of the browser's select.
+     - −, + and Fit screen become drawn icons at the size of the text. Fit screen gets the usual
+       *fit* icon (four corners pointing out); ⤢ read as *full size*.
+   - **Rails at the canvas's scale.** Today rails keep 40 px on screen at any zoom, so in a full
+     view (19%) each button is bigger than a screen. The three choices:
+     - *a. Hide below 30%*: a clean overview; but a jump at 30%, and from 30% to 50% they are
+       still large.
+     - *b. Shrink below 30%*: always clickable; but two rules and more code.
+     - *c. Scale with the canvas, like screens*: one rule, less code (the rail's `/z` sums and the
+       gaps that grow for it go), the overview packs tighter, and a rail is always the same size
+       next to its screen. At 19% a button is 8 px, too small to hit, but in an overview you click
+       a screen to zoom in first. At 200% buttons are 80 px.
+     - **Chosen: c.** A rail is 60 px of canvas wide, 40 px buttons at 100% as today.
+   *Done when* no `prompt()` is left, a box Edit from the drawer works and shows in Past changes,
+   box and screen rails look and act alike, the toolbar matches the list above in both themes, and
+   a full view of a 15-screen remake shows rails smaller than their screens.
+
 It works when a person reads each remake's boxes in two minutes, a component is pasted on 9 of 10
 screens that need it, a fixer's visit repairs 8 of 10 planted mistakes and changes nothing the
 user wrote, the first screen comes no later than today, and the app's code is under 220 KB (249
