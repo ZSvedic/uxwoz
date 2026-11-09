@@ -66,17 +66,10 @@ const OWN: Partial<Record<Box, string[]>> = {
   data: ['add', '+', 'Add a table'],
 }
 
-export interface Side {
-  el: HTMLElement
-  /** Where the canvas puts the component cards. */
-  components: HTMLElement
-  sections: Record<Box, HTMLElement>
-  rails: Record<Box, HTMLButtonElement[]>
-}
-
-export function createSide(op: (o: BoxOp) => void): Side {
+/** The boxes: their sections and rails, and where the canvas puts the component cards (`components`). */
+export function createSide(op: (o: BoxOp) => void) {
   const root = el('div', 'boxes')
-  const sections = {} as Side['sections'], rails = {} as Side['rails']
+  const sections = {} as Record<Box, HTMLElement>, rails = {} as Record<Box, HTMLButtonElement[]>
   for (const name of BOXES) {
     const undo = name === 'notes' ? 'Undo the newest visit' : 'Undo the last change'
     const rail = railOf([...OWN[name] ? [OWN[name]] : [], ['edit', '✎', 'Edit: ask the fixer'], ['undo', '↶', undo]], (tool) => {
@@ -90,16 +83,15 @@ export function createSide(op: (o: BoxOp) => void): Side {
     rails[name] = rail.tools
     root.append(s)
   }
-  return { el: root, components: sections.components.querySelector('.box-body')!, sections, rails }
+  return { el: root, components: sections.components.querySelector<HTMLElement>('.box-body')!, sections, rails }
 }
 
-interface SideView { boxes: Boxes; components: CacheEntry[]; undos: Record<BoxName, number>; visiting: boolean }
 
 /** True while the user types in a field inside `box`. */
 const typing = (box: HTMLElement) => document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable && box.contains(document.activeElement)
 
 /** Draw the boxes' headers and rails, the rules and the tables. A box the user is typing in is left alone. */
-export function renderSide(side: Side, v: SideView, op: (o: BoxOp) => void) {
+export function renderSide(side: ReturnType<typeof createSide>, v: { boxes: Boxes; components: CacheEntry[]; undos: Record<BoxName, number>; visiting: boolean }, op: (o: BoxOp) => void) {
   const visits = [...v.boxes.visits ?? []].reverse()
   const counts = { components: v.components.length, rules: v.boxes.rules.length, data: v.boxes.data.length, notes: visits.length }
   for (const name of BOXES) {
