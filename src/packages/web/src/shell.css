@@ -17,20 +17,23 @@ input, select, button, textarea { font: inherit; color: inherit; }
 button, select { padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); cursor: pointer; }
 button:disabled { opacity: .45; cursor: default; }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.toolbar :is(button, select), .recent button, .drawer :is(.tabs button, .close) { border-color: transparent; background: none; }
+/* Small uppercase headings of menus, the generate panel and the drawer. */
+.menu h3, .generate h3, .pane h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 
 /* The toolbar: project menu on the left, Nav in the middle, zoom on the right. */
 .toolbar { flex: none; height: 44px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px;
   padding: 0 10px; border-bottom: 1px solid var(--line); background: var(--card); position: relative; z-index: 20; }
-.tb-left { display: flex; gap: 8px; align-items: center; min-width: 0; }
-.tb-mid { display: flex; gap: 4px; justify-content: center; align-items: center; min-width: 0; }
-.trail { border: 0; background: none; padding: 2px 8px; font-size: 18px; line-height: 1; }
+.tb-left, .tb-mid, .tb-right { position: relative; display: flex; gap: 4px; align-items: center; }
+.tb-left { gap: 8px; min-width: 0; }
+.tb-mid { justify-content: center; min-width: 0; }
+.tb-right { justify-content: flex-end; }
+.toolbar .trail { border: 0; padding: 2px 8px; font-size: 18px; line-height: 1; }
 .trail:disabled { opacity: .3; }
-.tb-right { display: flex; gap: 4px; justify-content: flex-end; align-items: center; }
 .logo { font-size: 15px; white-space: nowrap; color: var(--accent); }
-.toolbar button { padding: 4px 9px; border-color: transparent; background: none; }
+.toolbar button { padding: 4px 9px; }
 .toolbar button:hover:not(:disabled) { border-color: var(--line); background: var(--bg); }
-.zoom #zoomValue { min-width: 5em; font-variant-numeric: tabular-nums; }
-.tb-left, .tb-mid, .tb-right { position: relative; }
+#zoomValue { min-width: 5em; font-variant-numeric: tabular-nums; }
 .menu-button { display: inline-flex; gap: 4px; align-items: center; max-width: 100%; min-width: 0; font-weight: 600; }
 .menu-button > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .caret { color: var(--muted); font-size: 11px; }
@@ -44,7 +47,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .tb-left .menu { left: 0; }
 .tb-mid .menu { left: 50%; transform: translateX(-50%); }
 .tb-right .menu { right: 0; }
-.menu h3 { margin: 8px 8px 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+.menu h3 { margin: 8px 8px 2px; font-size: 11px; font-weight: 600; }
 .menu hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .menu .item { display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left; border: 0; background: none; padding: 5px 8px;
   border-radius: 6px; }
@@ -78,7 +81,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   display: flex; flex-direction: column; gap: 12px; padding: 20px; background: var(--card); border: 1px solid var(--line);
   border-radius: 12px; box-shadow: var(--shadow); max-height: calc(100% - 24px); overflow: auto; }
 .generate h2 { margin: 0; font-size: 18px; }
-.generate h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.generate h3 { margin: 0 0 6px; }
 #prompt { width: 100%; resize: none; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
   font-size: 15px; field-sizing: content; min-height: 3.2em; max-height: 14em; }
 .gen-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
@@ -88,17 +91,15 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .example { padding: 3px 9px; font-size: 13px; }
 .example:hover, .recent button:hover { border-color: var(--accent); }
 .recent { display: flex; flex-direction: column; gap: 2px; max-height: 15em; overflow: auto; }
-.recent button { text-align: left; border-color: transparent; background: none; padding: 4px 8px; display: flex; gap: 8px; }
+.recent button { text-align: left; padding: 4px 8px; display: flex; gap: 8px; }
 .recent button span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recent button small { color: var(--muted); white-space: nowrap; }
 
-/* Errors show in a red pill at the bottom of the canvas until closed. */
-.error-pill { position: absolute; z-index: 12; left: 50%; bottom: 14px; transform: translateX(-50%); max-width: calc(100% - 32px);
-  display: flex; gap: 8px; align-items: center; padding: 6px 8px 6px 14px; border: 1px solid var(--err); border-radius: 18px;
-  background: var(--card); color: var(--err); box-shadow: var(--shadow); font-size: 13px; }
-.error-pill button { padding: 0 6px; border: 0; background: none; color: inherit; }
-.hint-pill { position: absolute; z-index: 12; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 6px 14px;
+/* Errors (until closed) and hints show in a pill at the bottom of the canvas. */
+.error-pill, .hint-pill { position: absolute; z-index: 12; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 6px 14px;
   border: 1px solid var(--line); border-radius: 18px; background: var(--card); color: var(--muted); box-shadow: var(--shadow); font-size: 13px; }
+.error-pill { max-width: calc(100% - 32px); display: flex; gap: 8px; align-items: center; padding-right: 8px; border-color: var(--err); color: var(--err); }
+.error-pill button { padding: 0 6px; border: 0; background: none; color: inherit; }
 
 /* The canvas: screens at fixed places, in canvas pixels; CSS zoom scales it. Names, ideas and
    rails divide by --z, so they keep their size on screen. */
@@ -161,15 +162,15 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 @media (max-width: 700px) { .drawer { position: absolute; right: 0; top: 0; bottom: 0; box-shadow: var(--shadow); } }
 .drawer-head { display: flex; align-items: center; gap: 8px; }
 .drawer .tabs { flex: 1; display: flex; gap: 4px; }
-.drawer .tabs button { border-color: transparent; background: none; color: var(--muted); font-weight: 600; }
+.drawer .tabs button { color: var(--muted); font-weight: 600; }
 .drawer .tabs button[aria-selected="true"] { color: var(--fg); background: var(--bg); border-color: var(--line); }
-.drawer .close { border-color: transparent; background: none; color: var(--muted); }
+.drawer .close { color: var(--muted); }
 .drawer-name { margin: 0; font-weight: 600; }
 .pane { display: flex; flex-direction: column; gap: 8px; }
 .pane label { color: var(--muted); }
 .pane textarea { width: 100%; resize: vertical; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
 .pane .primary { align-self: flex-start; }
-.pane h3 { margin: 10px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.pane h3 { margin: 10px 0 0; }
 .history { margin: 0; padding-left: 1.8em; display: flex; flex-direction: column; gap: 4px; color: var(--muted); }
 .history li.now { color: var(--fg); }
 .history li.now::after { content: " · showing"; color: var(--accent); }
@@ -191,7 +192,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
   .toolbar.boxes .box-nav[hidden] { display: none !important; }
   .box-nav button { justify-content: space-between; }
 }
-.toolbar select { padding: 4px 2px; border-color: transparent; background: none; }
+.toolbar select { padding: 4px 2px; }
 
 /* The boxes side by side right of the first screen, at canvas scale: they zoom with the screens. */
 .boxes { position: absolute; display: flex; align-items: flex-start; font-size: 15px; }
@@ -202,7 +203,6 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .box-hint { margin: 0; color: var(--muted); font-size: 13px; }
 .box-btn { padding: 1px 8px; font-size: 12px; color: var(--muted); }
 .box-btn:hover { color: var(--fg); border-color: var(--accent); }
-/* An entry added since the user last looked at its box. */
 /* The fixer's notes: a visit per entry, each change with its note and Undo. */
 .visit { margin: 0 0 12px; font-size: 14px; }
 .visit ul { margin: 4px 0 0; padding-left: 20px; }
