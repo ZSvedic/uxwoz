@@ -38,10 +38,10 @@
       <button data-box="data">Data <b></b></button>
     </span>
     <select id="theme" title="Theme: how every screen looks"></select>
-    <button id="zoomOut" data-zoom="out" class="wide-only" title="Zoom out (⌘−)">−</button>
+    <button data-zoom="out" class="wide-only" title="Zoom out (⌘−)">−</button>
     <button id="zoomValue" class="menu-button" aria-haspopup="menu" title="Zoom"><span id="zoomPct">100%</span> <span class="caret">▾</span></button>
-    <button id="zoomIn" data-zoom="in" class="wide-only" title="Zoom in (⌘+)">+</button>
-    <button id="fitScreen" data-zoom="screen" class="wide-only" title="Fit screen (⇧2)">⤢</button>
+    <button data-zoom="in" class="wide-only" title="Zoom in (⌘+)">+</button>
+    <button data-zoom="screen" class="wide-only" title="Fit screen (⇧2)">⤢</button>
     <div id="zoomMenu" class="menu zoom-menu" role="menu" hidden>
       <button class="item" data-zoom="in">Zoom in <kbd>⌘+</kbd></button>
       <button class="item" data-zoom="out">Zoom out <kbd>⌘−</kbd></button>
@@ -65,8 +65,8 @@
   <aside id="drawer" class="drawer" hidden>
     <div class="drawer-head">
       <div class="tabs" role="tablist">
-        <button id="tabEdit" role="tab" data-tab="edit">✎ Edit</button>
-        <button id="tabInfo" role="tab" data-tab="info">ⓘ Info</button>
+        <button role="tab" data-tab="edit">✎ Edit</button>
+        <button role="tab" data-tab="info">ⓘ Info</button>
       </div>
       <button id="drawerClose" class="close" title="Close (Esc)">✕</button>
     </div>
@@ -88,10 +88,10 @@
       <label>Model <select id="model"></select></label>
       <label>Device <select id="device" title="What the mockup's screens are designed for"></select></label>
     </div>
-    <button id="go" type="submit" class="primary go">Generate</button>
+    <button type="submit" class="primary go">Generate</button>
     <div class="gen-list">
       <h3>Templates</h3>
-      <div id="templates" class="chips">
+      <div class="chips">
         <button type="button" class="example">A coffee shop ordering app</button>
         <button type="button" class="example">A mortgage calculator with a yearly balance chart</button>
         <button type="button" class="example">A todo list with filters</button>

@@ -377,7 +377,9 @@ async function pick(key: string, index: number) {
     if (state.making === m) state.making = null
     if (!res?.ok) {
       showError('Could not keep that design')
-      return reloadMap()
+      // Take the server's copy of the open mockup.
+      const app = state.app!, map = await mapOf(app).then((r) => r.json()).catch(() => null)
+      return map?.entries && app === state.app && applyMap(map)
     }
     const { entry, filing, visiting } = await res.json() as { entry: CacheEntry; filing: boolean; visiting: boolean }
     keep(entry)
@@ -476,21 +478,8 @@ function walkTrail(dir: 1 | -1) {
   try { goTo(trail.keys[i]!) } finally { trail.moving = false }
 }
 
-/** Take the server's copy of the open mockup. */
-async function reloadMap() {
-  const app = state.app
-  if (!app) return
-  const res = await mapOf(app).catch(() => null)
-  if (!res?.ok || state.app !== app) return
-  applyMap(await res.json())
-}
-
 function applyMap(map: { entries: CacheEntry[]; boxes?: Boxes; undos?: Record<BoxName, number>; filing?: boolean; visiting?: boolean }) {
-  state.entries = new Map(map.entries.map((e) => [e.key, e]))
-  state.boxes = map.boxes ?? state.boxes
-  state.undos = map.undos ?? state.undos
-  state.filing = !!map.filing
-  state.visiting = !!map.visiting
+  Object.assign(state, { entries: new Map(map.entries.map((e) => [e.key, e])), boxes: map.boxes ?? state.boxes, undos: map.undos ?? state.undos, filing: !!map.filing, visiting: !!map.visiting })
   state.edits++
   // Filing or a visit runs (after a reload, say) and nothing waits for it yet.
   if ((state.filing || state.visiting) && !state.waiting) filed()
@@ -943,10 +932,8 @@ function renderNav() {
     const b = planned
       ? item(labelOf(e), 'not made yet', () => (state.busy ? hint() : openScreen(`@${e.name}`, e.parent!.key, e.parent!.label)))
       : item(labelOf(e), via ? `via ${via}` : '', () => goTo(e.key))
-    b.classList.toggle('planned', planned)
+    for (const [cls, on] of Object.entries({ planned, path: path.has(e.key), current: e.key === state.current })) b.classList.toggle(cls, on)
     b.style.setProperty('--depth', String(depth))
-    b.classList.toggle('path', path.has(e.key))
-    b.classList.toggle('current', e.key === state.current)
     rows.push(b)
     for (const k of list) if (treeParent(k.key) === e.key) walk(k, depth + 1)
   }
