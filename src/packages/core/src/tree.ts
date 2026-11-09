@@ -3,7 +3,7 @@
 // screen has it is a planned screen. Runs in the browser too: no Node or Bun APIs.
 
 import type { CacheEntry } from './cache.ts'
-import { OPEN_TAG, VOID, pasteComponents } from './frame.ts'
+import { OPEN_TAG, VOID, decode, pasteComponents } from './frame.ts'
 import { nameWords, normalizePrompt, screenKey, screenRef } from './keys.ts'
 
 /** Where a screen sits: its level (1 for the first screen), the screen it hangs under, and the control clicked there. */
@@ -11,8 +11,6 @@ export interface TreeNode { level: number; parent: string | null; label: string 
 
 /** The name of the first screen, in `@home`. */
 export const HOME_NAME = 'home'
-
-const decode = (s: string) => s.replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
 
 const attr = (attrs: string, name: string) => {
   const m = attrs.match(new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>"']+))`, 'i'))

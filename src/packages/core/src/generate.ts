@@ -49,18 +49,9 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
       yield {
         type: 'done',
         version: {
-          html,
-          model: o.model,
-          servedModel: ev.servedModel,
-          createdAt: new Date().toISOString(),
-          costUsd: ev.costUsd,
-          costEstimated: cfg.costEstimated,
-          firstChunkMs: firstChunkMs == null ? null : Math.round(firstChunkMs),
-          totalMs: Math.round(performance.now() - t0),
-          finishReason: ev.finishReason,
-          ...(o.device && { device: o.device }),
-          ...(name && { name }),
-          ...(idea && { idea }),
+          html, model: o.model, servedModel: ev.servedModel, createdAt: new Date().toISOString(), costUsd: ev.costUsd, costEstimated: cfg.costEstimated,
+          firstChunkMs: firstChunkMs == null ? null : Math.round(firstChunkMs), totalMs: Math.round(performance.now() - t0), finishReason: ev.finishReason,
+          ...(o.device && { device: o.device }), ...(name && { name }), ...(idea && { idea }),
         },
       }
       return

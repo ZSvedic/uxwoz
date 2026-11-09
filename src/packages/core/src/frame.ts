@@ -16,6 +16,9 @@ export function extractFragment(raw: string): string {
 export const hasVisibleText = (html: string): boolean =>
   html.replace(/<(style|script|title)[\s\S]*?(<\/\1>|$)|<[^>]*>|<[^>]*$/g, '').trim() !== ''
 
+/** HTML text with its five common entities read. */
+export const decode = (s: string) => s.replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+
 /** The short name the model gives a screen in its <title>, or '' if it gave none. */
 export function screenName(html: string): string {
   const t = html.match(/<title>([^<]*)<\/title>/i)?.[1] ?? ''
@@ -27,8 +30,7 @@ export function screenIdea(html: string): string {
   const tag = html.match(/<meta\s+name=["']idea["'][^>]*>/i)?.[0] ?? ''
   const t = tag.match(/content=(?:"([^"]*)"|'([^']*)')/i)
   const s = t?.[1] ?? t?.[2] ?? ''
-  return s.replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
-    .replace(/\s+/g, ' ').trim().slice(0, 140)
+  return decode(s).replace(/\s+/g, ' ').trim().slice(0, 140)
 }
 
 /** The window height of a screen made before devices; our script turns vh units into pixels of it, as a frame grows with its screen. */

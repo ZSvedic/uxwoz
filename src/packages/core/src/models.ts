@@ -22,48 +22,16 @@ export interface ModelConfig {
 }
 
 export const MODELS: Record<ModelId, ModelConfig> = {
-  'claude-haiku-5.5': {
-    id: 'claude-haiku-5.5',
-    label: 'Claude Haiku 5.5',
-    provider: 'openrouter',
-    model: 'anthropic/claude-haiku-5.5',
-    providerOrder: ['anthropic'],
-    reasoning: { enabled: false },
-    costEstimated: false,
-  },
-  'gpt-6-luna-fast': {
-    id: 'gpt-6-luna-fast',
-    label: 'GPT-6 Luna (fast)',
-    provider: 'openai',
-    model: 'gpt-6-luna',
-    serviceTier: 'fast',
-    reasoning: { effort: 'none' },
-    // 2x the $0.10 / $0.01 / $0.50 standard price (unconfirmed).
-    pricePerMTok: { input: 0.2, cachedInput: 0.02, output: 1.0 },
-    costEstimated: true,
-  },
-  'gpt-6.1-sol-ultrafast': {
-    id: 'gpt-6.1-sol-ultrafast',
-    label: 'GPT-6.1 Sol Ultrafast',
-    provider: 'openai',
-    model: 'gpt-6.1-sol',
-    serviceTier: 'ultrafast',
-    reasoning: { effort: 'low' },
-    // 6x the $2 / $0.10 / $10 standard price.
-    pricePerMTok: { input: 12.0, cachedInput: 0.6, output: 60.0 },
-    costEstimated: true,
-  },
-  'gpt-6.1-terra': {
-    id: 'gpt-6.1-terra',
-    label: 'GPT-6.1 Terra',
-    provider: 'openai',
-    model: 'gpt-6.1-terra',
-    serviceTier: 'default',
-    reasoning: { effort: 'low' },
-    pricePerMTok: { input: 1.0, cachedInput: 0.05, output: 5.0 },
-    costEstimated: true,
-    background: true,
-  },
+  'claude-haiku-5.5': { id: 'claude-haiku-5.5', label: 'Claude Haiku 5.5', provider: 'openrouter', model: 'anthropic/claude-haiku-5.5', providerOrder: ['anthropic'],
+    reasoning: { enabled: false }, costEstimated: false },
+  // 2x the $0.10 / $0.01 / $0.50 standard price (unconfirmed).
+  'gpt-6-luna-fast': { id: 'gpt-6-luna-fast', label: 'GPT-6 Luna (fast)', provider: 'openai', model: 'gpt-6-luna', serviceTier: 'fast',
+    reasoning: { effort: 'none' }, pricePerMTok: { input: 0.2, cachedInput: 0.02, output: 1.0 }, costEstimated: true },
+  // 6x the $2 / $0.10 / $10 standard price.
+  'gpt-6.1-sol-ultrafast': { id: 'gpt-6.1-sol-ultrafast', label: 'GPT-6.1 Sol Ultrafast', provider: 'openai', model: 'gpt-6.1-sol', serviceTier: 'ultrafast',
+    reasoning: { effort: 'low' }, pricePerMTok: { input: 12.0, cachedInput: 0.6, output: 60.0 }, costEstimated: true },
+  'gpt-6.1-terra': { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra', provider: 'openai', model: 'gpt-6.1-terra', serviceTier: 'default',
+    reasoning: { effort: 'low' }, pricePerMTok: { input: 1.0, cachedInput: 0.05, output: 5.0 }, costEstimated: true, background: true },
 }
 
 /** The model that files each decision into the boxes (the paper test's only pass). */
