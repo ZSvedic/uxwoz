@@ -42,7 +42,7 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
   fixer.ts       the fixer's visit: the paper and the screens new since the last one, parse its lines, apply them
                  with refusals and an Undo per change; the redraws are left to the server
   keys.ts        cache keys: a link by @name, normalize a prompt, "home" means the first screen, `back`; box limits and IDs,
-                 states kept, visits kept and how often
+                 states kept, visits kept and how often; a Data table as markdown
   tree.ts        the tree, worked out: links in each screen (components pasted), @names, planned screens,
                  shortest-path levels, the titles and lines of the paper
   cache.ts       screen cache: find by name, proposals (the open A OR B) and pick, versions and undo, parents,
@@ -50,7 +50,10 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
                  notes and their Undo, JSON file
   frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices and their size;
                  name, idea; paste by ID and the current link
+  zip.ts         a zip of stored entries (CRC-32, central directory), for Export project
 src/packages/web/src/
+  export.ts      GET /api/export: a mockup as a zip for a coding or design agent (handoff, README with the tree,
+                 the boxes, one page per drawn screen whose links work from disk)
   server.ts      Bun.serve: /api/config, /api/screen (NDJSON, A OR B at once), /api/pick, /api/revise, /api/undo,
                  /api/map (wait=1 for filing and a visit), /api/apps, /api/delete, /api/delete-app,
                  /api/box (also undo, a box's Undo and Edit, Visit now), /api/warmup, themes; filing and visits in one chain per mockup, a click

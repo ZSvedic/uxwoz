@@ -7,6 +7,7 @@ import {
   fileDecision, generateScreen, isComponent, isDevice, isModelId, normalizePrompt, visitPaper, plannedScreens, promptFromLabel, screenKey, screenRef,
   VISIT_EVERY, warmUp, type BoxName, type CacheEntry, type Device, type GenerateEvent, type Io, type ModelId, type Version, type VisitOptions,
 } from '@uxwoz/core'
+import { exportRoute } from './export.ts'
 import index from './index.html'
 
 const THEMES_DIR = resolve(import.meta.dir, '../themes')
@@ -395,6 +396,7 @@ export function createServer(opts: ServerOptions = {}) {
         }),
       },
       '/api/apps': () => json({ apps: cache.apps() }),
+      '/api/export': exportRoute(cache),
       // Returns the whole mockup: a delete can give other screens new parents.
       '/api/delete': {
         POST: api(async (b) => {

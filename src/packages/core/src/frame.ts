@@ -121,7 +121,7 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
 // blue cannot be mistaken for them. Blue links show their underline only on hover, so a tab bar looks
 // the same whatever markup the model chose. A form with an action prompt has a blue submit button.
 const GO = `[data-action]:not(form), form[data-action] :is(button:not([type="button"]), [type="submit"])`
-const NAV_CSS = `main { --pico-primary: #373c44; --pico-primary-background: #525f7a; --pico-primary-border: #525f7a;
+export const NAV_CSS = `main { --pico-primary: #373c44; --pico-primary-background: #525f7a; --pico-primary-border: #525f7a;
   --pico-primary-underline: rgba(55, 60, 68, .5); --pico-primary-hover: #1f2329; --pico-primary-hover-background: #48536b;
   --pico-primary-hover-border: #48536b; --pico-primary-hover-underline: #1f2329; --pico-primary-focus: rgba(82, 95, 122, .25);
   --pico-primary-inverse: #fff; }
@@ -132,13 +132,13 @@ main a:is(${GO}):hover { text-decoration-line: underline !important; }
 main [aria-current="page"] { font-weight: 700 !important; text-decoration-line: underline !important; text-underline-offset: .25em; }`
 
 // Our layout rules, after the theme. Pico grows its text with the window; a fixed 16 px keeps
-// screens in scale with the app around them.
-const FRAME_CSS = `html, body { overflow: hidden; }
-body > main { width: 100%; margin: 0; padding: 20px 24px; box-sizing: border-box; }
+// screens in scale with the app around them. The export uses them too, without the frame's no-scroll.
+export const SCREEN_CSS = `body > main { width: 100%; margin: 0; padding: 20px 24px; box-sizing: border-box; }
 @media (max-width: 600px) { body > main { padding: 16px; } }
 :root { --pico-font-size: 100%; --pico-spacing: .75rem; --pico-typography-spacing-vertical: .75rem;
   --pico-block-spacing-vertical: .75rem; --pico-block-spacing-horizontal: 1rem;
   --pico-form-element-spacing-vertical: .5rem; --pico-form-element-spacing-horizontal: .75rem; }`
+const FRAME_CSS = `html, body { overflow: hidden; }\n${SCREEN_CSS}`
 
 /** The iframe's srcdoc: theme CSS inlined, our script, the fragment in <main>, one `device` screen tall unless `fit`. */
 export function framePage(fragment: string, css: string, final: boolean, device?: Device, fit = false): string {

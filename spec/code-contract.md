@@ -115,6 +115,12 @@ can spend model credits.
   work them out (server and browser).
 - `GET /api/apps`: `{apps: {app, screens, updatedAt}[]}`, every mockup once as first typed,
   most recently changed first, for the Recent mockups lists.
+- `GET /api/export?app=…`: the mockup as a zip (`application/zip`, stored entries, written by
+  `core/src/zip.ts`), `Content-Disposition: attachment; filename="<slug>.zip"`, the slug being the
+  prompt's letters, digits and dashes (40 at most). It holds `HANDOFF.md`, `README.md`, `rules.md`,
+  `data.md`, `components.md` and `screens/<name>.html` per drawn screen (newest version, components
+  pasted, Pico and `mockup.css` inlined, our link script in place of the frame's); see
+  [behavior.md](behavior.md#export). 404 for a mockup with no picked first screen.
 - `POST /api/delete {key}`: delete a screen. Screens the first screen reached before and no longer
   reaches (through the clicks that made screens and the buttons in each screen's newest version) go
   too; a screen whose first click came from a screen that is gone takes the screen that reaches it
