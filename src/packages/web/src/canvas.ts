@@ -24,7 +24,7 @@ const RAIL_W = 60
 const OR_MIN = 120
 /** Margin so any screen can be scrolled to the middle. */
 const PAD = 600
-/** Where lines leave and bent lines enter a screen: different, so a line into a screen below another parent does not run on from that parent's. */
+/** Where lines leave and bent lines enter a screen: apart, so a line into a screen below another parent does not run on from it. */
 const LINE_X = 40
 const ENTRY_X = 110
 /** Spacing of parents' branch heights, in pixels on screen. */
@@ -44,14 +44,12 @@ export const MAX_ZOOM = 2
 const STEPS = [0.1, 0.15, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2]
 
 export interface CardView {
-  /** Unique on the canvas: the screen's key, or `key#0` and `key#1` for the sides of its A OR B. */
+  /** The screen's key, or `key#0` and `key#1` for the sides of its A OR B. */
   id: string
   width: number
-  /** Absent for screens made before devices. */
   device?: Device
   /** e.g. "L2 Camera"; '' for a side. */
   name: string
-  /** The design idea in one sentence. */
   idea: string
   /** For a side: which one, and whether it finished (may be picked). */
   side?: { index: number; pickable: boolean }
@@ -64,7 +62,6 @@ export interface CardView {
 
 export interface ScreenView {
   key: string
-  /** null for the first screen. */
   parent: string | null
   /** One card for a picked screen; two for an open A OR B. */
   cards: CardView[]
@@ -86,7 +83,6 @@ export interface CanvasHandlers {
   cancel: (key: string) => void
   /** A press in a screen: it becomes the current one. */
   focus: (key: string) => void
-  /** A rail button: edit, regenerate, undo, info or delete. */
   tool: (key: string, name: string) => void
   zoomed: (zoom: number) => void
 }
@@ -241,8 +237,9 @@ export class Canvas {
     this.stage.scrollTo({ left: v.left, top: v.top })
   }
 
-  /** A screen's place with the names above it and its rail, or the whole tree's without a key. */
-  box(key?: string): Box | undefined {
+  /** A screen's place with the names above it and its rail, a box's place, or the whole tree's without a key. */
+  box(key?: string | HTMLElement): Box | undefined {
+    if (key instanceof HTMLElement) return this.elBox(key)
     if (key == null) return this.extent.w ? this.extent : undefined
     const comp = this.cards.get(key)
     const b = this.boxes.get(key) ?? (comp && this.components.contains(comp.el) ? this.elBox(comp.el) : undefined)
@@ -257,7 +254,7 @@ export class Canvas {
    * show the top (an A OR B's heights still change). `snug`: fit the height too, but not below 60% of
    * the width's fit, so a tall screen shows its top readably.
    */
-  fit(key?: string, { max = 1, top = false, snug = false } = {}) {
+  fit(key?: string | HTMLElement, { max = 1, top = false, snug = false } = {}) {
     const st = this.stage, m = 48
     if (this.queued) this.layout() // sizes that arrived since the last frame count
     // Names and rails keep their size on screen, so the box changes with the zoom; a few rounds settle it.
@@ -294,13 +291,7 @@ export class Canvas {
   /** Move the view to a box: its width fits (at most 100%), its top shows. */
   showBox(el: HTMLElement) {
     this.moved = performance.now()
-    if (this.queued) this.layout()
-    for (let i = 0; i < 3; i++) {
-      const z = Math.max(MIN_ZOOM, Math.min(1, Math.floor(((this.stage.clientWidth - 96) / this.elBox(el).w) * 100) / 100))
-      if (z === this.z) break
-      this.applyZoom(z)
-    }
-    this.center({ ...this.elBox(el), h: Infinity })
+    this.fit(el, { top: true })
   }
 
   private center(b: Box, smooth = false) {
