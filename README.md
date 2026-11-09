@@ -17,13 +17,16 @@ screen comes as two designs side by side, A OR B; click the one you like to keep
 blue control inside a screen makes the next screen below it. Change a screen with the buttons to
 its right: ✎ Edit, ↻ Regenerate, ↶ Undo, ⓘ Info, ✕ Delete. `PORT=3001 bun run dev` picks another port.
 
-Left of the first screen are three boxes that every model call reads: **Components** (parts that
-look the same on every screen that has them; screens paste them by ID), **Rules** and **Data**.
-After each pick or Edit, filing adds what the decision settled, in the background. Edit a rule or a
-table cell by clicking it; the toolbar's Components, Rules, Data and Notes buttons move the view to
-each box, and **Export the boxes** in the project menu writes them as markdown. Every 5 picks the
-fixer visits: it merges doubles, removes what no screen needs and redraws up to 5 screens, and the
-fourth box, **Fixer's notes**, lists each change with an Undo. **Visit now** asks for a visit at once.
+Right of the first screen, side by side, are four boxes: **Rules**, **Fixer's notes**,
+**Components** (parts that look the same on every screen that has them; screens paste them by ID)
+and **Data**. Every model call reads Components, Rules and Data. After each pick or Edit, filing
+adds what the decision settled, in the background; the screen's Info says what it filed. Edit a
+rule or a table cell by clicking it; the toolbar's Rules, Fixer, Components and Data buttons move
+the view to each box, and **Export the boxes** in the project menu writes them as markdown. Every 5
+picks the fixer visits: it merges doubles, removes what no screen needs and redraws up to 5
+screens, and Fixer's notes lists each change with an Undo. Each box has a rail: **+ Rule**, **▶
+Visit now** or **+ Table**, then **✎ Edit** (ask the fixer for a change in that box) and **↶ Undo**
+(the box as it was before its last change). The Theme picker is in the toolbar.
 
 Generated screens are cached in `temp/screen-cache.json`. To make a mockup again from scratch,
 open it and choose **Start over** in the project menu (top left); **Delete** removes it. To clear the whole cache, stop the server,

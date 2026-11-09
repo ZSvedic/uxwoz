@@ -23,10 +23,10 @@ one, and the other is gone. After that, the user changes a screen by asking for 
    and **↶ Undo** brings the old version back.
 5. Back in L1, Zel clicks *Settings*. Its A OR B appears in a new column beside the Camera branch,
    still at level 2. **Fit all** shows the whole tree, like a Figma page.
-6. Left of L1, the boxes have filled in the background: Rules holds *box-levels: Levels show as a
+6. Right of L1, the boxes have filled in the background: Rules holds *box-levels: Levels show as a
    percentage*, and after Zel's Edit asking for a tab bar, Components holds `tab-bar`, which every
    later screen pastes.
-7. After the fifth pick the fixer visits. Its note, under the boxes, reads *merged `box-level` into
+7. After the fifth pick the fixer visits. Its note, in Fixer's notes, reads *merged `box-level` into
    `box-levels`; redrew settings: paste tab-bar*, with its time and cost and an Undo beside each.
 
 ```
@@ -59,9 +59,13 @@ One bar, 44 px tall, with three parts:
   browser: every screen that becomes current is a step, and reaching a screen any other way drops
   the steps ahead. Screens deleted since are skipped. ⌘[ and ⌘] do the same (also while a screen
   has the focus), and so do the mouse's back and forward buttons.
-- **Components, Rules, Data, Notes** (right): each moves the view to its box. A number beside it
-  counts the entries filing or the fixer added or changed (for Notes, the fixer's visits) since the
-  user last looked; three seconds after a look, they count as seen and lose their *new* mark.
+- **Rules, Fixer, Components, Data** (right): each moves the view to its box (Fixer to Fixer's
+  notes). A number beside it counts the entries filing or the fixer added or changed (for Fixer,
+  the fixer's visits) since the user last looked; three seconds after a look, they count as seen
+  and lose their *new* mark. Where the right of the toolbar runs out of room (it would be wider
+  than the left), the four fold into one **Boxes ▾** menu: each item keeps its number, and the
+  button shows their sum.
+- **Theme** (right, left of the zoom): see Pickers.
 - **Zoom** (right): **−**, the zoom level, **+** and **⤢ Fit screen**. The level opens a menu: Zoom
   in ⌘+, Zoom out ⌘−, 50%, 100% ⌘0, 200%, Fit all ⇧1, Fit screen ⇧2, Fit screen width ⇧3. The keys
   work anywhere outside a text field (Ctrl in place of ⌘ off a Mac). Under 900 px wide only the
@@ -72,7 +76,7 @@ Menus close on Esc, on a press outside them, or on a click into a screen.
 ## Generate panel
 
 The prompt box takes a product description (up to 2,000 characters) and grows with it; Enter makes
-the mockup, Shift+Enter adds a line. Under it, the **Model**, **Device** and **Theme** pickers sit
+the mockup, Shift+Enter adds a line. Under it, the **Model** and **Device** pickers sit
 in one row, and a large **Generate** button below them. Under that come **Templates** (example
 prompts that start a mockup at once) and **Recent mockups** (every mockup in the cache, most
 recently changed first, with its number of screens; the list comes from the server, so it is the
@@ -180,15 +184,33 @@ scrolls so the screen stays fully visible beside it. Esc or ✕ closes it. It ha
   showing marked.
 - **Info**: name, idea, the click that opened it, what made the version showing (the pick, an Edit
   and its request, or Regenerate), the number of versions, model, device, when it was made, time to
-  first text, total time, cost, cost of all versions, finish reason, size and prompt.
+  first text, total time, cost, cost of all versions, finish reason, size and prompt. Then the
+  screen's last filing: *Filing: added light-theme, 1.0 s, ~$0.0015* (or why it failed), and each
+  line filing's reply had that code refused, with the reason.
 
 Choosing another screen while the drawer is open shows that screen in it.
 
 ## Boxes
 
-Left of the first screen sits a column of four labelled boxes, at the canvas's scale. Every model
-call reads the first three in full, so what is in them is what the screens share. A line above them says what
-the last filing did, with its time and cost; hovering it lists any line filing's reply had refused.
+Right of the first screen and its rail, in its row, four labelled boxes stand side by side, at the
+canvas's scale, tops level with the first screen: **Rules**, **Fixer's notes**, **Components**,
+**Data**. The first row is as tall as the taller of the first screen and the tallest box, so the
+rows below start under both; a child that does not fit below the first screen goes right, under
+the boxes, and another screen with no parent goes right of the boxes. Every model call reads
+Components, Rules and Data in full, so what is in them is what the screens share.
+
+Each box has a rail like a screen's, right of it, at full strength: first its own button (Rules
+**+ Rule**, Fixer's notes **▶ Visit now**, Data **+ Table**; Components has none), then:
+
+- **✎ Edit** asks *What should change in Rules?* (or the box's name). The request goes to the
+  fixer as a visit that starts from it: the fixer does what the user asks first, and may then
+  change entries the user wrote in that box; then it tidies up as on any visit. Each change gets
+  its line and Undo in Fixer's notes, under *You asked: …*. While a visit runs, Edit and Visit
+  now wait.
+- **↶ Undo** puts the box back as it was before its last change, whoever made it: the user in
+  place, filing, an Edit or a visit (a filing or a visit is one change). Each box keeps its last 10
+  states; Undo again goes further back. On Fixer's notes, Undo undoes every change of the newest
+  visit that has one left. It shows only when there is something to undo.
 
 - **Components**: small cards like screens, as tall as their content, each with its ID and the line
   that says where it belongs. A screen pastes a component by ID; a changed component (Edit, Undo)
@@ -197,40 +219,40 @@ the last filing did, with its time and cost; hovering it lists any line filing's
   taken from) and ✕ Delete.
 - **Rules**: one line each, the ID and one sentence; an entry the user wrote is marked *yours*, in
   Data too. Click the sentence to change it; Enter or a
-  click elsewhere saves, Esc puts it back, an empty sentence deletes it. **+ Rule** asks for a
-  sentence and makes its ID from its first words.
+  click elsewhere saves, Esc puts it back, an empty sentence deletes it. **+ Rule** on the rail
+  asks for a sentence and makes its ID from its first words.
 - **Data**: small tables, each with an ID, named columns and rows. Click a cell to change it; a row
   left empty or a column without a name goes when the table saves. **+ row**, **+ column**, ✕, and
-  **+ Table**, which asks for a name.
+  **+ Table** on the rail, which asks for a name.
 - **Limits**, as the manual says: 20 components, 20 rules of at most 120 characters, 10 tables of at
   most 6 columns and 8 rows. A full box takes nothing new; a refused edit says why in the red pill.
   An ID is 1 to 4 lowercase words joined by dashes, unique in its box, and never used again.
 - **Filing**: after a pick or an Edit, GPT-6.1 Terra reads the paper and the decision and files what
   it settles, in the background: a part the screen shows the same as other screens will (it moves
   to Components, and the screen pastes it where it was, so it looks the same), a rule, a table.
-  The line above the boxes says *Filing your last decision…* meanwhile. A click that opens a new
-  screen waits for it, at most 5 seconds; an Edit too.
+  The screen's Info says what it filed. A click that opens a new screen waits for it, at most 5
+  seconds; an Edit too.
 - **New** marks an entry filing or the fixer added or changed since the user last looked at its box.
-- **Fixer's notes**: every 5th pick of a mockup, and on **Visit now** in the box, GPT-6.1 Terra
+- **Fixer's notes**: every 5th pick of a mockup, on **Visit now** and on an Edit of a box, GPT-6.1 Terra
   visits in the background, after any filing (the two never run at once). It reads the boxes, the
   titles and the screens added or changed since its last visit (all of them on the first), and
   merges entries that say one thing twice (the older ID stays), removes what one screen or none
-  needs, adds a rule or a component filing missed, and redraws at most 5 screens that break a
+  needs, adds or changes a rule, a table or a component filing missed, and redraws at most 5 screens or components that break a
   rule, draw a component by hand, have a control that leads nowhere or show a fact differently
   from a newer screen. A redraw is an Edit with the
   fixer's sentence as the change: a new version, no filing. An entry the user wrote is never
-  changed or removed, a screen whose A OR B is open is not redrawn, and a component that goes
+  changed or removed (except in the box the user asked about with Edit), a screen whose A OR B is open is not redrawn, and a component that goes
   leaves its HTML in the screens that paste it, so they look the same. A visit whose reply comes
   after Start over or the mockup's delete is dropped; a line about a screen or entry deleted
   meanwhile is refused, and a screen the user changed during the visit is not redrawn. A pick that
   comes while a visit runs brings none: the next visit reads its screen. At most 5 redraws a visit
   keeps a visit's cost to about a cent.
-- **A note per visit**, newest first: when, how many screens it read, each change on its line with
+- **A note per visit**, newest first: when, what the user asked (for an Edit), how many screens it read, each change on its line with
   the fixer's reason and an **Undo**, the lines code refused and why, time and cost (the redraws
   included). Undo of a merge or a remove puts the entry back with its ID and place, of an added
-  entry deletes it (unless the user rewrote it since), of a redraw drops that version. An undone
-  change is struck through. A redraw reads *redrawing* until its version is stored. The button says
-  *Visiting…* while a visit runs. An old mockup with empty boxes gets them filled this way.
+  entry deletes it (unless the user rewrote it since), of a change puts the old entry back, of a
+  redraw drops that version. An undone change is struck through. A redraw reads *redrawing* until
+  its version is stored. An old mockup with empty boxes gets them filled this way.
 
 ## Navigation
 
@@ -302,7 +324,7 @@ their links with no `@` lead nowhere.
   keep the screen's own device. While a mockup is open, the picker shows the device of its first
   screen, so its next screens, and Start over, match it; **New mockup…** and closing the mockup
   bring back the saved choice. Screens made before devices existed show at 800 px.
-- **Theme**: Mockup (default) or Clean. Mockup is black and white with a handwriting font and
+- **Theme** (in the toolbar): Mockup (default) or Clean. Mockup is black and white with a handwriting font and
   wobbly borders, so a screen reads as a sketch; even the model's chart colours turn grey, except
   the blue of controls that open a screen. Clean is plain Pico with neutral buttons and links.
   Switching restyles the screens at once; the model never sees the theme.

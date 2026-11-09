@@ -52,11 +52,11 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
 src/packages/web/src/
   server.ts      Bun.serve: /api/config, /api/screen (NDJSON, A OR B at once), /api/pick, /api/revise, /api/undo,
                  /api/map (wait=1 for filing and a visit), /api/visit, /api/apps, /api/delete, /api/delete-app,
-                 /api/box (also undo), /api/warmup, themes; filing and visits in one chain per mockup, a click
+                 /api/box (also undo, a box's Undo and Edit), /api/warmup, themes; filing and visits in one chain per mockup, a click
                  waits for it; a visit every 5 picks, its redraws as Edits
   app.ts         browser: generate panel, A OR B streaming, refit and pick, clicks (@names, back), rail tools, drawer
                  (Edit, Info), the boxes' data and filing's result, toolbar menus and box buttons, ← → trail, errors
-  canvas.ts      browser: the boxes column, the tree layout (packed rows, line lanes), cards and frames, A OR B sides,
+  canvas.ts      browser: the boxes right of Home, the tree layout (packed rows, line lanes), cards and frames, A OR B sides,
                  rail, pan and zoom, fits
   boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes, editing in place, Undo, Export
   index.html, shell.css   the page around the canvas

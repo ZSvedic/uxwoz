@@ -21,7 +21,7 @@ POST /api/pick  {"key": "a coffee shop ordering app", "index": 1}
 {"entry":{...CacheEntry, "versions":[{...the second proposal}]}, "filing":true, "visiting":false}
 
 GET /api/map?app=A%20coffee%20shop%20ordering%20app&wait=1      (answers once filing and a visit are done)
-{"root":"a coffee shop ordering app","entries":[...],"boxes":{...Boxes},"filing":false,"visiting":false}
+{"root":"a coffee shop ordering app","entries":[...],"boxes":{...Boxes},"undos":{"components":0,"rules":2,"data":1},"filing":false,"visiting":false}
 ```
 
 ## Packages
@@ -65,8 +65,8 @@ can spend model credits.
   the screen has no open A OR B or that side has not finished.
 - **Filing** runs after a pick and after a screen's Edit (whose `done` event has `filing: true`), on
   the background model GPT-6.1 Terra, one filing per mockup at a time. It applies the reply's lines
-  to the boxes (`applyFiling` in `core/src/filing.ts`) and refuses, in the server log and in
-  `boxes.filed.refused`, a bad or used ID, a line over 120 characters, a full box, a part that is
+  to the boxes (`applyFiling` in `core/src/filing.ts`) and refuses, in the server log and in the
+  screen's `filed.refused`, a bad or used ID, a line over 120 characters, a full box, a part that is
   not there, a row with no table above it or naming another table, the rows of a refused table. A
   row joins the table above it whatever ID it names. A new screen or a revise waits for a running filing at most 5 s (`fileWaitMs`) before
   its model calls, after its `meta` event.
@@ -74,7 +74,10 @@ can spend model credits.
   the same chain, so filing and the fixer never change the boxes at once. Terra reads the paper and
   the screens whose newest version is newer than the last visit, oldest first, parts numbered
   (code's numbers only: `numberParts` drops any a model wrote). Its lines are
-  applied with refusals in `visits[].refused`: no such entry, an entry `by: 'user'`, two IDs of
+  The visit's forms are its own (merge, remove, add rule, add component, redraw a screen or a
+  component) and filing's rule, table and row lines (`boxLines`, shared with filing). Its lines are
+  applied with refusals in `visits[].refused`: no such entry, an entry `by: 'user'` (except in the
+  box of an Edit, below), two IDs of
   different boxes, a used ID, a part not there, a second redraw of one screen, more than 5
   redraws (`MAX_REDRAWS`, a cost limit), a screen with an open A OR B. A merge removes the newer
   entry of the two; a component removed this way leaves its HTML in place (`removeComponent`). The
@@ -83,6 +86,11 @@ can spend model credits.
   screen with a version newer than the visit; their versions have `by: 'fixer'`. Start over and
   deleting the mockup stop them. The next visit reads what changed since the last visit that did
   not fail. The map's `filing` counts filings only, so a visit in the chain is `visiting`.
+- **An Edit of a box** is a visit with `ask: {box, text}`: the request names the box and the
+  user's words just before the visit's last line, and the note keeps `ask`.
+- **Box states**: each box (components, rules, data) keeps its last 10 states (`BOX_STATES`), one
+  before each change; `cache.group` makes a filing, a visit or an Undo of a visit one change.
+  They are saved in the cache file under `states`, by mockup.
 - `POST /api/visit {app}`: a visit now, unless one runs; the mockup as `/api/map` sends it, with
   `visiting: true`; 404 for a mockup with no picked first screen.
 - `POST /api/revise {key, change?, model?, device?}`: one new version of a picked screen or a
@@ -94,7 +102,8 @@ can spend model credits.
   devices). 400 on a bad `change`, model or device, 404 for an unknown screen, 409 while its A OR B
   is open; `error` if the model fails or the screen was deleted meanwhile.
 - `POST /api/undo {key}`: drop the newest version; `{entry}`, or 404 when one or none is left.
-- `GET /api/map?app=…[&wait=1]`: `{root, entries: CacheEntry[], boxes: Boxes, filing, visiting}`
+- `GET /api/map?app=…[&wait=1]`: `{root, entries: CacheEntry[], boxes: Boxes, undos, filing, visiting}`
+  (`undos`: how many states each box can go back)
   for one mockup, oldest first, components included; with `wait=1` once its running filing and
   visit, redraws included, have finished (at most a minute). Levels, the
   tree and planned screens are not stored: `screenTree` and `plannedScreens` in `core/src/tree.ts`
@@ -113,7 +122,10 @@ can spend model credits.
   from `text` (the sentence, or the table's name). `op: 'seen', box, ids?` (also `components`, and
   `notes` with visits by `at`) clears the new marks. `op: 'undo', at, i` undoes change `i` of the
   visit that began at `at` (`undoChange`); 400 when it was undone, its version is gone or its box is
-  full. The whole mockup as `/api/map` sends it; 400 with `{error}` for a refused edit, 404 for
+  full. `op: 'undo-box', box` puts a box back as it was before its last change (`undoBox`), or for
+  `notes` undoes every change of the newest visit with one left (`undoVisit`); 400 when there is
+  nothing to undo. `op: 'edit', box, text` (1-1,000 characters) starts an Edit of the box; 409 while
+  a visit runs. The whole mockup as `/api/map` sends it; 400 with `{error}` for a refused edit, 404 for
   a mockup with no first screen. A component is deleted with `/api/delete`, changed with
   `/api/revise`, undone with `/api/undo`.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
@@ -141,7 +153,8 @@ only from a card's own frame.
 
 ```ts
 CacheEntry { key; app; action: string | null; name?: string; parent: { key; label } | null;
-             versions: Version[]; proposals?: (Version | null)[] }
+             versions: Version[]; proposals?: (Version | null)[]; filed?: { at; screen; ms; costUsd; added; changed; refused; error? } }
+             // filed: the screen's last filing, shown in its Info
              // name never changes: "home" for the first screen, else the one in the link that
              // opened it ("@sleep-report: …"); unique in the mockup; links use it as "@sleep-report".
              // action is the screen's prompt (without "@name: "). parent is the screen and
@@ -156,12 +169,11 @@ CacheEntry { key; app; action: string | null; name?: string; parent: { key; labe
 Mark       { by: 'filing' | 'fixer' | 'user'; at; seen }   // who last wrote an entry, when, and whether its box was looked at since
 Boxes      { rules: (Mark & { id; text })[]; data: (Mark & { id; columns: string[]; rows: string[][] })[];
              gone: { components, rules, data: string[] }   // IDs used and deleted, never used again
-             filed?: { at; screen; ms; costUsd; added; changed; refused; error? }   // the last filing
              visits?: Visit[]; picks?: number }   // the fixer's last 20 visits, oldest first; picks so far
-Visit      { at; ms; costUsd; screens; changes: Change[]; refused: string[]; error?; seen }
+Visit      { at; ask?; ms; costUsd; screens; changes: Change[]; refused: string[]; error?; seen }
 Change     { text; note?; undo?: Undo; undone? }   // text says what changed: "merged a into b"
 Undo       { put: box; entry; index } | { drop: box; id } | { key; createdAt }
-           // put a removed entry (a component's whole CacheEntry) back; delete an added one; drop a redraw's version
+           // put a removed or changed entry (a component's whole CacheEntry) back; delete an added one; drop a redraw's version
 Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
              costEstimated; firstChunkMs; totalMs; finishReason; device?: Device;
              name?; idea?; feedback?; by?: 'fixer' }
@@ -188,7 +200,7 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 | `OPENAI_API_KEY` | GPT-6 Luna, GPT-6.1 Sol, GPT-6.1 Terra (filing, the fixer) |
 | `PORT` | server port, default 3000 |
 | `UXWOZ_HOST` | listen address, default `127.0.0.1` |
-| `UXWOZ_CACHE_FILE` | screen cache `{version: 5, entries, boxes}`, default `temp/screen-cache.json` |
+| `UXWOZ_CACHE_FILE` | screen cache `{version: 5, entries, boxes, states}`, default `temp/screen-cache.json` |
 | `UXWOZ_RECORD` | `1` makes tests call the live APIs and rewrite `cassettes/` |
 
 ## Tests
