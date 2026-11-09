@@ -62,9 +62,8 @@ One bar, 44 px tall, with three parts:
 - **Rules, Fixer, Components, Data** (right): each moves the view to its box (Fixer to Fixer's
   notes). A number beside it counts the entries filing or the fixer added or changed (for Fixer,
   the fixer's visits) since the user last looked; three seconds after a look, they count as seen
-  and lose their *new* mark. Where the right of the toolbar runs out of room (it would be wider
-  than the left), the four fold into one **Boxes ▾** menu: each item keeps its number, and the
-  button shows their sum.
+  and lose their *new* mark. In a window 1,200 px wide or less, the four fold into one **Boxes ▾**
+  menu: each item keeps its number, and the button shows their sum.
 - **Theme** (right, left of the zoom): see Pickers.
 - **Zoom** (right): **−**, the zoom level, **+** and **⤢ Fit screen**. The level opens a menu: Zoom
   in ⌘+, Zoom out ⌘−, 50%, 100% ⌘0, 200%, Fit all ⇧1, Fit screen ⇧2, Fit screen width ⇧3. The keys
@@ -194,8 +193,9 @@ Choosing another screen while the drawer is open shows that screen in it.
 
 Right of the first screen and its rail, in its row, four labelled boxes stand side by side, at the
 canvas's scale, tops level with the first screen: **Rules**, **Fixer's notes**, **Components**,
-**Data**. The first row is as tall as the taller of the first screen and the tallest box, so the
-rows below start under both; a child that does not fit below the first screen goes right, under
+**Data**. A box is at most as tall as the first screen (and at least one device screen); the rest
+scrolls inside it, and the wheel scrolls the box while it can, then pans the canvas. So the first
+row is as tall as the first screen, and the rows below start under it; a child that does not fit below the first screen goes right, under
 the boxes, and another screen with no parent goes right of the boxes. Every model call reads
 Components, Rules and Data in full, so what is in them is what the screens share.
 
@@ -206,11 +206,16 @@ Each box has a rail like a screen's, right of it, at full strength: first its ow
   fixer as a visit that starts from it: the fixer does what the user asks first, and may then
   change entries the user wrote in that box; then it tidies up as on any visit. Each change gets
   its line and Undo in Fixer's notes, under *You asked: …*. While a visit runs, Edit and Visit
-  now wait.
+  now wait (+ Rule and + Table do not). An Edit asked for before the first screen is picked says
+  *Wait for Home's pick*.
 - **↶ Undo** puts the box back as it was before its last change, whoever made it: the user in
-  place, filing, an Edit or a visit (a filing or a visit is one change). Each box keeps its last 10
-  states; Undo again goes further back. On Fixer's notes, Undo undoes every change of the newest
-  visit that has one left. It shows only when there is something to undo.
+  place, filing, an Edit or a visit (a filing, or a visit with its redraws, is one change). Each box
+  keeps its last 10 states; Undo again goes further back. A component the Undo drops leaves its
+  HTML in the screens that paste it; one it brings back is pasted on no screen until a screen
+  pastes it again (its Info says so). An ID the Undo drops is not used again. On Fixer's notes,
+  Undo undoes every change of the newest visit not undone yet; a change it cannot undo (the user
+  changed the entry since, a full box) is skipped and named in the red pill, its own Undo stays,
+  and the next Undo goes to the visit before. It shows only when there is something to undo.
 
 - **Components**: small cards like screens, as tall as their content, each with its ID and the line
   that says where it belongs. A screen pastes a component by ID; a changed component (Edit, Undo)
@@ -250,7 +255,7 @@ Each box has a rail like a screen's, right of it, at full strength: first its ow
 - **A note per visit**, newest first: when, what the user asked (for an Edit), how many screens it read, each change on its line with
   the fixer's reason and an **Undo**, the lines code refused and why, time and cost (the redraws
   included). Undo of a merge or a remove puts the entry back with its ID and place, of an added
-  entry deletes it (unless the user rewrote it since), of a change puts the old entry back, of a
+  entry deletes it (unless the user rewrote it since), of a change puts the old entry back (unless the entry changed since), of a
   redraw drops that version. An undone change is struck through. A redraw reads *redrawing* until
   its version is stored. An old mockup with empty boxes gets them filled this way.
 

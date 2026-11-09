@@ -73,26 +73,28 @@ can spend model credits.
 - **A visit** of the fixer (`visitPaper` and `applyVisit` in `core/src/fixer.ts`) takes its turn in
   the same chain, so filing and the fixer never change the boxes at once. Terra reads the paper and
   the screens whose newest version is newer than the last visit, oldest first, parts numbered
-  (code's numbers only: `numberParts` drops any a model wrote). Its lines are
-  The visit's forms are its own (merge, remove, add rule, add component, redraw a screen or a
-  component) and filing's rule, table and row lines (`boxLines`, shared with filing). Its lines are
+  (code's numbers only: `numberParts` drops any a model wrote). The visit's forms are its own
+  (merge, remove, add component, redraw a screen or a component) and filing's rule, table and row
+  lines (`boxLines`, shared with filing; `parseFiling` takes an optional `add `). Its lines are
   applied with refusals in `visits[].refused`: no such entry, an entry `by: 'user'` (except in the
-  box of an Edit, below), two IDs of
+  box of an Edit, below; a component the user wrote is redrawn only in an Edit of Components), two IDs of
   different boxes, a used ID, a part not there, a second redraw of one screen, more than 5
   redraws (`MAX_REDRAWS`, a cost limit), a screen with an open A OR B. A merge removes the newer
   entry of the two; a component removed this way leaves its HTML in place (`removeComponent`). The
   reply is dropped when the mockup was deleted or started over after the visit began. Redraws then
   run at once, as `/api/revise` Edits on the screen's own model that start no filing, skipping a
-  screen with a version newer than the visit; their versions have `by: 'fixer'`. Start over and
+  screen with a version newer than the visit; their versions have `by: 'fixer'`, and a redrawn
+  component keeps its `by`. They join the visit's one change of the boxes (`Applied.group`). A visit
+  asked for while one runs (Visit now, the 5th pick) comes after it. Start over and
   deleting the mockup stop them. The next visit reads what changed since the last visit that did
   not fail. The map's `filing` counts filings only, so a visit in the chain is `visiting`.
 - **An Edit of a box** is a visit with `ask: {box, text}`: the request names the box and the
   user's words just before the visit's last line, and the note keeps `ask`.
 - **Box states**: each box (components, rules, data) keeps its last 10 states (`BOX_STATES`), one
-  before each change; `cache.group` makes a filing, a visit or an Undo of a visit one change.
-  They are saved in the cache file under `states`, by mockup.
-- `POST /api/visit {app}`: a visit now, unless one runs; the mockup as `/api/map` sends it, with
-  `visiting: true`; 404 for a mockup with no picked first screen.
+  before each change; `cache.group` makes a filing, a visit with its redraws, or an Undo of a
+  visit one change. They are saved in the cache file under `states`, by mockup. An Undo that drops
+  a component pastes its HTML into the screens that paste it; no Undo frees an ID (`gone` keeps
+  every ID it drops).
 - `POST /api/revise {key, change?, model?, device?}`: one new version of a picked screen or a
   component (a component takes `change` only, else 400), streamed
   like `/api/screen` with one side (`meta.variants` 1, then `chunk`*, `version`, `done`). With
@@ -122,10 +124,13 @@ can spend model credits.
   from `text` (the sentence, or the table's name). `op: 'seen', box, ids?` (also `components`, and
   `notes` with visits by `at`) clears the new marks. `op: 'undo', at, i` undoes change `i` of the
   visit that began at `at` (`undoChange`); 400 when it was undone, its version is gone or its box is
-  full. `op: 'undo-box', box` puts a box back as it was before its last change (`undoBox`), or for
-  `notes` undoes every change of the newest visit with one left (`undoVisit`); 400 when there is
-  nothing to undo. `op: 'edit', box, text` (1-1,000 characters) starts an Edit of the box; 409 while
-  a visit runs. The whole mockup as `/api/map` sends it; 400 with `{error}` for a refused edit, 404 for
+  full, or the entry is no longer the fixer's (`you changed X since`); an entry already back or gone
+  counts as undone. `op: 'undo-box', box` puts a box back as it was before its last change
+  (`undoBox`; 400 when there is nothing to undo). For `notes` it undoes the newest visit not undone
+  yet (`undoVisit`): changes it cannot undo are skipped, the visit is marked `undone`, and the map
+  comes back with `error` saying the first skip. `op: 'visit'` asks for a visit now (after the
+  running one, if any); `op: 'edit', box, text` (1-1,000 characters) starts an Edit of the box.
+  Both 409 with why: *Wait for Home's pick.*, or for an Edit *The fixer is visiting now*. The whole mockup as `/api/map` sends it; 400 with `{error}` for a refused edit, 404 for
   a mockup with no first screen. A component is deleted with `/api/delete`, changed with
   `/api/revise`, undone with `/api/undo`.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
@@ -170,7 +175,7 @@ Mark       { by: 'filing' | 'fixer' | 'user'; at; seen }   // who last wrote an 
 Boxes      { rules: (Mark & { id; text })[]; data: (Mark & { id; columns: string[]; rows: string[][] })[];
              gone: { components, rules, data: string[] }   // IDs used and deleted, never used again
              visits?: Visit[]; picks?: number }   // the fixer's last 20 visits, oldest first; picks so far
-Visit      { at; ask?; ms; costUsd; screens; changes: Change[]; refused: string[]; error?; seen }
+Visit      { at; ask?: string; undone?: boolean; ms; costUsd; screens; changes: Change[]; refused: string[]; error?; seen }
 Change     { text; note?; undo?: Undo; undone? }   // text says what changed: "merged a into b"
 Undo       { put: box; entry; index } | { drop: box; id } | { key; createdAt }
            // put a removed or changed entry (a component's whole CacheEntry) back; delete an added one; drop a redraw's version

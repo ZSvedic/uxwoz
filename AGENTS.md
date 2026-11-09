@@ -51,8 +51,8 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
                  name, idea; paste by ID and the current link
 src/packages/web/src/
   server.ts      Bun.serve: /api/config, /api/screen (NDJSON, A OR B at once), /api/pick, /api/revise, /api/undo,
-                 /api/map (wait=1 for filing and a visit), /api/visit, /api/apps, /api/delete, /api/delete-app,
-                 /api/box (also undo, a box's Undo and Edit), /api/warmup, themes; filing and visits in one chain per mockup, a click
+                 /api/map (wait=1 for filing and a visit), /api/apps, /api/delete, /api/delete-app,
+                 /api/box (also undo, a box's Undo and Edit, Visit now), /api/warmup, themes; filing and visits in one chain per mockup, a click
                  waits for it; a visit every 5 picks, its redraws as Edits
   app.ts         browser: generate panel, A OR B streaming, refit and pick, clicks (@names, back), rail tools, drawer
                  (Edit, Info), the boxes' data and filing's result, toolbar menus and box buttons, ← → trail, errors
