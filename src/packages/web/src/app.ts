@@ -187,39 +187,24 @@ async function themeCss(theme: string): Promise<string> {
   return state.css[theme]!
 }
 
-/** Rebuilds one card's frame at most every REBUILD_MS while it streams. */
-class StreamRenderer {
-  private raw = ''
-  private shown: string | null = null
-  private lastBuild = 0
-  private timer: ReturnType<typeof setTimeout> | null = null
-  /** `bare`: a component, shown as it streams; a screen gets its components pasted. */
-  constructor(private id: string, private css: string, private bare = false) {}
-
-  push(text: string) {
-    this.raw += text
-    this.build(false)
-  }
-
-  cancel() {
-    if (this.timer) clearTimeout(this.timer)
-    this.timer = null
-    canvas.forgetLoad(this.id)
-  }
-
-  private build(force: boolean) {
+/** A card's frame while it streams, rebuilt at most every REBUILD_MS. `bare`: a component, shown as it streams; a screen gets its components pasted. */
+function streamInto(id: string, css: string, bare = false) {
+  let raw = '', shown = '', last = 0, timer: ReturnType<typeof setTimeout> | undefined
+  const build = (force: boolean) => {
     const now = Date.now()
-    if (!force && now - this.lastBuild < REBUILD_MS) {
-      this.timer ??= setTimeout(() => { this.timer = null; this.build(true) }, REBUILD_MS - (now - this.lastBuild))
-      return
-    }
-    const fragment = extractFragment(this.raw)
-    if (fragment === this.shown || !hasVisibleText(fragment)) return
-    this.lastBuild = now
-    this.shown = fragment
-    canvas.show(this.id, this.bare ? fragment : page(fragment, undefined), false, this.css)
+    if (!force && now - last < REBUILD_MS) return void (timer ??= setTimeout(() => { timer = undefined; build(true) }, REBUILD_MS - (now - last)))
+    const fragment = extractFragment(raw)
+    if (fragment === shown || !hasVisibleText(fragment)) return
+    last = now
+    shown = fragment
+    canvas.show(id, bare ? fragment : page(fragment, undefined), false, css)
+  }
+  return {
+    push: (text: string) => { raw += text; build(false) },
+    cancel: () => { clearTimeout(timer); timer = undefined; canvas.forgetLoad(id) },
   }
 }
+type StreamRenderer = ReturnType<typeof streamInto>
 
 // ---- Errors
 
@@ -308,7 +293,7 @@ async function openScreen(action: string | null, from: string | null, label: str
       m = { key: ev.key, parent: from, device, sides: [] }
       m.sides = Array.from({ length: ev.variants }, (_, i) => ({
         version: null, error: null,
-        stream: new StreamRenderer(`${ev.key}#${i}`, css),
+        stream: streamInto(`${ev.key}#${i}`, css),
       }))
       state.making = m
       // The view to come back to after the pick; a new mockup's first screen has none.
@@ -598,7 +583,7 @@ async function revise(key: string, change: string | null) {
   draw()
   let frame: StreamRenderer | null = null
   await stream('/api/revise', { key, change, model: modelSelect.value, device: deviceSelect.value }, change ? 'make the change' : 'make a new design', (ev, css) => {
-    if (ev.type === 'chunk') (frame ??= new StreamRenderer(key, css, isComponent(e))).push(ev.text)
+    if (ev.type === 'chunk') (frame ??= streamInto(key, css, isComponent(e))).push(ev.text)
     else if (ev.type === 'done') {
       frame?.cancel()
       keep(ev.entry)
