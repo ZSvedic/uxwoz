@@ -2,9 +2,9 @@
 // Cancel, then the same submit as Enter in that field. voice.ts does the listening.
 // Imported by toolbar.ts; at the top level this module uses only itself and state.ts (see app.ts).
 
-import { openDrawer } from './drawer.ts'
+import { renderDrawer } from './drawer.ts'
 import { hint, showError } from './net.ts'
-import { SpeechInput, VoiceMachine, speechSupported, type VoiceState } from './voice.ts'
+import { SpeechInput, VoiceMachine, speechSupported, voiceField, type VoiceState } from './voice.ts'
 import { $, changeInput, state } from './state.ts'
 
 const GOOGLE = 'In Chrome, the audio goes to Google to be turned into text.'
@@ -35,11 +35,18 @@ export function initVoice(button: HTMLButtonElement) {
 
   /** A screen or box the Edit goes to. */
   const target = () => (state.box ? !!state.boxes : !!(state.current && state.entries.get(state.current)?.versions.length))
-  let shown = ''
-  const show = (text: string) => {
-    if (!text && changeInput.value !== shown) return
-    if (text && target() && state.drawer !== 'edit') openDrawer('edit')
-    changeInput.value = shown = text
+  // What voice last wrote, and the user's own text in front of the spoken words: typed text is never overwritten.
+  let shown = '', mine = '', typed = false
+  changeInput.addEventListener('input', () => { typed = true })
+  const show = (text: string, force = false) => {
+    // The user is typing in the field: leave it alone until they stop (a send still adds the words).
+    if (!force && typed && document.activeElement === changeInput) return
+    const f = voiceField(changeInput.value, shown, mine, text)
+    mine = f.mine
+    typed = false
+    // Open the drawer on Edit without taking the focus from the screen.
+    if (text && target() && state.drawer !== 'edit') { state.drawer = 'edit'; renderDrawer() }
+    changeInput.value = shown = f.value
   }
 
   const machine = new VoiceMachine((e) => {
@@ -52,9 +59,10 @@ export function initVoice(button: HTMLButtonElement) {
     else if (e.type === 'countdown') { show(e.text); left.textContent = `Sending in ${e.secondsLeft}…` }
     else if (e.type === 'error') showError(e.message)
     else if (e.type === 'send') {
-      show(e.text)
+      show(e.text, true)
       // The text stays in the field for when a screen is chosen.
       if (!target()) return hint('Click a screen first.')
+      mine = ''
       ;($('editPane') as HTMLFormElement).requestSubmit()
     }
   })

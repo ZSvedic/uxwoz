@@ -1,6 +1,6 @@
 // Voice input's state machine: the wake phrase, the countdown, stop and cancel, with a fake clock.
 import { expect, test } from 'bun:test'
-import { VoiceMachine, type Clock, type VoiceEvent } from '../packages/web/src/voice.ts'
+import { GAVE_UP, SpeechInput, VoiceMachine, voiceField, type Clock, type Recognition, type VoiceEvent } from '../packages/web/src/voice.ts'
 
 class FakeClock implements Clock {
   t = 0
@@ -105,15 +105,51 @@ test('speaking during the countdown holds it until the next final piece', () => 
   m.hear('and a', false)
   expect(m.state).toBe('awake')
   expect(events.at(-1)).toEqual({ type: 'interim', text: 'use switches and a' })
-  clock.advance(10000)
+  clock.advance(1000)
+  m.hear('and a ti', false)
+  clock.advance(1000)
   expect(sent()).toEqual([])
   m.hear('and a title', true)
   clock.advance(3000)
   expect(sent()).toEqual(['use switches and a title'])
 })
 
-test('a stop phrase puts it to sleep without sending', () => {
-  for (const said of ['woz sleep', 'Woz, stop.', 'ok that is all, stop listening']) {
+test('an interim piece with no final one after it does not hold the countdown forever', () => {
+  const { m, clock, sent } = setup()
+  m.start()
+  m.hear('hey woz use switches', true)
+  m.hear('um', false)
+  clock.advance(1499)
+  expect(m.state).toBe('awake')
+  clock.advance(1)
+  expect(m.state).toBe('countdown')
+  clock.advance(3000)
+  expect(sent()).toEqual(['use switches'])
+})
+
+test('the browser stopping to listen restarts a held countdown', () => {
+  const { m, clock, sent } = setup()
+  m.start()
+  m.hear('hey woz use switches', true)
+  m.hear('um', false)
+  m.ended()
+  expect(m.state).toBe('countdown')
+  clock.advance(3000)
+  expect(sent()).toEqual(['use switches'])
+})
+
+test('while asleep, the words after the wake phrase show at once; the state changes with the final piece', () => {
+  const { m, events } = setup()
+  m.start()
+  m.hear('Hey Woz, use swi', false)
+  expect(m.state).toBe('asleep')
+  expect(events.at(-1)).toEqual({ type: 'interim', text: 'use swi' })
+  m.hear('so they said', false)
+  expect(events.at(-1)).toEqual({ type: 'interim', text: 'use swi' })
+})
+
+test('a stop phrase, as the whole piece, puts it to sleep without sending', () => {
+  for (const said of ['woz sleep', 'Woz, stop.', 'Stop listening!']) {
     const { m, clock, sent } = setup()
     m.start()
     m.hear('hey woz use switches', true)
@@ -122,6 +158,51 @@ test('a stop phrase puts it to sleep without sending', () => {
     clock.advance(5000)
     expect(sent()).toEqual([])
   }
+})
+
+test('a stop phrase inside a request is part of the request', () => {
+  const { m, clock, sent } = setup()
+  m.start()
+  m.hear('hey woz add a button that says stop listening', true)
+  expect(m.state).toBe('countdown')
+  clock.advance(3000)
+  expect(sent()).toEqual(['add a button that says stop listening'])
+})
+
+test('voice never overwrites typed text: it keeps it in front of the spoken words', () => {
+  // Nothing typed: the spoken words replace what voice wrote before.
+  expect(voiceField('use sw', 'use sw', '', 'use switches')).toEqual({ value: 'use switches', mine: '' })
+  // The user typed: their text stays first.
+  expect(voiceField('Make it dark.', '', '', 'use switches')).toEqual({ value: 'Make it dark. use switches', mine: 'Make it dark.' })
+  // Later words keep the same typed text.
+  expect(voiceField('Make it dark. use', 'Make it dark. use', 'Make it dark.', 'use switches')).toEqual({ value: 'Make it dark. use switches', mine: 'Make it dark.' })
+  // Dropped words leave the typed text.
+  expect(voiceField('Make it dark. use', 'Make it dark. use', 'Make it dark.', '').value).toBe('Make it dark.')
+})
+
+test('the microphone gives up after five failures in a row, "aborted" included', () => {
+  const clock = new FakeClock()
+  const events: VoiceEvent[] = []
+  const recs: FakeRecognition[] = []
+  class FakeRecognition implements Recognition {
+    continuous = false; interimResults = false; lang = ''; starts = 0
+    onresult: Recognition['onresult'] = null; onerror: Recognition['onerror'] = null; onend: Recognition['onend'] = null
+    constructor() { recs.push(this) }
+    start() { this.starts++ }
+    stop() {}
+  }
+  const input = new SpeechInput(new VoiceMachine((e) => events.push(e), { clock }), { Recognition: FakeRecognition, clock })
+  input.start()
+  const rec = recs[0]!
+  expect(rec.lang).toBe('en-US')
+  // A silence is routine: it restarts without counting.
+  for (let i = 0; i < 10; i++) { rec.onerror!({ error: 'no-speech' }); rec.onend!(); clock.advance(10000) }
+  expect(input.machine.state).toBe('asleep')
+  // Another tab took the microphone: each "aborted" counts.
+  for (let i = 0; i < 5; i++) { rec.onerror!({ error: 'aborted' }); rec.onend!(); clock.advance(10000) }
+  expect(input.machine.state).toBe('off')
+  expect(events.at(-1)).toEqual({ type: 'error', message: GAVE_UP })
+  expect(rec.starts).toBe(15)
 })
 
 test('"cancel" or "never mind" during the countdown drops the text and keeps listening', () => {

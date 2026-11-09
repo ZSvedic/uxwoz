@@ -40,7 +40,7 @@ export class VoiceMachine {
   private deadline = 0
   private timer: unknown = null
 
-  constructor(private emit: (e: VoiceEvent) => void, private opts: { countdownMs?: number; clock?: Clock } = {}) {}
+  constructor(private emit: (e: VoiceEvent) => void, private opts: { countdownMs?: number; idleMs?: number; clock?: Clock } = {}) {}
 
   private get clock() { return this.opts.clock ?? realClock }
 
@@ -77,23 +77,40 @@ export class VoiceMachine {
     this.to('awake')
   }
 
+  /** No final piece came after the user spoke again (a pause, or the browser stopped listening): count down with what was said. */
+  ended() {
+    if (this.state === 'awake' && this.said) this.countdown()
+  }
+
   /** A piece of transcript: interim pieces change as the user speaks, a final one is settled. */
   hear(text: string, final: boolean) {
     if (this.state === 'off') return
     const w = words(text)
     if (!final) {
-      if (this.state === 'asleep' || !w) return
-      // Speaking again during the countdown holds it until the next final piece.
-      if (this.state === 'countdown') { this.stopTimer(); this.to('awake') }
+      if (!w) return
+      if (this.state === 'asleep') {
+        // Show the words after "hey Woz" at once; the state changes only with the final piece.
+        const m = WAKE.exec(text)
+        if (m) this.emit({ type: 'interim', text: text.slice(m[0].length).trim() })
+        return
+      }
+      // Speaking again holds the countdown. If no final piece follows soon, it starts again with what was said.
+      if (this.said) {
+        this.stopTimer()
+        this.to('awake')
+        this.timer = this.clock.setTimeout(() => this.ended(), this.opts.idleMs ?? 1500)
+      }
       this.emit({ type: 'interim', text: join(this.said, text.trim()) })
       return
     }
-    if (STOP.some((p) => w === p || w.endsWith(' ' + p))) { this.drop(); return this.to('asleep') }
+    // Stop phrases and cancel count only as the whole piece: "a button that says stop listening" is an Edit.
+    if (STOP.includes(w)) { this.drop(); return this.to('asleep') }
     if (this.state === 'asleep') {
       const m = WAKE.exec(text)
       if (!m) return
       this.to('awake')
       text = text.slice(m[0].length)
+      if (STOP.includes(words(text))) return this.to('asleep')
       if (CANCEL.includes(words(text))) return
     } else if (CANCEL.includes(w)) return this.cancel()
     if (!words(text)) return
@@ -124,11 +141,21 @@ export class VoiceMachine {
   }
 }
 
+/**
+ * What the Edit field shows when voice writes `spoken` into it. `shown` is what voice wrote last and `mine` the
+ * user's own text kept in front: when the field differs from `shown`, the user changed it, and that becomes `mine`.
+ * Typed text is never overwritten.
+ */
+export function voiceField(field: string, shown: string, mine: string, spoken: string): { value: string; mine: string } {
+  if (field !== shown) mine = field.trim()
+  return { value: join(mine, spoken), mine }
+}
+
 const join = (a: string, b: string) => (a && b ? `${a} ${b}` : a || b)
 
 // ---- The browser's speech recognition
 
-interface Recognition {
+export interface Recognition {
   continuous: boolean
   interimResults: boolean
   lang: string
@@ -138,7 +165,7 @@ interface Recognition {
   onerror: ((e: { error: string }) => void) | null
   onend: (() => void) | null
 }
-type RecognitionClass = new () => Recognition
+export type RecognitionClass = new () => Recognition
 
 const recognitionClass = (): RecognitionClass | undefined => {
   if (typeof window === 'undefined') return undefined
@@ -157,20 +184,24 @@ const MAX_FAILURES = 5
 export class SpeechInput {
   private rec: Recognition | null = null
   private failures = 0
-  private retry: ReturnType<typeof setTimeout> | undefined
+  private retry: unknown
 
-  constructor(readonly machine: VoiceMachine) {}
+  /** Tests pass a fake recognition and clock. */
+  constructor(readonly machine: VoiceMachine, private opts: { Recognition?: RecognitionClass; clock?: Clock } = {}) {}
+
+  private get clock() { return this.opts.clock ?? realClock }
 
   toggle() { this.machine.state === 'off' ? this.start() : this.stop() }
 
   start() {
-    const R = recognitionClass()
+    const R = this.opts.Recognition ?? recognitionClass()
     if (!R) return
     if (!this.rec) {
       const rec = this.rec = new R()
       rec.continuous = true
       rec.interimResults = true
-      rec.lang = navigator.language
+      // Edits are written in English, so the words are heard as English.
+      rec.lang = 'en-US'
       rec.onresult = (e) => {
         this.failures = 0
         let interim = ''
@@ -183,9 +214,10 @@ export class SpeechInput {
       }
       rec.onerror = (e) => {
         if (e.error === 'not-allowed' || e.error === 'service-not-allowed') return this.give(BLOCKED)
-        if (e.error !== 'no-speech' && e.error !== 'aborted') this.failures++
+        // A silence is routine. Anything else counts, "aborted" too, so two tabs cannot take the microphone from each other forever.
+        if (e.error !== 'no-speech') this.failures++
       }
-      rec.onend = () => this.again()
+      rec.onend = () => { this.machine.ended(); this.again() }
     }
     this.failures = 0
     this.machine.start()
@@ -193,13 +225,13 @@ export class SpeechInput {
   }
 
   stop() {
-    clearTimeout(this.retry)
+    this.clock.clearTimeout(this.retry)
     this.machine.stop()
     try { this.rec?.stop() } catch { /* not listening */ }
   }
 
   private give(message: string) {
-    clearTimeout(this.retry)
+    this.clock.clearTimeout(this.retry)
     this.machine.fail(message)
     try { this.rec?.stop() } catch { /* not listening */ }
   }
@@ -213,7 +245,7 @@ export class SpeechInput {
   private again() {
     if (this.machine.state === 'off') return
     if (this.failures >= MAX_FAILURES) return this.give(GAVE_UP)
-    clearTimeout(this.retry)
-    this.retry = setTimeout(() => this.listen(), 250 + 500 * this.failures)
+    this.clock.clearTimeout(this.retry)
+    this.retry = this.clock.setTimeout(() => this.listen(), 250 + 500 * this.failures)
   }
 }
