@@ -5,8 +5,8 @@ import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isD
 import { canonicalAction, isBack, nameWords, normalizePrompt, screenKey, screenRef } from '@uxwoz/core/keys'
 import { componentsOf, isComponent, namesOf, plannedScreens, screenTree, type TreeNode } from '@uxwoz/core/tree'
 import type { BoxName, Boxes, CacheEntry, Version } from '@uxwoz/core'
-import { boxesMarkdown, createSide, renderSide, type Box, type BoxOp } from './boxes.ts'
-import { Canvas, type CardView, type ScreenView, type View } from './canvas.ts'
+import { boxesMarkdown, createSide, el, renderSide, type Box, type BoxOp } from './boxes.ts'
+import { Canvas, MAX_ZOOM, type CardView, type ScreenView, type View } from './canvas.ts'
 import type { ScreenEvent } from './server.ts'
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -701,24 +701,20 @@ function renderDrawer() {
   $<HTMLButtonElement>('makeChange').disabled = !!state.busy
   const history = $('history')
   const comp = isComponent(e)
-  history.replaceChildren(...e.versions.map((x, i) => {
-    const li = document.createElement('li')
-    const from = comp && e.parent && state.entries.get(e.parent.key)
-    li.textContent = x.feedback ? `${x.by === 'fixer' ? 'Fixer' : 'Edit'}: ${x.feedback}` : comp ? (i === 0 ? (from ? `Taken from ${labelOf(from)} by ${e.by === 'fixer' ? 'the fixer' : 'filing'}` : 'Added') : 'Changed by filing')
-      : i === 0 ? 'The design you picked' : 'Regenerated'
-    li.classList.toggle('now', i === e.versions.length - 1)
-    return li
-  }).reverse())
   const node = state.tree.get(e.key)
   const parent = node?.parent ? state.entries.get(node.parent) : undefined
   const from = comp && e.parent ? state.entries.get(e.parent.key) : undefined, f = e.filed
+  const versions: [string, string] = ['Versions', `${e.versions.length}${e.versions.length > 1 ? ' (↶ Undo goes back one)' : ''}`]
+  history.replaceChildren(...e.versions.map((x, i) => el('li', i === e.versions.length - 1 ? 'now' : '', x.feedback ? `${x.by === 'fixer' ? 'Fixer' : 'Edit'}: ${x.feedback}`
+    : comp ? (i === 0 ? (from ? `Taken from ${labelOf(from)} by ${e.by === 'fixer' ? 'the fixer' : 'filing'}` : 'Added') : 'Changed by filing')
+      : i === 0 ? 'The design you picked' : 'Regenerated')).reverse())
   const info: [string, string][] = comp ? [
     ['Component', e.name!],
     ['Where it belongs', e.action ?? '–'],
     ['Pasted on', pastedOn(e.name!).map(labelOf).join(', ') || 'no screen'],
     ['Taken from', from ? labelOf(from) : '–'],
     ['Last written by', `${e.by === 'user' ? 'you' : e.by === 'fixer' ? 'the fixer' : 'filing'}, ${e.at ? new Date(e.at).toLocaleString() : '–'}`],
-    ['Versions', `${e.versions.length}${e.versions.length > 1 ? ' (↶ Undo goes back one)' : ''}`],
+    versions,
     ['Model', modelLabel(v.model)],
     ['Size', `${v.html.length.toLocaleString()} characters`],
   ] : [
@@ -727,7 +723,7 @@ function renderDrawer() {
     ['Name in links', e.name ? `@${e.name}` : '–'],
     ['Reached by', parent ? `${node!.label || 'a click'} in ${labelOf(parent)}` : e.action ? '–' : 'the first screen'],
     ['Made by', v.feedback ? `${v.by === 'fixer' ? 'The fixer' : 'Edit'}: ${v.feedback}` : e.versions.length > 1 ? 'Regenerate' : 'your pick of two designs'],
-    ['Versions', `${e.versions.length}${e.versions.length > 1 ? ' (↶ Undo goes back one)' : ''}`],
+    versions,
     ['Model', modelLabel(v.model) + (v.servedModel ? ` (served ${v.servedModel})` : '')],
     ['Device', v.device ? DEVICES[v.device].label : 'from before devices'],
     ['Made', new Date(v.createdAt).toLocaleString()],
@@ -742,12 +738,7 @@ function renderDrawer() {
     ...(f ? [['Filing', f.error ? `failed: ${f.error}` : `${[...f.added.map((x) => `added ${x}`), ...f.changed.map((x) => `changed ${x}`)].join(', ') || 'nothing new'}, `
       + `${fmtS(f.ms)}${f.costUsd == null ? '' : `, ~${fmtUsd(f.costUsd)}`}`], ...f.refused.map((r) => ['Refused', r])] as [string, string][] : []),
   ]
-  $('info').replaceChildren(...info.flatMap(([k, val]) => {
-    const dt = document.createElement('dt'), dd = document.createElement('dd')
-    dt.textContent = k
-    dd.textContent = val
-    return [dt, dd]
-  }))
+  $('info').replaceChildren(...info.flatMap(([k, val]) => [el('dt', '', k), el('dd', '', val)]))
 }
 
 $('editPane').addEventListener('submit', (ev) => {
@@ -756,13 +747,13 @@ $('editPane').addEventListener('submit', (ev) => {
   if (!change) return changeInput.focus()
   if (state.current) revise(state.current, change)
 })
-// Enter makes the change; Shift+Enter adds a line.
-changeInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $<HTMLFormElement>('editPane').requestSubmit() }
-})
+/** Enter sends the form; Shift+Enter adds a line. */
+function enterSubmits(input: HTMLTextAreaElement, form: HTMLFormElement) {
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit() } })
+}
+enterSubmits(changeInput, $('editPane') as HTMLFormElement)
 for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.addEventListener('click', () => openDrawer(b.dataset.tab as 'edit' | 'info'))
 $('drawerClose').addEventListener('click', closeDrawer)
-addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape' && state.drawer) closeDrawer() })
 
 // ---- Mockups
 
@@ -810,35 +801,26 @@ function closeMockup() {
   state.busy?.abort()
   restorePickers()
   store.set('uxwoz:app', '')
-  state.app = null
-  state.entries = new Map()
-  state.boxes = null
-  state.filing = false
-  state.current = null
+  Object.assign(state, { app: null, entries: new Map(), boxes: null, filing: false, current: null, making: null, revising: null, drawer: null, before: null })
   resetTrail()
-  state.making = null
-  state.revising = null
-  state.drawer = null
-  state.before = null
   loadRecent()
   draw()
 }
 
 // ---- Wiring
 
+/** The pickers and the name each is kept under in this browser. */
+const PICKERS = [[modelSelect, 'model'], [deviceSelect, 'device'], [themeSelect, 'theme']] as const
+const keepPicker = (s: HTMLSelectElement, name: string) => store.set(`uxwoz:${name}`, s.value)
+
 generate.addEventListener('submit', (e) => {
   e.preventDefault()
   // The pickers as they are now are the ones to keep, also if a change event was missed.
-  store.set('uxwoz:model', modelSelect.value)
-  store.set('uxwoz:device', deviceSelect.value)
-  store.set('uxwoz:theme', themeSelect.value)
+  for (const [s, name] of PICKERS) keepPicker(s, name)
   const app = promptInput.value.trim()
   if (app) start(app).catch((err) => showError(String(err)))
 })
-// Enter makes the mockup; Shift+Enter adds a line.
-promptInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); generate.requestSubmit() }
-})
+enterSubmits(promptInput, generate)
 
 // A template with a long prompt shows a short name and keeps the full prompt in data-prompt.
 for (const b of document.querySelectorAll<HTMLButtonElement>('.example')) {
@@ -848,39 +830,28 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('.example')) {
 }
 
 
+for (const [s, name] of PICKERS) s.addEventListener('change', () => keepPicker(s, name))
 // While a screen streams, the new theme applies when it finishes.
-themeSelect.addEventListener('change', async () => {
-  store.set('uxwoz:theme', themeSelect.value)
-  try {
-    await themeCss(themeSelect.value)
-    await draw()
-  } catch (e) {
-    showError(`Could not load the theme: ${e instanceof Error ? e.message : e}`)
-  }
-})
-deviceSelect.addEventListener('change', () => store.set('uxwoz:device', deviceSelect.value))
+themeSelect.addEventListener('change', () => themeCss(themeSelect.value).then(draw).catch((e) => showError(`Could not load the theme: ${e.message}`)))
 
-$('zoomIn').addEventListener('click', () => canvas.step(1))
-$('zoomOut').addEventListener('click', () => canvas.step(-1))
-$('fitScreen').addEventListener('click', () => fitScreen())
-
-// The user's own fits count as moving the canvas: a refit waiting for sizes must not undo them.
-const fitAll = () => { canvas.moved = performance.now(); canvas.fit() }
-const fitScreen = () => { canvas.moved = performance.now(); canvas.fit(state.current ?? undefined, { snug: true }) }
-const fitWidth = () => { canvas.moved = performance.now(); if (state.current) canvas.fitWidth(state.current) }
+/** A zoom from a key or a button: in, out, a level, or a fit. The user's own fits count as moving the canvas, so a refit waiting for sizes does not undo them. */
+function zoomTo(z: string) {
+  canvas.moved = performance.now()
+  if (z === 'in' || z === 'out') canvas.step(z === 'in' ? 1 : -1)
+  else if (z === 'all') canvas.fit()
+  else if (z === 'screen') canvas.fit(state.current ?? undefined, { snug: true })
+  else if (z !== 'width') canvas.setZoom(Number(z))
+  else if (state.current) canvas.fit(state.current, { max: MAX_ZOOM, top: true })
+}
 
 // Zoom keys as in Figma: ⌘+ and ⌘− (Ctrl on other systems), ⌘0 for 100%, ⇧1 fit all, ⇧2 fit screen, ⇧3 fit width.
+const ZOOM_KEYS: Record<string, string> = { '=': 'in', '+': 'in', '-': 'out', 0: '1', Digit1: 'all', Digit2: 'screen', Digit3: 'width' }
 const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))
 addEventListener('keydown', (e: KeyboardEvent) => {
   const mod = e.metaKey || e.ctrlKey
-  if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); canvas.step(1) }
-  else if (mod && e.key === '-') { e.preventDefault(); canvas.step(-1) }
-  else if (mod && e.key === '0') { e.preventDefault(); canvas.setZoom(1) }
+  if (mod && ZOOM_KEYS[e.key]) { e.preventDefault(); zoomTo(ZOOM_KEYS[e.key]!) }
   else if (mod && (e.key === '[' || e.key === ']') && !editable(e.target)) { e.preventDefault(); walkTrail(e.key === '[' ? -1 : 1) }
-  else if (editable(e.target) || mod || e.altKey || !e.shiftKey) return
-  else if (e.code === 'Digit1') fitAll()
-  else if (e.code === 'Digit2') fitScreen()
-  else if (e.code === 'Digit3') fitWidth()
+  else if (!editable(e.target) && !mod && !e.altKey && e.shiftKey && ZOOM_KEYS[e.code]) zoomTo(ZOOM_KEYS[e.code]!)
 })
 
 /** Every mockup, newest first. */
@@ -906,21 +877,15 @@ function renderRecentMenu() {
     b.classList.toggle('current', here)
     return b
   })
-  const head = document.createElement('h3')
-  head.textContent = 'Recent mockups'
-  $('menuRecent').replaceChildren(...(rows.length ? [head, ...rows] : []))
+  $('menuRecent').replaceChildren(...(rows.length ? [el('h3', '', 'Recent mockups'), ...rows] : []))
 }
 
 /** A row in a list or menu: label, note on the right, click action. */
-function item(label: string, note: string, run: () => void, cls = 'item'): HTMLButtonElement {
-  const b = document.createElement('button')
+function item(label: string, note: string, run: () => void): HTMLButtonElement {
+  const b = el('button', 'item')
   b.type = 'button'
-  b.className = cls
   b.title = label
-  const name = document.createElement('span'), n = document.createElement('small')
-  name.textContent = label
-  n.textContent = note
-  b.append(name, n)
+  b.append(el('span', '', label), el('small', '', note))
   b.addEventListener('click', () => { closeMenus(); run() })
   return b
 }
@@ -961,6 +926,7 @@ addEventListener('keydown', (e: KeyboardEvent) => {
   if (e.key !== 'Escape') return
   closeMenus()
   if (state.app && generate.classList.contains('open')) closeGenerate()
+  if (state.drawer) closeDrawer()
 })
 
 function openGenerate() {
@@ -1083,36 +1049,19 @@ async function deleteApp(again: boolean) {
   closeMockup()
 }
 
-for (const b of $('zoomMenu').querySelectorAll<HTMLButtonElement>('[data-zoom]')) b.addEventListener('click', () => {
-  closeMenus()
-  const z = b.dataset.zoom!
-  if (z === 'in') canvas.step(1)
-  else if (z === 'out') canvas.step(-1)
-  else if (z === 'all') fitAll()
-  else if (z === 'screen') fitScreen()
-  else if (z === 'width') fitWidth()
-  else canvas.setZoom(Number(z))
-})
+for (const b of document.querySelectorAll<HTMLButtonElement>('[data-zoom]')) b.addEventListener('click', () => { closeMenus(); zoomTo(b.dataset.zoom!) })
 
 const warmUp = (model: string) => post('/api/warmup', { model }).catch(() => {})
-
-modelSelect.addEventListener('change', () => {
-  store.set('uxwoz:model', modelSelect.value)
-  warmUp(modelSelect.value)
-})
+modelSelect.addEventListener('change', () => warmUp(modelSelect.value))
 
 async function init() {
   const cfg = await (await fetch('/api/config')).json()
   if (cfg.warning) showError(cfg.warning)
-  for (const m of cfg.models) modelSelect.add(new Option(m.label, m.id))
-  for (const t of cfg.themes) themeSelect.add(new Option(t.label, t.id))
-  for (const d of cfg.devices) deviceSelect.add(new Option(d.label, d.id))
-  const savedModel = store.get('uxwoz:model')
-  modelSelect.value = cfg.models.some((m: { id: string }) => m.id === savedModel) ? savedModel! : cfg.defaultModel
-  const savedTheme = store.get('uxwoz:theme')
-  themeSelect.value = cfg.themes.some((t: { id: string }) => t.id === savedTheme) ? savedTheme! : cfg.defaultTheme
-  const savedDevice = store.get('uxwoz:device')
-  deviceSelect.value = isDevice(savedDevice) ? savedDevice : cfg.defaultDevice
+  for (const [s, name] of PICKERS) {
+    const list: { id: string; label: string }[] = cfg[`${name}s`], saved = store.get(`uxwoz:${name}`)
+    for (const x of list) s.add(new Option(x.label, x.id))
+    s.value = list.some((x) => x.id === saved) ? saved! : cfg[`default${name[0]!.toUpperCase()}${name.slice(1)}`]
+  }
   warmUp(modelSelect.value)
   loadRecent()
   await themeCss(themeSelect.value)

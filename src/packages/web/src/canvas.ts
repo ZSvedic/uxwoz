@@ -304,11 +304,6 @@ export class Canvas {
     this.center({ ...this.elBox(el), h: Infinity })
   }
 
-  /** Fit a screen's width (at most 200%) and scroll to its top. */
-  fitWidth(key: string) {
-    this.fit(key, { max: MAX_ZOOM, top: true })
-  }
-
   private center(b: Box, smooth = false) {
     const st = this.stage
     const top = b.h * this.z > st.clientHeight - 48 ? b.y * this.z - 24 : (b.y + b.h / 2) * this.z - st.clientHeight / 2

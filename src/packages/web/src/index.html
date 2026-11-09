@@ -38,10 +38,10 @@
       <button type="button" data-box="data">Data <b></b></button>
     </span>
     <select id="theme" title="Theme: how every screen looks"></select>
-    <button id="zoomOut" type="button" class="wide-only" title="Zoom out (⌘−)">−</button>
+    <button id="zoomOut" type="button" data-zoom="out" class="wide-only" title="Zoom out (⌘−)">−</button>
     <button id="zoomValue" type="button" class="menu-button" aria-haspopup="menu" title="Zoom"><span id="zoomPct">100%</span> <span class="caret">▾</span></button>
-    <button id="zoomIn" type="button" class="wide-only" title="Zoom in (⌘+)">+</button>
-    <button id="fitScreen" type="button" class="wide-only" title="Fit screen (⇧2)">⤢</button>
+    <button id="zoomIn" type="button" data-zoom="in" class="wide-only" title="Zoom in (⌘+)">+</button>
+    <button id="fitScreen" type="button" data-zoom="screen" class="wide-only" title="Fit screen (⇧2)">⤢</button>
     <div id="zoomMenu" class="menu zoom-menu" role="menu" hidden>
       <button type="button" class="item" data-zoom="in">Zoom in <kbd>⌘+</kbd></button>
       <button type="button" class="item" data-zoom="out">Zoom out <kbd>⌘−</kbd></button>
