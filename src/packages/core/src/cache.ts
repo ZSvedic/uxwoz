@@ -58,6 +58,8 @@ export interface Mark { by: 'filing' | 'fixer' | 'user'; at: string; seen: boole
 export interface Rule extends Mark { id: string; text: string }
 export interface Table extends Mark { id: string; columns: string[]; rows: string[][] }
 export type BoxName = 'components' | 'rules' | 'data'
+export type Entry = Rule | Table | CacheEntry
+export type EntryBody = { id: string; text?: string; columns?: string[]; rows?: string[][] }
 /** A mockup's Rules and Data (its components are entries), and the IDs each box used and deleted. */
 export interface Boxes {
   rules: Rule[]
@@ -71,18 +73,18 @@ export interface Boxes {
 /** A filing: when, on which screen, what it added, changed and refused, its time and cost. */
 export interface Filing { at: string; screen: string; ms: number; costUsd: number | null; added: string[]; changed: string[]; refused: string[]; error?: string }
 /** A box as it was before a change: its entries and the IDs it had used. It keeps the last BOX_STATES. */
-export interface BoxState { list: (Rule | Table | CacheEntry)[]; gone: string[] }
+export interface BoxState { list: Entry[]; gone: string[] }
 export const BOX_STATES = 10
 
 /** How to undo one change of the fixer: put an entry back (`over` the one it changed), drop an entry it added, or drop a version it drew. */
-export type Undo = { put: BoxName; entry: Rule | Table | CacheEntry; index: number; over?: true } | { drop: BoxName; id: string } | { key: string; createdAt: string }
+export type Undo = { put: BoxName; entry: Entry; index: number; over?: true } | { drop: BoxName; id: string } | { key: string; createdAt: string }
 /** One change of a visit, in words (`merged a into b`), with the fixer's note on why. */
 export interface Change { text: string; note?: string; undo?: Undo; undone?: boolean }
 /** One visit of the fixer; `ask`: the user's request, for an Edit of a box. */
 export interface Visit { at: string; ask?: string; undone?: boolean; ms: number; costUsd: number | null; screens: number; changes: Change[]; refused: string[]; error?: string; seen: boolean }
 
 export const BOXES: BoxName[] = ['components', 'rules', 'data']
-export const idOf = (x: Rule | Table | CacheEntry) => ('id' in x ? x.id : x.name!)
+export const idOf = (x: Entry) => ('id' in x ? x.id : x.name!)
 const emptyBoxes = (): Boxes => ({ rules: [], data: [], gone: { components: [], rules: [], data: [] } })
 const componentKey = (app: string, id: string) => `${normalizePrompt(app)} » #${id}`
 
@@ -350,7 +352,7 @@ export class ScreenCache {
   }
 
   /** A box's entries, oldest first. */
-  list(app: string, box: BoxName): (Rule | Table | CacheEntry)[] {
+  list(app: string, box: BoxName): Entry[] {
     return box === 'components' ? this.mockup(app).filter(isComponent) : this.boxesOf(app)[box]
   }
 
@@ -387,7 +389,7 @@ export class ScreenCache {
   }
 
   /** Add, change or delete a rule or a table within the manual's limits. Returns why not, or null. */
-  setBox(app: string, op: 'add' | 'set' | 'delete', box: 'rules' | 'data', entry: { id: string; text?: string; columns?: string[]; rows?: string[][] }, by: Mark['by']): string | null {
+  setBox(app: string, op: 'add' | 'set' | 'delete', box: 'rules' | 'data', entry: EntryBody, by: Mark['by']): string | null {
     const b = this.own(app), list: (Rule | Table)[] = b[box]
     const i = list.findIndex((x) => x.id === entry.id)
     const why = op === 'add' ? this.refuseNew(app, box, entry.id) : i < 0 ? `${box} has no ${entry.id}` : null

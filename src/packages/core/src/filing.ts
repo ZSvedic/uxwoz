@@ -1,7 +1,7 @@
 // Filing: after a pick or an Edit, the background model files the decision in plain lines; code
 // applies them to the boxes, refusing with a reason what breaks the manual's limits.
 
-import { refuseLine, type Filing, type ScreenCache, type Version } from './cache.ts'
+import { refuseLine, type EntryBody, type Filing, type ScreenCache, type Version } from './cache.ts'
 import { LIMITS, normalizePrompt } from './keys.ts'
 import { elementEnd, type Device } from './frame.ts'
 import { FILING_MODEL, MODELS } from './models.ts'
@@ -63,7 +63,7 @@ export interface Filed { added: string[]; changed: string[]; refused: string[] }
 const cells = (text: string) => text.split('|').map((c) => c.trim())
 
 /** A rule or a table read from filing's forms, to store. */
-export interface BoxLine { box: 'rules' | 'data'; change: boolean; entry: { id: string; text?: string; columns?: string[]; rows?: string[][] }; line: string }
+export interface BoxLine { box: 'rules' | 'data'; change: boolean; entry: EntryBody; line: string }
 
 /** Read rule, table and row lines in order: a rule goes to `set` at once, a table once its rows have come (`flush` at the end). */
 export function boxLines(cache: ScreenCache, app: string, set: (l: BoxLine) => string | null, refuse: (line: string, why: string) => void) {
