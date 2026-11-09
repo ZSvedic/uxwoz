@@ -1,8 +1,8 @@
 // The fixer's visit: the background model reads the paper, the screens new since its last visit and
 // any request of the user, and replies in plain lines; code applies them with refusals and an Undo each.
 
-import type { BoxName, CacheEntry, Change, Rule, ScreenCache, Table, Visit } from './cache.ts'
-import { refuseLine } from './cache.ts'
+import type { BoxName, Change, Rule, ScreenCache, Table, Visit } from './cache.ts'
+import { BOXES, idOf, refuseLine } from './cache.ts'
 import { askBackground, backgroundVersion, boxLines, numberParts, parseFiling, partOf, type FilingLine } from './filing.ts'
 import { BOX_TITLES } from './keys.ts'
 import { visitRequest } from './prompt.ts'
@@ -51,14 +51,11 @@ function visitLines(cache: ScreenCache, app: string, reply: string, sent: Map<st
   let last = null as Change | null
   const did = (c: Change) => { out.changes.push((last = c)); return c }
   // Where an ID is, among the boxes: its box, its entry and its place in the list (older first).
-  const find = (id: string): { box: BoxName; entry: Rule | Table | CacheEntry; index: number } | null => {
-    const comps = cache.map(app).entries.filter(isComponent)
-    const lists: [BoxName, (Rule | Table | CacheEntry)[]][] = [['components', comps], ['rules', cache.boxesOf(app).rules], ['data', cache.boxesOf(app).data]]
-    for (const [box, list] of lists) {
-      const index = list.findIndex((x) => ('id' in x ? x.id : x.name) === id)
+  const find = (id: string) => {
+    for (const box of BOXES) {
+      const list = cache.list(app, box), index = list.findIndex((x) => idOf(x) === id)
       if (index >= 0) return { box, entry: list[index]!, index }
     }
-    return null
   }
   const remove = (id: string, text: string, line: string) => {
     const f = find(id)

@@ -81,8 +81,8 @@ export interface Change { text: string; note?: string; undo?: Undo; undone?: boo
 /** One visit of the fixer; `ask`: the user's request, for an Edit of a box. */
 export interface Visit { at: string; ask?: string; undone?: boolean; ms: number; costUsd: number | null; screens: number; changes: Change[]; refused: string[]; error?: string; seen: boolean }
 
-const BOXES: BoxName[] = ['components', 'rules', 'data']
-const idOf = (x: Rule | Table | CacheEntry) => ('id' in x ? x.id : x.name!)
+export const BOXES: BoxName[] = ['components', 'rules', 'data']
+export const idOf = (x: Rule | Table | CacheEntry) => ('id' in x ? x.id : x.name!)
 const emptyBoxes = (): Boxes => ({ rules: [], data: [], gone: { components: [], rules: [], data: [] } })
 const componentKey = (app: string, id: string) => `${normalizePrompt(app)} » #${id}`
 
@@ -350,7 +350,7 @@ export class ScreenCache {
   }
 
   /** A box's entries, oldest first. */
-  private list(app: string, box: BoxName): (Rule | Table | CacheEntry)[] {
+  list(app: string, box: BoxName): (Rule | Table | CacheEntry)[] {
     return box === 'components' ? this.mockup(app).filter(isComponent) : this.boxesOf(app)[box]
   }
 
