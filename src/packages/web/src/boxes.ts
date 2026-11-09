@@ -19,7 +19,6 @@ export const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', ...k
 
 export function button(text: string, title: string, run: () => void, cls = 'box-btn') {
   const b = el('button', cls, text)
-  b.type = 'button'
   b.title = title
   b.addEventListener('click', run)
   return b

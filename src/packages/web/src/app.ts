@@ -266,76 +266,87 @@ async function* readEvents(res: Response): AsyncGenerator<ScreenEvent> {
 const post = (url: string, body: object, signal?: AbortSignal) =>
   fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal })
 
-// ---- Screens
-
-/** Open a screen from the cache, else as A OR B: remember the view, fit both, stream them. */
-async function openScreen(action: string | null, from: string | null, label: string | null) {
-  const app = state.app!
+/**
+ * Stream a screen request as the one busy job: each event to `on` (with the theme's CSS), an error or
+ * a stream that ends early to the red pill as "Could not `what`", then `after(failed)`.
+ */
+async function stream(url: string, body: object, what: string, on: (ev: ScreenEvent, css: string) => unknown, after: (failed: boolean) => void) {
   showError(null)
   state.busy?.abort()
   const ctrl = new AbortController()
   state.busy = ctrl
-  const model = modelSelect.value
-  const device = deviceSelect.value as Device
-  /** When the A OR B was fitted; refitted once both finish unless the canvas moved since. */
-  let fitted: number | null = null
+  let failed = false
   try {
     const css = await themeCss(themeSelect.value)
-    const res = await post('/api/screen', { app, action, model, device, from, label }, ctrl.signal)
-    let m: Making | null = null
     let finished = false
-    for await (const ev of readEvents(res)) {
-      if (ev.type === 'meta' && !ev.cached) {
-        m = { key: ev.key, parent: from, device, sides: [] }
-        m.sides = Array.from({ length: ev.variants }, (_, i) => ({
-          version: null, error: null,
-          stream: new StreamRenderer(`${ev.key}#${i}`, css),
-        }))
-        state.making = m
-        // The view to come back to after the pick; a new mockup's first screen has none.
-        if (!state.before && state.entries.size) state.before = canvas.view()
-        await draw()
-        canvas.fit(ev.key, { top: true })
-        fitted = performance.now()
-      } else if (ev.type === 'chunk') m?.sides[ev.variant]?.stream?.push(ev.text)
-      else if (ev.type === 'version' || ev.type === 'failed') {
-        const s = m?.sides[ev.variant]
-        if (!s) continue
-        s.stream?.cancel()
-        s.stream = null
-        if (ev.type === 'version') s.version = ev.version
-        else { s.error = ev.message; state.failed.set(`${m!.key}#${ev.variant}`, ev.message) }
-        draw()
-      } else if (ev.type === 'error') throw new Error(ev.message)
-      else if (ev.type === 'done') {
-        finished = true
-        state.entries.set(ev.entry.key, ev.entry)
-        state.edits++
-        if (state.making === m) state.making = null
-        loadRecent()
-        await draw()
-        if (m) refit(ev.entry.key, fitted)
-        else {
-          // Already made (another tab, or a reload while its A OR B was open).
-          if (ev.entry.versions.length) setCurrent(ev.entry.key)
-          else {
-            if (!state.before) state.before = canvas.view()
-            fitChoice(ev.entry.key)
-          }
-        }
-      }
+    for await (const ev of readEvents(await post(url, body, ctrl.signal))) {
+      if (ev.type === 'error') throw new Error(ev.message)
+      finished ||= ev.type === 'done'
+      await on(ev, css)
     }
     if (!finished && !ctrl.signal.aborted) throw new Error('the stream ended early')
   } catch (err) {
-    if (ctrl.signal.aborted) return
-    showError(`Could not make this screen: ${err instanceof Error ? err.message : err}`)
-    for (const s of state.making?.sides ?? []) s.stream?.cancel()
-    state.making = null
-    back()
+    failed = !ctrl.signal.aborted
+    if (failed) showError(`Could not ${what}: ${err instanceof Error ? err.message : err}`)
   } finally {
+    after(failed)
     if (state.busy === ctrl) state.busy = null
     draw().catch((e) => showError(String(e)))
   }
+}
+
+// ---- Screens
+
+/** Open a screen from the cache, else as A OR B: remember the view, fit both, stream them. */
+async function openScreen(action: string | null, from: string | null, label: string | null) {
+  const device = deviceSelect.value as Device
+  /** When the A OR B was fitted; refitted once both finish unless the canvas moved since. */
+  let fitted: number | null = null
+  let m: Making | null = null
+  await stream('/api/screen', { app: state.app!, action, model: modelSelect.value, device, from, label }, 'make this screen', async (ev, css) => {
+    if (ev.type === 'meta' && !ev.cached) {
+      m = { key: ev.key, parent: from, device, sides: [] }
+      m.sides = Array.from({ length: ev.variants }, (_, i) => ({
+        version: null, error: null,
+        stream: new StreamRenderer(`${ev.key}#${i}`, css),
+      }))
+      state.making = m
+      // The view to come back to after the pick; a new mockup's first screen has none.
+      if (!state.before && state.entries.size) state.before = canvas.view()
+      await draw()
+      canvas.fit(ev.key, { top: true })
+      fitted = performance.now()
+    } else if (ev.type === 'chunk') m?.sides[ev.variant]?.stream?.push(ev.text)
+    else if (ev.type === 'version' || ev.type === 'failed') {
+      const s = m?.sides[ev.variant]
+      if (!s) return
+      s.stream?.cancel()
+      s.stream = null
+      if (ev.type === 'version') s.version = ev.version
+      else { s.error = ev.message; state.failed.set(`${m!.key}#${ev.variant}`, ev.message) }
+      draw()
+    } else if (ev.type === 'done') {
+      state.entries.set(ev.entry.key, ev.entry)
+      state.edits++
+      if (state.making === m) state.making = null
+      loadRecent()
+      await draw()
+      if (m) refit(ev.entry.key, fitted)
+      else {
+        // Already made (another tab, or a reload while its A OR B was open).
+        if (ev.entry.versions.length) setCurrent(ev.entry.key)
+        else {
+          if (!state.before) state.before = canvas.view()
+          fitChoice(ev.entry.key)
+        }
+      }
+    }
+  }, (failed) => {
+    if (!failed) return
+    for (const s of state.making?.sides ?? []) s.stream?.cancel()
+    state.making = null
+    back()
+  })
 }
 
 /** Once a screen (or an A OR B) has its size, fit it snugly, unless the view moved since `fitted` or the A OR B was picked. */
@@ -583,45 +594,26 @@ async function revise(key: string, change: string | null) {
   const e = state.entries.get(key)
   if (!e?.versions.length) return
   if (state.busy) return hint()
-  showError(null)
-  const ctrl = new AbortController()
-  state.busy = ctrl
   state.revising = { key, change }
-  const model = modelSelect.value
   draw()
-  try {
-    const css = await themeCss(themeSelect.value)
-    const stream = new StreamRenderer(key, css, isComponent(e))
-    const res = await post('/api/revise', { key, change, model, device: deviceSelect.value }, ctrl.signal)
-    let finished = false
-    try {
-      for await (const ev of readEvents(res)) {
-        if (ev.type === 'chunk') stream.push(ev.text)
-        else if (ev.type === 'error') throw new Error(ev.message)
-        else if (ev.type === 'done') {
-          finished = true
-          stream.cancel()
-          state.entries.set(key, ev.entry)
-          state.edits++
-          if (ev.filing) { state.filing = true; filed() }
-          state.revising = null
-          if (change) changeInput.value = ''
-          // The new version may be taller or narrower: keep it in view once it has its size.
-          canvas.sized(key).then(() => canvas.reveal(key))
-        }
-      }
-    } finally {
-      stream.cancel()
+  let frame: StreamRenderer | null = null
+  await stream('/api/revise', { key, change, model: modelSelect.value, device: deviceSelect.value }, change ? 'make the change' : 'make a new design', (ev, css) => {
+    if (ev.type === 'chunk') (frame ??= new StreamRenderer(key, css, isComponent(e))).push(ev.text)
+    else if (ev.type === 'done') {
+      frame?.cancel()
+      state.entries.set(key, ev.entry)
+      state.edits++
+      if (ev.filing) { state.filing = true; filed() }
+      state.revising = null
+      if (change) changeInput.value = ''
+      // The new version may be taller or narrower: keep it in view once it has its size.
+      canvas.sized(key).then(() => canvas.reveal(key))
     }
-    if (!finished && !ctrl.signal.aborted) throw new Error('the stream ended early')
-  } catch (err) {
-    if (!ctrl.signal.aborted) showError(`Could not ${change ? 'make the change' : 'make a new design'}: ${err instanceof Error ? err.message : err}`)
-  } finally {
+  }, () => {
+    frame?.cancel()
     // After a failure, draw() puts the screen as it was back into its frame.
     if (state.revising?.key === key) state.revising = null
-    if (state.busy === ctrl) state.busy = null
-    draw().catch((e) => showError(String(e)))
-  }
+  })
 }
 
 async function undo(key: string) {
