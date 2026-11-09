@@ -40,6 +40,7 @@ export interface ServerOptions {
 const shown = (e: CacheEntry) => ({ id: e.name ?? HOME_NAME, line: e.action ?? HOME_LINE, html: e.versions.at(-1)?.html ?? '' })
 
 const json = (data: unknown, status = 200) => Response.json(data, { status })
+const fail = (error: string, status = 400) => json({ error }, status)
 
 /** Interleave several streams, yielding each item as soon as its stream has it. */
 async function* merge<T>(sources: AsyncIterator<T>[]): AsyncGenerator<T> {
@@ -67,16 +68,17 @@ async function* tagged(slot: number, events: AsyncIterable<GenerateEvent>): Asyn
  * and no cross-site Origin.
  */
 function refuseForeign(req: Request): Response | null {
-  if (!req.headers.get('content-type')?.startsWith('application/json')) return json({ error: 'send application/json' }, 415)
+  if (!req.headers.get('content-type')?.startsWith('application/json')) return fail('send application/json', 415)
   const origin = req.headers.get('origin')
-  if (origin && origin !== new URL(req.url).origin) return json({ error: 'cross-origin request refused' }, 403)
-  if (req.headers.get('sec-fetch-site') === 'cross-site') return json({ error: 'cross-site request refused' }, 403)
+  if (origin && origin !== new URL(req.url).origin) return fail('cross-origin request refused', 403)
+  if (req.headers.get('sec-fetch-site') === 'cross-site') return fail('cross-site request refused', 403)
   return null
 }
 
 /** A POST route: refuse a foreign request, then read its JSON body (null when it has none). */
 const api = (run: (b: any, req: Request) => Response | Promise<Response>) => async (req: Request) => refuseForeign(req) ?? run(await req.json().catch(() => null), req)
 const appOf = (b: any): string => (typeof b?.app === 'string' ? b.app.trim() : '')
+const badApp = (app: string) => (!app || app.length > 2000 ? fail('app must be 1-2000 characters') : null)
 
 function ndjson(events: AsyncIterable<ScreenEvent>): Response {
   const enc = new TextEncoder()
@@ -107,6 +109,7 @@ export function createServer(opts: ServerOptions = {}) {
   const log = opts.log ?? ((m: string) => console.warn(m))
   const random = opts.random ?? Math.random
   const fileWaitMs = opts.fileWaitMs ?? 5000
+  const io = { fetch: opts.fetch, env: opts.env }
 
   /** The background job running for each mockup, by root key: filings and the fixer's visits run one after another. */
   const filings = new Map<string, Promise<unknown>>()
@@ -127,7 +130,7 @@ export function createServer(opts: ServerOptions = {}) {
     if (!e || isComponent(e)) return false
     const root = normalizePrompt(e.app), t0 = performance.now(), since = cache.now()
     count(root, 1)
-    chain(root, () => fileDecision({ cache, key, decision, fetch: opts.fetch, env: opts.env, log }))
+    chain(root, () => fileDecision({ cache, key, decision, ...io, log }))
       .then((run) => run && log(`filed ${run.screen} in ${(run.ms / 1000).toFixed(1)} s for $${run.costUsd?.toFixed(4)}: added ${run.added.join(', ') || 'nothing'}, changed ${run.changed.join(', ') || 'nothing'}, refused ${run.refused.length}`))
       .catch((err) => {
         log(`filing failed: ${message(err)}`)
@@ -156,7 +159,7 @@ export function createServer(opts: ServerOptions = {}) {
     }
     const since = cache.now(), t0 = performance.now(), stop = new AbortController()
     stops.set(root, stop)
-    const p = chain(root, () => visitPaper({ cache, app, ask, fetch: opts.fetch, env: opts.env, log }, () => cache.removedSince(root, since)))
+    const p = chain(root, () => visitPaper({ cache, app, ask, ...io, log }, () => cache.removedSince(root, since)))
       .then(async (r) => {
         if (!r) return log('visit dropped: the mockup changed meanwhile')
         let cost = r.visit.costUsd ?? 0
@@ -200,8 +203,7 @@ export function createServer(opts: ServerOptions = {}) {
     stops.get(root)?.abort()
   }
 
-  interface Click { from: string; label: string }
-  interface ScreenRequest { app: string; action: string | null; model: ModelId; device: Device; click: Click | null }
+  interface ScreenRequest { app: string; action: string | null; model: ModelId; device: Device; click: { from: string; label: string } | null }
 
   const message = (err: unknown) => (err instanceof Error ? err.message : String(err))
 
@@ -247,7 +249,7 @@ export function createServer(opts: ServerOptions = {}) {
     const different = Math.min(PROPOSALS - 1, Math.floor(random() * PROPOSALS))
     const streams = Array.from({ length: PROPOSALS }, (_, slot) => tagged(slot, generateScreen({
       user: drawRequest(paper, target, from ? { ...shown(from), label: click!.label } : null, slot === different),
-      model, device, signal, fetch: opts.fetch, env: opts.env,
+      model, device, signal, ...io,
     })))
     const parent = click && { key: click.from, label: click.label || prompt || 'home' }
     const failed: string[] = []
@@ -289,7 +291,7 @@ export function createServer(opts: ServerOptions = {}) {
     const user = change ? editRequest(paper, shown(entry), change, isComponent(entry))
       : drawRequest(paper, shown(entry), parent?.versions.length ? { ...shown(parent), label: entry.parent!.label } : null)
     try {
-      for await (const ev of generateScreen({ user, model, device, signal, fetch: opts.fetch, env: opts.env })) {
+      for await (const ev of generateScreen({ user, model, device, signal, ...io })) {
         if (ev.type === 'chunk') { yield { type: 'chunk', variant: 0, text: ev.text }; continue }
         const version: Version = { ...ev.version, ...(change && { feedback: change }), ...(fixer && { by: 'fixer' as const }) }
         const stored = cache.group(() => cache.addVersion(key, version), group)
@@ -309,8 +311,8 @@ export function createServer(opts: ServerOptions = {}) {
 
   const pickers = (b: { model?: unknown; device?: unknown } | null) => {
     const model = b?.model ?? DEFAULT_MODEL, device = b?.device ?? DEFAULT_DEVICE
-    if (!isModelId(model)) return json({ error: `unknown model ${model}` }, 400)
-    if (!isDevice(device)) return json({ error: `unknown device ${device}` }, 400)
+    if (!isModelId(model)) return fail(`unknown model ${model}`)
+    if (!isDevice(device)) return fail(`unknown device ${device}`)
     return { model, device }
   }
 
@@ -341,8 +343,8 @@ export function createServer(opts: ServerOptions = {}) {
         POST: api(async (b, req) => {
           const app = appOf(b)
           const action = typeof b?.action === 'string' && b.action.trim() ? b.action.trim() : null
-          if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
-          if (action && (action.length > 500 || (canonicalAction(action) && !screenRef(action)))) return json({ error: 'action must be @name or @name: its one line, at most 500 characters' }, 400)
+          if (badApp(app)) return badApp(app)!
+          if (action && (action.length > 500 || (canonicalAction(action) && !screenRef(action)))) return fail('action must be @name or @name: its one line, at most 500 characters')
           const p = pickers(b)
           if (p instanceof Response) return p
           const click = typeof b?.from === 'string' && b.from ? { from: b.from.slice(0, 3000), label: String(b?.label ?? '').slice(0, 200) } : null
@@ -354,7 +356,7 @@ export function createServer(opts: ServerOptions = {}) {
           const key = String(b?.key ?? ''), index = Number(b?.index)
           const other = cache.get(key)?.proposals?.find((p, i) => p && i !== index)?.html
           const entry = cache.pick(key, index)
-          if (!entry) return json({ error: 'no such screen, or no such design to pick' }, 404)
+          if (!entry) return fail('no such screen, or no such design to pick', 404)
           // Filing reads the pick in the background, and every 5th pick the fixer visits after it;
           // the page learns of both from /api/map?wait=1.
           const filing = file(key, { other: other ?? '(none: it failed)' })
@@ -364,25 +366,25 @@ export function createServer(opts: ServerOptions = {}) {
       '/api/revise': {
         POST: api(async (b, req) => {
           const change = typeof b?.change === 'string' ? b.change.trim() : null
-          if (b?.change != null && (!change || change.length > 1000)) return json({ error: 'change must be 1-1000 characters' }, 400)
+          if (b?.change != null && (!change || change.length > 1000)) return fail('change must be 1-1000 characters')
           const p = pickers(b)
           if (p instanceof Response) return p
           const entry = cache.get(String(b?.key ?? ''))
-          if (!entry) return json({ error: 'no such screen' }, 404)
-          if (!entry.versions.length) return json({ error: 'pick one of the two designs first' }, 409)
-          if (isComponent(entry) && !change) return json({ error: 'a component changes by Edit' }, 400)
+          if (!entry) return fail('no such screen', 404)
+          if (!entry.versions.length) return fail('pick one of the two designs first', 409)
+          if (isComponent(entry) && !change) return fail('a component changes by Edit')
           return ndjson(reviseEvents(entry, change, p.model, p.device, req.signal))
         }),
       },
       '/api/undo': {
         POST: api(async (b) => {
           const entry = cache.undo(String(b?.key ?? ''))
-          return entry ? json({ entry }) : json({ error: 'no such screen, or nothing to undo' }, 404)
+          return entry ? json({ entry }) : fail('no such screen, or nothing to undo', 404)
         }),
       },
       '/api/map': async (req) => {
         const url = new URL(req.url), app = url.searchParams.get('app')?.trim() ?? ''
-        if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
+        if (badApp(app)) return badApp(app)!
         const root = normalizePrompt(app)
         if (url.searchParams.get('wait') === '1') await Promise.race([Promise.all([filings.get(root), visits.get(root)]), Bun.sleep(60_000)])
         return json(mapOf(app))
@@ -390,7 +392,7 @@ export function createServer(opts: ServerOptions = {}) {
       '/api/box': {
         POST: api(async (b) => {
           const app = appOf(b)
-          if (!cache.get(screenKey(app, null))) return json({ error: 'no such mockup' }, 404)
+          if (!cache.get(screenKey(app, null))) return fail('no such mockup', 404)
           const box = b?.box as BoxName | 'notes', op = b?.op, any = Object.hasOwn(BOX_TITLES, String(box))
           let why: string | null = null
           if (op === 'seen' && any) cache.markSeen(app, box, Array.isArray(b?.ids) ? b.ids.map(String) : undefined)
@@ -400,15 +402,15 @@ export function createServer(opts: ServerOptions = {}) {
           else if (op === 'undo-box' && any) why = cache.undoBox(app, box as BoxName)
           else if (op === 'visit' || (op === 'edit' && any)) {
             const text = typeof b?.text === 'string' ? b.text.trim() : ''
-            if (op === 'edit' && (!text || text.length > 1000)) return json({ error: 'text must be 1-1000 characters' }, 400)
+            if (op === 'edit' && (!text || text.length > 1000)) return fail('text must be 1-1000 characters')
             const busy = visit(app, op === 'edit' ? { box, text } : undefined)
-            if (busy) return json({ error: busy }, 409)
+            if (busy) return fail(busy, 409)
           } else if ((box === 'rules' || box === 'data') && ['add', 'set', 'delete'].includes(op)) {
             // A new entry's ID comes from its words: the rule's sentence, or the table's name.
             const id = op === 'add' ? cache.freeId(app, box, String(b?.text ?? b?.id ?? '')) : String(b?.id ?? '')
             why = cache.setBox(app, op, box, { id, text: b?.text, columns: b?.columns, rows: b?.rows }, 'user')
-          } else return json({ error: 'unknown box or op' }, 400)
-          return why ? json({ error: why }, 400) : json(mapOf(app))
+          } else return fail('unknown box or op')
+          return why ? fail(why) : json(mapOf(app))
         }),
       },
       '/api/apps': () => json({ apps: cache.apps() }),
@@ -418,22 +420,23 @@ export function createServer(opts: ServerOptions = {}) {
           const key = String(b?.key ?? ''), app = cache.get(key)?.app
           const removed = cache.delete(key)
           if (app && key === normalizePrompt(app)) forget(app)
-          return removed && app ? json({ removed, ...mapOf(app) }) : json({ error: 'no such screen' }, 404)
+          return removed && app ? json({ removed, ...mapOf(app) }) : fail('no such screen', 404)
         }),
       },
       '/api/delete-app': {
         POST: api(async (b) => {
           const app = appOf(b)
-          if (!app || app.length > 2000) return json({ error: 'app must be 1-2000 characters' }, 400)
+          if (badApp(app)) return badApp(app)!
           forget(app)
           return json({ removed: cache.deleteApp(app) })
         }),
       },
       '/api/warmup': {
         POST: api(async (b) => {
-          const model = b?.model ?? DEFAULT_MODEL
-          if (!isModelId(model)) return json({ error: `unknown model ${model}` }, 400)
-          warmUp(model, { fetch: opts.fetch, env: opts.env }).catch((e) => log(`warm-up failed (${model}): ${e.message}`))
+          const p = pickers(b)
+          if (p instanceof Response) return p
+          const { model } = p
+          warmUp(model, io).catch((e) => log(`warm-up failed (${model}): ${e.message}`))
           return new Response(null, { status: 204 })
         }),
       },
