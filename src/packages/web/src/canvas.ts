@@ -473,6 +473,9 @@ export class Canvas {
     this.boxes.clear()
     const xs = new Map<string, number>()
     const side = !this.side.hidden && rows.length > 0
+    // A box is at most as tall as the first screen (and one device screen); the rest scrolls inside it.
+    const home = this.screens.find((s) => s.key === rows[0]?.[0])
+    if (side) this.side.style.setProperty('--box-h', `${Math.max(sizes.get(home!.key)!.h, DEVICES[home!.cards[0]?.device ?? DEFAULT_DEVICE].height)}px`)
     let maxX = PAD, sideX = PAD
     for (const row of rows) {
       let cursor = PAD

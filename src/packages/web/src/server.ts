@@ -137,17 +137,23 @@ export function createServer(opts: ServerOptions = {}) {
     return true
   }
 
-  /** Per mockup: the visit running (with its redraws), and how to stop its redraws. */
-  const visits = new Map<string, Promise<unknown>>(), stops = new Map<string, AbortController>()
+  /** Per mockup: the visit running (with its redraws), how to stop its redraws, and whether another waits. */
+  const visits = new Map<string, Promise<unknown>>(), stops = new Map<string, AbortController>(), again = new Set<string>()
 
   /**
    * A visit of the fixer in the mockup's chain, dropped when the mockup goes meanwhile; `ask` makes it
    * an Edit of a box. Its redraws are Edits that file nothing, skipped for a screen changed since the
-   * visit began. A pick that comes while a visit runs brings none: the next visit reads its screen.
+   * visit began. A visit asked for while one runs comes after it; an Edit is refused then. Returns
+   * why not, or null.
    */
-  function visit(app: string, ask?: VisitOptions['ask']): boolean {
+  function visit(app: string, ask?: VisitOptions['ask']): string | null {
     const root = normalizePrompt(app)
-    if (!cache.get(root)?.versions.length || visits.has(root)) return false
+    if (!cache.get(root)?.versions.length) return 'Wait for Home\'s pick.'
+    if (visits.has(root)) {
+      if (ask) return 'The fixer is visiting now: try again when it is done.'
+      again.add(root)
+      return null
+    }
     const since = cache.now(), t0 = performance.now(), stop = new AbortController()
     stops.set(root, stop)
     const p = chain(root, () => visitPaper({ cache, app, ask, fetch: opts.fetch, env: opts.env, log }, () => cache.removedSince(root, since)))
@@ -158,7 +164,7 @@ export function createServer(opts: ServerOptions = {}) {
           const e = cache.get(d.key), v = e?.versions.at(-1)
           if (!e || !v) return
           if (v.createdAt > r.visit.at) return void (d.change.text = `did not redraw ${e.name}: it changed during the visit`)
-          for await (const ev of reviseEvents(e, d.sentence, isModelId(v.model) ? v.model : DEFAULT_MODEL, v.device ?? DEFAULT_DEVICE, stop.signal, true)) {
+          for await (const ev of reviseEvents(e, d.sentence, isModelId(v.model) ? v.model : DEFAULT_MODEL, v.device ?? DEFAULT_DEVICE, stop.signal, r.group)) {
             if (ev.type === 'version') Object.assign(d.change, { text: d.change.text.replace('redrawing', 'redrew'), undo: { key: d.key, createdAt: ev.version.createdAt } }), cost += ev.version.costUsd ?? 0
             if (ev.type === 'error') d.change.text = `could not redraw ${e.name}: ${ev.message}`
           }
@@ -171,9 +177,13 @@ export function createServer(opts: ServerOptions = {}) {
         log(`visit failed: ${message(err)}`)
         if (cache.get(root) && !cache.removedSince(root, since)) cache.noteVisit(app, { at: new Date().toISOString(), ...(ask && { ask: ask.text }), ms: Math.round(performance.now() - t0), costUsd: null, screens: 0, changes: [], refused: [], error: message(err), seen: false })
       })
-      .finally(() => { if (visits.get(root) === p) visits.delete(root); if (stops.get(root) === stop) stops.delete(root) })
+      .finally(() => {
+        if (visits.get(root) === p) visits.delete(root)
+        if (stops.get(root) === stop) stops.delete(root)
+        if (again.delete(root)) visit(app)
+      })
     visits.set(root, p)
-    return true
+    return null
   }
 
   const filed = (app: string, ms: number) => Promise.race([filings.get(normalizePrompt(app)), Bun.sleep(ms)])
@@ -186,6 +196,7 @@ export function createServer(opts: ServerOptions = {}) {
     const root = normalizePrompt(app)
     filings.delete(root)
     visits.delete(root)
+    again.delete(root)
     stops.get(root)?.abort()
   }
 
@@ -264,9 +275,11 @@ export function createServer(opts: ServerOptions = {}) {
 
   /**
    * One new version of a picked screen or a component: an Edit with `change`, else (screens only) a
-   * Regenerate from its prompt. A screen's Edit is filed afterwards.
+   * Regenerate from its prompt. A screen's Edit is filed afterwards. `group`: a fixer's redraw, in its
+   * visit's change of the boxes.
    */
-  async function* reviseEvents(entry: CacheEntry, change: string | null, model: ModelId, device: Device, signal: AbortSignal, fixer = false): AsyncGenerator<ScreenEvent> {
+  async function* reviseEvents(entry: CacheEntry, change: string | null, model: ModelId, device: Device, signal: AbortSignal, group?: number): AsyncGenerator<ScreenEvent> {
+    const fixer = group != null
     const { key, app } = entry
     yield { type: 'meta', key, cached: false, variants: 1 }
     await filed(app, fileWaitMs)
@@ -279,9 +292,9 @@ export function createServer(opts: ServerOptions = {}) {
       for await (const ev of generateScreen({ user, model, device, signal, fetch: opts.fetch, env: opts.env })) {
         if (ev.type === 'chunk') { yield { type: 'chunk', variant: 0, text: ev.text }; continue }
         const version: Version = { ...ev.version, ...(change && { feedback: change }), ...(fixer && { by: 'fixer' as const }) }
-        const stored = cache.addVersion(key, version)
-        // A component the user changed is the user's now.
-        if (isComponent(entry)) Object.assign(entry, { by: fixer ? 'fixer' : 'user', at: version.createdAt, seen: !fixer })
+        const stored = cache.group(() => cache.addVersion(key, version), group)
+        // A component the user changed is the user's now; a fixer's redraw keeps its mark.
+        if (isComponent(entry) && !fixer) Object.assign(entry, { by: 'user', at: version.createdAt, seen: true })
         if (signal.aborted) return
         if (!stored) { yield { type: 'error', message: 'this screen was deleted while it was being changed' }; return }
         yield { type: 'version', variant: 0, version }
@@ -345,7 +358,7 @@ export function createServer(opts: ServerOptions = {}) {
           // Filing reads the pick in the background, and every 5th pick the fixer visits after it;
           // the page learns of both from /api/map?wait=1.
           const filing = file(key, { other: other ?? '(none: it failed)' })
-          return json({ entry, filing, visiting: cache.boxesOf(entry.app).picks! % VISIT_EVERY === 0 && visit(entry.app) })
+          return json({ entry, filing, visiting: cache.boxesOf(entry.app).picks! % VISIT_EVERY === 0 && !visit(entry.app) })
         }),
       },
       '/api/revise': {
@@ -374,14 +387,6 @@ export function createServer(opts: ServerOptions = {}) {
         if (url.searchParams.get('wait') === '1') await Promise.race([Promise.all([filings.get(root), visits.get(root)]), Bun.sleep(60_000)])
         return json(mapOf(app))
       },
-      '/api/visit': {
-        POST: api(async (b) => {
-          const app = appOf(b)
-          if (!cache.get(screenKey(app, null))?.versions.length) return json({ error: 'no such mockup' }, 404)
-          visit(app)
-          return json(mapOf(app))
-        }),
-      },
       '/api/box': {
         POST: api(async (b) => {
           const app = appOf(b)
@@ -390,12 +395,14 @@ export function createServer(opts: ServerOptions = {}) {
           let why: string | null = null
           if (op === 'seen' && any) cache.markSeen(app, box, Array.isArray(b?.ids) ? b.ids.map(String) : undefined)
           else if (op === 'undo') why = cache.undoChange(app, String(b?.at ?? ''), Number(b?.i))
-          // Undo of a whole box: the fixer's notes undo their newest visit.
-          else if (op === 'undo-box' && any) why = box === 'notes' ? cache.undoVisit(app) : cache.undoBox(app, box)
-          else if (op === 'edit' && any) {
+          // Undo of the fixer's notes undoes their newest visit, and sends the map with what it skipped.
+          else if (op === 'undo-box' && box === 'notes') return json({ ...mapOf(app), error: cache.undoVisit(app) ?? undefined })
+          else if (op === 'undo-box' && any) why = cache.undoBox(app, box as BoxName)
+          else if (op === 'visit' || (op === 'edit' && any)) {
             const text = typeof b?.text === 'string' ? b.text.trim() : ''
-            if (!text || text.length > 1000) return json({ error: 'text must be 1-1000 characters' }, 400)
-            if (!visit(app, { box, text })) return json({ error: 'The fixer is visiting now: try again when it is done.' }, 409)
+            if (op === 'edit' && (!text || text.length > 1000)) return json({ error: 'text must be 1-1000 characters' }, 400)
+            const busy = visit(app, op === 'edit' ? { box, text } : undefined)
+            if (busy) return json({ error: busy }, 409)
           } else if ((box === 'rules' || box === 'data') && ['add', 'set', 'delete'].includes(op)) {
             // A new entry's ID comes from its words: the rule's sentence, or the table's name.
             const id = op === 'add' ? cache.freeId(app, box, String(b?.text ?? b?.id ?? '')) : String(b?.id ?? '')

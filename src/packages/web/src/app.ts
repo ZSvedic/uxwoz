@@ -544,10 +544,11 @@ async function filed() {
 async function boxOp(o: BoxOp | { op: 'seen'; box: Box; ids: string[] }) {
   const app = state.app
   if (!app) return
-  const res = await post(o.op === 'visit' ? '/api/visit' : '/api/box', { app, ...o }).catch(() => null)
+  const res = await post('/api/box', { app, ...o }).catch(() => null)
   const body = await res?.json().catch(() => null)
-  if (!res?.ok) { showError(`Could not change the box: ${body?.error ?? 'no answer'}`); return draw() }
-  if (app === state.app) applyMap(body)
+  // The fixer's Undo sends the map with the changes it could not undo.
+  if (body?.entries && app === state.app) applyMap(body)
+  if (!res?.ok || body?.error) { showError(`Could not change the box: ${body?.error ?? 'no answer'}`); draw() }
 }
 
 /** What is new in a box since the user last looked: entries by ID, visits by when they started. */
@@ -932,7 +933,7 @@ function open(app: string) {
 
 // ---- The toolbar: project menu, Nav, zoom
 
-const MENUS: [string, string][] = [['projectButton', 'projectMenu'], ['navButton', 'navMenu'], ['zoomValue', 'zoomMenu'], ['boxesButton', 'boxesMenu']]
+const MENUS: [string, string][] = [['projectButton', 'projectMenu'], ['navButton', 'navMenu'], ['zoomValue', 'zoomMenu'], ['boxesButton', 'boxNav']]
 
 function closeMenus() {
   for (const [, m] of MENUS) $(m).hidden = true
@@ -992,27 +993,17 @@ function renderToolbar() {
   $('navName').textContent = cur ? labelOf(cur) : 'Screens'
   nav.title = cur ? labelOf(cur) : 'Every screen of this mockup'
   $('exportBoxes').hidden = !app
-  // Each box button counts entries new since the user last looked; the Boxes menu shows their sum.
+  // Each box button counts entries new since the user last looked; Boxes (a narrow window's menu of them) shows the sum.
   let sum = 0
-  for (const b of document.querySelectorAll<HTMLButtonElement>('.box-nav [data-box], #boxesMenu [data-box]')) {
+  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-box]')) {
     const n = unseen(b.dataset.box as Box).length
-    b.hidden = side.el.hidden
     b.querySelector('b')!.textContent = n ? String(n) : ''
-    if (b.closest('.box-nav')) sum += n
+    sum += n
   }
-  $('boxesButton').hidden = side.el.hidden
+  $('toolbar').classList.toggle('boxes', !side.el.hidden)
   $('boxesSum').textContent = sum ? String(sum) : ''
-  fold()
   if (!$('navMenu').hidden) renderNav()
 }
-
-/** The box buttons fold into the Boxes menu where the toolbar runs out of room for them. */
-function fold() {
-  const tb = $('toolbar')
-  tb.classList.remove('fold')
-  tb.classList.toggle('fold', tb.querySelector<HTMLElement>('.tb-right')!.offsetWidth > tb.querySelector<HTMLElement>('.tb-left')!.offsetWidth + 1)
-}
-new ResizeObserver(fold).observe($('toolbar'))
 
 /** Every screen as an indented tree, planned screens greyed (a click makes one), the current path marked. */
 function renderNav() {

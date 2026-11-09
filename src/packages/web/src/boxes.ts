@@ -55,17 +55,17 @@ function editable(e: HTMLElement, save: (text: string) => void) {
 }
 
 const HINTS: Record<Box, string> = {
-  components: 'Parts that look the same on every screen that has them. Filing takes them from the screens you pick; screens paste them by ID.',
-  rules: 'One sentence each that several screens follow. Filing adds them; click a sentence to change it.',
-  data: 'Example data that several screens show. Click a cell to change it; clear a row or a column name to remove it.',
-  notes: 'Every 5 picks the fixer reads the boxes and the new screens, and tidies up: it merges doubles, removes what no screen needs and redraws screens that break a rule. It changes what you wrote only when you ask with Edit.',
+  components: 'Parts that look the same on every screen that pastes them. Filing takes them from your picks.',
+  rules: 'One sentence each that several screens follow. Click one to change it.',
+  data: 'Example data that several screens show. Click a cell to change it.',
+  notes: 'Every 5 picks the fixer tidies the boxes and redraws screens that break a rule.',
 }
 const BOXES = Object.keys(BOX_TITLES) as Box[]
 /** Each box's own first button on its rail. */
 const OWN: Partial<Record<Box, string[]>> = {
-  rules: ['add', '+', 'Add a rule: one sentence that several screens follow'],
-  notes: ['visit', '▶', 'Visit now: the fixer tidies up the boxes and the screens'],
-  data: ['add', '+', 'Add a table of example data'],
+  rules: ['add', '+', 'Add a rule'],
+  notes: ['visit', '▶', 'Visit now'],
+  data: ['add', '+', 'Add a table'],
 }
 
 export interface Side {
@@ -81,11 +81,11 @@ export function createSide(op: (o: BoxOp) => void): Side {
   const sections = {} as Side['sections'], rails = {} as Side['rails']
   for (const name of BOXES) {
     const s = el('section', `box box-${name}`)
-    const undo = name === 'notes' ? 'Undo: undo every change of the fixer\'s newest visit' : 'Undo: put the box back as it was before its last change'
-    const rail = railOf([...OWN[name] ? [OWN[name]] : [], ['edit', '✎', `Edit: ask the fixer for a change in ${BOX_TITLES[name]}`], ['undo', '↶', undo]], (tool) => {
+    const undo = name === 'notes' ? 'Undo the newest visit' : 'Undo the last change'
+    const rail = railOf([...OWN[name] ? [OWN[name]] : [], ['edit', '✎', 'Edit: ask the fixer'], ['undo', '↶', undo]], (tool) => {
       if (tool === 'undo') return op({ op: 'undo-box', box: name })
       if (tool === 'visit') return op({ op: 'visit' })
-      const text = prompt(tool === 'edit' ? `What should change in ${BOX_TITLES[name]}?` : name === 'rules' ? 'A new rule: one sentence that several screens follow' : 'Name of the new table, e.g. nights')?.trim()
+      const text = prompt(tool === 'edit' ? `What should change in ${BOX_TITLES[name]}?` : name === 'rules' ? 'A new rule, one sentence' : 'Name of the new table, e.g. nights')?.trim()
       if (text) op(tool === 'edit' ? { op: 'edit', box: name, text } : name === 'rules' ? { op: 'add', box: 'rules', text } : { op: 'add', box: 'data', text, columns: ['name', 'value'], rows: [['', '']] })
     })
     s.append(el('h3'), el('p', 'box-hint', HINTS[name]), el('div', 'box-body'), rail.el)
@@ -111,8 +111,8 @@ export function renderSide(side: Side, v: SideView, op: (o: BoxOp) => void) {
     s.querySelector<HTMLElement>('.box-hint')!.hidden = counts[name] > 0
     // Undo shows when there is something to undo; Visit now and Edit wait while the fixer visits.
     for (const b of side.rails[name]) {
-      b.hidden = b.dataset.tool === 'undo' && !(name === 'notes' ? visits.some((x) => x.changes.some((c) => c.undo && !c.undone)) : v.undos[name])
-      b.disabled = v.visiting && b.dataset.tool !== 'undo'
+      b.hidden = b.dataset.tool === 'undo' && !(name === 'notes' ? visits.some((x) => !x.undone && x.changes.some((c) => c.undo && !c.undone)) : v.undos[name])
+      b.disabled = v.visiting && /visit|edit/.test(b.dataset.tool!)
     }
   }
   const rules = side.sections.rules.querySelector<HTMLElement>('.box-body')!
