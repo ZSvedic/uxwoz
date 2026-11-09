@@ -189,6 +189,9 @@ Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | nul
              // feedback is the Edit request that made this version, by: 'fixer' when a visit asked
 TreeNode   { level; parent: key | null; label }
              // from screenTree: level 1 is the first screen, the fewest clicks from it otherwise
+VoiceState 'off' | 'asleep' | 'awake' | 'countdown'   // web/src/voice.ts, the microphone's state
+VoiceEvent { type: 'state'; state } | { type: 'interim'; text } | { type: 'countdown'; text; secondsLeft }
+           | { type: 'send'; text } | { type: 'error'; message }   // what VoiceMachine tells the page
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast' | 'gpt-6.1-terra'
            // Terra is the background model (filing, the fixer): never a screen model, never in /api/config
 Device     'phone' (390 × 844 px) | 'desktop' (1024 × 768 px): every screen is that wide and at
