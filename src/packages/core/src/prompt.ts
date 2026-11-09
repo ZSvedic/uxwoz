@@ -1,7 +1,5 @@
-// The system prompt: the canvas manual (process/plans/2026-11-06-canvas-manual.md) verbatim, then
-// how to reply. spec/prompt-screen.md holds the same text; a test keeps the three in step.
-// These bytes are hashed into every cassette key: changing them means `bun run test:record`.
-// The user message is the paper (paperText), then one job: draw, change, or file.
+// The system prompt: the canvas manual verbatim, then how to reply (a test keeps it equal to
+// spec/prompt-screen.md). Its bytes key every cassette: a change means `bun run test:record`.
 
 import { LIMITS } from './keys.ts'
 import { DEVICES, type Device } from './frame.ts'

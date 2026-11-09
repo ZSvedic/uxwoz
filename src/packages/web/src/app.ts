@@ -1,5 +1,4 @@
-// The browser side: the generate panel, the canvas, A OR B streaming and picking, clicks, the rail's
-// tools with the Edit and Info drawer, the boxes, pickers, recent mockups, errors.
+// The browser side: generate panel, canvas, A OR B, clicks, rail tools and drawer, boxes, toolbar.
 
 import { DEVICES, LEGACY_WIDTH, REBUILD_MS, extractFragment, hasVisibleText, isDevice, markCurrent, pasteComponents, type Device } from '@uxwoz/core/frame'
 import { canonicalAction, isBack, nameWords, normalizePrompt, screenKey, screenRef } from '@uxwoz/core/keys'
@@ -339,10 +338,7 @@ async function openScreen(action: string | null, from: string | null, label: str
   }
 }
 
-/**
- * Once a screen (or an A OR B) has its final size, fit it snugly: it is often smaller than the window
- * it was fitted for. Not if the view moved since `fitted`, or an A OR B was picked meanwhile (`choice`).
- */
+/** Once a screen (or an A OR B) has its size, fit it snugly, unless the view moved since `fitted` or the A OR B was picked. */
 async function refit(key: string, fitted: number | null, choice = true) {
   await canvas.sized(key)
   const e = state.entries.get(key)
@@ -418,10 +414,7 @@ async function dropChoice(key: string) {
   await draw()
 }
 
-/**
- * Where a click leads, and its prompt if new: Back to the tree parent, Home to the first screen,
- * `@name` to that screen (the server makes it if missing). Words with no `@` lead nowhere.
- */
+/** Where a click leads: back to the tree parent, `@name` to that screen (made if missing); words with no `@` nowhere. */
 function target(app: string, from: string, prompt: string): { to: string; prompt: string } {
   if (isBack(prompt)) {
     // The screen it hangs under on the canvas; else the one whose click made it.
@@ -515,10 +508,7 @@ function applyMap(map: { entries: CacheEntry[]; boxes?: Boxes; undos?: Record<Bo
   draw()
 }
 
-/**
- * After a pick, an Edit or a fixer visit: fetch the mockup once filing is done and show the result.
- * A map that crosses a change made here (or a screen being made) is fetched again.
- */
+/** After a pick, an Edit or a visit: fetch the mockup once filing is done; a map that crosses a change made here is fetched again. */
 async function filed() {
   const app = state.app
   state.waiting = true

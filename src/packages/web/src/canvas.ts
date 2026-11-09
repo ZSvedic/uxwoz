@@ -1,7 +1,6 @@
-// The canvas: every screen on one panning, zooming surface, laid out as a tree. Each level is a row;
-// a first child sits below its parent when there is room. Each parent's lines branch at a height of
-// their own, so lines never cross. A new screen shows as A OR B; a click on a finished side picks it.
-// Names and rails keep their size on screen at any zoom. Right of the first screen: the boxes (boxes.ts).
+// The canvas: every screen on one panning, zooming surface, a tree with a row per level, a first child
+// below its parent when there is room, each parent's lines at a height of their own so they never cross.
+// Names and rails keep their size on screen. Right of the first screen: the boxes (boxes.ts).
 
 import { DEFAULT_DEVICE, DEVICES, FRAME_SANDBOX, framePage, type Device } from '@uxwoz/core/frame'
 import { button, el, railOf } from './boxes.ts'
@@ -249,11 +248,7 @@ export class Canvas {
     return { x: b.x, y: b.y - above, w: b.w + (choice ? 0 : RAIL_W / this.z), h: b.h + above }
   }
 
-  /**
-   * Zoom and scroll so a screen (or the tree) fills the stage, at most `max`. `top`: fit the width and
-   * show the top (an A OR B's heights still change). `snug`: fit the height too, but not below 60% of
-   * the width's fit, so a tall screen shows its top readably.
-   */
+  /** Zoom and scroll so a screen (or the tree) fills the stage, at most `max`. `top`: fit the width, show the top. `snug`: the height too, at least 60% of the width's fit. */
   fit(key?: string | HTMLElement, { max = 1, top = false, snug = false } = {}) {
     const st = this.stage, m = 48
     if (this.queued) this.layout() // sizes that arrived since the last frame count

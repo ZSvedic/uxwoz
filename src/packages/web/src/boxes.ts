@@ -1,6 +1,5 @@
-// The boxes right of the first screen: Rules, the fixer's notes, Components (cards the canvas puts
-// in it) and Data, each with a rail. The user edits rules and tables in place, asks the fixer for a
-// change with Edit, and undoes; each goes to the server as one request. Export writes the boxes as markdown.
+// The boxes right of the first screen, each with a rail: Rules, the fixer's notes, Components (the
+// canvas puts the cards in) and Data. Rules and tables are edited in place. Export writes markdown.
 
 import type { BoxName, Boxes, CacheEntry, Table } from '@uxwoz/core'
 import { BOX_TITLES, LIMITS } from '@uxwoz/core/keys'

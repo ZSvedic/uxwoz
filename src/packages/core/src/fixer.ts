@@ -1,6 +1,5 @@
-// The fixer's visit: the background model reads the paper and the screens new since its last visit
-// (and, for an Edit of a box, the user's request) and replies in plain lines; code applies them with
-// refusals and keeps how to undo each change. The server runs the redraws, as Edits.
+// The fixer's visit: the background model reads the paper, the screens new since its last visit and
+// any request of the user, and replies in plain lines; code applies them with refusals and an Undo each.
 
 import type { BoxName, CacheEntry, Change, Rule, ScreenCache, Table, Visit } from './cache.ts'
 import { refuseLine } from './cache.ts'
@@ -40,10 +39,7 @@ export function parseVisit(reply: string): VisitLine[] {
 /** What applying a visit leaves for the server: the redraws to run, in the same change of the boxes (see cache.group). */
 export interface Applied { changes: Change[]; refused: string[]; redraws: { key: string; sentence: string; change: Change }[]; group: number }
 
-/**
- * Apply a visit's reply to the boxes of `app`; `sent` holds the numbered HTML of each screen it read,
- * by ID. `asked`: the box of an Edit, whose entries by the user may change.
- */
+/** Apply a visit's reply; `sent`: the numbered HTML of each screen it read; `asked`: an Edit's box, whose user entries may change. */
 export function applyVisit(cache: ScreenCache, app: string, reply: string, sent: Map<string, string>, asked?: BoxName | 'notes'): Applied {
   return cache.group((group) => visitLines(cache, app, reply, sent, group, asked))
 }

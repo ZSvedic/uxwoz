@@ -62,11 +62,7 @@ async function* tagged(slot: number, events: AsyncIterable<GenerateEvent>): Asyn
   }
 }
 
-/**
- * Every POST costs money or changes the shared cache, so it must come from this app's own page:
- * JSON only (a cross-site form or no-cors fetch cannot send it without a preflight we never answer),
- * and no cross-site Origin.
- */
+/** Every POST costs money or changes the cache, so only this app's page may send it: JSON only (no preflight is answered), no cross-site Origin. */
 function refuseForeign(req: Request): Response | null {
   if (!req.headers.get('content-type')?.startsWith('application/json')) return fail('send application/json', 415)
   const origin = req.headers.get('origin')
@@ -144,10 +140,8 @@ export function createServer(opts: ServerOptions = {}) {
   const visits = new Map<string, Promise<unknown>>(), stops = new Map<string, AbortController>(), again = new Set<string>()
 
   /**
-   * A visit of the fixer in the mockup's chain, dropped when the mockup goes meanwhile; `ask` makes it
-   * an Edit of a box. Its redraws are Edits that file nothing, skipped for a screen changed since the
-   * visit began. A visit asked for while one runs comes after it; an Edit is refused then. Returns
-   * why not, or null.
+   * A visit of the fixer in the mockup's chain (`ask`: an Edit of a box); its redraws are Edits that file
+   * nothing. One asked for while one runs comes after it; an Edit is refused then. Why not, or null.
    */
   function visit(app: string, ask?: VisitOptions['ask']): string | null {
     const root = normalizePrompt(app)
@@ -227,8 +221,7 @@ export function createServer(opts: ServerOptions = {}) {
       yield { type: 'error', message: 'the screen clicked in is gone' }
       return
     }
-    // A design that finishes after its screen, the screen clicked in, or its mockup was deleted
-    // (Delete, Start over, dropping the A OR B) is not kept: it would bring them back.
+    // A design that finishes after its screen, the screen clicked in or its mockup was deleted is not kept.
     const since = cache.now()
     const gone = () => cache.removedSince(key, since) || cache.removedSince(root, since) || (!!click && cache.removedSince(click.from, since))
     // A screen opened by name alone is made from the planned screen's prompt, else from the words clicked.
@@ -275,11 +268,7 @@ export function createServer(opts: ServerOptions = {}) {
     else yield { type: 'done', entry }
   }
 
-  /**
-   * One new version of a picked screen or a component: an Edit with `change`, else (screens only) a
-   * Regenerate from its prompt. A screen's Edit is filed afterwards. `group`: a fixer's redraw, in its
-   * visit's change of the boxes.
-   */
+  /** A new version: an Edit with `change` (a screen's is filed), else a Regenerate. `group`: a fixer's redraw, in its visit's change. */
   async function* reviseEvents(entry: CacheEntry, change: string | null, model: ModelId, device: Device, signal: AbortSignal, group?: number): AsyncGenerator<ScreenEvent> {
     const fixer = group != null
     const { key, app } = entry

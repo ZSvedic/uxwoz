@@ -1,10 +1,6 @@
-// Turns the model's HTML fragment into the srcdoc page for the sandboxed iframe.
-// Runs in the browser as well as on the server, so it uses no Node or Bun APIs.
+// The model's HTML fragment as the srcdoc page of a sandboxed iframe. Runs in the browser too: no Node or Bun APIs.
 
-/**
- * Remove a markdown fence (and prose around a fenced block) if the model added one.
- * The code itself is never changed, so failures stay the model's.
- */
+/** Remove a markdown fence (and prose around it) if the model added one; the code itself is never changed. */
 export function extractFragment(raw: string): string {
   const block = raw.match(/(?:^|\n)[ \t]*```[^\n`]*\n([\s\S]*?)(?:\n[ \t]*```|$)/)
   if (block) return block[1]!
@@ -47,9 +43,8 @@ export const DEFAULT_DEVICE: Device = 'phone'
 export const LEGACY_WIDTH = 800
 export const isDevice = (v: unknown): v is Device => typeof v === 'string' && Object.hasOwn(DEVICES, v)
 
-// Our script, added before the model's markup. It turns clicks on data-action controls
-// into postMessage calls to the app, and keeps the frame from navigating away. While the screen is
-// still streaming (`final` false), controls do nothing: their handlers are not ready yet.
+// Our script, before the model's markup: clicks on data-action controls become messages to the app,
+// and the frame never navigates. While the screen streams (`final` false), controls do nothing.
 const bootstrap = (final: boolean, vh: number) => `(() => {
   const final = ${final}
   // Only a real click may open a screen, so a screen's script cannot start paid generations by itself.
@@ -124,11 +119,9 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
   }, { passive: false })
 })()`
 
-// Controls that open another screen are blue, in every theme; everything else keeps a neutral ink,
-// so Pico's own blue (links, buttons) cannot be mistaken for them. Blue links lose their underline
-// until hovered: Pico drops it inside <nav> and the mockup theme makes it wavy elsewhere, so the
-// same tab bar looked different depending on the markup the model chose. A form with an action prompt
-// opens a screen on submit, so its submit button is blue, not the whole form.
+// Controls that open another screen are blue in every theme, the rest a neutral ink, so Pico's own
+// blue cannot be mistaken for them. Blue links show their underline only on hover, so a tab bar looks
+// the same whatever markup the model chose. A form with an action prompt has a blue submit button.
 const GO = `[data-action]:not(form), form[data-action] :is(button:not([type="button"]), [type="submit"])`
 const NAV_CSS = `main { --pico-primary: #373c44; --pico-primary-background: #525f7a; --pico-primary-border: #525f7a;
   --pico-primary-underline: rgba(55, 60, 68, .5); --pico-primary-hover: #1f2329; --pico-primary-hover-background: #48536b;
@@ -149,10 +142,7 @@ body > main { width: 100%; margin: 0; padding: 20px 24px; box-sizing: border-box
   --pico-block-spacing-vertical: .75rem; --pico-block-spacing-horizontal: 1rem;
   --pico-form-element-spacing-vertical: .5rem; --pico-form-element-spacing-horizontal: .75rem; }`
 
-/**
- * The full page for the iframe's srcdoc: theme CSS inlined, our bootstrap, the fragment in <main>,
- * at least one screen of `device` tall (unless `fit`: a component is as tall as its content).
- */
+/** The iframe's srcdoc: theme CSS inlined, our script, the fragment in <main>, one `device` screen tall unless `fit`. */
 export function framePage(fragment: string, css: string, final: boolean, device?: Device, fit = false): string {
   const h = device && !fit ? DEVICES[device].height : 0
   const style = css.replace(/<\/style/gi, '<\\/style')
@@ -174,10 +164,7 @@ export const REBUILD_MS = 300
 export const OPEN_TAG = /<([a-z][\w-]*)((?:\s+[^\s=>"'/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>"']+))?)*)\s*(\/?)>/gi
 export const VOID = new Set(['input', 'img', 'br', 'hr', 'area', 'col', 'embed', 'source', 'wbr', 'meta', 'link'])
 
-/**
- * Where the element whose opening tag starts at `start` ends: after its closing tag, counting
- * nested elements of the same name and skipping scripts. -1 when it has no end (yet).
- */
+/** Where the element whose opening tag starts at `start` ends, nested ones counted, scripts skipped; -1 when it has no end yet. */
 export function elementEnd(html: string, start: number): number {
   // A sticky copy: OPEN_TAG's own lastIndex must stay 0, as matchAll starts from it.
   const at = new RegExp(OPEN_TAG.source, 'iy')
@@ -197,11 +184,7 @@ export function elementEnd(html: string, start: number): number {
   return -1
 }
 
-/**
- * Each element with `data-component="ID"`, contents and all, becomes that component's HTML, and so
- * on inside it, three levels deep. An element whose ID is not in the box stays as it is, so an
- * empty placeholder of a deleted component shows nothing.
- */
+/** Each element with `data-component="ID"` becomes that component's HTML, three levels deep; an unknown ID stays as it is. */
 export function pasteComponents(html: string, components: Record<string, string>, depth = 3): string {
   let out = '', at = 0
   for (const m of html.matchAll(OPEN_TAG)) {

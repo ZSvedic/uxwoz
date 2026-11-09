@@ -1,6 +1,5 @@
-// The tree of a mockup, worked out and never stored: a level is the fewest clicks from the first
-// screen, through each screen's links and the click that made it. A name linked to before any
-// screen has it is a planned screen. Runs in the browser too: no Node or Bun APIs.
+// The tree of a mockup, worked out, never stored: a level is the fewest clicks from the first screen.
+// A name linked to before a screen has it is a planned screen. Runs in the browser too.
 
 import type { CacheEntry } from './cache.ts'
 import { OPEN_TAG, VOID, decode, pasteComponents } from './frame.ts'
@@ -32,11 +31,7 @@ export const shownHtml = (e: CacheEntry, components: Record<string, string>) => 
   return v ? pasteComponents(v.html, components) : ''
 }
 
-/**
- * The controls in a screen that open another screen: each one's action prompt and its words (its
- * aria-label, its value, or its text up to its closing tag). Every opening tag with data-action
- * counts, nested ones too; one written by a script is not in the markup, and is not found.
- */
+/** The controls with data-action in a screen's markup: each one's action and its words (aria-label, value, or text). */
 export function linksIn(html: string): { action: string; label: string }[] {
   const out: { action: string; label: string }[] = []
   for (const m of html.matchAll(OPEN_TAG)) {
@@ -79,11 +74,7 @@ export function promptFromLabel(name: string, label: string): string {
   return label && normalizePrompt(label) !== words ? `The ${words} screen, opened by "${label}"` : `The ${words} screen`
 }
 
-/**
- * The planned screens of one mockup: names the picked screens link to that no screen has yet. Each
- * one is an entry with no versions; the first link that names it (oldest screen first) gives its
- * prompt and the screen it hangs under.
- */
+/** The planned screens: names linked to that no screen has, as entries with no versions; the first link gives prompt and parent. */
 export function plannedScreens(all: CacheEntry[]): CacheEntry[] {
   const entries = all.filter((e) => !isComponent(e)), components = componentsOf(all)
   const first = entries[0]
@@ -162,11 +153,7 @@ function build(all: CacheEntry[]): { tree: Map<string, TreeNode>; entries: Cache
 /** The first screen's one line, as the paper lists it. */
 export const HOME_LINE = 'the first screen'
 
-/**
- * The screens as the paper lists them: titles (`id: one line`, the first screen first, then the
- * tree's order; screens with no drawing yet marked) and lines (`id -> id`, a control on the first
- * screen opens the second). Screens the first screen does not reach are left out.
- */
+/** The paper's titles (`id: one line`, in tree order) and lines (`id -> id`); screens the first does not reach are left out. */
 export function screenList(all: CacheEntry[]): { titles: string[]; lines: string[] } {
   const { tree, entries, links } = build(all)
   const titles: string[] = []

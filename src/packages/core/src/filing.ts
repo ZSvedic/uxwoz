@@ -1,6 +1,5 @@
-// Filing: after a pick or an Edit, the background model reads the paper and the decision and replies
-// in plain lines; code applies them to the boxes and refuses, with a reason, any line that breaks
-// the manual's limits. A new component takes the part's HTML, and the screen pastes it there.
+// Filing: after a pick or an Edit, the background model files the decision in plain lines; code
+// applies them to the boxes, refusing with a reason what breaks the manual's limits.
 
 import { refuseLine, type Filing, type ScreenCache, type Version } from './cache.ts'
 import { LIMITS, normalizePrompt } from './keys.ts'
@@ -65,10 +64,7 @@ const cells = (text: string) => text.split('|').map((c) => c.trim())
 /** A rule or a table read from filing's forms, to store. */
 export interface BoxLine { box: 'rules' | 'data'; change: boolean; entry: { id: string; text?: string; columns?: string[]; rows?: string[][] }; line: string }
 
-/**
- * Read filing's rule, table and row lines in order: a rule goes to `set` at once, a table once its
- * rows have come (`flush` after the last line). `set` stores one and says why not, or null.
- */
+/** Read rule, table and row lines in order: a rule goes to `set` at once, a table once its rows have come (`flush` at the end). */
 export function boxLines(cache: ScreenCache, app: string, set: (l: BoxLine) => string | null, refuse: (line: string, why: string) => void) {
   let table: { id: string; columns: string[]; rows: string[][]; lines: string[]; change: boolean; line: string } | null = null
   const flush = () => {
@@ -93,10 +89,7 @@ export function boxLines(cache: ScreenCache, app: string, set: (l: BoxLine) => s
   return { read, flush }
 }
 
-/**
- * Apply a filing reply to the boxes of `app`. `filedHtml` is the screen's HTML as it was filed; the
- * screen pastes each new component in its part's place only while that HTML is still its newest.
- */
+/** Apply a filing reply; the screen pastes each new component in its part's place only while `filedHtml` is still its newest. */
 export function applyFiling(cache: ScreenCache, app: string, key: string, filedHtml: string, reply: string, made: Omit<Version, 'html'>): Filed {
   return cache.group(() => fileLines(cache, app, key, filedHtml, reply, made))
 }

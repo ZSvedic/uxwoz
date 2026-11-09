@@ -1,6 +1,5 @@
-// The screen cache: each screen under its name, its open A OR B until a pick, then its versions,
-// and the click that first made it (the tree is worked out in tree.ts). Each mockup also has its
-// boxes (components are entries of their own kind), the last states of each box and the fixer's notes.
+// The screen cache: each screen, its open A OR B until a pick, then its versions, and the click that
+// made it. Each mockup has its boxes (components are entries), their last states and the fixer's notes.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
