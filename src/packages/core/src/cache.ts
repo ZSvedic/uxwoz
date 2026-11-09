@@ -17,17 +17,16 @@ export interface Version {
   createdAt: string
   costUsd: number | null
   costEstimated: boolean
-  /** Milliseconds from request to first text chunk, and to the end of the stream. */
+  /** Milliseconds to the first text chunk, and to the end. */
   firstChunkMs: number | null
   totalMs: number
   finishReason: string | null
-  /** The device the screen was designed for; absent on screens made before devices existed. */
+  /** Absent on screens made before devices. */
   device?: Device
-  /** A short name the model gave the screen, e.g. "Planning sync". */
+  /** The model's short name for the screen, and its design idea in one sentence. */
   name?: string
-  /** One sentence naming the design idea, e.g. "Common actions as buttons on top". */
   idea?: string
-  /** The Edit request that made this version; `by` is 'fixer' when a visit of the fixer asked for it. */
+  /** The Edit request that made this version; `by` is 'fixer' when a visit asked for it. */
   feedback?: string
   by?: 'fixer'
 }
@@ -39,24 +38,23 @@ export interface CacheEntry {
   key: string
   app: string
   action: string | null
-  /** The name links use (`@sleep-report`): the one in the link that opened it, `home` for the first screen. */
+  /** The name links use (`@sleep-report`); `home` for the first screen. */
   name?: string
-  /** The screen and click that first made it; null for the first screen (and screens made without a click). */
+  /** Null for the first screen (and screens made without a click). */
   parent: Parent | null
   /** Oldest first; the last one shows. Empty while the A OR B is open. */
   versions: Version[]
-  /** The open A OR B, by side; a side is null until it finishes (or if it failed). Gone after a pick. */
+  /** The open A OR B, by side; null until a side finishes (or if it failed). */
   proposals?: (Version | null)[]
   /** A component: its ID is `name`, where it belongs is `action`, parent is the screen it came from. */
   kind?: 'component'
-  /** A screen's last filing. */
   filed?: Filing
   by?: Mark['by']
   at?: string
   seen?: boolean
 }
 
-/** Who last wrote a box entry and when, and whether the user has looked at its box since. */
+/** Who last wrote a box entry and when, and whether the user has looked at it since. */
 export interface Mark { by: 'filing' | 'fixer' | 'user'; at: string; seen: boolean }
 export interface Rule extends Mark { id: string; text: string }
 export interface Table extends Mark { id: string; columns: string[]; rows: string[][] }
@@ -66,23 +64,22 @@ export interface Boxes {
   rules: Rule[]
   data: Table[]
   gone: Record<BoxName, string[]>
-  /** The fixer's notes, oldest first (the last 20), and the number of picks so far (a visit comes every 5). */
+  /** The fixer's notes, oldest first (the last 20), and the picks so far. */
   visits?: Visit[]
   picks?: number
 }
 
 /** A filing: when, on which screen, what it added, changed and refused, its time and cost. */
 export interface Filing { at: string; screen: string; ms: number; costUsd: number | null; added: string[]; changed: string[]; refused: string[]; error?: string }
-/** A box as it was before a change: its entries and the IDs it had used. */
+/** A box as it was before a change: its entries and the IDs it had used. It keeps the last BOX_STATES. */
 export interface BoxState { list: (Rule | Table | CacheEntry)[]; gone: string[] }
-/** How many states each box keeps for its Undo. */
 export const BOX_STATES = 10
 
 /** How to undo one change of the fixer: put an entry back (`over` the one it changed), drop an entry it added, or drop a version it drew. */
 export type Undo = { put: BoxName; entry: Rule | Table | CacheEntry; index: number; over?: true } | { drop: BoxName; id: string } | { key: string; createdAt: string }
 /** One change of a visit, in words (`merged a into b`), with the fixer's note on why. */
 export interface Change { text: string; note?: string; undo?: Undo; undone?: boolean }
-/** One visit of the fixer: when it started, what the user asked (an Edit of a box), how many screens it read, what it changed and refused, its time and cost. */
+/** One visit of the fixer; `ask`: the user's request, for an Edit of a box. */
 export interface Visit { at: string; ask?: string; undone?: boolean; ms: number; costUsd: number | null; screens: number; changes: Change[]; refused: string[]; error?: string; seen: boolean }
 
 const BOXES: BoxName[] = ['components', 'rules', 'data']
@@ -92,8 +89,7 @@ const componentKey = (app: string, id: string) => `${normalizePrompt(app)} » #$
 
 export const PROPOSALS = 2
 
-// Format 5 adds the boxes, and later their states. Files of format 3 and 4 load with empty boxes; the spec feature's fields
-// stay in the file, unread.
+// Format 5 adds the boxes (and later their states). Files of format 3 and 4 load with empty boxes.
 const FORMAT = 5
 
 export class ScreenCache {
@@ -106,7 +102,7 @@ export class ScreenCache {
   /** When each key was last deleted, on a counter, so a design still streaming cannot bring it back. */
   private removed = new Map<string, number>()
   private clock = 0
-  /** Why the cache does not write its file, when it does not: the file is from a newer version of the app. */
+  /** Why the cache does not write its file: it is from a newer app. */
   readonly warning: string | null = null
 
   constructor(private file: string | null = null) {
@@ -114,7 +110,6 @@ export class ScreenCache {
     try {
       const data = JSON.parse(readFileSync(file, 'utf8'))
       if (typeof data?.version === 'number' && data.version > FORMAT) {
-        // A newer app wrote it: leave it alone, and keep this session's screens in memory only.
         this.warning = `The screen cache ${file} is from a newer version of UX Woz (format ${data.version}); it is left as it is, and nothing made now is saved.`
         console.warn(this.warning)
         this.file = null
@@ -137,10 +132,10 @@ export class ScreenCache {
     return this.entries.get(key)
   }
 
-  /** The screen an action opens, if the mockup has it: the first screen, or the screen with the name in `@name`. */
+  /** The screen an action opens, if the mockup has it: the first screen, or the one named by `@name`. */
   find(app: string, action: string | null): CacheEntry | undefined {
     const ref = canonicalAction(action) && screenRef(action!)
-    return ref ? this.mockup(normalizePrompt(app)).find((e) => e.name === ref.name && !isComponent(e)) : this.entries.get(normalizePrompt(app))
+    return ref ? this.mockup(app).find((e) => e.name === ref.name && !isComponent(e)) : this.entries.get(normalizePrompt(app))
   }
 
   now(): number {
@@ -156,10 +151,7 @@ export class ScreenCache {
     this.removed.set(key, ++this.clock)
   }
 
-  /**
-   * Store one finished side of a new screen's A OR B; the first side makes the screen, named by its
-   * `@name: prompt`. Undefined when a side was already picked.
-   */
+  /** Store one finished side of a new screen's A OR B; the first side makes the screen. Undefined once picked. */
   propose(app: string, action: string | null, side: number, version: Version, parent: Parent | null = null): CacheEntry | undefined {
     action = canonicalAction(action)
     let entry = this.find(app, action)
@@ -220,10 +212,7 @@ export class ScreenCache {
     this.save()
   }
 
-  /**
-   * Run `fn` as one change (`change`, to go on with one): each box it changes keeps one state for
-   * its Undo. A box changed outside a group keeps a state at each change.
-   */
+  /** Run `fn` as one change (or go on with `change`): each box it changes keeps one state for its Undo. */
   group<T>(fn: (change: number) => T, change?: number): T {
     const outer = this.change
     this.change = change ?? outer ?? ++this.clock
@@ -246,10 +235,7 @@ export class ScreenCache {
     return Object.fromEntries(BOXES.map((b) => [b, s?.[b]?.length ?? 0])) as Record<BoxName, number>
   }
 
-  /**
-   * Put a box back as it was before its last change, whoever made it. A component it drops leaves its
-   * HTML in the screens that paste it; no ID it drops is used again. Returns why not, or null.
-   */
+  /** Put a box back as it was before its last change; a component it drops leaves its HTML in place, its ID stays used. Why not, or null. */
   undoBox(app: string, box: BoxName): string | null {
     const st = this.states.get(normalizePrompt(app))?.[box]?.pop()
     if (!st) return 'nothing to undo'
@@ -265,10 +251,7 @@ export class ScreenCache {
     return null
   }
 
-  /**
-   * Undo every change of the newest visit not undone yet; a change that cannot be undone is skipped
-   * (its own Undo stays), so the next Undo goes to the visit before. Returns the first why not, or null.
-   */
+  /** Undo every change of the newest visit not undone yet, skipping (and naming) what cannot be; the next goes to the visit before. */
   undoVisit(app: string): string | null {
     const v = this.boxesOf(app).visits?.findLast((x) => !x.undone && x.changes.some((c) => c.undo && !c.undone))
     if (!v) return 'nothing to undo'
@@ -316,7 +299,7 @@ export class ScreenCache {
     return null
   }
 
-  /** Remove a component and leave its HTML in each entry that pastes it, so they look the same. Returns why not, or null. */
+  /** Remove a component, leaving its HTML where it was pasted. Returns why not, or null. */
   removeComponent(app: string, id: string): string | null {
     const c = this.component(app, id)
     if (!c) return `components has no ${id}`
@@ -325,10 +308,10 @@ export class ScreenCache {
     return null
   }
 
-  /** Each screen that pastes component `c` gets its HTML in place, so it looks the same without it. */
+  /** Each screen that pastes component `c` gets its HTML in its place. */
   private inline(app: string, c: CacheEntry) {
     const html = c.versions.at(-1)?.html
-    for (const e of this.mockup(normalizePrompt(app))) { const v = e.versions.at(-1); if (v && html != null) v.html = pasteComponents(v.html, { [c.name!]: html }, 1) }
+    for (const e of this.mockup(app)) { const v = e.versions.at(-1); if (v && html != null) v.html = pasteComponents(v.html, { [c.name!]: html }, 1) }
   }
 
   undo(key: string): CacheEntry | undefined {
@@ -342,7 +325,7 @@ export class ScreenCache {
 
   /** The paper every model call reads: the screens' titles and lines, and the three boxes in full. */
   paper(app: string, device?: Device): Paper {
-    const all = this.mockup(normalizePrompt(app)), b = this.boxesOf(app)
+    const all = this.mockup(app), b = this.boxesOf(app)
     const screens = all.filter((e) => !isComponent(e) && e.versions.length)
     const components = all.filter((e) => isComponent(e) && e.versions.length).map((e) => ({ id: e.name!, where: e.action ?? '', html: e.versions.at(-1)!.html, by: e.by,
       on: screens.filter((s) => s.versions.at(-1)!.html.includes(`data-component="${e.name}"`)).map((s) => s.name ?? HOME_NAME) }))
@@ -369,7 +352,7 @@ export class ScreenCache {
 
   /** A box's entries, oldest first. */
   private list(app: string, box: BoxName): (Rule | Table | CacheEntry)[] {
-    return box === 'components' ? this.mockup(normalizePrompt(app)).filter(isComponent) : this.boxesOf(app)[box]
+    return box === 'components' ? this.mockup(app).filter(isComponent) : this.boxesOf(app)[box]
   }
 
   private ids(app: string, box: BoxName): string[] {
@@ -423,9 +406,9 @@ export class ScreenCache {
     return null
   }
 
-  /** The user looked at a box: its entries (those with `ids`, when given; a visit's ID is when it started) are no longer marked new. */
+  /** The user looked at a box: its entries (or those with `ids`; a visit's is `at`) are no longer new. */
   markSeen(app: string, box: BoxName | 'notes', ids?: string[]) {
-    const list: { seen?: boolean; id?: string; name?: string; at?: string }[] = box === 'components' ? this.mockup(normalizePrompt(app)).filter(isComponent) : box === 'notes' ? this.own(app).visits ?? [] : this.own(app)[box]
+    const list = (box === 'notes' ? this.own(app).visits ?? [] : this.list(app, box)) as { seen?: boolean; id?: string; name?: string; at?: string }[]
     for (const x of list) if (!ids || ids.includes(x.id ?? x.name ?? x.at ?? '')) x.seen = true
     this.save()
   }
@@ -443,7 +426,7 @@ export class ScreenCache {
     return [...byRoot.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   }
 
-  /** Delete a screen and every screen the first screen no longer reaches without it; the first screen takes the mockup. The keys removed. */
+  /** Delete a screen and the screens only it reaches (the first screen takes the mockup); the keys removed. */
   delete(key: string): string[] | undefined {
     const entry = this.entries.get(key)
     // Even an unknown key is marked: an A OR B dropped before its first side finished stays dropped.
@@ -494,7 +477,8 @@ export class ScreenCache {
   }
 
   /** One mockup's screens, oldest first: the order the tree uses for children. */
-  private mockup(root: string): CacheEntry[] {
+  private mockup(app: string): CacheEntry[] {
+    const root = normalizePrompt(app)
     return [...this.entries.values()].filter((e) => normalizePrompt(e.app) === root)
   }
 
