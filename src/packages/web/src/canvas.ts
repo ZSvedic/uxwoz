@@ -89,29 +89,31 @@ interface CanvasHandlers {
 export interface Box { x: number; y: number; w: number; h: number }
 export interface View { z: number; left: number; top: number }
 
-interface Card {
-  /** Name, screen and rail. Positioned, never moved in the DOM (that reloads the frame). */
-  el: HTMLElement
-  name: HTMLElement
-  idea: HTMLElement
-  /** Unfolds an idea longer than two lines. */
-  more: HTMLButtonElement
-  note: HTMLElement
-  screen: HTMLElement
-  frame: HTMLIFrameElement
-  /** Over a side's frame: takes the click that picks it. */
-  shield: HTMLElement
-  error: HTMLElement
-  rail: HTMLElement
-  tools: HTMLButtonElement[]
-  key: string
-  view: CardView | null
-  width: number
-  height: number
-  shown: { html: string; final: boolean; css: string } | null
-  /** The final screen has reported its size since it was shown. */
-  sized: boolean
+/**
+ * A card: name, screen and rail, positioned and never moved in the DOM (that reloads the frame). `more`
+ * unfolds a long idea; `shield` lies over a side's frame and takes the click that picks it; `sized`:
+ * the final screen has reported its size since it was shown.
+ */
+function newCard(key: string, on: CanvasHandlers) {
+  const name = el('b', 'name'), idea = el('span', 'idea'), note = el('span', 'note'), error = el('div', 'error-box')
+  const more = button('more', '', () => { more.textContent = head.classList.toggle('open') ? 'less' : 'more' }, 'more')
+  more.hidden = true
+  const head = el('div', 'head', name, el('div', 'idea-row', idea, more), note)
+  const frame = el('iframe')
+  frame.setAttribute('sandbox', FRAME_SANDBOX)
+  frame.title = 'Generated screen'
+  frame.style.height = `${START_H}px`
+  const shield = el('div', 'shield', el('span', 'pick-hint', 'Pick this design'))
+  const screen = el('div', 'screen', frame, shield)
+  const { el: rail, tools } = railOf(RAIL, (tool) => on.tool(c.key, tool))
+  const c = {
+    el: el('article', 'card', head, screen, error, rail), name, idea, more, note, screen, frame, shield, error, rail, tools, key,
+    view: null as CardView | null, width: 0, height: START_H, shown: null as { html: string; final: boolean; css: string } | null, sized: false,
+  }
+  shield.addEventListener('click', () => { if (c.view?.side?.pickable) on.pick(c.key, c.view.side.index) })
+  return c
 }
+type Card = ReturnType<typeof newCard>
 
 const RAIL: [string, string, string][] = [
   ['edit', '✎', 'Edit: say what should change in this screen'],
@@ -512,27 +514,8 @@ export class Canvas {
   }
 
   private card(id: string, key: string, parent: HTMLElement): Card {
-    const have = this.cards.get(id)
-    if (have) return have
-    const name = el('b', 'name'), idea = el('span', 'idea'), note = el('span', 'note'), error = el('div', 'error-box')
-    const more = button('more', '', () => { more.textContent = head.classList.toggle('open') ? 'less' : 'more' }, 'more')
-    more.hidden = true
-    const head = el('div', 'head', name, el('div', 'idea-row', idea, more), note)
-    const frame = el('iframe')
-    frame.setAttribute('sandbox', FRAME_SANDBOX)
-    frame.title = 'Generated screen'
-    frame.style.height = `${START_H}px`
-    const shield = el('div', 'shield', el('span', 'pick-hint', 'Pick this design'))
-    const screen = el('div', 'screen', frame, shield)
-    const { el: rail, tools } = railOf(RAIL, (tool) => this.on.tool(c.key, tool))
-    const root = el('article', 'card', head, screen, error, rail)
-    const c: Card = {
-      el: root, name, idea, more, note, screen, frame, shield, error, rail, tools, key, view: null,
-      width: 0, height: START_H, shown: null, sized: false,
-    }
-    shield.addEventListener('click', () => { if (c.view?.side?.pickable) this.on.pick(c.key, c.view.side.index) })
-    parent.append(root)
-    this.cards.set(id, c)
+    const c = this.cards.get(id) ?? newCard(key, this.on)
+    if (!this.cards.has(id)) { parent.append(c.el); this.cards.set(id, c) }
     return c
   }
 
