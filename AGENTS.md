@@ -55,9 +55,14 @@ src/packages/web/src/
                  /api/map (wait=1 for filing and a visit), /api/apps, /api/delete, /api/delete-app,
                  /api/box (also undo, a box's Undo and Edit, Visit now), /api/warmup, themes; filing and visits in one chain per mockup, a click
                  waits for it; a visit every 5 picks, its redraws as Edits
-  app.ts         browser: generate panel, A OR B streaming, refit and pick, clicks (@names, back), rail tools, drawer
-                 (Edit, Info) for a screen or a box, the boxes' data and filing's result, toolbar menus (Theme too) and
-                 box buttons, ← → trail, errors
+  app.ts         browser entry: builds the canvas and the boxes, opens, closes and deletes a mockup, init
+  state.ts       browser: the shared state, local storage, elements by id, Enter sends a form
+  screens.ts     browser: views and draw, A OR B streaming, refit and pick, clicks (@names, back), Regenerate, Edit,
+                 Undo, delete
+  nav.ts         browser: the current screen, ← → trail, the map after filing, Nav
+  drawer.ts      browser: box changes and rail tools, the drawer (Edit, Info) for a screen or a box
+  toolbar.ts     browser: generate panel and pickers, toolbar menus (Theme too), Recent, zoom and its keys
+  net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill and the hint
   canvas.ts      browser: the boxes right of Home, the tree layout (packed rows, line lanes), cards and frames, A OR B sides,
                  rails at the canvas's scale, pan and zoom, fits
   boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes and their rails, editing and adding in

@@ -29,8 +29,9 @@ GET /api/map?app=A%20coffee%20shop%20ordering%20app&wait=1      (answers once fi
 - `@uxwoz/core` (`src/packages/core`): models, prompt, provider streaming, screen cache with the
   boxes, filing, the fixer, cache keys, frame page (with paste by ID and the current link) and devices. `frame.ts`, `keys.ts` and `tree.ts` run in the browser too, so they use
   no Node or Bun APIs.
-- `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`,
-  `canvas.ts`, `boxes.ts`, `shell.css`, bundled by Bun's HTML import), and the themes in `themes/`.
+- `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`
+  as the entry, `state.ts`, `screens.ts`, `nav.ts`, `drawer.ts`, `toolbar.ts`, `net.ts`, `canvas.ts`,
+  `boxes.ts`, `shell.css`, bundled by Bun's HTML import), and the themes in `themes/`.
 
 There are no runtime dependencies; `@types/bun` and `typescript` are dev-only.
 
