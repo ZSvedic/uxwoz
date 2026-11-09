@@ -232,3 +232,10 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .data-table table { border-collapse: collapse; width: 100%; font-size: 13px; }
 .data-table th, .data-table td { border: 1px solid var(--line); padding: 3px 6px; text-align: left; height: 1.6em; }
 .data-table th { color: var(--muted); font-weight: 600; }
+
+/* Voice: the microphone in the toolbar, a pulsing dot while it listens, "Sending in 3…" under the Edit field. */
+.toolbar .voice { position: relative; }
+.toolbar .voice:not(.voice-off) { color: var(--accent); }
+.voice:is(.voice-awake, .voice-countdown)::after { content: ''; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: voice-pulse 1s ease-in-out infinite alternate; }
+@keyframes voice-pulse { to { opacity: .25; } }
+.voice-count { display: flex; gap: 8px; align-items: center; color: var(--muted); }

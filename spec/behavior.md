@@ -214,6 +214,38 @@ it. It has two tabs:
 
 Choosing another screen or box while the drawer is open shows that one in it.
 
+## Voice
+
+The user can say an Edit instead of typing it. A microphone button sits last in the toolbar; a click
+turns it on or off. The browser asks for the microphone the first time. In a browser that cannot
+turn speech into text, the button is not there. Its tooltip says that in Chrome the audio goes to
+Google to be turned into text. It hears English, the language Edits are written in.
+
+1. **On** (the icon in orange): it listens for **"hey Woz"** at the start of what the user says
+   (also heard as *hey was* or *hey waz*). The phrase in the middle of a sentence does nothing, so
+   talk about something else does not start an Edit.
+2. **Listening** (a pulsing dot): the words show live in the drawer's Edit field of the current
+   screen or box, and the drawer opens on Edit; the focus stays where it was. Words said right
+   after "hey Woz" count too, and show while they are said: *"Hey Woz, use switches"*. Text the
+   user typed in the field stays, in front of the spoken words, and voice does not write while the
+   user is typing there.
+3. **Sending in 3…**: a pause starts a three-second countdown under the field, with **Cancel**.
+   Speaking again holds it, and the new words join the old ones, so a breath does not split one
+   request in two. If the browser settles no words within 1.5 seconds, or stops listening, the
+   countdown starts again with what was said.
+4. At zero the Edit runs, exactly as Enter in the field would. Then it waits for "hey Woz" again.
+   With no screen or box current, the hint says *Click a screen first.* and the words stay in the
+   field.
+
+**Cancel** (the button, or saying **"cancel"** or **"never mind"**) works while it listens or counts
+down: it drops the words and keeps listening. **"Woz sleep"**, **"Woz stop"** or **"stop
+listening"** drops them and waits for "hey Woz" again. These phrases count only when said on their
+own: *"add a button that says stop listening"* is an Edit.
+
+The browser stops listening by itself after a silence; UX Woz starts it again at once. After five
+failures in a row (another tab taking the microphone counts) the red pill says *Voice input stopped. Click the microphone to start again.*
+If the browser blocks the microphone, it says *The browser blocked the microphone.* and turns off.
+
 ## Boxes
 
 Right of the first screen and its rail, in its row, four labelled boxes stand side by side, at the

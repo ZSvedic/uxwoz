@@ -8,6 +8,7 @@ import { closeDrawer, unseen } from './drawer.ts'
 import { post, showError, themeCss } from './net.ts'
 import { currentAt, renderNav, trailStep, walkTrail } from './nav.ts'
 import { draw, labelOf } from './screens.ts'
+import { initVoice } from './voice-ui.ts'
 import { $, deviceSelect, enterSubmits, generate, modelSelect, promptInput, state, store } from './state.ts'
 
 // ---- Wiring
@@ -186,6 +187,9 @@ export function renderToolbar() {
 }
 
 for (const b of document.querySelectorAll<HTMLButtonElement>('[data-zoom]')) b.addEventListener('click', () => { closeMenus(); zoomTo(b.dataset.zoom!) })
+
+// The microphone, last in the toolbar (voice-ui.ts).
+initVoice($('toolbar').querySelector('.tb-right')!.appendChild(el('button')))
 
 export const warmUp = (model: string) => post('/api/warmup', { model }).catch(() => {})
 modelSelect.addEventListener('change', () => warmUp(modelSelect.value))
