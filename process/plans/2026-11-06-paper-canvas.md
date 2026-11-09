@@ -10,7 +10,7 @@ user sees, what each model call does and the build order. The rules a designer f
 
 1. The user types the NiceSnore prompt and picks one of two Home variants. No plan runs before
    them, so they come about 2 seconds sooner than today.
-2. Filing runs in the background. Left of Home, Components gets `tab-bar`, Rules gets
+2. Filing runs in the background. Right of Home, Components gets `tab-bar`, Rules gets
    `score-direction: A higher snore score is worse.`, Data gets the table `nights`, five rows.
 3. The user taps *Nights*. Both variants paste `tab-bar` and show the same five nights.
 4. On Settings the user types *use switches*. The Edit redraws Settings, and filing adds
@@ -36,7 +36,8 @@ and an architect's sheet with its legend, general notes, schedules and revision 
 
 ## What the user sees
 
-The canvas is the only place: the tree of screens as today, and four boxes left of the first screen.
+The canvas is the only place: the tree of screens as today, and four boxes right of the first
+screen, side by side in its row (left of it until step 6).
 
 - **Components**: small cards with Edit, versions, Undo and Delete, like screens. They also list
   with the screens, under a Components parent.
@@ -102,6 +103,20 @@ gives the size of the code before and after.
    screens that need them (all misses the late Back), first side in 2.4 to 2.8 s, app code 218.5
    KB on `main`. The 10-plant visit did not run (no OpenAI credits); the manual's change waits on
    the branch `paper-fixer-wording` for one `bun run test:record`.
+6. **The user's feedback of 2026-11-09.** The user tested the app and asked for these changes.
+   - **A. The boxes go right of Home.** Today they stand in a column left of the tree, so the
+     mockup opens on Home with the boxes out of sight on the other side. An architect's sheet keeps
+     its legend and notes on the right too. The four boxes (Components, Rules, Data, Fixer's
+     notes) sit side by side in Home's row, right of Home and its rail, tops level with Home; the
+     line about the last filing stays above them. Side by side keeps the row short: stacked, the
+     four would push every level far down. Home's row is as tall as the taller of Home and the
+     tallest box; the rows below start under it as today, and a child that does not fit below
+     Home goes right, under the boxes. Another screen with no parent in Home's row goes right of
+     the boxes. The toolbar buttons, Fit screen and opening a mockup work as before.
+     *Done when* on a 15-screen remake (`temp/screen-cache-remake.json`) a fit of Home shows the
+     first box beside it, no line or screen overlaps a box, and the toolbar still moves to each box.
+     Code and docs that say *left*: `canvas.ts` (`layout`, the comments), `boxes.ts`,
+     `spec/behavior.md` (Canvas, Boxes, the walk-through), README and the AGENTS.md code map.
 
 It works when a person reads each remake's boxes in two minutes, a component is pasted on 9 of 10
 screens that need it, a fixer's visit repairs 8 of 10 planted mistakes and changes nothing the
