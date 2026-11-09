@@ -58,7 +58,6 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .menu-recent .item.current { font-weight: 700; }
 .menu-foot { display: flex; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
 .menu-foot button { flex: 1; }
-.menu-foot .danger:hover { color: var(--err); border-color: var(--err); }
 /* Nav: every screen as an indented tree; the path to the current screen in the accent colour. */
 .nav-menu .item { padding-left: calc(8px + var(--depth, 0) * 16px); }
 .nav-menu .item b { font-variant-numeric: tabular-nums; color: var(--muted); }
@@ -69,7 +68,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 /* The workspace: the canvas, the generate panel over it, the drawer at the right. */
 .workspace { flex: 1; min-height: 0; display: flex; position: relative; }
 .canvas-area { flex: 1; min-width: 0; min-height: 0; position: relative; display: flex; }
-.stage { flex: 1; min-width: 0; min-height: 0; position: relative; overflow: auto; outline: none;
+.stage { flex: 1; min-width: 0; min-height: 0; position: relative; overflow: auto;
   --z: 1; background: var(--bg) radial-gradient(circle, var(--dot) 1.2px, transparent 1.4px) 0 0 / calc(24px * var(--z)) calc(24px * var(--z));
   background-attachment: local; }
 .stage.panning { cursor: grabbing; }
@@ -142,7 +141,6 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .or b { font-size: calc(40px / var(--z)); font-weight: 800; color: var(--accent); letter-spacing: .04em; }
 .or .drop { pointer-events: auto; width: calc(32px / var(--z)); height: calc(32px / var(--z)); padding: 0; border-radius: 50%;
   font-size: calc(14px / var(--z)); color: var(--muted); border-width: calc(1px / var(--z)); }
-.or .drop:hover { color: var(--err); border-color: var(--err); }
 
 /* The rail: big icon buttons right of a screen, full strength on the current screen, else on hover. */
 .rail { position: absolute; left: 100%; top: 0; padding-left: calc(10px / var(--z)); display: flex; flex-direction: column;
@@ -151,7 +149,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .rail .tool { width: calc(40px / var(--z)); height: calc(40px / var(--z)); padding: 0; border-radius: calc(10px / var(--z));
   border-width: calc(1px / var(--z)); font-size: calc(18px / var(--z)); line-height: 1; color: var(--muted); box-shadow: 0 1px 4px rgba(0, 0, 0, .1); }
 .rail .tool:hover:not(:disabled) { color: var(--fg); border-color: var(--accent); }
-.rail .tool[data-tool="delete"]:hover:not(:disabled) { color: var(--err); border-color: var(--err); }
+.rail .tool[data-tool="delete"]:hover:not(:disabled), .or .drop:hover, .menu-foot .danger:hover { color: var(--err); border-color: var(--err); }
 
 /* The drawer: docked at the right edge for Edit and Info; the canvas gets narrower. */
 .drawer { flex: none; width: 360px; max-width: 100%; display: flex; flex-direction: column; gap: 10px; padding: 10px 14px 14px;

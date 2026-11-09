@@ -14,9 +14,6 @@ const promptInput = $<HTMLTextAreaElement>('prompt')
 const modelSelect = $<HTMLSelectElement>('model')
 const themeSelect = $<HTMLSelectElement>('theme')
 const deviceSelect = $<HTMLSelectElement>('device')
-const zoomPct = $('zoomPct')
-const errorBox = $('error')
-const errorText = $('errorText')
 const drawer = $('drawer')
 const changeInput = $<HTMLTextAreaElement>('change')
 
@@ -67,9 +64,9 @@ const canvas = new Canvas($('stage'), {
   action: onAction,
   pick,
   cancel: dropChoice,
-  focus: (key) => setCurrent(key),
+  focus: setCurrent,
   tool: onTool,
-  zoomed: (z) => { zoomPct.textContent = `${Math.round(z * 100)}%` },
+  zoomed: (z) => { $('zoomPct').textContent = `${Math.round(z * 100)}%` },
 }, side.el, side.components)
 
 // ---- Views
@@ -84,13 +81,8 @@ function nameOf(e: CacheEntry, v: Version): string {
 }
 
 /** e.g. "L2 Camera"; a planned screen's from its name; a component's is its ID. */
-const labelOf = (e: CacheEntry) => {
-  if (isComponent(e)) return e.name!
-  const level = state.tree.get(e.key)?.level ?? '?'
-  if (e.versions.length) return `L${level} ${nameOf(e, e.versions.at(-1)!)}`
-  if (!state.entries.has(e.key)) return `L${level} ${nameWords(e.name!).replace(/^./, (c) => c.toUpperCase())}`
-  return `L${level} New screen · pick one`
-}
+const labelOf = (e: CacheEntry) => isComponent(e) ? e.name! : `L${state.tree.get(e.key)?.level ?? '?'} ${e.versions.length ? nameOf(e, e.versions.at(-1)!)
+  : state.entries.has(e.key) ? 'New screen · pick one' : nameWords(e.name!).replace(/^./, (c) => c.toUpperCase())}`
 
 /** The tree parent: the screen fewest clicks from home that leads here. */
 const treeParent = (key: string) => state.tree.get(key)?.parent ?? null
@@ -207,8 +199,8 @@ const modelLabel = (id: string) => [...modelSelect.options].find((o) => o.value 
 
 /** A red pill at the bottom of the canvas, until closed or replaced. */
 function showError(msg: string | null) {
-  errorText.textContent = msg ?? ''
-  errorBox.hidden = !msg
+  $('errorText').textContent = msg ?? ''
+  $('error').hidden = !msg
 }
 
 $('errorClose').addEventListener('click', () => showError(null))
@@ -622,10 +614,7 @@ function openDrawer(tab: 'edit' | 'info') {
   requestAnimationFrame(() => { if (state.current) canvas.reveal(state.current) })
 }
 
-function closeDrawer() {
-  state.drawer = null
-  renderDrawer()
-}
+const closeDrawer = () => { state.drawer = null; renderDrawer() }
 
 /** The drawer shows the current screen: Edit (the change box and the past changes) or Info. */
 function renderDrawer() {

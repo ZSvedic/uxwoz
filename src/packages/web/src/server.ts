@@ -194,14 +194,11 @@ export function createServer(opts: ServerOptions = {}) {
     stops.get(root)?.abort()
   }
 
-  interface ScreenRequest { app: string; action: string | null; model: ModelId; device: Device; click: { from: string; label: string } | null }
-
   const message = (err: unknown) => (err instanceof Error ? err.message : String(err))
 
   /** A new screen: from the cache when it is there (with its open A OR B, if any), else two designs at once. */
-  async function* screenEvents(r: ScreenRequest, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
-    const { app, model, device, click } = r
-    let action = canonicalAction(r.action)
+  async function* screenEvents(app: string, asked: string | null, model: ModelId, device: Device, click: { from: string; label: string } | null, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
+    let action = canonicalAction(asked)
     const hit = cache.find(app, action)
     const key = hit?.key ?? screenKey(app, action)
     if (hit) {
@@ -334,7 +331,7 @@ export function createServer(opts: ServerOptions = {}) {
           const p = pickers(b)
           if (p instanceof Response) return p
           const click = typeof b?.from === 'string' && b.from ? { from: b.from.slice(0, 3000), label: String(b?.label ?? '').slice(0, 200) } : null
-          return ndjson(screenEvents({ app, action, ...p, click }, req.signal))
+          return ndjson(screenEvents(app, action, p.model, p.device, click, req.signal))
         }),
       },
       '/api/pick': {
