@@ -98,11 +98,13 @@ const treeParent = (key: string) => state.tree.get(key)?.parent ?? null
 const widthOf = (d: Device | undefined) => (d ? DEVICES[d].width : LEGACY_WIDTH)
 const ideaOf = (v: Version) => v.idea ?? ''
 
-const components = () => [...state.entries.values()].filter(isComponent)
+/** Every screen and component, as the server last sent them. */
+const all = () => [...state.entries.values()]
+const components = () => all().filter(isComponent)
 /** A stored screen as it shows: its components pasted, links to itself marked current. */
-const page = (html: string, name: string | undefined, c = componentsOf([...state.entries.values()])) => markCurrent(pasteComponents(html, c), name)
+const page = (html: string, name: string | undefined, c = componentsOf(all())) => markCurrent(pasteComponents(html, c), name)
 /** The screens whose newest version pastes a component. */
-const pastedOn = (id: string) => [...state.entries.values()].filter((e) => !isComponent(e) && new RegExp(`data-component\\s*=\\s*["']?${id}["'\\s>]`, 'i').test(e.versions.at(-1)?.html ?? ''))
+const pastedOn = (id: string) => all().filter((e) => !isComponent(e) && new RegExp(`data-component\\s*=\\s*["']?${id}["'\\s>]`, 'i').test(e.versions.at(-1)?.html ?? ''))
 
 function sideCard(key: string, index: number, side: Side | null, stored: Version | null, device: Device | undefined): CardView {
   const version = stored ?? side?.version ?? null
@@ -123,19 +125,13 @@ function views(): ScreenView[] {
     const v = e.versions.at(-1)
     const making = m?.key === e.key ? m : null
     const revising = state.revising?.key === e.key ? state.revising : null
+    const shown = v && { key: e.key, current: state.current === e.key, undo: e.versions.length > 1, note: revising ? (revising.change ? 'Making the change…' : 'Making a new design…') : '' }
+    const card = v && { id: e.key, width: widthOf(v.device), device: v.device, streaming: !!revising }
     if (isComponent(e)) {
-      if (v) out.push({
-        key: e.key, parent: null, current: state.current === e.key, undo: e.versions.length > 1, component: true, fresh: !e.seen,
-        note: revising ? 'Making the change…' : '',
-        cards: [{ id: e.key, width: widthOf(v.device), device: v.device, name: e.name!, idea: e.action ?? '', streaming: !!revising, fit: true }],
-      })
+      if (v) out.push({ ...shown!, parent: null, component: true, fresh: !e.seen, cards: [{ ...card!, name: e.name!, idea: e.action ?? '', fit: true }] })
       continue
     }
-    out.push(v ? {
-      key: e.key, parent: treeParent(e.key), current: state.current === e.key, undo: e.versions.length > 1,
-      note: revising ? (revising.change ? 'Making the change…' : 'Making a new design…') : '',
-      cards: [{ id: e.key, width: widthOf(v.device), device: v.device, name: labelOf(e), idea: ideaOf(v), streaming: !!revising }],
-    } : {
+    out.push(v ? { ...shown!, parent: treeParent(e.key), cards: [{ ...card!, name: labelOf(e), idea: ideaOf(v) }] } : {
       key: e.key, parent: treeParent(e.key), current: false, undo: false, note: '',
       cards: (e.proposals ?? []).map((p, i) => sideCard(e.key, i, making?.sides[i] ?? null, p, making?.device)),
     })
@@ -149,7 +145,7 @@ function views(): ScreenView[] {
 
 /** Draw every screen and put each stored design in its frame. Streaming frames are left to their streams. */
 async function draw() {
-  state.tree = screenTree([...state.entries.values()])
+  state.tree = screenTree(all())
   side.el.hidden = !state.app || !state.entries.size || !state.boxes
   if (state.boxes) renderSide(side, { boxes: state.boxes, components: components(), undos: state.undos, visiting: state.visiting }, boxOp)
   canvas.render(views(), !!state.busy)
@@ -160,7 +156,7 @@ async function draw() {
   const css = await themeCss(theme)
   if (theme !== themeSelect.value) return // a newer draw shows the newer theme
   // Today's components, so a changed component redraws the screens that paste it.
-  const c = componentsOf([...state.entries.values()])
+  const c = componentsOf(all())
   for (const e of state.entries.values()) {
     const v = e.versions.at(-1)
     if (v) { if (state.revising?.key !== e.key) canvas.show(e.key, isComponent(e) ? v.html : page(v.html, e.name, c), true, css) }
@@ -416,7 +412,7 @@ function target(app: string, from: string, prompt: string): { to: string; prompt
     return { to: treeParent(from) ?? (made && state.entries.has(made) ? made : screenKey(app, null)), prompt }
   }
   const ref = screenRef(prompt)
-  const known = ref && namesOf([...state.entries.values()]).get(ref.name)
+  const known = ref && namesOf(all()).get(ref.name)
   return { to: known || (ref || !canonicalAction(prompt) ? screenKey(app, prompt) : from), prompt }
 }
 
@@ -608,7 +604,7 @@ async function undo(key: string) {
 
 /** How many other screens a delete takes with it: those the first screen would no longer reach. */
 function goesWith(key: string): number {
-  const rest = screenTree([...state.entries.values()].filter((e) => e.key !== key))
+  const rest = screenTree(all().filter((e) => e.key !== key))
   return [...state.tree.keys()].filter((k) => k !== key && state.entries.has(k) && !rest.has(k)).length
 }
 
@@ -746,7 +742,7 @@ async function start(app: string, make = true) {
   if (device) deviceSelect.value = device // for this mockup only: the saved choice stays
   if (!state.entries.has(root)) return openScreen(null, null, null)
   await draw()
-  const open = [...state.entries.values()].find((e) => !e.versions.length)
+  const open = all().find((e) => !e.versions.length)
   if (open) fitChoice(open.key)
   else fitScreenSoon(state.current ?? root)
 }
@@ -934,8 +930,7 @@ function renderToolbar() {
 /** Every screen as an indented tree, planned screens greyed (a click makes one), the current path marked. */
 function renderNav() {
   const menu = $('navMenu')
-  const made = [...state.entries.values()]
-  const all = [...made, ...plannedScreens(made)]
+  const list = [...all(), ...plannedScreens(all())]
   const path = new Set<string>()
   for (let k = state.current; k && !path.has(k); k = treeParent(k)) path.add(k)
   const rows: HTMLElement[] = []
@@ -953,10 +948,10 @@ function renderNav() {
     b.classList.toggle('path', path.has(e.key))
     b.classList.toggle('current', e.key === state.current)
     rows.push(b)
-    for (const k of all) if (treeParent(k.key) === e.key) walk(k, depth + 1)
+    for (const k of list) if (treeParent(k.key) === e.key) walk(k, depth + 1)
   }
   // The first screen first; screens the first screen does not reach after it, as their own trees.
-  for (const e of all) if (!treeParent(e.key) && !isComponent(e)) walk(e, 0)
+  for (const e of list) if (!treeParent(e.key) && !isComponent(e)) walk(e, 0)
   // Then the components.
   const comps = components()
   if (comps.length) {
