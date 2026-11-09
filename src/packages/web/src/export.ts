@@ -4,14 +4,14 @@
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import {
-  DEVICES, HOME_NAME, LEGACY_WIDTH, VIEWPORT_H, MODELS, NAV_CSS, SCREEN_CSS, componentsOf, isComponent, linksIn, normalizePrompt, pasteComponents,
+  DEVICES, HOME_NAME, LEGACY_WIDTH, VIEWPORT_H, MODELS, NAV_CSS, SCREEN_CSS, componentsOf, isComponent, linksIn, markCurrent, normalizePrompt, pasteComponents,
   plannedScreens, screenKey, screenName, screenTree, tableMarkdown, zip, type Boxes, type CacheEntry, type ScreenCache, type ZipFile,
 } from '@uxwoz/core'
 
 const THEMES_DIR = resolve(import.meta.dir, '../themes')
 
-/** The file name of a mockup: letters, digits and dashes from its prompt, at most 40. */
-export const slugOf = (app: string) => app.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40).replace(/^-+|-+$/g, '') || 'mockup'
+/** The file name of a mockup: letters, digits and dashes from its prompt, at most 40; accents go, as in nameFrom ("čišćenje" is "ciscenje"). */
+export const slugOf = (app: string) => app.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40).replace(/^-+|-+$/g, '') || 'mockup'
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 /** The prompt's first line, cut at a word to at most `n` characters. */
@@ -22,22 +22,23 @@ const short = (s: string, n: number) => {
 const nameOf = (e: CacheEntry) => e.name ?? HOME_NAME
 const titleOf = (e: CacheEntry) => e.versions.at(-1)?.name || screenName(e.versions.at(-1)?.html ?? '') || nameOf(e)
 
-// In the export a click on a control whose action names a drawn screen opens its page; `back` goes
-// back; any other control, and any plain link, does nothing.
-const linkScript = (files: Record<string, string>) => `(() => {
-  const files = ${JSON.stringify(files)}
+// In the export a click on a control whose action names a drawn screen opens its page; `back` opens
+// the screen it hangs under (the browser's back on Home); any other control, and any plain link, does nothing.
+const linkScript = (files: Record<string, string>, back: string | null) => `(() => {
+  const files = ${JSON.stringify(files)}, back = ${JSON.stringify(back)}
   const go = (action) => {
     const a = String(action || '').trim()
-    if (/^back$/i.test(a)) return history.back()
+    if (/^back$/i.test(a)) return back ? (location.href = back) : history.back()
     const m = a.match(/^@([a-z0-9][a-z0-9_-]*)/i)
     const file = files[m ? m[1].toLowerCase() : /^home$/i.test(a) ? 'home' : '']
     if (file) location.href = file
   }
   document.addEventListener('click', (e) => {
-    const el = e.target instanceof Element && e.target.closest('[data-action], a[href]')
-    if (!el || el.matches('form')) return
-    e.preventDefault()
-    go(el.getAttribute('data-action'))
+    if (!(e.target instanceof Element)) return
+    // As in the app's frame: the control with the action first, so a link inside it opens the screen.
+    const el = e.target.closest('[data-action]')
+    if (el && !el.matches('form')) { e.preventDefault(); return go(el.getAttribute('data-action')) }
+    if (e.target.closest('a[href]')) e.preventDefault()
   }, true)
   document.addEventListener('submit', (e) => {
     e.preventDefault()
@@ -46,7 +47,7 @@ const linkScript = (files: Record<string, string>) => `(() => {
 })()`
 
 /** One drawn screen as a standalone page: the theme inlined, components pasted, as wide as its device and at least as tall. */
-export function screenPage(e: CacheEntry, components: Record<string, string>, css: string, files: Record<string, string>): string {
+export function screenPage(e: CacheEntry, components: Record<string, string>, css: string, files: Record<string, string>, back: string | null): string {
   const v = e.versions.at(-1)!
   const d = v.device && DEVICES[v.device]
   // The screen sits centred on a grey page, as wide as its device and at least as tall. A transform
@@ -54,11 +55,11 @@ export function screenPage(e: CacheEntry, components: Record<string, string>, cs
   const size = `html, body { background: #e4e4e4; } body { margin: 0; padding: 24px 0; }
 body > main { max-width: ${d ? d.width : LEGACY_WIDTH}px; margin: 0 auto; transform: translateZ(0); background: var(--pico-background-color, #fff);
   box-shadow: 0 2px 12px rgba(0, 0, 0, .15); min-height: ${d ? d.height : VIEWPORT_H}px; }`
-  const html = vhToPx(pasteComponents(v.html, components), d ? d.height : VIEWPORT_H)
+  const html = vhToPx(markCurrent(pasteComponents(v.html, components), e.name ?? HOME_NAME), d ? d.height : VIEWPORT_H)
   return `<!doctype html><html data-theme="light"><head><meta charset="utf-8">`
     + `<meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(titleOf(e))}</title>`
     + `<style>${css.replace(/<\/style/gi, '<\\/style')}</style><style>${SCREEN_CSS}\n${NAV_CSS}\n${size}</style>`
-    + `<script>${linkScript(files)}</script></head><body><main>${html}</main></body></html>\n`
+    + `<script>${linkScript(files, back)}</script></head><body><main>${html}</main></body></html>\n`
 }
 
 /** vh units in the screen's styles become pixels of the device's height, as the app's frame turns them, so the page looks the same on any window. */
@@ -119,11 +120,13 @@ This folder is a clickable mockup of one app, made with UX Woz. Build the real f
 
 The screens' structure is the spec: what each screen shows, in what order, its controls and labels, and where each control leads.
 The look is not: the hand-drawn sketch style and the blue of the links only mark a mockup. Replace them with a real theme or the project's design system.
+A rule about the look (a light theme, a bottom navigation bar) still binds; only the sketch style itself does not.
+Controls that lead to a screen under "Not drawn yet" in \`README.md\` do nothing in the mockup: that screen still has to be designed.
 
 ## Build order
 
 1. The components in \`components.md\`.
-2. The screens, from Home outward, level by level as \`README.md\` lists them.
+2. The screens, from Home outward, in \`README.md\`'s order.
 3. The screens under "Not drawn yet", if any, in the style of the rest.
 
 ## Prompt to paste
@@ -144,6 +147,7 @@ export function exportFiles(app: string, entries: CacheEntry[], boxes: Boxes, cs
   const screens = entries.filter((e) => !isComponent(e) && e.versions.length)
   const parts = entries.filter((e) => isComponent(e) && e.versions.length)
   const files = Object.fromEntries(screens.map((e) => [nameOf(e), `${nameOf(e)}.html`]))
+  const tree = screenTree(entries)
   return [
     { name: 'HANDOFF.md', data: HANDOFF(app) },
     { name: 'README.md', data: readme(app, entries, screens, components) },
@@ -151,8 +155,14 @@ export function exportFiles(app: string, entries: CacheEntry[], boxes: Boxes, cs
     { name: 'data.md', data: ['# Data', '', 'Sample data the screens show.', '', ...boxes.data.flatMap((t) => [`## ${t.id}`, '', ...tableMarkdown(t), '']), ''].join('\n') },
     { name: 'components.md', data: ['# Components', '', 'Parts shared across screens. A screen holds one where it has `data-component="ID"`.', '',
       ...parts.flatMap((c) => [`## ${c.name}`, '', `Where it belongs: ${c.action ?? ''}`, '', '```html', c.versions.at(-1)!.html, '```', ''])].join('\n') },
-    ...screens.map((e) => ({ name: `screens/${nameOf(e)}.html`, data: screenPage(e, components, css, files) })),
+    ...screens.map((e) => ({ name: `screens/${nameOf(e)}.html`, data: screenPage(e, components, css, files, backOf(e)) })),
   ]
+  /** Where `back` leads, as in the app: the screen it hangs under in the tree, else the one whose click made it, else Home; none on Home. */
+  function backOf(e: CacheEntry): string | null {
+    if (e === root) return null
+    const drawn = new Map(screens.map((s) => [s.key, s])), to = drawn.get(tree.get(e.key)?.parent ?? '') ?? drawn.get(e.parent?.key ?? '') ?? root!
+    return `${nameOf(to)}.html`
+  }
 }
 
 /** The mockup theme as one stylesheet: Pico, then mockup.css. */

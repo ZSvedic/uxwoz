@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ScreenCache, crc32, zip, type Version } from '@uxwoz/core'
 import { createServer } from '@uxwoz/web/src/server.ts'
+import { slugOf } from '../packages/web/src/export.ts'
 
 /** The entries of a zip, read from its central directory: name, size, and the stored bytes as text. */
 function unzip(z: Uint8Array): Record<string, string> {
@@ -77,6 +78,12 @@ describe('export project', () => {
     // As in the app's frame: vh is pixels of the phone's 844 px height, and the page is at least that tall.
     expect(home).toContain('<section style="height:422px">')
     expect(home).toContain('min-height: 844px')
+    // As in the app: the control with the action wins over a link inside it, the current tab is marked, back opens the tree parent.
+    expect(home).toContain(`const el = e.target.closest('[data-action]')`)
+    expect(home).toContain('<a data-action="@home" aria-current="page">')
+    expect(files['screens/report.html']).not.toContain('aria-current="page">')
+    expect(home).toContain('back = null')
+    expect(files['screens/report.html']).toContain('back = "home.html"')
     expect(home).toContain('<nav class="tabs">')
     expect(home).not.toContain('data-component="tab-bar"></div>')
     expect(home).toContain('--pico-') // the theme inlined
@@ -92,6 +99,10 @@ describe('export project', () => {
     expect(files['components.md']).toContain('## tab-bar')
     expect(files['HANDOFF.md']).toContain('## Prompt to paste')
     expect(Object.values(files).join('\n')).not.toContain('secret-note')
+  })
+
+  test('the file name keeps accented letters without their accents', () => {
+    expect(slugOf('Čišćenje stana: a cleaning app')).toBe('ciscenje-stana-a-cleaning-app')
   })
 
   test('an unknown mockup is 404', async () => {

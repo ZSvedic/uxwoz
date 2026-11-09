@@ -78,7 +78,7 @@ Menus close on Esc, on a press outside them, or on a click into a screen.
 
 ### Export
 
-Once a mockup is final, **Export project…** downloads it as one zip (*nicesnore-a-snore-app.zip*)
+Once a mockup is final, **Export project…** downloads it as one zip (*nicesnore-a-snore-app-with-recording-as.zip*)
 for a coding agent or a design agent to build the real front end from. It holds the product, not
 the process: no fixer's notes, no design that was not picked, no older versions.
 
