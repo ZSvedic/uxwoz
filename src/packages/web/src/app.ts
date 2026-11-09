@@ -326,8 +326,7 @@ async function openScreen(action: string | null, from: string | null, label: str
       else { s.error = ev.message; state.failed.set(`${m!.key}#${ev.variant}`, ev.message) }
       draw()
     } else if (ev.type === 'done') {
-      state.entries.set(ev.entry.key, ev.entry)
-      state.edits++
+      keep(ev.entry)
       if (state.making === m) state.making = null
       loadRecent()
       await draw()
@@ -342,10 +341,7 @@ async function openScreen(action: string | null, from: string | null, label: str
       }
     }
   }, (failed) => {
-    if (!failed) return
-    for (const s of state.making?.sides ?? []) s.stream?.cancel()
-    state.making = null
-    back()
+    if (failed) { stopMaking(); back() }
   })
 }
 
@@ -369,6 +365,20 @@ function fitScreenSoon(key: string) {
   refit(key, performance.now(), false)
 }
 
+/** Stop the busy job and the streams of the A OR B being made, which is dropped. */
+function stopMaking() {
+  state.busy?.abort()
+  state.busy = null
+  for (const s of state.making?.sides ?? []) { s.stream?.cancel(); s.stream = null }
+  state.making = null
+}
+
+/** A screen as the server sent it, applied here. */
+function keep(e: CacheEntry) {
+  state.entries.set(e.key, e)
+  state.edits++
+}
+
 /** Back to the view from before an A OR B. */
 function back() {
   if (state.before) canvas.setView(state.before)
@@ -383,11 +393,7 @@ async function pick(key: string, index: number) {
   try {
     // The other side stops; the A OR B stays drawn until the server answers, so the picked frame
     // is kept (and renamed below) instead of loading again.
-    if (m) {
-      state.busy?.abort()
-      state.busy = null
-      for (const s of m.sides) { s.stream?.cancel(); s.stream = null }
-    }
+    if (m) { stopMaking(); state.making = m }
     const res = await post('/api/pick', { key, index }).catch(() => null)
     if (state.making === m) state.making = null
     if (!res?.ok) {
@@ -395,8 +401,7 @@ async function pick(key: string, index: number) {
       return reloadMap()
     }
     const { entry, filing, visiting } = await res.json() as { entry: CacheEntry; filing: boolean; visiting: boolean }
-    state.entries.set(key, entry)
-    state.edits++
+    keep(entry)
     Object.assign(state, { filing, visiting: visiting || state.visiting })
     if (filing || visiting) filed()
     canvas.rename(`${key}#${index}`, key)
@@ -411,12 +416,7 @@ async function pick(key: string, index: number) {
 
 /** Drop both designs of an open A OR B; for the first screen, that drops the mockup too. */
 async function dropChoice(key: string) {
-  if (state.making?.key === key) {
-    state.busy?.abort()
-    state.busy = null
-    for (const s of state.making.sides) s.stream?.cancel()
-    state.making = null
-  }
+  if (state.making?.key === key) stopMaking()
   const root = state.app && screenKey(state.app, null) === key
   await post('/api/delete', { key }).catch(() => null)
   state.entries.delete(key)
@@ -601,8 +601,7 @@ async function revise(key: string, change: string | null) {
     if (ev.type === 'chunk') (frame ??= new StreamRenderer(key, css, isComponent(e))).push(ev.text)
     else if (ev.type === 'done') {
       frame?.cancel()
-      state.entries.set(key, ev.entry)
-      state.edits++
+      keep(ev.entry)
       if (ev.filing) { state.filing = true; filed() }
       state.revising = null
       if (change) changeInput.value = ''
@@ -620,9 +619,7 @@ async function undo(key: string) {
   if (state.busy) return
   const res = await post('/api/undo', { key }).catch(() => null)
   if (!res?.ok) return showError('Nothing to undo')
-  const { entry } = await res.json() as { entry: CacheEntry }
-  state.entries.set(key, entry)
-  state.edits++
+  keep((await res.json()).entry)
   draw()
 }
 
@@ -742,9 +739,7 @@ $('drawerClose').addEventListener('click', closeDrawer)
 /** Open a mockup: its screens from the cache, else (unless `make` is false) its first screen as A OR B. */
 async function start(app: string, make = true) {
   showError(null)
-  state.busy?.abort()
-  state.busy = null
-  state.making = null
+  stopMaking()
   state.before = null
   const n = ++state.starts
   const res = await fetch(`/api/map?app=${encodeURIComponent(app)}`)
