@@ -96,13 +96,8 @@ async function* streamOpenRouter(cfg: ModelConfig, o: StreamOptions, f: Fetch, e
       if (text) yield { type: 'text', text } as const
       if (choice.finish_reason) final.finishReason ??= choice.finish_reason
     }
-    if (chunk.usage) {
-      const u = chunk.usage
-      final.inputTokens = u.prompt_tokens ?? null
-      final.cachedInputTokens = u.prompt_tokens_details?.cached_tokens ?? null
-      final.outputTokens = u.completion_tokens ?? null
-      final.costUsd = u.cost ?? null
-    }
+    const u = chunk.usage
+    if (u) Object.assign(final, { inputTokens: u.prompt_tokens ?? null, cachedInputTokens: u.prompt_tokens_details?.cached_tokens ?? null, outputTokens: u.completion_tokens ?? null, costUsd: u.cost ?? null })
   }
   yield final
 }
@@ -128,13 +123,9 @@ async function* streamOpenAI(cfg: ModelConfig, o: StreamOptions, f: Fetch, env: 
     if (ev.type === 'response.output_text.delta' && ev.delta) {
       yield { type: 'text', text: ev.delta } as const
     } else if (ev.type === 'response.completed' || ev.type === 'response.incomplete') {
-      const r = ev.response
-      const u = r.usage ?? {}
-      final.servedModel = r.model ?? null
-      final.finishReason = ev.type === 'response.completed' ? 'stop' : (r.incomplete_details?.reason ?? 'incomplete')
-      final.inputTokens = u.input_tokens ?? null
-      final.cachedInputTokens = u.input_tokens_details?.cached_tokens ?? null
-      final.outputTokens = u.output_tokens ?? null
+      const r = ev.response, u = r.usage ?? {}
+      Object.assign(final, { servedModel: r.model ?? null, finishReason: ev.type === 'response.completed' ? 'stop' : (r.incomplete_details?.reason ?? 'incomplete'),
+        inputTokens: u.input_tokens ?? null, cachedInputTokens: u.input_tokens_details?.cached_tokens ?? null, outputTokens: u.output_tokens ?? null })
       final.costUsd = estimateCost(cfg, final)
     } else if (ev.type === 'response.failed' || ev.type === 'error') {
       throw new ProviderError(`OpenAI stream error: ${JSON.stringify(ev).slice(0, 300)}`)

@@ -47,12 +47,13 @@ export interface FilingLine { kind: 'component' | 'rule' | 'table' | 'row' | 'no
 /** The lines of a filing reply, each read as one of the forms; anything else is `bad`. */
 export function parseFiling(reply: string): FilingLine[] {
   return reply.split('\n').map((l) => l.trim()).filter(Boolean).map((line): FilingLine => {
-    if (/^nothing$/i.test(line)) return { kind: 'nothing', change: false, id: '', part: null, text: '', line }
+    const none = { change: false, id: '', part: null, text: '', line }
+    if (/^nothing$/i.test(line)) return { kind: 'nothing', ...none }
     const c = line.match(/^(change\s+)?component\s+(\S+)\s+from\s+part\s+(\d+)\s*:\s*(.+)$/i)
     if (c) return { kind: 'component', change: !!c[1], id: c[2]!, part: Number(c[3]), text: c[4]!.trim(), line }
     const r = line.match(/^(?:add\s+)?(change\s+)?(rule|table|row)\s+(\S+?)\s*:\s*(.+)$/i)
     if (r) return { kind: r[2]!.toLowerCase() as FilingLine['kind'], change: !!r[1], id: r[3]!, part: null, text: r[4]!.trim(), line }
-    return { kind: 'bad', change: false, id: '', part: null, text: '', line }
+    return { kind: 'bad', ...none }
   })
 }
 

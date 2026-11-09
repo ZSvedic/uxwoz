@@ -35,7 +35,8 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .toolbar button:hover:not(:disabled) { border-color: var(--line); background: var(--bg); }
 #zoomValue { min-width: 5em; font-variant-numeric: tabular-nums; }
 .menu-button { display: inline-flex; gap: 4px; align-items: center; max-width: 100%; min-width: 0; font-weight: 600; }
-.menu-button > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-button > span:first-child, .menu .item > span, .recent button span, .card .head > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu .item > span, .recent button span { flex: 1; min-width: 0; }
 .caret { color: var(--muted); font-size: 11px; }
 #projectButton { max-width: min(36ch, 40vw); }
 #navButton { max-width: min(40ch, 36vw); }
@@ -52,7 +53,6 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .menu .item { display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left; border: 0; background: none; padding: 5px 8px;
   border-radius: 6px; }
 .menu .item:hover, .menu .item:focus-visible { background: var(--bg); }
-.menu .item > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu .item small, .menu kbd { color: var(--muted); font: inherit; margin-left: auto; white-space: nowrap; }
 .menu-recent { display: flex; flex-direction: column; min-width: 320px; max-width: 460px; }
 .menu-recent .item.current { font-weight: 700; }
@@ -92,7 +92,6 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .example:hover, .recent button:hover { border-color: var(--accent); }
 .recent { display: flex; flex-direction: column; gap: 2px; max-height: 15em; overflow: auto; }
 .recent button { text-align: left; padding: 4px 8px; display: flex; gap: 8px; }
-.recent button span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recent button small { color: var(--muted); white-space: nowrap; }
 
 /* Errors (until closed) and hints show in a pill at the bottom of the canvas. */
@@ -113,7 +112,6 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .card iframe { display: block; border: 0; background: #fff; }
 .card .head { position: absolute; left: 0; bottom: 100%; width: 100%; padding-bottom: calc(6px / var(--z));
   display: flex; flex-direction: column; font-size: calc(13px / var(--z)); line-height: 1.3; }
-.card .head > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card .name { color: var(--fg); }
 .card.current .name { color: var(--accent); }
 /* The idea under a name takes up to two lines; "more" shows the rest, over the space above. */

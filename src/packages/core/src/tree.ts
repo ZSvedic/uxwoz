@@ -115,11 +115,12 @@ function build(all: CacheEntry[]): { tree: Map<string, TreeNode>; entries: Cache
   if (!keys.has(root)) return { tree, entries, links }
   const byName = namesOf(entries)
   const edges = new Map<string, { to: string; label: string }[]>()
+  const edge = (from: string, to: string, label: string) => edges.set(from, [...edges.get(from) ?? [], { to, label }])
   // A screen's first click counts only from a screen that is there: a planned screen has no buttons,
   // so a screen made from one that was deleted (and is planned again) is not reached through it.
   const madeKeys = new Set(made.map((e) => e.key))
   for (const e of entries) {
-    if (e.parent && madeKeys.has(e.parent.key)) edges.set(e.parent.key, [...(edges.get(e.parent.key) ?? []), { to: e.key, label: e.parent.label }])
+    if (e.parent && madeKeys.has(e.parent.key)) edge(e.parent.key, e.key, e.parent.label)
   }
   for (const e of entries) {
     if (!e.versions.length) continue
@@ -127,7 +128,7 @@ function build(all: CacheEntry[]): { tree: Map<string, TreeNode>; entries: Cache
       // A link opens a screen the mockup has by its `@name`; back, words with no `@` and new screens open none.
       const to = byName.get(screenRef(l.action)?.name ?? '')
       if (!to || to === e.key || !keys.has(to)) continue
-      edges.set(e.key, [...(edges.get(e.key) ?? []), { to, label: l.label }])
+      edge(e.key, to, l.label)
       if (!links.some(([f, t]) => f === e.key && t === to)) links.push([e.key, to])
     }
   }
