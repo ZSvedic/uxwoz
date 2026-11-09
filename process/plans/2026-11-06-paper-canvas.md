@@ -117,6 +117,33 @@ gives the size of the code before and after.
      first box beside it, no line or screen overlaps a box, and the toolbar still moves to each box.
      Code and docs that say *left*: `canvas.ts` (`layout`, the comments), `boxes.ts`,
      `spec/behavior.md` (Canvas, Boxes, the walk-through), README and the AGENTS.md code map.
+   - **B. Theme in the toolbar**, left of the zoom. It is the Theme select of the generate panel,
+     moved: one value, kept in the browser as today, and every screen redraws in it at once.
+   - **C. No filing line.** The line above the boxes (*Last filing, after home: added light-theme ·
+     1.0 s · ~$0.0015*, and *Filing your last decision…*) goes. What it said goes in the filed
+     screen's Info: *Filing: added light-theme, 1.0 s, ~$0.0015*, and the lines it refused.
+   - **D. Order: Rules, Fixer, Components, Data**, in the row of boxes and in the toolbar. The
+     toolbar button says *Fixer*; the box keeps its title *Fixer's notes*.
+   - **E. A narrow window folds the four toolbar buttons** into one menu, *Boxes ▾*, at the width
+     where the toolbar first runs out of room. Each item keeps its count of new entries, and the
+     menu button shows their sum.
+   - **F. A rail for each box**, like a screen's: large icon buttons right of the box, kept at 40 px
+     on screen. First a button of its own: Rules **+ Rule**, Fixer **▶ Visit now**, Data **+ Table**
+     (they leave the box's head). Then for all four:
+     - **✎ Edit** asks *What should change in Rules?* The request goes to the fixer as a visit that
+       starts from the user's words: the user's request comes first and may change what the user
+       wrote, and the reply uses the visit's forms. So each change of an Edit gets a note in Fixer's
+       notes with its own Undo, as a visit's do. The visit's forms gain what an Edit needs and a
+       visit lacked: change a rule, a table and its rows (filing's forms), and redraw a component.
+       That changes the manual's visit section: one `bun run test:record`.
+     - **↶ Undo** puts the box back as it was before its last change, whoever made it: the user in
+       place, filing, an Edit or a visit. Each box keeps its last 10 states; Undo again goes further
+       back. On Fixer's notes, Undo undoes the newest visit that is not undone yet, every change of
+       it. Undo shows only when there is something to undo.
+     *Done when* each button works in the running app on a remake, an Edit like *merge the two
+     rules about scores* changes the box in one visit, and Undo after it brings the box back whole.
+   The code stays under 220 KB (219.5 KB on 2026-11-09, after the fixer wording merged): moving
+   Theme and dropping the filing line and the head buttons pay for part of it.
 
 It works when a person reads each remake's boxes in two minutes, a component is pasted on 9 of 10
 screens that need it, a fixer's visit repairs 8 of 10 planted mistakes and changes nothing the
