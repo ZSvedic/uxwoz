@@ -65,3 +65,24 @@ These go under a new heading **Design**:
   for one of these variants and little else. A change that crosses it removes something first.
 - **No design tweak without a request.** Change colours, spacing, fonts, motion or sounds only when the
   user asked for that change. A fix for a bug keeps the look as it is.
+
+## Judge's notes, 2026-11-09 night
+
+I (the lead agent) opened all three in the browser pane at 800 px, light and dark, and clicked
+Pick in C. Screenshots are in `shots/` (`a-light.jpg`, `a-dark.jpg` and so on, and
+`current-app.jpg` for today's look). My order: B, then A, then C.
+
+- **A, Sticker book.** Reads clearly, keeps today's layout, so it is the cheapest to apply and the
+  least to relearn. The thick ink outlines and hard shadows compete with the sketch frames: two
+  loud things on one canvas. Dark mode is good. Pick if you want colour with no UX change.
+- **B, Sketchbook.** The one that fits the product: screens are sketches, the boxes are index cards,
+  the fixer "visits the paper", and here the whole app is paper. The left rail frees the top, the
+  chalkboard dark mode is calm. The handwritten titles cost legibility on small text; keep the
+  hand font for headings only. Pick if you want the app to feel of one piece with the mockups.
+- **C, Tabletop.** The most "game": dealt cards, a wooden command bar, pinned notes. The gingham
+  light background is busy behind sketches (the green felt is fine). The floating bar hides the
+  bottom of the canvas on a phone, and it is the biggest CSS change. Pick if play matters more
+  than reading.
+
+What each needs before it is real: fonts copied into `themes/`, the sounds behind a setting that
+is off by default, and the `shell.css` cap above.
