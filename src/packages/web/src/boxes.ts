@@ -10,14 +10,15 @@ export type Box = BoxName | 'notes'
 export type BoxOp = { op: 'add' | 'set' | 'delete'; box: 'rules' | 'data'; id?: string; text?: string; columns?: string[]; rows?: string[][] }
   | { op: 'undo'; at: string; i: number } | { op: 'visit' } | { op: 'undo-box'; box: Box } | { op: 'edit'; box: Box; text: string }
 
-export const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text?: string) => {
+/** An element with its class and its children (text or elements). */
+export const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', ...kids: (Node | string)[]) => {
   const e = document.createElement(tag)
   if (cls) e.className = cls
-  if (text != null) e.textContent = text
+  e.append(...kids)
   return e
 }
 
-function button(text: string, title: string, run: () => void, cls = 'box-btn') {
+export function button(text: string, title: string, run: () => void, cls = 'box-btn') {
   const b = el('button', cls, text)
   b.type = 'button'
   b.title = title
@@ -27,15 +28,13 @@ function button(text: string, title: string, run: () => void, cls = 'box-btn') {
 
 /** A rail: big icon buttons right of a screen or a box, kept at 40 px on screen; each tool is [name, icon, tip]. */
 export function railOf(tools: string[][], run: (tool: string) => void) {
-  const rail = el('div', 'rail')
   const buttons = tools.map(([tool, icon, tip]) => {
     const b = button(icon!, tip!, () => run(tool!), 'tool')
     b.dataset.tool = tool
     b.setAttribute('aria-label', tip!.split(':')[0]!)
     return b
   })
-  rail.append(...buttons)
-  return { el: rail, tools: buttons }
+  return { el: el('div', 'rail', ...buttons), tools: buttons }
 }
 
 /** Text the user types in place: Enter or leaving the field saves it, Esc puts it back. */
@@ -80,7 +79,6 @@ export function createSide(op: (o: BoxOp) => void): Side {
   const root = el('div', 'boxes')
   const sections = {} as Side['sections'], rails = {} as Side['rails']
   for (const name of BOXES) {
-    const s = el('section', `box box-${name}`)
     const undo = name === 'notes' ? 'Undo the newest visit' : 'Undo the last change'
     const rail = railOf([...OWN[name] ? [OWN[name]] : [], ['edit', '✎', 'Edit: ask the fixer'], ['undo', '↶', undo]], (tool) => {
       if (tool === 'undo') return op({ op: 'undo-box', box: name })
@@ -88,7 +86,7 @@ export function createSide(op: (o: BoxOp) => void): Side {
       const text = prompt(tool === 'edit' ? `What should change in ${BOX_TITLES[name]}?` : name === 'rules' ? 'A new rule, one sentence' : 'Name of the new table, e.g. nights')?.trim()
       if (text) op(tool === 'edit' ? { op: 'edit', box: name, text } : name === 'rules' ? { op: 'add', box: 'rules', text } : { op: 'add', box: 'data', text, columns: ['name', 'value'], rows: [['', '']] })
     })
-    s.append(el('h3'), el('p', 'box-hint', HINTS[name]), el('div', 'box-body'), rail.el)
+    const s = el('section', `box box-${name}`, el('h3'), el('p', 'box-hint', HINTS[name]), el('div', 'box-body'), rail.el)
     sections[name] = s
     rails[name] = rail.tools
     root.append(s)
@@ -148,10 +146,8 @@ export function renderSide(side: Side, v: SideView, op: (o: BoxOp) => void) {
 const yours = (x: { by: string }) => el('small', 'yours', x.by === 'user' ? ' yours' : '')
 
 function tableView(t: Table, op: (o: BoxOp) => void): HTMLElement {
-  const wrap = el('div', `data-table${t.seen ? '' : ' fresh'}`)
   const set = (columns: string[], rows: string[][]) => op({ op: 'set', box: 'data', id: t.id, columns, rows })
-  const head = el('div', 'table-head')
-  head.append(el('b', '', t.id), yours(t),
+  const head = el('div', 'table-head', el('b', '', t.id), yours(t),
     button('+ row', 'Add a row', () => set(t.columns, [...t.rows, t.columns.map(() => '')])),
     button('+ column', 'Add a column', () => set([...t.columns, `column ${t.columns.length + 1}`], t.rows.map((r) => [...r, '']))),
     button('✕', `Delete table ${t.id}`, () => op({ op: 'delete', box: 'data', id: t.id })))
@@ -173,8 +169,7 @@ function tableView(t: Table, op: (o: BoxOp) => void): HTMLElement {
     }
     table.append(tr)
   }
-  wrap.append(head, table)
-  return wrap
+  return el('div', `data-table${t.seen ? '' : ' fresh'}`, head, table)
 }
 
 /** The three boxes as markdown, for Export. */

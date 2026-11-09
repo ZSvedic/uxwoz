@@ -4,7 +4,7 @@
 // Names and rails keep their size on screen at any zoom. Right of the first screen: the boxes (boxes.ts).
 
 import { DEFAULT_DEVICE, DEVICES, FRAME_SANDBOX, framePage, type Device } from '@uxwoz/core/frame'
-import { el, railOf } from './boxes.ts'
+import { button, el, railOf } from './boxes.ts'
 
 /** Bounds on a reported height, so a broken screen cannot make a huge frame; components may be shorter. */
 const MIN_SCREEN_H = 160
@@ -108,7 +108,6 @@ interface Card {
   shield: HTMLElement
   error: HTMLElement
   rail: HTMLElement
-  undo: HTMLButtonElement
   tools: HTMLButtonElement[]
   key: string
   view: CardView | null
@@ -363,19 +362,14 @@ export class Canvas {
         c.screen.hidden = !!v.error
         c.shield.title = v.side ? (v.side.pickable ? 'Pick this design' : 'Wait until it is finished') : ''
         c.rail.hidden = !!v.side
-        c.undo.hidden = !s.undo
+        c.tools[2]!.hidden = !s.undo
         c.tools[1]!.hidden = !!s.component
         c.tools[4]!.title = s.component ? 'Delete this component: screens that paste it show nothing in its place' : RAIL[4]![2]
         for (const b of c.tools) b.disabled = busy && b.dataset.tool !== 'info'
       }
       if (choices.has(s.key) && !this.ors.has(s.key)) {
         const o = el('div', 'or')
-        o.append(el('b', '', 'OR'))
-        const x = el('button', 'drop', '✕') as HTMLButtonElement
-        x.type = 'button'
-        x.title = 'Drop both designs'
-        x.addEventListener('click', () => this.on.cancel(o.dataset.key!))
-        o.append(x)
+        o.append(el('b', '', 'OR'), button('✕', 'Drop both designs', () => this.on.cancel(o.dataset.key!), 'drop'))
         o.dataset.key = s.key
         this.surface.append(o)
         this.ors.set(s.key, o)
@@ -575,34 +569,20 @@ export class Canvas {
   private card(id: string, key: string, parent: HTMLElement): Card {
     const have = this.cards.get(id)
     if (have) return have
-    const root = el('article', 'card')
-    const head = el('div', 'head')
-    const name = el('b', 'name')
-    const idea = el('span', 'idea')
-    const more = el('button', 'more', 'more') as HTMLButtonElement
-    more.type = 'button'
+    const name = el('b', 'name'), idea = el('span', 'idea'), note = el('span', 'note'), error = el('div', 'error-box')
+    const more = button('more', '', () => { more.textContent = head.classList.toggle('open') ? 'less' : 'more' }, 'more')
     more.hidden = true
-    more.addEventListener('click', () => {
-      const open = head.classList.toggle('open')
-      more.textContent = open ? 'less' : 'more'
-    })
-    const ideaRow = el('div', 'idea-row')
-    ideaRow.append(idea, more)
-    const note = el('span', 'note')
-    head.append(name, ideaRow, note)
-    const screen = el('div', 'screen')
-    const frame = document.createElement('iframe')
+    const head = el('div', 'head', name, el('div', 'idea-row', idea, more), note)
+    const frame = el('iframe')
     frame.setAttribute('sandbox', FRAME_SANDBOX)
     frame.title = 'Generated screen'
     frame.style.height = `${START_H}px`
-    const shield = el('div', 'shield')
-    shield.append(el('span', 'pick-hint', 'Pick this design'))
-    screen.append(frame, shield)
-    const error = el('div', 'error-box')
+    const shield = el('div', 'shield', el('span', 'pick-hint', 'Pick this design'))
+    const screen = el('div', 'screen', frame, shield)
     const { el: rail, tools } = railOf(RAIL, (tool) => this.on.tool(c.key, tool))
-    root.append(head, screen, error, rail)
+    const root = el('article', 'card', head, screen, error, rail)
     const c: Card = {
-      el: root, name, idea, more, note, screen, frame, shield, error, rail, undo: tools[2]!, tools, key, view: null,
+      el: root, name, idea, more, note, screen, frame, shield, error, rail, tools, key, view: null,
       width: 0, height: START_H, shown: null, sized: false, onLoad: null,
     }
     shield.addEventListener('click', () => { if (c.view?.side?.pickable) this.on.pick(c.key, c.view.side.index) })
