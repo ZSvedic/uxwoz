@@ -432,11 +432,12 @@ browser and says what they think. Nothing is real-time and nobody signs in: a li
     how much is used. Past it, the red pill
     says *This link's budget is used up*.
 - **The player** shows one screen at a time in its device frame, in the Mockup theme, components
-  pasted, its name on top, **← Back** and the trail of names (each one clickable). A click on a
+  pasted, in an ivory frame on the night sky; on a parchment strip at the top, the hat, **← Back**,
+  its name and the trail of names (each one clickable). It plays no sounds and no animation. A click on a
   control opens the screen it names; `back` goes to the screen it hangs under; a control whose
   action names no screen (plain words) leads nowhere, as in the app. A desktop screen
   shrinks to fit a phone.
-- **Feedback** (comment links), in a bar under the screen: 👍 and 👎 for the screen (a visitor's
+- **Feedback** (comment links), on the wooden bar at the bottom, **Done** in ember: 👍 and 👎 for the screen (a visitor's
   newest counts), **Comment on this screen** (with an optional part: **Pick a part** and click it in
   the screen, and its words fill *About*), and **Done**, which asks *Would you use this? Why or why
   not?*. A dead control asks *Not designed yet. What did you expect here?* and keeps the control's

@@ -182,7 +182,8 @@ export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; playe
     return res
   }
 
-  /** Every /api route but the visitors' goes through `wrap`; with UXWOZ_OWNER set, `/` asks for the owner's cookie. */
+  const closed = () => new Response('This UX Woz is private.', { status: 403, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+  /** Every /api route but the visitors' goes through `wrap`; with UXWOZ_OWNER set, `/` and `/design` ask for the owner's cookie. */
   function guard<R extends string>(all: Bun.Serve.Routes<unknown, R>): Bun.Serve.Routes<unknown, R> {
     const out: Record<string, Route> = { ...all, ...routes }
     for (const [path, r] of Object.entries(out)) {
@@ -193,8 +194,10 @@ export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; playe
       const secret = new URL(req.url).searchParams.get('owner')
       const https = new URL(req.url).protocol === 'https:' || req.headers.get('x-forwarded-proto') === 'https'
       if (secret === owner) return new Response(null, { status: 302, headers: { Location: '/', 'Set-Cookie': `uxwoz_owner=${owner}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${https ? '; Secure' : ''}` } })
-      return isOwner(req) ? page(server, '/_app') : new Response('This UX Woz is private.', { status: 403, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+      return isOwner(req) ? page(server, '/_app') : closed()
     }
+    // The design sheet is the owner's too: its page moves to /_design, as the app's is at /_app.
+    if (owner && out['/design']) { out['/_design'] = out['/design']; out['/design'] = (req: Request, server: { port?: number }) => isOwner(req) ? page(server, '/_design') : closed() }
     return out as Bun.Serve.Routes<unknown, R>
   }
 
