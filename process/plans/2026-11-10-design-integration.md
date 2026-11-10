@@ -4,20 +4,21 @@ This plan owns how the look of [variant F](../design/variant-f.html) gets into U
 what it changes in each part of the app, and the five build phases. It does not own the mockup screens
 (`themes/mockup.css` stays), the prompt (no cassette changes) or any behavior beyond what the look forces.
 
-Status: a plan, revised after three critics (their findings are quoted near the end). No code is written
-until the user says go. The decisions the user must make are in the next section but one.
+Status: approved on 2026-11-10 with all nine decisions as picked and the folder named `design/` (the user's
+choice over `look/`); the phases are being built. Revised after three critics (their findings are quoted near
+the end).
 
 ## Example: three changes after the integration
 
-The look lives in one folder, `src/packages/web/src/look/`, and the feature files do not know about it.
+The look lives in one folder, `src/packages/web/src/design/`, and the feature files do not know about it.
 
-1. *"Make the Pick button green."* The agent opens `look/tokens.css`, finds `--pick: var(--ember)`, writes
+1. *"Make the Pick button green."* The agent opens `design/tokens.css`, finds `--pick: var(--ember)`, writes
    `--pick: #2e9d5b`. One file. The app, the player and `/design` all change, because all three read that
    token.
-2. *"The drawer swings in too slowly."* `look/motion.css`, the `hand` keyframes. One file.
+2. *"The drawer swings in too slowly."* `design/motion.css`, the `hand` keyframes. One file.
 3. *"Add a Duplicate button to the rail."* The agent edits `canvas.ts` (the `RAIL` list) and
-   `screens.ts`, as today. The button gets the rail's look for free, since `look/canvas.css` styles
-   `.rail .tool`. The agent never opens `look/`.
+   `screens.ts`, as today. The button gets the rail's look for free, since `design/canvas.css` styles
+   `.rail .tool`. The agent never opens `design/`.
 
 ## Decisions for you
 
@@ -25,7 +26,7 @@ Each has my pick first. Say "all as picked" or name the numbers to change.
 
 1. **No raw look; a still look instead.** The feature files gain 4 lines and lose about 8 (table below),
    so the reason for a second, plain skin is gone, and a second skin would cost more than it saves: every
-   new control would need its CSS twice. I propose `?look=still`: the same F with no animation, no sound
+   new control would need its CSS twice. I propose `?design=still`: the same F with no animation, no sound
    and no tilt, so browser checks and screenshots do not depend on timing. Default stays full F.
 2. **Ropes keep today's start and end points; only their shape changes.** A rope drops straight to the
    bottom of its row, then makes one S-curve in the gap to its child, ending above the child's name as
@@ -52,7 +53,7 @@ Each has my pick first. Say "all as picked" or name the numbers to change.
 
 ## Where the look lives
 
-One folder. Its CSS and code are bundled by Bun's HTML import, and so are the files in `look/brand/`,
+One folder. Its CSS and code are bundled by Bun's HTML import, and so are the files in `design/brand/`,
 because every reference to them is a relative path (Bun 1.3.11 refuses an absolute `/brand/x.svg`).
 
 | File | Owns | Estimate, lines |
@@ -72,17 +73,17 @@ because every reference to them is a relative path (Bun 1.3.11 refuses an absolu
 | `player.css` | the player's layout and dialogs | 45 |
 | `index.css` | eight `@import` lines; the app, the player and the sheet link it | 10 |
 | `fx.ts` | sparks, the three sounds, the sound setting, the still flag, `pickFx` | 130 |
-| `design.html` | the sheet at `/design`: the app's own classes on static markup, its few layout rules inline, and 15 lines of script that list the tokens from `document.styleSheets` and play a sound per ▶ | 110 |
+| `sheet.html` | the sheet at `/design`: the app's own classes on static markup, its few layout rules inline, and 15 lines of script that list the tokens from `document.styleSheets` and play a sound per ▶ | 110 |
 
 The rule that makes a change a one-file edit: **colours only in `tokens.css`**, shapes and spacing in the
 part's file, anything two parts share in `base.css`, movement in `motion.css`, sound in `fx.ts`. A test
 fails on a `#hex` or `rgb(` in any other look file, in `index.html` or in `player.html`.
 
 **The cap moves.** `AGENTS.md` today caps `shell.css` at 300 lines and 24 KB (it is 252 lines, 19 KB; the
-player has 28 more lines inline). New rule: *all CSS in `look/` together stays under 700 lines and 52 KB,
-and no file in `look/` is over 130 lines. A change that crosses a cap removes something first.* My
+player has 28 more lines inline). New rule: *all CSS in `design/` together stays under 700 lines and 52 KB,
+and no file in `design/` is over 130 lines. A change that crosses a cap removes something first.* My
 estimate for F is 560 lines and 40 to 44 KB with the player in, so the cap leaves the same fifth of spare
-room `shell.css` has today. `tests/look.test.ts` enforces it, which nothing does today. Bun inlines the
+room `shell.css` has today. `tests/design.test.ts` enforces it, which nothing does today. Bun inlines the
 font and the stars into the served CSS (about 55 KB more on the wire, cached with it); the cap counts the
 source files, which is what an agent reads.
 
@@ -91,7 +92,7 @@ source files, which is what an agent reads.
 The look needs code in two places only, and the features call one function.
 
 ```
-look/fx.ts
+design/fx.ts
   pickFx(key, index) -> Promise   the winner glows and rises, the loser dissolves, sparks, the chime;
                                   both sides and the OR's ✕ are locked meanwhile; resolves when the loser
                                   may go (0.8 s; at once when still or reduced); clears its own classes
@@ -106,11 +107,11 @@ look/fx.ts
 |---|---|---|
 | `screens.ts` | +1, 1 changed | import `pickFx`; `pick()` awaits it together with the `/api/pick` call |
 | `canvas.ts` | about −8 | +1 `data-id` on a card in `render()`, +1 for the rope's second stroke; `elbow` becomes a shorter `curve`; the lane map, its sums and `BEND` go |
-| `server.ts` | +3 | import `design.html`, the `/design` route, `/og.png` (outside the owner's gate) |
+| `server.ts` | +3 | import `sheet.html`, the `/design` route, `/og.png` (outside the owner's gate) |
 | `app.ts`, `toolbar.ts`, `drawer.ts`, `boxes.ts`, `nav.ts`, `net.ts`, `voice-ui.ts`, `sharing.ts`, `player.ts` | 0 | |
 | `index.html` | about +5 | three icon links, the logo, the speaker; the bar's items move into F's order; `#menuNew` moves out of the menu to be the deck |
 | `player.html` | about −25 | its `<style>` goes; a stylesheet link, the icons and the `og:` tags come |
-| `AGENTS.md` | about +4 | two code-map lines for `look/` and `look/brand/`; the cap rule rewritten in place |
+| `AGENTS.md` | about +4 | two code-map lines for `design/` and `design/brand/`; the cap rule rewritten in place |
 | `spec/behavior.md` | about +10 | sentences replaced where the look changes them, plus a 5-line *Look* section; the visual detail (parchment, pins, glows) lives on `/design`, not in the spec |
 
 The sky needs no code: the stars are a layer inside `.surface`, which already has CSS `zoom`, so they
@@ -175,7 +176,7 @@ app already sets (`.card.side`, `.pickable`, the drawer losing `hidden`).
   | Nav's path, *new*, *more*, a card's note, *· showing* | ember (`--mark`) |
 
   Blue stays the colour of a control in a mockup that opens a screen.
-- **Export zip.** Unchanged: it carries the screens' own theme and reads nothing from `look/`.
+- **Export zip.** Unchanged: it carries the screens' own theme and reads nothing from `design/`.
 - **Light and dark.** The sky is dark in both. By day the chrome is parchment with ink text, by night
   indigo with pale text. Screens stay white.
 - **Phone, 375 px.** The two-row bar, the drawer over the canvas, the logo as the hat alone.
@@ -203,7 +204,7 @@ Three Opus critics read the first draft, each with one question. What they found
 - *"Renaming a class set by feature code: files today 2, under the plan 5… a broken sound or spark goes
   unnoticed."* Changed: `fx.ts` lists its hook classes in `HOOKS` and a test checks each against the
   feature file that sets it.
-- *"The no-hex test catches code outside the look"* (`frame.ts`, `export.ts`). Changed: it scans `look/`,
+- *"The no-hex test catches code outside the look"* (`frame.ts`, `export.ts`). Changed: it scans `design/`,
   `index.html` and `player.html` only. *"The 'every token used' test turns any CSS removal into an extra
   `tokens.css` edit."* Dropped that check.
 - *"When `/api/pick` fails… a pickable card stays dissolved"*, and Drop both stays open for 0.8 s longer.
@@ -230,7 +231,7 @@ Three Opus critics read the first draft, each with one question. What they found
 **Code size: "where does this plan add bytes to files agents read for features?"**
 
 - *"Bun cannot resolve absolute `/brand/x.svg` paths… the page does not bundle."* (Checked on 1.3.11 in a
-  scratch copy.) Changed: `brand/` moved inside `look/`, all paths relative, `look/routes.ts` dropped;
+  scratch copy.) Changed: `brand/` moved inside `design/`, all paths relative, `design/routes.ts` dropped;
   `server.ts` gains 3 lines for `/design` and `/og.png`.
 - *"`canvas.ts`: plan about 0, mine about −12… Without lanes, lines do not cross: two S-curves of the same
   shape whose ends keep their order never cross."* Taken, less the anchors decision 2 keeps: about −8.
@@ -240,7 +241,7 @@ Three Opus critics read the first draft, each with one question. What they found
 - *"`behavior.md`… change sentences in place and leave the visual detail to the `/design` sheet: about
   +10"* and a two-line code-map block for `AGENTS.md`. Both taken into the table above.
 - *"`import … with { type: 'text' }`… the file disappeared from the CSS bundle. Prefer
-  `document.styleSheets`."* Taken: `sheet.ts` and `sheet.css` folded into `design.html`, 12 look files.
+  `document.styleSheets`."* Taken: `sheet.ts` and `sheet.css` folded into `sheet.html`, 12 look files.
 - Verified by the critic: `@import` from an HTML import bundles in dev and production; relative `url()`
   in CSS is inlined; `<link rel=icon>` with a relative path is rewritten to a hashed file.
 
@@ -252,17 +253,17 @@ same commit as the code, written first.
 
 | # | Phase | Files | Spec | Test | Browser check |
 |---|---|---|---|---|---|
-| 1 | **Split, same look** | `shell.css` cut into `look/*.css` with today's values as tokens; `look/brand/`; `AGENTS.md` cap and code map; `code-contract.md` | none (nothing visible) | `look.test.ts`: the cap, colours only in tokens, every `var()` defined | before and after screenshots of the canvas, a menu, the drawer, at 1,400 and 375 px: the same |
+| 1 | **Split, same look** | `shell.css` cut into `design/*.css` with today's values as tokens; `design/brand/`; `AGENTS.md` cap and code map; `code-contract.md` | none (nothing visible) | `design.test.ts`: the cap, colours only in tokens, every `var()` defined | before and after screenshots of the canvas, a menu, the drawer, at 1,400 and 375 px: the same |
 | 2 | **Bar and sky** | `tokens.css` to F's values, `bar.css`, `base.css`, `panel.css`, the sky in `canvas.css`, `index.html` reordered, the font and icons | Toolbar (order, upward menus, the deck, breakpoints), Canvas (*dot grid* twice), Colours | contrast pairs; no Google request; `index.html` has no `data:` and no `<style>` | bar at 1,400, 1,000, 800, 375 px; every menu open, Nav with 20 screens; Tab order; light and dark; `bun run start` |
 | 3 | **Canvas, boxes, drawer** | `canvas.css`, `boxes.css`, `drawer.css`; ropes in `canvas.ts` | Canvas (Lines, Names, Current screen), Rail, Drawer, Boxes | a pure `curve()` test: stays in the gap, ends where `elbow` ended | a 6-screen tree with a short parent beside a tall one and an open A OR B, at 25%, 100%, 200%; an edit in a box; wheel zoom over a component |
-| 4 | **Motion and sound** | `motion.css`, `fx.ts`, the speaker in `index.html`, the two lines in `screens.ts` | A OR B (hover, the pick), Drawer, Voice (*gold*, no sound while on), a new 5-line *Look* section | `fx.ts`'s pure parts: sound off by default, still and reduced resolve at once; `HOOKS` against the feature files | a pick filmed frame by frame; with `?look=still`; while the other side streams; a pick the server refuses; ✕ during a pick |
-| 5 | **Player and sheet** | `player.html`, `look/player.css`, `look/design.html`, `og.png`, 3 lines in `server.ts` | Sharing (the player), a line for `/design` in `code-contract.md` | `/design` and `/og.png` 200; every class in `design.html` has a rule in `look/`; `player.html` has no `<style>` | the player on a phone and a desktop screen, each dialog; `/design` beside `variant-f.html`'s sheet |
+| 4 | **Motion and sound** | `motion.css`, `fx.ts`, the speaker in `index.html`, the two lines in `screens.ts` | A OR B (hover, the pick), Drawer, Voice (*gold*, no sound while on), a new 5-line *Look* section | `fx.ts`'s pure parts: sound off by default, still and reduced resolve at once; `HOOKS` against the feature files | a pick filmed frame by frame; with `?design=still`; while the other side streams; a pick the server refuses; ✕ during a pick |
+| 5 | **Player and sheet** | `player.html`, `design/player.css`, `design/sheet.html`, `og.png`, 3 lines in `server.ts` | Sharing (the player), a line for `/design` in `code-contract.md` | `/design` and `/og.png` 200; every class in `sheet.html` has a rule in `design/`; `player.html` has no `<style>` | the player on a phone and a desktop screen, each dialog; `/design` beside `variant-f.html`'s sheet |
 
 Briefs, three lines each:
 
 1. *Cut `shell.css` into the files of the plan's table without changing one pixel. Pull every colour into
-   `tokens.css` as palette and role; rules that span parts go to `base.css`. Add `look/brand/`,
-   `look.test.ts` and the new cap in `AGENTS.md`.*
+   `tokens.css` as palette and role; rules that span parts go to `base.css`. Add `design/brand/`,
+   `design.test.ts` and the new cap in `AGENTS.md`.*
 2. *Give `tokens.css` F's values and build the bar and the sky from `variant-f.html`. Reorder the bar's
    markup, keep every id, move `#menuNew` out as the deck; anchor every popup to open upward. No transform
    on the bar (it would capture fixed children); check `bun run start`.*
@@ -271,9 +272,9 @@ Briefs, three lines each:
    Keep `LINE_X`, `ENTRY_X`, the end above the name and every size constant.*
 4. *Write `motion.css` and `fx.ts` from the script in `variant-f.html`. `pickFx` is the only export the
    features call; it locks, animates, resolves and cleans up after itself. Sounds off by default, none
-   while the microphone is on; `?look=still` and reduced motion skip all of it.*
-5. *Move the player's CSS to `look/player.css` on the shared tokens, in the light F of decision 8. Build
-   `design.html` from the app's own classes, its colour table read from `document.styleSheets`. Add
+   while the microphone is on; `?design=still` and reduced motion skip all of it.*
+5. *Move the player's CSS to `design/player.css` on the shared tokens, in the light F of decision 8. Build
+   `sheet.html` from the app's own classes, its colour table read from `document.styleSheets`. Add
    `/og.png` outside the owner's gate and the `og:` tags in `player.html`.*
 
 After phase 5 the lead opens `/design` and the app beside `variant-f.html`, lists what differs, and shows
