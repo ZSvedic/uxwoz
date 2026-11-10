@@ -197,16 +197,18 @@ export async function pick(key: string, index: number) {
   const m = state.making?.key === key ? state.making : null
   if (state.picking || !(m?.sides[index]?.version ?? state.entries.get(key)?.proposals?.[index])) return
   state.picking = true
+  const app = state.app, fx = pickFx(key, index)
   try {
     // The other side stops; the A OR B stays drawn until the server answers, so the picked frame
     // is kept (and renamed below) instead of loading again.
     if (m) { stopMaking(); state.making = m }
-    const [res] = await Promise.all([post('/api/pick', { key, index }).catch(() => null), pickFx(key, index)])
+    const [res] = await Promise.all([post('/api/pick', { key, index }).catch(() => null), fx.wait])
     if (state.making === m) state.making = null
+    if (app !== state.app) return
     if (!res?.ok) {
       showError('Could not keep that design')
       // Take the server's copy of the open mockup.
-      const app = state.app!, map = await mapOf(app).then((r) => r.json()).catch(() => null)
+      const map = await mapOf(app!).then((r) => r.json()).catch(() => null)
       return map?.entries && app === state.app && applyMap(map)
     }
     const { entry, filing, visiting } = await res.json() as { entry: CacheEntry; filing: boolean; visiting: boolean }
@@ -220,6 +222,7 @@ export async function pick(key: string, index: number) {
     if (state.before) { back(); canvas.reveal(key, false) } else fitScreenSoon(key)
   } finally {
     state.picking = false
+    fx.done()
   }
 }
 

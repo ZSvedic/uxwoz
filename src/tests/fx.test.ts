@@ -3,16 +3,20 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { HOOKS, pickFx, pickWait, soundOn } from '../packages/web/src/design/fx.ts'
+import { HOOKS, pickFx, pickWait, playSound, soundOn } from '../packages/web/src/design/fx.ts'
 
 const WEB = resolve(import.meta.dir, '../packages/web/src')
 const DESIGN = resolve(WEB, 'design')
 const read = (path: string) => readFileSync(path, 'utf8')
 
 describe('fx.ts', () => {
-  test('loads under bun with no page, and a pick there resolves at once', async () => {
+  test('loads under bun with no page; a pick there waits for nothing and its done is harmless', async () => {
     expect(typeof document).toBe('undefined')
-    await pickFx('x', 0)
+    const fx = pickFx('x', 0)
+    await fx.wait
+    fx.done()
+    expect(typeof playSound).toBe('function')
+    playSound('chime')
   })
 
   test('sound is off unless stored as on', () => {
@@ -24,12 +28,21 @@ describe('fx.ts', () => {
   })
 
   test('every hook is set by the feature file named for it', () => {
-    // A quoted class list or id that holds the name (el('div', 'or'), class="drawer"), or a key of the classes
-    // canvas.ts toggles ({ side: v.side, … }).
+    // A quoted class list or id that holds the name (el('div', 'or'), class="drawer", `box box-${name}`), a key of the
+    // classes canvas.ts toggles ({ side: v.side, … }), or for data-id the line that sets dataset.id.
     for (const [name, file] of Object.entries(HOOKS)) {
-      const set = new RegExp(`(['"])(?:[\\w-]+ )*${name}(?: [\\w-]+)*\\1|[{,] ${name}: `)
+      const data = name.startsWith('data-') ? `|\\.dataset\\.${name.slice(5)} = ` : ''
+      const set = new RegExp(`(['"\`])(?:[\\w-]+ )*${name}(?: [^'"\`]*)?\\1|[{,] ${name}: ${data}`)
       expect([name, file, set.test(read(resolve(WEB, file)))]).toEqual([name, file, true])
     }
+  })
+
+  test('the microphone states motion.css keys on are voice-<state> in voice-ui.ts, from VoiceState in voice.ts', () => {
+    expect(read(resolve(WEB, 'voice-ui.ts'))).toContain('`voice voice-${e.state}`')
+    const states = read(resolve(WEB, 'voice.ts')).match(/type VoiceState = (.*)/)?.[1] ?? ''
+    const used = [...read(resolve(DESIGN, 'motion.css')).matchAll(/\.voice-(\w+)/g)].map((m) => m[1]!)
+    expect(used.length).toBeGreaterThan(0)
+    for (const s of used) expect([s, states.includes(`'${s}'`)]).toEqual([s, true])
   })
 
   test('no colour literal: sparks take their colours from tokens', () => {

@@ -14,7 +14,7 @@
 
 /* The canvas: screens at fixed places, in canvas pixels; CSS zoom scales it. Names, ideas, rings and the OR divide by
    --z, so they keep their size on screen. The stars are a layer behind the screens, so they zoom too. */
-.surface { position: relative; }
+.surface { position: relative; overflow: clip; }
 .surface::before { content: ''; position: absolute; inset: 0; pointer-events: none;
   background: url("./brand/stars-1.svg") 0 0 / 547px 547px, url("./brand/stars-2.svg") 131px 71px / 443px 443px,
     url("./brand/stars-3.svg") 257px 193px / 389px 389px; }

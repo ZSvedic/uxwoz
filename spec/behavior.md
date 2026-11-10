@@ -174,7 +174,9 @@ says nothing about which is which. Both appear out of a blur, the second a beat 
 - **Picking**: a click anywhere on a finished side keeps it as the screen's first version and
   deletes the other. If the other is still streaming, it stops at once and nothing of it is kept.
   Both sides and the ✕ are locked, and for 0.8 s the picked one rises and the other dissolves;
-  then the other is deleted and the zoom and scroll come back. The frame does not reload, so the
+  once the server has kept it, the other is deleted and the zoom and scroll come back. If the
+  server refuses, both sides come back as they were. If another mockup was opened meanwhile, the
+  pick is not drawn into it. The frame does not reload, so the
   picked screen stays as it was, and it ends where it started.
 - **Failures**: a side that fails shows its error in its place. If both fail, the A OR B goes
   away.
@@ -465,6 +467,7 @@ screen or box. Lines are tan ropes with a dark twist.
 
 Sounds are off by default; the speaker in the bar turns them on, kept in this browser: a whoosh
 when designs appear and when the drawer opens, a chime on a pick, a tinkle on hovering a side.
-With the system's reduced-motion setting there are no sparks and every animation jumps to its end.
-`?design=still` in the address shows the same look with no animation, no sound and no tilt, for
-checks and screenshots.
+Turning them on plays the tinkle once. With the system's reduced-motion setting there are no sparks
+and nothing moves (every animation jumps to its end); sounds still follow the speaker.
+`?design=still` in the address shows the same look with no animation, no sound and no tilt (the
+logo and the boxes sit level), for checks and screenshots.

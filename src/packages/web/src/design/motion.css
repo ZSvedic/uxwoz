@@ -62,4 +62,4 @@
 :root[data-design="still"] *, :root[data-design="still"] *::before, :root[data-design="still"] *::after {
   animation: none !important; transition: none !important; }
 :root[data-design="still"] .spark { display: none; }
-:root[data-design="still"] .box { transform: none; }
+:root[data-design="still"] :is(.box, .logo) { transform: none; }
