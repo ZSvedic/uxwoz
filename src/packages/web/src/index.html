@@ -4,16 +4,32 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>UX Woz</title>
+<link rel="icon" type="image/svg+xml" href="./design/brand/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="./design/brand/favicon-32.png">
+<link rel="apple-touch-icon" href="./design/brand/apple-touch-icon.png">
 <link rel="stylesheet" href="./design/index.css">
 </head>
 <body>
 <header class="toolbar" id="toolbar">
+  <div class="logo"><img src="./design/brand/logo.svg" alt="" width="40" height="40"><b>UX <span>Woz</span></b></div>
+  <nav class="bar" aria-label="Commands">
   <div class="tb-left">
-    <strong class="logo">UX Woz</strong>
-    <button id="projectButton" class="menu-button" aria-haspopup="menu" title="Mockup: new, recent, start over, delete">
+    <button id="menuNew" class="deck" title="New mockup" aria-label="New mockup">+</button>
+    <i class="sep"></i>
+    <span class="pop nav-pop">
+    <button id="trailBack" class="trail" title="Back to the screen you looked at before (⌘[)" hidden>←</button>
+    <button id="navButton" class="menu-button" aria-haspopup="menu" title="Every screen of this mockup" hidden>
+      <span id="navName"></span> <span class="caret"></span></button>
+    <button id="trailForward" class="trail" title="Forward again (⌘])" hidden>→</button>
+    <div id="navMenu" class="menu nav-menu" role="menu" hidden></div>
+    </span>
+  </div>
+  <div class="tb-mid">
+    <i class="sep"></i>
+    <span class="pop">
+    <button id="projectButton" class="menu-button" aria-haspopup="menu" title="Mockup: recent, start over, delete">
       <span id="projectName">New mockup</span> <span class="caret"></span></button>
     <div id="projectMenu" class="menu" role="menu" hidden>
-      <button class="item" id="menuNew">＋ New mockup…</button>
       <div id="menuRecent" class="menu-recent"></div>
       <button class="item" id="exportBoxes" title="Download the Components, Rules and Data boxes as one markdown file">⇩ Export the boxes (markdown)</button>
       <button class="item" id="shareMenu" title="Make a link for a reviewer or a customer">⇗ Share…</button>
@@ -23,17 +39,8 @@
         <button id="deleteApp" class="danger" title="Delete this mockup">✕ Delete</button>
       </div>
     </div>
-  </div>
-  <div class="tb-mid">
-    <i class="sep"></i>
-    <button id="trailBack" class="trail" title="Back to the screen you looked at before (⌘[)" hidden>←</button>
-    <button id="navButton" class="menu-button" aria-haspopup="menu" title="Every screen of this mockup" hidden>
-      <span id="navName"></span> <span class="caret"></span></button>
-    <button id="trailForward" class="trail" title="Forward again (⌘])" hidden>→</button>
-    <i class="sep"></i>
-    <div id="navMenu" class="menu nav-menu" role="menu" hidden></div>
-  </div>
-  <div class="tb-right">
+    </span>
+    <i class="sep box-sep"></i>
     <span class="pop">
     <button id="boxesButton" class="menu-button" aria-haspopup="menu" title="Show a box">Boxes <b id="boxesSum"></b> <span class="caret"></span></button>
     <span class="box-nav menu" id="boxNav" title="Show a box; the number counts what is new since you last looked" hidden>
@@ -43,16 +50,17 @@
       <button data-box="data">Data <b></b></button>
     </span>
     </span>
-    <i class="sep box-sep"></i>
+  </div>
+  <div class="tb-right">
+    <i class="sep"></i>
     <span class="pop">
       <button id="themeButton" class="menu-button" aria-haspopup="menu" title="Theme: how every screen looks"><span id="themeName"></span> <span class="caret"></span></button>
       <div id="themeMenu" class="menu" role="menu" hidden></div>
     </span>
     <i class="sep"></i>
     <button data-zoom="out" class="wide-only" title="Zoom out (⌘−)"><svg class="icon" viewBox="0 0 16 16"><path d="M3 8h10"/></svg></button>
+    <span class="pop">
     <button id="zoomValue" class="menu-button" aria-haspopup="menu" title="Zoom"><span id="zoomPct">100%</span> <span class="caret"></span></button>
-    <button data-zoom="in" class="wide-only" title="Zoom in (⌘+)"><svg class="icon" viewBox="0 0 16 16"><path d="M3 8h10M8 3v10"/></svg></button>
-    <button data-zoom="screen" class="wide-only" title="Fit screen (⇧2)"><svg class="icon" viewBox="0 0 16 16"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg></button>
     <div id="zoomMenu" class="menu" role="menu" hidden>
       <button class="item" data-zoom="in">Zoom in <kbd>⌘+</kbd></button>
       <button class="item" data-zoom="out">Zoom out <kbd>⌘−</kbd></button>
@@ -65,7 +73,11 @@
       <button class="item" data-zoom="screen">Fit screen <kbd>⇧2</kbd></button>
       <button class="item" data-zoom="width">Fit screen width <kbd>⇧3</kbd></button>
     </div>
+    </span>
+    <button data-zoom="in" class="wide-only" title="Zoom in (⌘+)"><svg class="icon" viewBox="0 0 16 16"><path d="M3 8h10M8 3v10"/></svg></button>
+    <button data-zoom="screen" class="wide-only" title="Fit screen (⇧2)"><svg class="icon" viewBox="0 0 16 16"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg></button>
   </div>
+  </nav>
 </header>
 <div class="workspace">
   <div class="canvas-area">

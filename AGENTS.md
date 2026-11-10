@@ -81,7 +81,7 @@ src/packages/web/src/
   index.html     the page around the canvas; links design/index.css
   design/        the look: tokens.css (every colour), base.css (shared by parts), one file per part (bar,
                  canvas, boxes, drawer, panel), motion.css; index.css imports them all
-  design/brand/  the logo, the favicon and the three star tiles as SVG files
+  design/brand/  the logo, the favicons (SVG, PNG, home screen), the three star tiles, Fredoka and its licence
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
 src/scripts/fixer-reply.ts   run by hand: Terra's raw reply to a visit of a cache file

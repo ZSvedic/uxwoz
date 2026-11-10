@@ -2,13 +2,21 @@
 /* The reset, plain buttons and fields, and every rule whose selectors reach into more than one part. */
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, -apple-system, sans-serif;
-  height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+/* The night sky fills the window, behind the canvas and the bar's strip; the workspace ends above the strip. */
+body { margin: 0; color: var(--text); font: 14px/1.4 system-ui, -apple-system, sans-serif;
+  height: 100vh; display: flex; flex-direction: column; overflow: hidden; padding-bottom: var(--bar-h);
+  --bar-h: 74px; background: radial-gradient(40% 40% at 85% 5%, var(--violet-glow), transparent),
+  radial-gradient(40% 35% at 5% 95%, var(--green-glow), transparent), linear-gradient(var(--sky1), var(--sky2)); }
+@media (max-width: 720px) { body { --bar-h: 108px; } }
 input, select, button, textarea { font: inherit; color: inherit; }
-button, select { padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); cursor: pointer; }
-button:disabled { opacity: .45; cursor: default; }
-button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+button, select { padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); cursor: pointer; }
+button:disabled { color: var(--disabled); cursor: default; }
+button.primary { background: var(--pick); border-color: var(--pick); color: var(--on-pick); font-weight: 600; }
 .toolbar button, .recent button, .drawer :is(.tabs button, .close) { border-color: transparent; background: none; }
+/* Fredoka: headings, the bar, the logo, primary buttons, the Pick pill and the OR. */
+h2, .box h3, .drawer-name, .toolbar, button.primary, .pick-hint, .or b { font-family: Fredoka, system-ui, sans-serif; }
+/* Focus: a gold ring around a dark one, so it shows on parchment, wood and sky. */
+:focus-visible:not(.stage, [contenteditable]) { outline: 2px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 2px var(--focus-in); }
 /* Small uppercase headings of menus, the generate panel and the drawer. */
 .menu h3, .generate h3, .pane h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 /* Text cut off with an ellipsis: menu buttons, menu items, Recent, a screen's name and idea. */

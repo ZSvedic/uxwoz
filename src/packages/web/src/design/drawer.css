@@ -1,23 +1,23 @@
 /* The drawer: docked at the right edge for Edit and Info; the canvas gets narrower. */
 .drawer { flex: none; width: 360px; max-width: 100%; display: flex; flex-direction: column; gap: 10px; padding: 10px 14px 14px;
-  border-left: 1px solid var(--line); background: var(--card); overflow: auto; z-index: 14; }
+  border-left: 1px solid var(--border); background: var(--surface); overflow: auto; z-index: 14; }
 @media (max-width: 700px) { .drawer { position: absolute; right: 0; top: 0; bottom: 0; box-shadow: var(--shadow); } }
 .drawer-head { display: flex; align-items: center; gap: 8px; }
 .drawer .tabs { flex: 1; display: flex; gap: 4px; }
 .drawer .tabs button { color: var(--muted); font-weight: 600; }
-.drawer .tabs button[aria-selected="true"] { color: var(--fg); background: var(--bg); border-color: var(--line); }
+.drawer .tabs button[aria-selected="true"] { color: var(--text); background: var(--surface-2); border-color: var(--border); }
 .drawer .close { color: var(--muted); }
 .drawer-name { margin: 0; font-weight: 600; }
 .pane { display: flex; flex-direction: column; gap: 8px; }
 .pane label { color: var(--muted); }
-.pane textarea { width: 100%; resize: vertical; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.pane textarea { width: 100%; resize: vertical; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--field); }
 .pane .primary { align-self: flex-start; }
 .pane h3 { margin: 10px 0 0; }
 .history { margin: 0; padding-left: 1.8em; display: flex; flex-direction: column; gap: 4px; color: var(--muted); }
-.history li.now { color: var(--fg); }
+.history li.now { color: var(--text); }
 .history li.none { list-style: none; }
 .history li.undone { text-decoration: line-through; }
-.history li.now::after { content: " · showing"; color: var(--accent); }
+.history li.now::after { content: " · showing"; color: var(--mark); }
 .info { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
 .info dt { color: var(--muted); }
 .info dd { margin: 0; overflow-wrap: anywhere; }
@@ -27,7 +27,7 @@
 
 /* The Share pane: links per role, then the feedback by screen and the trips. */
 .share-pane select { width: 100%; }
-.share-pane select, .share-pane input { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+.share-pane select, .share-pane input { font: inherit; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--field); color: var(--text); }
 .share-cap input { width: 5em; }
 .share-links, .feedback { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
 .share-link .share-url { display: block; width: 100%; margin: 4px 0; font-size: 12px; }

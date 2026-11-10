@@ -1,59 +1,62 @@
-/* The workspace: the canvas, the generate panel over it, the drawer at the right. */
+/* The workspace: the canvas, the generate panel over it, the drawer at the right. It ends above the bar's strip. */
 .workspace { flex: 1; min-height: 0; display: flex; position: relative; }
 .canvas-area { flex: 1; min-width: 0; min-height: 0; position: relative; display: flex; }
 .stage { flex: 1; min-width: 0; min-height: 0; position: relative; overflow: auto; outline: none;
-  --z: 1; background: var(--bg) radial-gradient(circle, var(--dot) 1.2px, transparent 1.4px) 0 0 / calc(24px * var(--z)) calc(24px * var(--z));
-  background-attachment: local; }
+  --z: 1; background: transparent; mask-image: linear-gradient(to top, transparent, black 16px); }
 .stage.panning { cursor: grabbing; }
 .stage.panning iframe { pointer-events: none; }
 
 /* Errors (until closed) and hints show in a pill at the bottom of the canvas. */
 .error-pill, .hint-pill { position: absolute; z-index: 12; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 6px 14px;
-  border: 1px solid var(--line); border-radius: 18px; background: var(--card); color: var(--muted); box-shadow: var(--shadow); font-size: 13px; }
+  border: 1px solid var(--border); border-radius: 18px; background: var(--surface); color: var(--muted); box-shadow: var(--shadow); font-size: 13px; }
 .error-pill { max-width: calc(100% - 32px); display: flex; gap: 8px; align-items: center; padding-right: 8px; border-color: var(--err); color: var(--err); }
 .error-pill button { padding: 0 6px; border: 0; background: none; color: inherit; }
 
 /* The canvas: screens at fixed places, in canvas pixels; CSS zoom scales it. Names, ideas and
-   rails divide by --z, so they keep their size on screen. */
+   rails divide by --z, so they keep their size on screen. The stars are a layer behind the screens, so they zoom too. */
 .surface { position: relative; }
+.surface::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: url("./brand/stars-1.svg") 0 0 / 547px 547px, url("./brand/stars-2.svg") 131px 71px / 443px 443px,
+    url("./brand/stars-3.svg") 257px 193px / 389px 389px; }
 .lines { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
-.lines .line { fill: none; stroke: var(--accent); stroke-width: calc(1.5px / var(--z)); opacity: .8; }
+.lines .line { fill: none; stroke: var(--rope); stroke-width: calc(1.5px / var(--z)); opacity: .8; }
 .card { position: absolute; }
-.card .screen { position: relative; overflow: hidden; background: var(--screen); border: calc(1px / var(--z)) solid var(--line);
+.card .screen { position: relative; overflow: hidden; background: var(--screen); border: calc(1px / var(--z)) solid var(--border);
   border-radius: calc(8px / var(--z)); box-shadow: var(--shadow-screen); }
-.card.current .screen { outline: calc(2px / var(--z)) solid var(--accent); outline-offset: calc(2px / var(--z)); }
+.card.current .screen { outline: calc(2px / var(--z)) solid var(--current); outline-offset: calc(2px / var(--z)); }
 .card iframe { display: block; border: 0; background: var(--screen); }
 .card .head { position: absolute; left: 0; bottom: 100%; width: 100%; padding-bottom: calc(6px / var(--z));
   display: flex; flex-direction: column; font-size: calc(13px / var(--z)); line-height: 1.3; }
-.card .name { color: var(--fg); }
-.card.current .name { color: var(--accent); }
+/* Names and ideas sit straight on the sky, in light text; an idea opened with "more" lies on an indigo plate. */
+.card .name { color: var(--sky-text); }
+.card.current .name { color: var(--current); }
 /* The idea under a name takes up to two lines; "more" shows the rest, over the space above. */
 .card .head > .idea-row { display: flex; align-items: flex-end; gap: calc(6px / var(--z)); white-space: normal; }
-.card .idea { flex: 1; min-width: 0; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.card .head.open { background: var(--bg); z-index: 3; }
+.card .idea { flex: 1; min-width: 0; color: var(--sky-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card .head.open { background: var(--plate); z-index: 3; }
 .card .head.open .idea { display: block; }
 /* Zoomed far out, a screen shows only its name. */
 .surface.far .card:not(.side) .idea-row { display: none; }
-.card .more { flex: none; padding: 0; border: 0; background: none; color: var(--accent); }
+.card .more { flex: none; padding: 0; border: 0; background: none; color: var(--sky-mark); }
 .card .more:hover { text-decoration: underline; }
-.card .note { color: var(--accent); font-weight: 600; }
+.card .note { color: var(--sky-mark); font-weight: 600; }
 .card.streaming .screen { opacity: .8; }
 /* A side of an A OR B: its idea above in larger type, and a shield over the frame that takes the click. */
 .card.side .head > * { white-space: normal; }
-.card.side .idea { color: var(--fg); font-size: calc(16px / var(--z)); font-weight: 600; -webkit-line-clamp: 3; }
+.card.side .idea { color: var(--sky-text); font-size: calc(16px / var(--z)); font-weight: 600; -webkit-line-clamp: 3; }
 .card .shield { display: none; }
 .card.side .shield { display: flex; position: absolute; inset: 0; cursor: progress; align-items: flex-start; justify-content: center;
   padding-top: calc(160px / var(--z)); }
 .card.side.pickable .shield { cursor: pointer; }
-.card.side.pickable:hover .screen { outline: calc(3px / var(--z)) solid var(--accent); outline-offset: calc(3px / var(--z)); }
+.card.side.pickable:hover .screen { outline: calc(3px / var(--z)) solid var(--current); outline-offset: calc(3px / var(--z)); }
 .pick-hint { opacity: 0; padding: calc(8px / var(--z)) calc(16px / var(--z)); border-radius: 999px;
-  background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: calc(14px / var(--z)); box-shadow: var(--shadow); }
+  background: var(--pick); color: var(--on-pick); font-weight: 600; font-size: calc(14px / var(--z)); box-shadow: var(--shadow); }
 .card.side.pickable:hover .pick-hint { opacity: 1; }
 .error-box { height: 100%; padding: calc(16px / var(--z)); border: calc(1px / var(--z)) dashed var(--err); border-radius: calc(8px / var(--z));
-  color: var(--err); font-size: calc(13px / var(--z)); overflow: auto; background: var(--card); }
+  color: var(--err); font-size: calc(13px / var(--z)); overflow: auto; background: var(--surface); }
 .or { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(12px / var(--z));
   pointer-events: none; }
-.or b { font-size: calc(40px / var(--z)); font-weight: 800; color: var(--accent); letter-spacing: .04em; }
+.or b { font-size: calc(40px / var(--z)); font-weight: 700; color: var(--or); letter-spacing: .04em; }
 .or .drop { pointer-events: auto; width: calc(32px / var(--z)); height: calc(32px / var(--z)); padding: 0; border-radius: 50%;
   font-size: calc(14px / var(--z)); color: var(--muted); border-width: calc(1px / var(--z)); }
 
@@ -64,4 +67,4 @@
 .card:hover .rail, .card.current .rail, .box:hover > .rail, .box.current > .rail, .rail:focus-within { opacity: 1; }
 .rail .tool { width: 40px; height: 40px; padding: 0; border-radius: 10px; font-size: 18px; line-height: 1; color: var(--muted);
   box-shadow: var(--shadow-tool); }
-.rail .tool:hover:not(:disabled) { color: var(--fg); border-color: var(--accent); }
+.rail .tool:hover:not(:disabled) { color: var(--text); border-color: var(--current); }

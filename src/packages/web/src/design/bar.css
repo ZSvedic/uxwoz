@@ -1,68 +1,105 @@
-/* The toolbar: project menu on the left, Nav in the middle, zoom on the right. */
-.toolbar { flex: none; height: 44px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px;
-  padding: 0 10px; border-bottom: 1px solid var(--line); background: var(--card); position: relative; z-index: 20; }
-.tb-left, .tb-mid, .tb-right { position: relative; display: flex; gap: 4px; align-items: center; }
-.tb-left { gap: 8px; min-width: 0; }
-.tb-mid { justify-content: center; min-width: 0; }
-.tb-right { justify-content: flex-end; }
-.toolbar .trail { border: 0; font-size: 18px; line-height: 1; }
-.trail:disabled { opacity: .3; }
-.logo { font-size: 15px; white-space: nowrap; color: var(--accent); }
-.toolbar button { padding: 4px 9px; }
-.toolbar button:hover:not(:disabled) { border-color: var(--line); background: var(--bg); }
-#zoomValue { min-width: 5em; font-variant-numeric: tabular-nums; }
-.menu-button { display: inline-flex; gap: 4px; align-items: center; max-width: 100%; min-width: 0; }
-/* One chevron for every menu; a thin line between the toolbar's items; icons drawn at the size of the text. */
-.caret { flex: none; width: 7px; height: 7px; margin: 0 2px 3px 4px; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
-.sep { flex: none; width: 1px; height: 20px; margin: 0 4px; background: var(--line); }
-.tb-mid:has(#navButton[hidden]) .sep, .toolbar:not(.has-boxes) .box-sep { display: none; }
+/* The bar's strip along the bottom of the window: the logo at its left end, the wooden bar in the middle (or as near
+   it as the logo allows). No transform here or on the bar: it would trap the menus, which are fixed on a phone. */
+.toolbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--bar-h); padding: 0 16px;
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; font-size: 15px; font-weight: 500; color: var(--bar-text); }
+.logo { justify-self: start; display: flex; align-items: center; gap: 8px; padding: 4px 14px 4px 6px; white-space: nowrap;
+  background: var(--surface); border: 2px solid var(--border); border-radius: 14px; box-shadow: var(--halo), var(--lift);
+  transform: rotate(-2deg); color: var(--text); }
+.logo img { display: block; width: 40px; height: 40px; }
+.logo b { font-size: 20px; font-weight: 700; }
+.logo b span { color: var(--wordmark); }
+/* The wooden tray: grain over a vertical gradient, a lit top edge and a shaded bottom one. It never scrolls sideways. */
+.bar { grid-column: 2; min-width: 0; max-width: 100%; display: flex; align-items: center; gap: 4px; padding: 6px; border-radius: 20px;
+  background: var(--grain), linear-gradient(var(--wood1), var(--wood2)); box-shadow: var(--wood-shadow); }
+.tb-left, .tb-mid, .tb-right, .pop { position: relative; display: flex; gap: 4px; align-items: center; min-width: 0; }
+.tb-left, .tb-right { flex: none; }
+/* Only the names of the mockup and the screen (on a phone also the theme) get shorter when the bar is short of room. */
+.bar #boxesButton, .pop:has(> #boxesButton, > #zoomValue) { flex: none; }
+.bar button { flex: none; display: inline-flex; gap: 5px; align-items: center; padding: 6px 10px; border-radius: 12px; white-space: nowrap; }
+.bar button:hover:not(:disabled) { background: var(--wood-hover); }
+.bar button:disabled { color: var(--bar-disabled); }
+.bar .trail { font-size: 18px; line-height: 1; }
+/* The deck: New mockup, a blue card with an ivory edge. */
+.bar .deck { width: 42px; height: 46px; padding: 0; justify-content: center; border: 3px solid var(--deck-edge); border-radius: 8px;
+  background: repeating-linear-gradient(45deg, var(--deck-stripe) 0 4px, var(--deck) 4px 8px);
+  box-shadow: 2px 2px 0 var(--deck-edge), 4px 4px 0 var(--wood-line); font-size: 22px; color: var(--deck-edge); }
+.bar .deck:hover:not(:disabled) { background: repeating-linear-gradient(45deg, var(--deck) 0 4px, var(--deck-stripe) 4px 8px); }
+#zoomValue { min-width: 4.6em; font-variant-numeric: tabular-nums; }
+.bar .menu-button { flex: 0 1 auto; max-width: 100%; min-width: 0; }
+/* One chevron for every menu, pointing up, since menus open upward; a line between the bar's items. */
+.caret { flex: none; width: 6px; height: 6px; margin: 4px 1px 0 3px; border: solid currentColor; border-width: 0 1.8px 1.8px 0;
+  transform: rotate(-135deg); opacity: .7; }
+.sep { flex: none; width: 2px; height: 26px; margin: 0 3px; background: var(--wood-line); }
+.tb-left:has(#navButton[hidden]) .sep, .toolbar:not(.has-boxes) .box-sep { display: none; }
 .icon { display: block; width: 1em; height: 1.4em; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
-.pop { position: relative; display: flex; align-items: center; }
-#projectButton { max-width: min(36ch, 40vw); }
-#navButton { max-width: min(40ch, 36vw); }
-@media (max-width: 900px) { .wide-only { display: none; } .logo { display: none; } }
-/* Dropdowns from the toolbar. */
-.menu { position: absolute; top: calc(100% + 6px); z-index: 30; min-width: 240px; max-width: min(440px, calc(100vw - 20px));
-  max-height: calc(100vh - 70px); overflow: auto; display: flex; flex-direction: column; padding: 6px; background: var(--card);
-  border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); font-size: 13px; }
-.tb-left .menu { left: 0; }
-.tb-mid .menu { left: 50%; transform: translateX(-50%); }
-.tb-right .menu { right: 0; }
+#projectButton { max-width: min(36ch, 24vw); }
+.pop:has(> #projectButton) { min-width: 7.5em; }
+#navButton { max-width: min(40ch, 30vw); }
+@media (max-width: 900px) { .bar .wide-only, .logo b { display: none; } #projectName { max-width: 12ch; } .logo { padding: 4px; } }
+
+/* Menus open upward from their button and are never taller than the window above the bar; they scroll inside. */
+.menu { position: absolute; left: 0; bottom: calc(100% + 16px); z-index: 30; min-width: 240px; max-width: min(440px, calc(100vw - 20px));
+  max-height: calc(100vh - var(--bar-h) - 12px); overflow: auto; display: flex; flex-direction: column; padding: 6px;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
+  font: 13px/1.4 system-ui, -apple-system, sans-serif; }
+.tb-right .menu { left: auto; right: 0; }
 .pop .menu { min-width: 160px; }
 .menu h3 { margin: 8px 8px 2px; font-size: 11px; font-weight: 600; }
-.menu hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
-.menu .item { display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left; border: 0; background: none; padding: 5px 8px;
+.menu hr { width: 100%; border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
+.bar .menu .item { display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left; border: 0; background: none; padding: 5px 8px;
   border-radius: 6px; }
-.menu .item:hover, .menu .item:focus-visible { background: var(--bg); }
+.bar .menu :is(.item, .menu-foot button):is(:hover, :focus-visible):not(:disabled) { background: var(--surface-2); }
+.bar .menu button:disabled { color: var(--disabled); }
 .menu .item small, .menu kbd { color: var(--muted); font: inherit; margin-left: auto; white-space: nowrap; }
 .menu-recent { display: flex; flex-direction: column; min-width: 320px; max-width: 460px; }
 .menu-recent .item.current { font-weight: 700; }
-.menu-foot { display: flex; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
-.menu-foot button { flex: 1; }
-/* Nav: every screen as an indented tree; the path to the current screen in the accent colour. */
-.nav-menu .item { padding-left: calc(8px + var(--depth, 0) * 16px); }
+.menu-foot { display: flex; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+.bar .menu-foot button { flex: 1; justify-content: center; border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; }
+/* Nav: every screen as an indented tree; the path to the current screen in ember. */
+.bar .nav-menu .item { padding-left: calc(8px + var(--depth, 0) * 16px); }
 .nav-menu .item b { font-variant-numeric: tabular-nums; color: var(--muted); }
-.nav-menu .item.path, .nav-menu .item.path b { color: var(--accent); }
-.nav-menu .item.current { font-weight: 700; background: var(--bg); }
+.nav-menu .item.path, .nav-menu .item.path b { color: var(--mark); }
+.nav-menu .item.current { font-weight: 700; background: var(--surface-2); }
 .nav-menu .item.planned { color: var(--muted); font-style: italic; }
 
-/* The box buttons in the toolbar: each moves the view to its box; the number counts what is new. In a
-   narrow window they fold into the Boxes menu. */
-.box-nav { position: static; display: flex; flex-direction: row; align-items: center; min-width: 0; padding: 0; border: 0; box-shadow: none; background: none; gap: 2px; }
-.box-nav button { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; padding: 4px 6px; }
-.box-nav b, #boxesButton b { color: var(--on-accent); background: var(--accent); border-radius: 9px; padding: 0 6px; font-size: 11px; }
+/* The box buttons in the bar: each moves the view to its box; the gold number counts what is new. In a narrow window
+   they fold into the Boxes menu. */
+.box-nav { position: static; display: flex; flex-direction: row; align-items: center; min-width: 0; max-height: none; padding: 0; border: 0;
+  box-shadow: none; background: none; color: inherit; font: inherit; gap: 4px; }
+.box-nav b, #boxesButton b { min-width: 20px; padding: 0 6px; border-radius: 99px; background: var(--badge); color: var(--on-badge);
+  font-size: 12px; font-weight: 600; line-height: 20px; text-align: center; }
 .toolbar b:empty, #boxesButton, .toolbar:not(.has-boxes) .box-nav { display: none; }
 .toolbar.has-boxes .box-nav[hidden] { display: flex !important; }
 @media (max-width: 1200px) {
   .toolbar.has-boxes #boxesButton { display: inline-flex; }
-  .box-nav { position: absolute; flex-direction: column; align-items: stretch; min-width: 200px; padding: 6px; border: 1px solid var(--line);
-    box-shadow: var(--shadow); background: var(--card); margin: 0; }
+  .box-nav { position: absolute; bottom: calc(100% + 16px); flex-direction: column; align-items: stretch; min-width: 200px; padding: 6px;
+    max-height: calc(100vh - var(--bar-h) - 12px); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
+    background: var(--surface); color: var(--text); font: 13px/1.4 system-ui, -apple-system, sans-serif; }
   .toolbar.has-boxes .box-nav[hidden] { display: none !important; }
-  .box-nav button { justify-content: space-between; }
+  .bar button { padding: 6px 7px; }
+  .sep { margin: 0 1px; }
+  .pop:has(> #projectButton) { min-width: 6em; }
+  .bar .box-nav button { justify-content: space-between; padding: 5px 8px; border-radius: 6px; }
+  .bar .box-nav button:hover:not(:disabled) { background: var(--surface-2); }
   .box-nav .sep { display: none; }
 }
 
-/* Voice: the microphone in the toolbar, a pulsing dot while it listens. */
+/* A phone: two rows (the deck and Nav above, the rest below); menus span the window; no logo. */
+@media (max-width: 720px) {
+  .toolbar { grid-template-columns: 1fr; padding: 0 8px; }
+  .logo, .tb-mid > .sep:first-child { display: none; }
+  .bar { grid-column: 1; justify-self: center; display: grid; grid-template-columns: minmax(0, auto) auto; row-gap: 4px; gap: 4px 2px; }
+  .tb-left { grid-column: 1 / -1; justify-content: center; }
+  .tb-mid .sep, .tb-right > .sep { display: none; }
+  .pop:has(> .menu-button) { min-width: 4.5em; }
+  #projectButton, #navButton { max-width: none; }
+  .bar button { padding: 6px 5px; }
+  .bar .deck { height: 40px; width: 38px; }
+  .toolbar :is(.menu, .box-nav) { position: fixed; left: 8px; right: 8px; bottom: calc(var(--bar-h) - 2px); min-width: 0; max-width: none; }
+  .menu-recent { min-width: 0; max-width: none; }
+}
+
+/* Voice: the microphone, last in the bar, gold while on, with a pulsing dot while it listens. */
 .toolbar .voice { position: relative; }
-.toolbar .voice:not(.voice-off) { color: var(--accent); }
-.voice:is(.voice-awake, .voice-countdown)::after { content: ''; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.toolbar .voice:not(.voice-off) { color: var(--current); }
+.voice:is(.voice-awake, .voice-countdown)::after { content: ''; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--current); }

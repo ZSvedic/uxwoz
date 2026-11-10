@@ -43,36 +43,39 @@ one, and the other is gone. After that, the user changes a screen by asking for 
 
 ## Toolbar
 
-One bar, 44 px tall, with three parts. A thin vertical line stands between its items: the mockup
-menu | ← Nav → | Rules | Fixer | Components | Data | Theme | zoom. The four menus (mockup, Nav,
-Theme, zoom) look alike: normal weight and the same chevron.
+One wooden bar, about 58 px tall, at the bottom centre of the window, with the logo at the left
+end of its strip. A thin vertical line stands between its items: **+** | ← Nav → | the mockup menu |
+Rules | Fixer | Components | Data | Theme | zoom | the microphone. **+** opens the generate panel
+(New mockup). The four menus (mockup, Nav, Theme, zoom) look alike, have the same chevron, and open
+upward, never taller than the window above the bar. The bar never scrolls sideways. Under 720 px it
+has two rows (**+** and ← Nav → above, the rest below), menus span the window, and the logo goes.
 
-- **Project menu** (left): a button with the mockup's prompt, cut short. Its menu has
-  **New mockup…** (opens the generate panel), **Recent mockups** (the last ten, the open one
+- **Project menu**: a button with the mockup's prompt, cut short (at 12 characters under 900 px).
+  Its menu has **Recent mockups** (the last ten, the open one
   ticked; choosing one opens it), and, with a mockup open, **⇩ Export the boxes** (a markdown file
   of Components, Rules and Data), **⇩ Export project…** (a zip, see Export below), **↺ Start over** (deletes every screen and the boxes, and makes
   the first screen again) and **✕ Delete** (deletes the mockup). Both ask first.
-- **Nav** (middle): names the current screen (*L2 Camera ▾*). Its menu lists every screen as an
+- **Nav**: names the current screen (*L2 Camera ▾*). Its menu lists every screen as an
   indented tree, each with the control that opened it (*via Camera*), the path to the current
-  screen in orange. Choosing one makes it current and scrolls to it. Planned screens (see
+  screen in ember. Choosing one makes it current and scrolls to it. Planned screens (see
   Navigation) are in the tree too, greyed, marked *not made yet*; choosing one makes it, as its
   link would. The components follow, under a **Components** row that moves the view to their box.
 - **← and →** (either side of Nav): back to the screen looked at before, and forward again, like a
   browser: every screen that becomes current is a step, and reaching a screen any other way drops
   the steps ahead. Screens deleted since are skipped. ⌘[ and ⌘] do the same (also while a screen
   has the focus), and so do the mouse's back and forward buttons.
-- **Rules, Fixer, Components, Data** (right): each moves the view to its box (Fixer to Fixer's
+- **Rules, Fixer, Components, Data**: each moves the view to its box (Fixer to Fixer's
   notes). A number beside it counts the entries filing or the fixer added or changed (for Fixer,
   the fixer's visits) since the user last looked; three seconds after a look, they count as seen
   and lose their *new* mark. The box becomes current. In a window 1,200 px wide or less, the four
-  fold into one **Boxes ▾** menu under its button: each item keeps its number, and the button shows
+  fold into one **Boxes ▾** menu above its button: each item keeps its number, and the button shows
   their sum.
-- **Theme** (right, left of the zoom): a menu of the themes, the one showing ticked; see Pickers.
-- **Zoom** (right): **−**, the zoom level, **+** and **Fit screen**, the first and last drawn as icons
+- **Theme** (left of the zoom): a menu of the themes, the one showing ticked; see Pickers.
+- **Zoom**: **−**, the zoom level, **+** and **Fit screen**, the first and last drawn as icons
   at the size of the text (Fit screen's is four corners pointing out). The level opens a menu: Zoom
   in ⌘+, Zoom out ⌘−, 50%, 100% ⌘0, 200%, Fit all ⇧1, Fit screen ⇧2, Fit screen width ⇧3. The keys
   work anywhere outside a text field (Ctrl in place of ⌘ off a Mac). Under 900 px wide only the
-  level stays. The keys also work while a screen has the focus.
+  level stays, and the logo is the hat alone. The keys also work while a screen has the focus.
 
 Menus close on Esc, on a press outside them, or on a click into a screen.
 
@@ -100,14 +103,14 @@ in one row, and a large **Generate** button below them. Under that come **Templa
 prompts that start a mockup at once) and **Recent mockups** (every mockup in the cache, most
 recently changed first, with its number of screens; the list comes from the server, so it is the
 same in every browser). The panel is the same with or without a mockup open: with none it shows on
-its own, and **New mockup…** shows it over the canvas, where Esc or a press outside closes it.
+its own, and **+** shows it over the dimmed canvas, where Esc or a press outside closes it.
 A prompt seen before opens its mockup from the cache, at no cost, with the current screen it had
 last time in this browser. A reload opens the mockup that
 was open, with its A OR B if one was waiting for a pick; it never starts a new design by itself.
 
 ## Canvas
 
-The canvas holds every picked screen of the mockup, laid out as a tree on a dot grid. Nothing is
+The canvas holds every picked screen of the mockup, laid out as a tree on a night sky. Nothing is
 hidden when the user branches.
 
 - **Levels**: a screen's level is the fewest clicks from the first screen (L1). The app works it
@@ -119,7 +122,7 @@ hidden when the user branches.
   one, else the first other. The screens of a row sit side by side, children in the order of their
   parents; a screen's first child sits straight below it when that place is free, else in the next
   free place to the right. A parent never moves to make room for its children.
-- **Lines**: one thin orange line from each screen to the screen it hangs under: straight down in
+- **Lines**: one thin tan line from each screen to the screen it hangs under: straight down in
   the same column, else down, across and down. Each parent whose lines bend has its own height in
   the gap below its row where they go across, the leftmost parent lowest, so no two lines cross or
   run together; the gap grows with them. Other buttons between screens draw no line.
@@ -127,7 +130,7 @@ hidden when the user branches.
   under that, its idea, on up to two lines; a longer idea ends in **more**, which shows the rest
   (and **less** folds it again). Names and ideas keep their size on screen at any zoom; below
   50% only the names show. Hovering a name shows it whole.
-- **Current screen**: the one the user last picked, clicked in, or chose in Nav. It has an orange
+- **Current screen**: the one the user last picked, clicked in, or chose in Nav. It has a gold
   outline and its rail at full strength; other screens show their rail on hover. Fit screen uses
   it. A box can be current instead (see Boxes): then Fit screen and Fit screen width fit the box
   and its rail, top first, and opening the drawer keeps the box in view. A click in a screen makes
@@ -143,9 +146,9 @@ hidden when the user branches.
 - **Opening a mockup** fits its current screen, and fits it again once the screen has its real
   size. **Fit screen** keeps a tall screen readable and shows its top, like the A OR B fit.
 - **Pan and zoom**: scroll, or drag the empty canvas, to pan. Pinch or Ctrl/Cmd + scroll zooms
-  around the pointer, also over a screen, from 10% to 200%. The dot grid's spacing follows the
-  zoom.
-- **Errors** show in a red pill at the bottom of the canvas until closed, or until the next screen
+  around the pointer, also over a screen, from 10% to 200%. The stars zoom with
+  the canvas.
+- **Errors** show in a red pill at the bottom of the canvas, above the bar, until closed, or until the next screen
   or change starts. Time and cost are in Info.
 
 ## A OR B
@@ -221,7 +224,7 @@ turns it on or off. The browser asks for the microphone the first time. In a bro
 turn speech into text, the button is not there. Its tooltip says that in Chrome the audio goes to
 Google to be turned into text. It hears English, the language Edits are written in.
 
-1. **On** (the icon in orange): it listens for **"hey Woz"** at the start of what the user says
+1. **On** (the icon in gold): it listens for **"hey Woz"** at the start of what the user says
    (also heard as *hey was* or *hey waz*). The phrase in the middle of a sentence does nothing, so
    talk about something else does not start an Edit.
 2. **Listening** (a pulsing dot): the words show live in the drawer's Edit field of the current
@@ -256,7 +259,7 @@ row is as tall as the first screen, and the rows below start under it; a child t
 the boxes, and another screen with no parent goes right of the boxes. Every model call reads
 Components, Rules and Data in full, so what is in them is what the screens share.
 
-A click in a box (not in a component card) or on its toolbar button makes it current: an orange
+A click in a box (not in a component card) or on its toolbar button makes it current: a gold
 border and its rail at full strength, as a current screen has; other boxes show their rail on
 hover. Each box's rail is like a screen's, right of it: first its own button (Rules **+ Rule**,
 Fixer's notes **▶ Visit now**, Data **+ Table**; Components has none), then:
@@ -394,7 +397,7 @@ their links with no `@` lead nowhere.
 - **Device**: Phone (default, 390 px wide) or Desktop (1024 px). The model is told which one, and
   every screen is that wide and at least one device screen tall. It applies to new screens; Edit and Regenerate
   keep the screen's own device. While a mockup is open, the picker shows the device of its first
-  screen, so its next screens, and Start over, match it; **New mockup…** and closing the mockup
+  screen, so its next screens, and Start over, match it; **+** (New mockup) and closing the mockup
   bring back the saved choice. Screens made before devices existed show at 800 px.
 - **Theme** (in the toolbar): Mockup (default) or Clean. Mockup is black and white with a handwriting font and
   wobbly borders, so a screen reads as a sketch; even the model's chart colours turn grey, except
@@ -444,6 +447,7 @@ browser and says what they think. Nothing is real-time and nobody signs in: a li
 
 ## Colours
 
-Black and white is the mockup, blue is a control in a mockup that opens another screen, and burnt
-orange is UX Woz itself: Generate, the current screen, lines, the OR, Nav's path and the picked
-outline.
+Black and white is the mockup, and blue is a control in a mockup that opens another screen, in
+both themes. UX Woz itself sits on a night sky, its menus and panels parchment by day and indigo
+by night. Ember is UX Woz's actions: Generate, Make the change, Pick; it also marks Nav's path and
+what is *new*. Gold is the OR, the box numbers and the current screen or box. Lines are ropes.
