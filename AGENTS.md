@@ -80,7 +80,7 @@ src/packages/web/src/
   player.html, player.ts   the player at /s/<token>: one screen in its device frame, Back, the trail, feedback, trips
   index.html     the page around the canvas; links design/index.css
   design/        the look: tokens.css (every colour), base.css (shared by parts), one file per part (bar,
-                 canvas, boxes, drawer, panel), motion.css; index.css imports them all
+                 canvas, boxes, drawer, panel), motion.css; index.css imports them all; fx.ts (sparks, sounds, pickFx)
   design/brand/  the logo, the favicons (SVG, PNG, home screen), the three star tiles, Fredoka and its licence
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest

@@ -45,7 +45,8 @@ one, and the other is gone. After that, the user changes a screen by asking for 
 
 One wooden bar, about 58 px tall, at the bottom centre of the window, with the logo at the left
 end of its strip. A thin vertical line stands between its items: **+** | ← Nav → | the mockup menu |
-Rules | Fixer | Components | Data | Theme | zoom | the microphone (in a browser with speech input).
+Rules | Fixer | Components | Data | Theme | zoom | the speaker | the microphone (in a browser with
+speech input).
 **+** opens the generate panel (New mockup). The four menus (mockup, Nav, Theme, zoom) look alike,
 have the same chevron, and open upward, never taller than the window above the bar. The bar never
 scrolls sideways and nothing in it runs past its edge: short of room, the mockup's name gets shorter
@@ -157,7 +158,7 @@ hidden when the user branches.
 
 Every new screen, the first one and every click to a new screen, comes as two designs made at the
 same time. One of them, on a random side, is asked to be a clearly different design, so the side
-says nothing about which is which.
+says nothing about which is which. Both appear out of a blur, the second a beat later.
 
 - **Fit and restore**: before an A OR B shows, the canvas remembers its zoom and scroll, then fits
   both designs to the stage's width, top first. Once both have finished and taken their real size
@@ -169,10 +170,12 @@ says nothing about which is which.
   (*One big clean button on top*).
 - **Locked previews**: both stream in live, and their scripts run once finished, so charts draw.
   Nothing inside them can be clicked. A side can be picked once it has finished: hovering it
-  rings it in gold and shows **Pick this design**.
+  lifts it with a gold glow, rings it in gold and shows **Pick this design**.
 - **Picking**: a click anywhere on a finished side keeps it as the screen's first version and
-  deletes the other. If the other is still streaming, it stops and nothing of it is kept. The
-  frame does not reload, so the picked screen stays as it was.
+  deletes the other. If the other is still streaming, it stops at once and nothing of it is kept.
+  Both sides and the ✕ are locked, and for 0.8 s the picked one rises and the other dissolves;
+  then the other is deleted and the zoom and scroll come back. The frame does not reload, so the
+  picked screen stays as it was, and it ends where it started.
 - **Failures**: a side that fails shows its error in its place. If both fail, the A OR B goes
   away.
 - **✕** under the OR drops both designs; for the first screen, that drops the mockup.
@@ -203,7 +206,7 @@ buttons wait (Info still works).
 ## Drawer
 
 A 360 px card docked at the right edge, level, rounded, with a double gold line inside its edge,
-for the current screen or box (see Boxes for a box's).
+for the current screen or box (see Boxes for a box's). It swings in over 0.45 s and closes at once.
 The canvas gets narrower and scrolls so the screen stays fully visible beside it. Esc or ✕ closes
 it. It has two tabs:
 
@@ -227,7 +230,7 @@ turns it on or off. The browser asks for the microphone the first time. In a bro
 turn speech into text, the button is not there. Its tooltip says that in Chrome the audio goes to
 Google to be turned into text. It hears English, the language Edits are written in.
 
-1. **On** (the icon in gold): it listens for **"hey Woz"** at the start of what the user says
+1. **On** (the icon in gold; no sound plays while it is on): it listens for **"hey Woz"** at the start of what the user says
    (also heard as *hey was* or *hey waz*). The phrase in the middle of a sentence does nothing, so
    talk about something else does not start an Edit.
 2. **Listening** (a pulsing dot): the words show live in the drawer's Edit field of the current
@@ -457,3 +460,11 @@ both themes. UX Woz itself sits on a night sky, its menus and panels parchment b
 by night. Ember is UX Woz's actions: Generate, Make the change, Pick; it also marks Nav's path and
 what is *new*. Gold is the OR, the box numbers, the pins, and the ring and glow of the current
 screen or box. Lines are tan ropes with a dark twist.
+
+## Look
+
+Sounds are off by default; the speaker in the bar turns them on, kept in this browser: a whoosh
+when designs appear and when the drawer opens, a chime on a pick, a tinkle on hovering a side.
+With the system's reduced-motion setting there are no sparks and every animation jumps to its end.
+`?design=still` in the address shows the same look with no animation, no sound and no tilt, for
+checks and screenshots.

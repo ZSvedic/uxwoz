@@ -29,6 +29,8 @@
   /* The gold pin of a box and the gold coin of the OR: a lit face, a glow, a shadow under them. */
   --pin: radial-gradient(circle at 35% 35%, #ffe9a8, var(--gold) 55%, #8a5a00); --pin-shadow: 0 0 8px var(--gold), 0 3px 4px #0006;
   --coin: radial-gradient(#fff3c4, var(--gold)); --coin-shadow: 0 0 18px var(--gold), inset 0 -3px 0 #0003;
+  /* Sparks (fx.ts): gold, white and blue round a picked design, two greens round the other; the winner's glow. */
+  --spark-gold: var(--gold); --spark-white: var(--paper); --spark-blue: #6f8cff; --spark-green: #34d38a; --spark-mint: #9fe9c4;
   /* The wood's grain and its lit and shaded edges; the light and the line on wood for hover and separators. */
   --grain: repeating-linear-gradient(100deg, transparent 0 22px, rgba(255, 255, 255, .05) 22px 24px);
   --wood-shadow: 0 2px 0 rgba(255, 255, 255, .15) inset, 0 -3px 0 rgba(0, 0, 0, .25) inset, 0 16px 34px -8px rgba(0, 0, 0, .55);

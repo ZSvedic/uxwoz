@@ -9,6 +9,7 @@ import type { CardView, ScreenView } from './canvas.ts'
 import { canvas, closeMockup, side } from './app.ts'
 import { boxOp, renderDrawer } from './drawer.ts'
 import { mapOf, post, showError, hint, stream, streamInto, themeCss, type StreamRenderer } from './net.ts'
+import { pickFx } from './design/fx.ts'
 import { applyMap, filed, saveCurrent, setCurrent } from './nav.ts'
 import { loadRecent, renderToolbar } from './toolbar.ts'
 import { changeInput, deviceSelect, generate, modelSelect, state, type Making, type Side } from './state.ts'
@@ -200,7 +201,7 @@ export async function pick(key: string, index: number) {
     // The other side stops; the A OR B stays drawn until the server answers, so the picked frame
     // is kept (and renamed below) instead of loading again.
     if (m) { stopMaking(); state.making = m }
-    const res = await post('/api/pick', { key, index }).catch(() => null)
+    const [res] = await Promise.all([post('/api/pick', { key, index }).catch(() => null), pickFx(key, index)])
     if (state.making === m) state.making = null
     if (!res?.ok) {
       showError('Could not keep that design')

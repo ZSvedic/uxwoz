@@ -102,6 +102,10 @@
   .menu-recent { min-width: 0; max-width: none; }
 }
 
+/* The speaker: sounds on or off (fx.ts); muted, it is faint and has no waves. */
+.bar .sound svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.bar .sound.off { opacity: .55; }
+.sound.off .wave { display: none; }
 /* Voice: the microphone, last in the bar, gold while on, with a pulsing dot while it listens. */
 .toolbar .voice { position: relative; }
 .toolbar .voice:not(.voice-off) { color: var(--current); }

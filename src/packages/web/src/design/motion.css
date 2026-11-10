@@ -1,7 +1,65 @@
-/* Every transition and animation of the app. */
-/* The Pick hint and the rails fade in. */
+/* Every transition and animation of the app. They move transform, opacity, filter and box-shadow only, on a card's
+   inner .screen, so no box the canvas measures changes. fx.ts adds the pick's classes (fx-lock, fx-won, fx-lost), the
+   sparks and the sounds; the sounds start on the animations named summon and hand. */
+
+/* The Pick hint and the rails fade in; a box straightens smoothly when it becomes current. */
 .pick-hint { transition: opacity .15s; }
 .rail { transition: opacity .15s; }
+.box { transition: transform .2s; }
 /* The microphone's dot pulses while it listens. */
 .voice:is(.voice-awake, .voice-countdown)::after { animation: voice-pulse 1s ease-in-out infinite alternate; }
 @keyframes voice-pulse { to { opacity: .25; } }
+
+/* A or B: both designs appear out of a blur, the second a beat later. Every later animation of a side lists summon
+   first, so it does not play again. */
+.card.side .screen { animation: summon .8s ease-out both; }
+.card.side[data-id$="#1"] .screen { animation-delay: .15s; }
+@keyframes summon {
+  0% { opacity: 0; filter: blur(10px) brightness(3); transform: scale(.85); }
+  60% { opacity: 1; filter: blur(0) brightness(1.4); }
+  100% { transform: none; }
+}
+/* Hovering a finished side lifts it once with a gold glow. */
+.card.side.pickable:not(.fx-lock):hover .screen { animation: summon .8s ease-out both, lift .9s ease-in-out; }
+@keyframes lift {
+  50% { transform: translateY(calc(-12px / var(--z)));
+    box-shadow: 0 0 0 7px var(--frame), 0 0 0 calc(7px + 2px / var(--z)) var(--current), 0 0 calc(40px / var(--z)) var(--gold), var(--lift); }
+}
+
+/* The pick: nothing of the pair takes a click; the picked side rises, glows and comes back to where it was (no fill),
+   the other dissolves, its idea too, and stays gone until fx.ts takes the class off (or the app deletes it). */
+.fx-lock, .fx-lock * { pointer-events: none !important; }
+.card.side.fx-won .screen { animation: summon .8s ease-out both, won .8s cubic-bezier(.3, 1.4, .5, 1); }
+@keyframes won {
+  40% { transform: translateY(calc(-22px / var(--z))) scale(1.04);
+    box-shadow: 0 0 0 7px var(--frame), 0 0 0 calc(7px + 3px / var(--z)) var(--current), 0 0 calc(60px / var(--z)) var(--gold); }
+}
+.card.side.fx-lost .screen { animation: summon .8s ease-out both, lost .8s ease-in forwards; }
+.card.fx-lost .head { opacity: 0; transition: opacity .4s; }
+@keyframes lost {
+  30% { filter: brightness(1.6) blur(1px); }
+  100% { opacity: 0; filter: blur(12px) brightness(2.5); transform: scale(.7) translateY(calc(-30px / var(--z))); }
+}
+/* Sparks: small stars fly out from a card and fade. fx.ts sets where each goes (--x, --y) and its colour (--c). */
+.spark { position: absolute; left: 50%; top: 45%; z-index: 3; pointer-events: none; color: var(--c);
+  font: calc(18px / var(--z))/1 serif; text-shadow: 0 0 calc(6px / var(--z)) var(--c); animation: spark .9s ease-out forwards; }
+@keyframes spark {
+  0% { transform: translate(-50%, -50%) scale(.3); }
+  100% { transform: translate(calc(var(--x) / var(--z)), calc(var(--y) / var(--z))) scale(1.3) rotate(180deg); opacity: 0; }
+}
+
+/* The drawer swings in from off the right, tilted, and comes to rest level. It closes at once. */
+.drawer:not([hidden]) { animation: hand .45s cubic-bezier(.2, 1.3, .4, 1); }
+@keyframes hand { from { transform: translate(150%, 40px) rotate(12deg); } }
+
+/* Reduced motion: every animation jumps to its end, nothing moves on its own, no sparks. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01s !important; animation-delay: 0s !important;
+    animation-iteration-count: 1 !important; transition: none !important; }
+  .spark { display: none; }
+}
+/* The still look (?design=still): the same, with no animation at all, no tilt and no sparks, for checks and screenshots. */
+:root[data-design="still"] *, :root[data-design="still"] *::before, :root[data-design="still"] *::after {
+  animation: none !important; transition: none !important; }
+:root[data-design="still"] .spark { display: none; }
+:root[data-design="still"] .box { transform: none; }
