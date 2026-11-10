@@ -14,9 +14,9 @@ function walk(rules: CSSRuleList, into: Map<string, string>) {
 }
 for (const s of document.styleSheets) try { walk(s.cssRules, light) } catch { /* another origin's sheet */ }
 
-/** A value with its var() chain followed, by day or by night. */
+/** A value with every var() in it replaced, chains followed, by day or by night (a gradient's colours too). */
 const at = (night: boolean) => (n: string) => (night && dark.get(n)) || light.get(n) || ''
-const resolve = (v: string, get: (n: string) => string) => { for (let i = 0, m; i < 9 && (m = v.match(/^var\((--[\w-]+)\)$/)); i++) v = get(m[1]!); return v }
+const resolve = (v: string, get: (n: string) => string) => { for (let i = 0; i < 9 && v.includes('var('); i++) v = v.replace(/var\((--[\w-]+)\)/g, (_, n: string) => get(n)); return v }
 const span = (text: string, swatch?: string) => {
   const s = document.createElement('span'), i = document.createElement('i')
   if (swatch && (/gradient\(/.test(swatch) || (!swatch.includes('var(') && CSS.supports('color', swatch)))) { i.className = 'sheet-sw'; i.style.background = swatch; s.append(i) }

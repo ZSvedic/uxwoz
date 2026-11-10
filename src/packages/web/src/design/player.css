@@ -25,9 +25,13 @@ body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-even
   border-radius: 10px; box-shadow: 0 0 0 7px var(--frame), 0 0 0 8px var(--frame-edge), var(--halo), var(--lift); }
 .device iframe { display: block; width: 100%; border: 0; }
 
-/* Feedback on the wooden bar at the bottom; Done is the ember button. */
-.tools { position: fixed; bottom: 10px; left: 8px; right: 8px; z-index: 2; width: fit-content; margin: 0 auto;
-  display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 6px; border-radius: 20px;
+/* The dock at the bottom: a toast sits on top of the feedback bar, however many rows the bar wraps to. */
+.dock { position: fixed; bottom: 10px; left: 8px; right: 8px; z-index: 2; display: flex; flex-direction: column;
+  align-items: center; gap: 8px; pointer-events: none; }
+.dock > * { pointer-events: auto; }
+
+/* Feedback on the wooden bar; Done is the ember button. */
+.tools { max-width: 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 6px; border-radius: 20px;
   background: var(--grain), linear-gradient(var(--wood1), var(--wood2)); box-shadow: var(--wood-shadow);
   color: var(--bar-text); font: 500 15px/1.4 Fredoka, system-ui, sans-serif; }
 .tools button { padding: 6px 12px; border-color: transparent; border-radius: 12px; background: none; }
@@ -35,9 +39,10 @@ body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-even
 .tools button.on { background: var(--badge); color: var(--on-badge); }
 .tools .primary, dialog .primary { padding: 6px 18px; border-radius: 99px; background: var(--pick); color: var(--on-pick);
   box-shadow: var(--pick-shadow); }
+.tools .primary:focus-visible, dialog .primary:focus-visible { box-shadow: 0 0 0 2px var(--focus-in), var(--pick-shadow); }
 
 /* A short message, and a link that shows nothing: parchment. */
-.toast { position: fixed; bottom: 76px; left: 16px; right: 16px; z-index: 3; width: fit-content; margin: 0 auto; padding: 8px 16px;
+.toast { max-width: calc(100% - 16px); padding: 8px 16px;
   background: var(--surface); color: var(--text); border: 2px solid var(--border); border-radius: 99px; box-shadow: var(--lift); }
 .note { max-width: min(420px, calc(100% - 32px)); margin: 80px auto; padding: 20px; text-align: center; font-size: 16px;
   background: var(--surface); color: var(--muted); border: 2px solid var(--border); border-radius: 20px; box-shadow: var(--halo), var(--lift); }

@@ -71,7 +71,10 @@ export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; playe
     '/s/:token': (req: Request & { params: Record<string, string> }, server: { port?: number }) => {
       const f = found(req)
       if (!f) return new Response('This link does not work any more.', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
-      return page(server, f.share.role === 'edit' ? '/_app' : '/_player')
+      if (f.share.role === 'edit') return page(server, '/_app')
+      // Crawlers ignore a relative og:image: give it this link's own origin, as linkOf does.
+      const origin = new URL(req.url).origin
+      return page(server, '/_player').then(async (r) => new Response((await r.text()).replace('content="/og.png"', `content="${origin}/og.png"`), { status: r.status, headers: { 'Content-Type': r.headers.get('content-type') ?? 'text/html;charset=utf-8' } }))
     },
     '/api/s/:token/map': (req: Request & { params: Record<string, string> }) => {
       const f = found(req)
