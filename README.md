@@ -67,8 +67,9 @@ cd src && bun scripts/voice-check.ts --url http://localhost:3000 --say "Hey Woz,
 It makes the clip with macOS `say`, starts a separate Google Chrome with its own profile (yours is
 never touched), opens the app, turns the microphone on and plays the clip through the speakers
 (`--player`, `afplay` by default). It prints what Chrome heard, what the label showed and the Edit
-field, then `PASS: the Edit was sent: "…"` or `FAIL:` with the link that broke. It stops the Edit's
-request before it reaches the server, so a run costs nothing. `--keep` keeps the clip and the profile.
+field, then `PASS: the Edit was sent: "…"` or `FAIL:` with the link that broke. It stops every POST to
+`/api/` (the Edit, a new screen, the warm-up) before it reaches the server, so a run costs nothing. It
+closes its Chrome and deletes the profile even on Ctrl-C; `--keep` keeps the clip and the profile.
 
 It needs a quiet room and speakers the microphone can hear. Chrome sends the audio to Google, as its
 voice input always does. The clip plays through the speakers because Chrome's fake microphone

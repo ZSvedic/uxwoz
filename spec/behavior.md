@@ -234,11 +234,11 @@ turn speech into text, the button is not there. Its tooltip says that in Chrome 
 Google to be turned into text. It hears English, the language Edits are written in.
 
 1. **On** (the icon in gold; no sound plays while it is on): it listens for **"hey Woz"** at the start of what the user says.
-   Chrome never writes *Woz*, so it also wakes on *hey*, *he*, *they* or *there* followed by *woz*,
-   *was* or *waz* (Chrome hears *"hey Woz"* as *he was* most often). **"Hey wizard"** works too, and
-   Chrome hears it right: *wizard* as the first or second word wakes it (*hey wizard*, *he wizard*,
-   *very wizard*). The phrase in the middle of a sentence does nothing, so talk about something else
-   does not start an Edit. The tooltip teaches "hey Woz" and says "hey wizard" works too.
+   Chrome never writes *Woz*, so it also wakes on *hey* or *he* followed by *woz*, *was* or *waz*
+   (Chrome hears *"hey Woz"* as *he was* most often). *They was* and *there was* do not wake it: they
+   start ordinary sentences. **"Hey wizard"** works too, and Chrome hears it right: *wizard* wakes it
+   as the first word, or after *hey*, *he*, *hi* or *very* (*the wizard* does not). The phrase in
+   the middle of a sentence does nothing, so talk about something else does not start an Edit. The tooltip teaches "hey Woz" and says "hey wizard" works too.
 2. **Listening** (a pulsing dot): the words show live in the drawer's Edit field of the current
    screen or box, and the drawer opens on Edit; the focus stays where it was. Words said right
    after "hey Woz" count too, and show while they are said: *"Hey Woz, use switches"*. Text the
@@ -255,7 +255,8 @@ Google to be turned into text. It hears English, the language Edits are written 
 
 **What it heard**: while the microphone is on, a small parchment label just above it shows the
 words as the browser returns them, live: *Heard: he was you switches*. When settled words do not
-start with the wake phrase, it adds *Start with "hey Woz".* The label hides four seconds after the
+start with the wake phrase, it adds *Start with "hey Woz".* (not for a stop or cancel phrase said
+on its own). The label hides four seconds after the
 last words. A long text is cut short on one line; the label never moves the bar and stays inside
 the window on a phone.
 
@@ -267,8 +268,9 @@ only when said on their own: *"add a button that says stop listening"* is an Edi
 
 Every stop says why, at once:
 
-- **No speech**: the label says *I hear nothing. Check the microphone.* The browser reports this
-  after a silence; it is routine, and voice keeps listening.
+- **No speech**: the label says *I hear nothing. Check the microphone.* once after the microphone is
+  turned on, and only if no words have been heard since. The browser reports no speech after every
+  silence; it is routine, and voice keeps listening.
 - **No microphone**: the red pill says *No microphone found.*
 - **No network**: the red pill says *Speech recognition needs the internet.*
 - **Blocked**: the red pill says *The browser blocked the microphone. To allow it, click the lock or

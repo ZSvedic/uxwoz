@@ -260,7 +260,7 @@ test('fail stops it and says why', () => {
 test('what Chrome hears for "hey Woz" and "hey wizard" wakes it, and the words after it are the Edit', () => {
   const cases: [string, string][] = [
     [' he was you switches', 'you switches'], [' hey was make the title bigger', 'make the title bigger'],
-    [' they was make the title bigger', 'make the title bigger'], [' There Was You switches', 'You switches'],
+    [' He Was You switches', 'You switches'], ['wizard, use switches', 'use switches'], [' hi wizard use switches', 'use switches'],
     ['hey wizard you switchers', 'you switchers'], [' he wizard use switches', 'use switches'], [' very wizard use switches', 'use switches'],
   ]
   for (const [said, edit] of cases) {
@@ -282,8 +282,9 @@ test('a bare " he was" wakes it; the next settled piece is the Edit', () => {
   expect(sent()).toEqual(['use switches'])
 })
 
-test('these do not wake it: the phrase mid-piece, wizard in a longer word or after two words, "wasn\'t", hey alone', () => {
-  for (const said of ['hello this is a test he was you switches', 'wizardry is fun', "he wasn't there", 'the old grey wizard came', ' hey make the title bigger']) {
+test('these do not wake it: the phrase mid-piece, "they was" and "there was", wizard in a longer word or after another word, "wasn\'t", hey alone', () => {
+  for (const said of ['hello this is a test he was you switches', ' they was make the title bigger', ' There Was You switches', 'wizardry is fun',
+    "he wasn't there", 'the old grey wizard came', 'the wizard', 'a wizard came', ' hey make the title bigger']) {
     const { m } = setup()
     m.start()
     m.hear(said, false)
@@ -323,19 +324,45 @@ test('every piece with words is heard, interim and final, with whether it woke; 
   m.hear(' he was use switches', true)
   m.hear(' and a title', false)
   expect(heard()).toEqual([
-    { type: 'heard', text: 'so they said', final: false, woke: false },
-    { type: 'heard', text: 'so they said', final: true, woke: false },
-    { type: 'heard', text: 'he was use', final: false, woke: true },
-    { type: 'heard', text: 'he was use switches', final: true, woke: true },
-    { type: 'heard', text: 'and a title', final: false, woke: true },
+    { type: 'heard', text: 'so they said', final: false, woke: false, phrase: false },
+    { type: 'heard', text: 'so they said', final: true, woke: false, phrase: false },
+    { type: 'heard', text: 'he was use', final: false, woke: true, phrase: false },
+    { type: 'heard', text: 'he was use switches', final: true, woke: true, phrase: false },
+    { type: 'heard', text: 'and a title', final: false, woke: true, phrase: false },
   ])
 })
 
-test('no speech says so and is no failure; no microphone and no network show at once, once per kind until turned on again', () => {
+test('a stop or cancel phrase said while asleep is heard as a phrase, so the label gives no "hey Woz" hint for it', () => {
+  const { m, events } = setup()
+  m.start()
+  for (const said of ['Woz stop.', 'was sleep', 'stop listening', 'cancel', 'Never mind', 'stop the music']) m.hear(said, true)
+  const heard = events.flatMap((e) => (e.type === 'heard' ? [[e.text, e.woke, e.phrase]] : []))
+  expect(heard).toEqual([['Woz stop.', false, true], ['was sleep', false, true], ['stop listening', false, true], ['cancel', false, true],
+    ['Never mind', false, true], ['stop the music', false, false]])
+})
+
+test('no speech says so once per turn-on, and only before any words were heard', () => {
+  const { clock, events, input, rec } = speech()
+  const quiet = () => events.filter((e) => e.type === 'quiet').length
+  const silence = () => { rec.onerror!({ error: 'no-speech' }); rec.onend!(); clock.advance(10000) }
+  silence(); silence(); silence()
+  expect(quiet()).toBe(1)
+  input.stop()
+  input.start()
+  input.machine.hear(' so they said', true)
+  silence()
+  expect(quiet()).toBe(1)
+  input.stop()
+  input.start()
+  silence()
+  expect(quiet()).toBe(2)
+})
+
+test('no speech is no failure; no microphone and no network show at once, once per kind until turned on again', () => {
   const { clock, events, input, rec } = speech()
   const errors = () => events.filter((e) => e.type === 'error').map((e) => (e as { message: string }).message)
   for (let i = 0; i < 6; i++) { rec.onerror!({ error: 'no-speech' }); rec.onend!(); clock.advance(10000) }
-  expect(events.filter((e) => e.type === 'quiet')).toHaveLength(6)
+  expect(events.filter((e) => e.type === 'quiet')).toHaveLength(1)
   expect(errors()).toEqual([])
   expect(input.machine.state).toBe('asleep')
   for (const kind of ['audio-capture', 'network', 'audio-capture']) { rec.onerror!({ error: kind }); rec.onend!(); clock.advance(10000) }

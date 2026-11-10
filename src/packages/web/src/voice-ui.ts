@@ -77,7 +77,7 @@ export function initVoice(button: HTMLButtonElement) {
       // Woken with nowhere to send the Edit: say so now, not at the end of the countdown.
       if (was === 'asleep' && e.state === 'awake' && !target()) hint('Click a screen first.')
       was = e.state
-    } else if (e.type === 'heard') tell(`Heard: ${e.text}`, e.final && !e.woke ? '. Start with "hey Woz".' : '')
+    } else if (e.type === 'heard') tell(`Heard: ${e.text}`, e.final && !e.woke && !e.phrase ?'. Start with "hey Woz".' : '')
     else if (e.type === 'quiet') tell('I hear nothing. Check the microphone.')
     else if (e.type === 'interim') show(e.text)
     else if (e.type === 'countdown') { show(e.text); left.textContent = `Sending in ${e.secondsLeft}…` }

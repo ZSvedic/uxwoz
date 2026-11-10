@@ -10,8 +10,9 @@ export type VoiceEvent =
   | { type: 'countdown'; text: string; secondsLeft: number }
   | { type: 'send'; text: string }
   | { type: 'error'; message: string }
-  /** Every piece with words while on; `woke`: it starts with the wake phrase, or the machine was awake already. */
-  | { type: 'heard'; text: string; final: boolean; woke: boolean }
+  /** Every piece with words while on; `woke`: it starts with the wake phrase, or the machine was awake already;
+   *  `phrase`: the whole piece is a stop or cancel phrase. */
+  | { type: 'heard'; text: string; final: boolean; woke: boolean; phrase: boolean }
   /** The browser heard no speech: routine, it keeps listening. */
   | { type: 'quiet' }
 
@@ -31,11 +32,12 @@ const realClock: Clock = {
 /** Lower case, letters and digits only, one space between words. */
 const words = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
 
-// "hey woz", and what Chrome hears instead (it never writes "woz": "he was" most often, then "hey was", "they was",
-// "there was"); or "wizard" as the first or second word ("hey wizard", "he wizard", "very wizard"). Only at the
-// start of a piece: in the middle of one it is more likely part of an unrelated sentence ("they say hey was a
-// greeting"). The word must end there: "he wasn't" and "wizardry" do not wake it.
-const WAKE = /^[^\p{L}\p{N}]*(?:(?:hey|he|they|there)[\s,]+(?:woz|was|waz)|(?:\p{L}+[\s,]+)?wizard)(?![\p{L}\p{N}'’])[\s,.!?;:]*/iu
+// "hey woz", and what Chrome hears instead (it never writes "woz": "he was" most often, then "hey was"; "they was"
+// and "there was" start ordinary sentences, so they do not count); or "wizard", first or after "hey", "he", "hi"
+// or "very" ("the wizard" does not count). Only at the start of a piece: in the middle of one it is more likely
+// part of an unrelated sentence ("they say hey was a greeting"). The word must end there: "he wasn't" and
+// "wizardry" do not wake it.
+const WAKE = /^[^\p{L}\p{N}]*(?:(?:hey|he)[\s,]+(?:woz|was|waz)|(?:(?:hey|he|hi|very)[\s,]+)?wizard)(?![\p{L}\p{N}'’])[\s,.!?;:]*/iu
 const STOP = ['woz sleep', 'woz stop', 'stop listening', 'was stop', 'was stopped', 'was sleep', 'wizard stop', 'wizard sleep']
 const CANCEL = ['cancel', 'never mind', 'nevermind']
 
@@ -68,7 +70,7 @@ export class VoiceMachine {
   }
 
   /** The microphone is on: wait for the wake phrase. */
-  start() { if (this.state === 'off') this.to('asleep') }
+  start() { if (this.state === 'off') { this.heardOnce = false; this.to('asleep') } }
 
   /** The microphone is off: nothing is sent. */
   stop() { this.drop(); this.to('off') }
@@ -79,8 +81,15 @@ export class VoiceMachine {
   /** Say what went wrong and keep listening. */
   warn(message: string) { if (this.state !== 'off') this.emit({ type: 'error', message }) }
 
-  /** The browser heard no speech. */
-  quiet() { if (this.state !== 'off') this.emit({ type: 'quiet' }) }
+  /** Whether words were heard, or "nothing heard" was said, since the microphone was turned on. */
+  private heardOnce = false
+
+  /** The browser heard no speech: say so once per turn-on, and only before any words were heard. */
+  quiet() {
+    if (this.state === 'off' || this.heardOnce) return
+    this.heardOnce = true
+    this.emit({ type: 'quiet' })
+  }
 
   /** The Cancel button, or "cancel" said: drop the text and keep listening. */
   cancel() {
@@ -98,7 +107,10 @@ export class VoiceMachine {
   hear(text: string, final: boolean) {
     if (this.state === 'off') return
     const w = words(text)
-    if (w) this.emit({ type: 'heard', text: text.trim(), final, woke: this.state !== 'asleep' || WAKE.test(text) })
+    if (w) {
+      this.heardOnce = true
+      this.emit({ type: 'heard', text: text.trim(), final, woke: this.state !== 'asleep' || WAKE.test(text), phrase: STOP.includes(w) || CANCEL.includes(w) })
+    }
     if (!final) {
       if (!w) return
       if (this.state === 'asleep') {

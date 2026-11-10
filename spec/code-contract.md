@@ -257,9 +257,10 @@ TreeNode   { level; parent: key | null; label }
 VoiceState 'off' | 'asleep' | 'awake' | 'countdown'   // web/src/voice.ts, the microphone's state
 VoiceEvent { type: 'state'; state } | { type: 'interim'; text } | { type: 'countdown'; text; secondsLeft }
            | { type: 'send'; text } | { type: 'error'; message }   // what VoiceMachine tells the page
-           | { type: 'heard'; text; final; woke }   // every piece with words while on; woke: it starts with the wake
-           // phrase, or the machine was awake or counting down already
-           | { type: 'quiet' }   // the browser heard no speech (routine); an 'error' from SpeechInput need not turn it off
+           | { type: 'heard'; text; final; woke; phrase }   // every piece with words while on; woke: it starts with the
+           // wake phrase, or the machine was awake or counting down already; phrase: the piece is a stop or cancel phrase
+           | { type: 'quiet' }   // the browser heard no speech, once per turn-on and only before any words; an 'error'
+           // from SpeechInput need not turn it off
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast' | 'gpt-6.1-terra'
            // Terra is the background model (filing, the fixer): never a screen model, never in /api/config
 Device     'phone' (390 × 844 px) | 'desktop' (1024 × 768 px): every screen is that wide and at
