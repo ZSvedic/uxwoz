@@ -10,8 +10,8 @@ export const TRIP_KEEP = 50
 export const FEEDBACK_CHARS = 1000
 export const EDIT_CAP = 20
 const ROLES = ['view', 'comment', 'edit'] as const
-/** The routes an edit link may not use: the share links themselves, deleting the whole mockup, the owner's warm-up. */
-const OWNER_ONLY = new Set(['/api/share', '/api/shares', '/api/unshare', '/api/delete-app', '/api/warmup'])
+/** The routes an edit link may not use: the share links themselves, resolving feedback, deleting the whole mockup, the owner's warm-up. */
+const OWNER_ONLY = new Set(['/api/share', '/api/shares', '/api/unshare', '/api/feedback', '/api/delete-app', '/api/warmup'])
 /** The routes that call a model when an edit link uses them (a new screen only when it is not in the cache). */
 const PAID = new Set(['/api/screen', '/api/revise', '/api/pick'])
 
@@ -20,7 +20,9 @@ type Route = any
 const json = (data: unknown, status = 200) => Response.json(data, { status })
 const fail = (error: string, status = 400) => json({ error }, status)
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
-const token = () => [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('')
+const hex = (bytes: number) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, '0')).join('')
+const token = () => hex(16)
+const VISITOR = /^[a-f0-9]{8,40}$/
 /** Keep the newest `SHARE_KEEP` of a list's items in the `same` group. */
 function capped<T>(list: T[], same: (x: T) => boolean = () => true) {
   const mine = list.filter(same)
@@ -28,8 +30,8 @@ function capped<T>(list: T[], same: (x: T) => boolean = () => true) {
   const drop = new Set(mine.slice(0, mine.length - SHARE_KEEP))
   list.splice(0, list.length, ...list.filter((x) => !drop.has(x)))
 }
-/** Feedback kinds kept apart, so one kind cannot push out another: comments, thumbs, answers (dead controls and Done). */
-const groupOf = (kind: Feedback['kind']) => (kind === 'done' ? 'dead' : kind)
+/** Feedback kinds kept apart, so one kind cannot push out another: comments, thumbs, answers (Done, and the old dead controls). */
+const groupOf = (kind: Feedback['kind']) => (kind === 'dead' ? 'done' : kind)
 const titleOf = (e: CacheEntry) => e.versions.at(-1)?.name || e.name || HOME_NAME
 
 /** The player's mockup: the picked screens' newest versions, their tree parents and the components; nothing else. */
@@ -56,14 +58,19 @@ export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; playe
   let saving: ReturnType<typeof setTimeout> | undefined
   const saveSoon = () => { saving ??= setTimeout(() => { saving = undefined; cache.save() }, 1000) }
 
-  /** A visitor's feedback or trip: the link must work, and a view link only views. */
-  const visitor = (run: (b: any, root: string) => Response) => api((b, req) => {
+  /** The link of a visitor's request: it must work, and a view link only views. */
+  const linkFor = (req: Request) => {
     const f = found(req as Request & { params?: Record<string, string> })
-    if (!f) return fail('This link does not work any more.', 404)
-    if (f.share.role === 'view') return fail('This link can only view.', 403)
-    return run(b, f.root)
+    return !f ? fail('This link does not work any more.', 404) : f.share.role === 'view' ? fail('This link can only view.', 403) : f
+  }
+  /** A visitor's feedback or trip: a working comment link, and a name (nothing is stored about a nameless visitor). */
+  const visitor = (run: (b: any, root: string, who: { visitor: string; name: string }) => Response) => api((b, req) => {
+    const f = linkFor(req)
+    if (f instanceof Response) return f
+    const name = str(b?.name, 60)
+    if (!name) return fail('Type your name first.')
+    return run(b, f.root, { visitor: VISITOR.test(String(b?.visitor)) ? String(b.visitor) : 'unknown', name })
   })
-  const who = (b: any) => ({ visitor: /^[a-f0-9]{8,40}$/.test(String(b?.visitor)) ? String(b.visitor) : 'unknown', name: str(b?.name, 60) || 'Someone' })
 
   const routes: Record<string, Route> = {
     '/_app': pages.app,
@@ -83,32 +90,42 @@ export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; playe
       f.share.opens++
       return json({ role: f.share.role, app: cache.get(f.root)?.app ?? f.root, ...playerMap(cache, f.root) })
     },
-    '/api/s/:token/feedback': { POST: visitor((b, root) => {
+    '/api/s/:token/feedback': { POST: visitor((b, root, who) => {
       const kind = b?.kind
-      if (!['comment', 'thumb', 'dead', 'done'].includes(kind)) return fail('unknown kind')
+      if (!['comment', 'thumb', 'done'].includes(kind)) return fail('unknown kind')
       const text = typeof b?.text === 'string' ? b.text.trim() : ''
       if (text.length > FEEDBACK_CHARS) return fail(`a text must be at most ${FEEDBACK_CHARS} characters`)
       if (kind !== 'thumb' && !text) return fail('write something first')
       const screen = cache.get(String(b?.screen ?? ''))
       const at = screen && normalizePrompt(screen.app) === root && !isComponent(screen) ? screen : undefined
       if (kind !== 'done' && !at) return fail('no such screen', 404)
-      const f: Feedback = { at: new Date().toISOString(), ...who(b), screen: at?.key ?? root, title: at ? titleOf(at) : '', kind,
-        ...(text && { text }), ...(str(b?.about, 120) && { about: str(b?.about, 120) }), ...(kind === 'thumb' && { up: !!b?.up }), ...(str(b?.label, 80) && { label: str(b?.label, 80) }) }
+      const about = str(b?.about, 120), tag = str(b?.tag, 20), label = str(b?.label, 80)
+      const nth = Number.isInteger(b?.nth) && b.nth >= 0 && b.nth <= 999 ? b.nth as number : undefined
+      const f: Feedback = { id: hex(8), at: new Date().toISOString(), ...who, screen: at?.key ?? root, title: at ? titleOf(at) : '', kind,
+        ...(text && { text }), ...(about && { about }), ...(about && /^[a-z][a-z0-9]*$/.test(tag) && { tag }), ...(about && nth != null && { nth }),
+        ...(kind === 'thumb' && { up: !!b?.up }), ...(label && { label }) }
       const list = cache.ownShared(root).feedback
       // One thumb per visitor and screen: the newest counts.
       if (kind === 'thumb') list.splice(0, list.length, ...list.filter((x) => !(x.kind === 'thumb' && x.visitor === f.visitor && x.screen === f.screen)))
       list.push(f)
       capped(list, (x) => groupOf(x.kind) === groupOf(kind))
       saveSoon()
-      return json({ ok: true })
-    }) },
-    '/api/s/:token/trip': { POST: visitor((b, root) => {
-      const id = /^[a-f0-9]{8,40}$/.test(String(b?.id)) ? String(b.id) : null
+      return json({ ok: true, id: f.id })
+    }),
+    // A visitor's own feedback, to show again on reload; never another visitor's.
+    GET: (req: Request) => {
+      const f = linkFor(req)
+      if (f instanceof Response) return f
+      const v = new URL(req.url).searchParams.get('visitor') ?? ''
+      return json({ feedback: VISITOR.test(v) ? cache.sharedOf(f.root).feedback.filter((x) => x.visitor === v) : [] })
+    } },
+    '/api/s/:token/trip': { POST: visitor((b, root, who) => {
+      const id = VISITOR.test(String(b?.id)) ? String(b.id) : null
       if (!id) return fail('a trip needs its id')
       const names = (v: unknown) => (Array.isArray(v) ? v.slice(0, TRIP_KEEP).map((x) => str(x, 80)).filter(Boolean) : [])
       const trips = cache.ownShared(root).trips
       const old = trips.findIndex((t) => t.id === id)
-      const t: Trip = { id, ...who(b), at: old >= 0 ? trips[old]!.at : new Date().toISOString(), screens: names(b?.screens), dead: names(b?.dead) }
+      const t: Trip = { id, ...who, at: old >= 0 ? trips[old]!.at : new Date().toISOString(), screens: names(b?.screens), dead: names(b?.dead) }
       if (old >= 0) trips[old] = t
       else trips.push(t)
       capped(trips)
@@ -130,6 +147,14 @@ export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; playe
       const s = cache.sharedOf(app)
       return json({ shares: s.shares.map((x) => linkOf(req, x)), feedback: s.feedback, trips: s.trips })
     },
+    '/api/feedback': { POST: api((b) => {
+      const f = cache.sharedOf(str(b?.app, 2000)).feedback.find((x) => x.id === b?.id)
+      if (!f) return fail('no such feedback', 404)
+      if (b?.resolved) f.resolved = new Date().toISOString()
+      else delete f.resolved
+      cache.save()
+      return json({ ok: true })
+    }) },
     '/api/unshare': { POST: api((b) => {
       const f = cache.share(String(b?.token ?? ''))
       if (!f) return fail('no such link', 404)

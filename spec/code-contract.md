@@ -32,7 +32,7 @@ GET /api/map?app=A%20coffee%20shop%20ordering%20app&wait=1      (answers once fi
 - `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`
   as the entry, `state.ts`, `screens.ts`, `nav.ts`, `drawer.ts`, `toolbar.ts`, `net.ts`, `canvas.ts`,
   `boxes.ts`, `sharing.ts`, the CSS in `design/`, bundled by Bun's HTML import), the player (`player.html`,
-  `player.ts`, its CSS in `design/player.css` on the shared tokens), the design sheet (`design/sheet.html`, `design/sheet.ts`), the share routes (`share.ts`), and the themes in `themes/`.
+  `player.ts`, `pins.ts` (shared with the app), its CSS in `design/player.css` on the shared tokens), the design sheet (`design/sheet.html`, `design/sheet.ts`), the share routes (`share.ts`), and the themes in `themes/`.
 
 There are no runtime dependencies; `@types/bun` and `typescript` are dev-only.
 
@@ -153,17 +153,24 @@ can spend model credits.
   routes: `GET /api/s/:token/map` → `{role, app, root, components, screens: {key, name, title, html,
   device, parent}[]}` (picked screens' newest versions and their tree parents only; it counts an
   open in memory; a GET never writes the file), `POST /api/s/:token/feedback {visitor, name, kind,
-  screen, text?, about?, up?, label?}` (400 for a text over 1,000 characters or empty but a thumb;
-  404 for a screen not in the mockup), `POST /api/s/:token/trip {id, visitor, name, screens, dead}`
-  (replaces the trip with that id; at most 50 screens and 50 dead clicks). Both are 403 for a view
-  link. A mockup keeps 500 of each: comments, thumbs, answers (dead controls and Done), trips. These
-  two save the file at most once a second. Every request body is at most 64 KB (`maxRequestBodySize`).
+  screen, text?, about?, tag?, nth?, up?, label?}` → `{ok, id}` (`kind` comment, thumb or done; 400
+  *Type your name first.* without a `name`, for a text over 1,000 characters, or an empty one but a
+  thumb; 404 for a screen not in the mockup; `about` is kept to 120 characters, `tag` to 20 lower case
+  letters and digits, `nth` to an integer 0-999, `label` to 80; a comment with `label` is one at a dead
+  control), `GET /api/s/:token/feedback?visitor=` → `{feedback}` (that visitor's own comments,
+  thumbs and answers with `resolved`; empty for an unknown or malformed visitor; never another
+  visitor's), `POST /api/s/:token/trip {id, visitor, name, screens, dead}` (400 without a `name`;
+  replaces the trip with that id; at most 50 screens and 50 dead clicks). All three are 403 for a view
+  link. A mockup keeps 500 of each: comments, thumbs, answers (Done, and the old dead controls), trips.
+  The two POSTs save the file at most once a second. `POST /api/feedback {app, id, resolved}` (the
+  owner only: 403 through an edit link) sets or clears a comment's `resolved` → `{ok}`; 404 for an
+  unknown id. Every request body is at most 64 KB (`maxRequestBodySize`).
 - **An edit link**: its page sends `x-uxwoz-share: <token>` on every `/api` call. It may use
   `/api/config`, `/api/apps` (its mockup only), `/api/map`, `/api/screen`, `/api/pick`,
   `/api/revise`, `/api/undo`, `/api/box` and `/api/delete`, each for its own mockup only: the mockup
   is a GET's `?app=`, or a POST body's `app` or the first part of its `key`; a POST whose `app` or
   `key` is not a string, or whose `?app=` names another mockup than its body, is 403. It may not use
-  `/api/share`, `/api/shares`, `/api/unshare`, `/api/delete-app`, `/api/warmup`, or `/api/delete` of
+  `/api/share`, `/api/shares`, `/api/unshare`, `/api/feedback`, `/api/delete-app`, `/api/warmup`, or `/api/delete` of
   its first screen (all 403). Its budget (`cap`) counts each call that makes a model work: a new
   screen that is not a cache hit, a pick (its filing), `/api/revise`, and `/api/box` with `edit` or
   `visit`. A unit is taken before the call and given back when the call is refused; past the cap,
@@ -185,7 +192,7 @@ The script we add to every screen talks to the app with `postMessage`; the app a
 only from a card's own frame.
 
 ```ts
-{ uxwoz: 'action', prompt, label }   // a click on a control with an action prompt (ignored on a side of an A OR B)
+{ uxwoz: 'action', prompt, label, part } // a click on a control with an action prompt (ignored on a side of an A OR B)
 { uxwoz: 'touch' }                   // any press in the screen: it becomes the current screen
 { uxwoz: 'key', key, code, shift, mod } // a zoom key (⌘/Ctrl with + − 0), ⌘[ ⌘], ⇧1-3 outside a text field,
                                      // or Esc: the app handles it as if pressed outside the screen
@@ -194,8 +201,19 @@ only from a card's own frame.
 { uxwoz: 'wheel', dx, dy }           // scroll over the screen: dy and dx scroll the canvas
 { uxwoz: 'zoom', dy, x, y }          // Ctrl/Cmd + scroll or a pinch over the screen, at (x, y) in
                                      // the frame: zooms the canvas around that point
-{ uxwoz: 'part', text }              // the player's Pick a part: the words of the part clicked after
-                                     // the player sent the frame { uxwoz: 'name-part' }
+{ uxwoz: 'part', text, tag, nth, x, y, w, h } // the part clicked after the page sent { uxwoz: 'name-part' }:
+                                     // its words (60 characters), tag, place among the parts with the same
+                                     // tag and words, and its rectangle in the frame's own pixels; while
+                                     // picking, the part under the pointer has an outline
+{ uxwoz: 'located', spots: [{ id, x, y, w, h }] } // the answer to locate: an anchor not found is left out
+```
+
+An `action` also carries `part`, the control clicked as above. The page sends the frame
+`{ uxwoz: 'name-part' }` to pick a part, `{ uxwoz: 'name-part', off: true }` to stop picking, and
+`{ uxwoz: 'locate', anchors: [{ id, text, tag, nth }] }` (at most 200) to find parts again: the `nth`
+element with that tag and words (the first if there are fewer), else the first part of any tag with
+those words. The frame accepts these from its parent only and does nothing until asked.
+
 ```
 
 ## Types
@@ -230,7 +248,9 @@ Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | nul
              // feedback is the Edit request that made this version, by: 'fixer' when a visit asked
 Shared     { shares: Share[]; feedback: Feedback[]; trips: Trip[] }   // per mockup, in the cache file under `shared`
 Share      { token; role: 'view' | 'comment' | 'edit'; createdAt; cap?; used; opens }   // token: 32 hex characters
-Feedback   { at; visitor; name; screen: key; title; kind: 'comment' | 'thumb' | 'dead' | 'done'; text?; about?; up?; label? }
+Feedback   { id; at; visitor; name; screen: key; title; kind: 'comment' | 'thumb' | 'dead' | 'done'; text?; about?; tag?; nth?;
+             up?; label?; resolved? }   // id: 16 hex, given on load to old entries; 'dead' is read, no longer
+             // written; about, tag, nth: the anchor; resolved: when the owner resolved it
 Trip       { id; visitor; name; at; screens: string[]; dead: string[] }   // the last 500 feedback and trips are kept
 TreeNode   { level; parent: key | null; label }
              // from screenTree: level 1 is the first screen, the fewest clicks from it otherwise

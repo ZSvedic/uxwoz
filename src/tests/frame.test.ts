@@ -54,3 +54,23 @@ test('spec/prompt-screen.md holds the exact system prompt the app sends, and it 
   const manual = readFileSync(resolve(import.meta.dir, '../../process/plans/2026-11-06-canvas-manual.md'), 'utf8').trim()
   expect(SYSTEM_PROMPT.startsWith(`${manual}\n\n`)).toBe(true)
 })
+
+test('the frame script parses, and finds a part again by its words, its tag and its place among equals', () => {
+  const script = framePage('', '', true).match(/<script>([\s\S]*?)<\/script>/)![1]!
+  expect(() => new Function(script)).not.toThrow()
+  for (const s of ["uxwoz: 'located'", "uxwoz: 'part'", "d.uxwoz === 'locate'", 'd.off', 'describe(el))']) expect(script).toContain(s)
+  // The matching helpers as the browser sees them, run against fake elements.
+  const lines = ['labelOf', 'PARTS', 'textOf'].map((n) => script.match(new RegExp(`const ${n} = [^\\n]*`))![0])
+  const find = script.match(/const find = [\s\S]*?\n {2}\}\n/)![0]
+  const run = new Function(`${lines.join('\n')}\n${find}\nreturn { find, PARTS }`)() as { find: (q: (s: string) => unknown[], a: object) => unknown; PARTS: string }
+  const node = (tag: string, text: string) => ({ tagName: tag.toUpperCase(), getAttribute: () => null, textContent: text })
+  const save1 = node('button', 'Save'), save2 = node('button', ' Save '), title = node('h2', 'Save'), other = node('p', 'Hello')
+  const q = (s: string) => (s === 'button' ? [save1, save2] : s === 'h2' ? [title] : s === run.PARTS ? [title, save1, save2, other] : [])
+  expect(run.find(q, { text: 'Save', tag: 'button', nth: 1 })).toBe(save2)
+  expect(run.find(q, { text: 'Save', tag: 'button', nth: 5 })).toBe(save1)
+  // The tag changed in an Edit: the same words under any tag.
+  expect(run.find(q, { text: 'Hello', tag: 'h3', nth: 0 })).toBe(other)
+  expect(run.find(q, { text: 'Save', tag: '', nth: 0 })).toBe(title)
+  expect(run.find(q, { text: 'Save', tag: 'x)', nth: 0 })).toBe(title)
+  expect(run.find(q, { text: 'Gone', tag: 'button', nth: 0 })).toBeNull()
+})

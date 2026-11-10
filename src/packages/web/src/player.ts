@@ -1,10 +1,13 @@
 // The player of a share link: one screen at a time in its device frame, Back and the trail of names.
-// A comment link adds feedback: a comment, a thumb, what a dead control should do, and a closing answer.
+// A comment link adds feedback, once the visitor gave a name: comments pinned to parts of the screen and listed in
+// the margin beside it, a thumb, what a dead control should do, and a closing answer. No dialogs.
 // Each visit sends its trip (the screens seen, the dead controls clicked) as it changes.
 
+import type { Feedback } from '@uxwoz/core'
 import { DEVICES, FRAME_SANDBOX, framePage, markCurrent, pasteComponents, type Device } from '@uxwoz/core/frame'
 import { linkTarget } from '@uxwoz/core/keys'
 import { el } from './boxes.ts'
+import { anchorOf, numbered, pinLayer, type Spot } from './pins.ts'
 
 interface Screen { key: string; name: string; title: string; html: string; device?: Device; parent: string | null }
 interface PlayerMap { role: 'view' | 'comment'; app: string; root: string; components: Record<string, string>; screens: Screen[] }
@@ -28,8 +31,8 @@ const byKey = new Map<string, Screen>(), byName = new Map<string, Screen>()
 /** The screens visited in this tab, for Back and the trail; the last one shows. */
 let history: string[] = []
 const trip = { id: random(), screens: [] as string[], dead: [] as string[] }
-const thumbsKey = `uxwoz:thumbs:${token}`
-const thumbs: Record<string, boolean> = JSON.parse(store.get(thumbsKey) || '{}')
+/** This visitor's own feedback on this mockup, from the server, and what they sent since. */
+let mine: Feedback[] = []
 const current = () => byKey.get(history.at(-1) ?? '')
 
 const post = (what: string, body: object) =>
@@ -45,21 +48,25 @@ function toast(text: string) {
 }
 
 let tripTimer: ReturnType<typeof setTimeout> | undefined
-/** The trip goes to the server a moment after it changes. */
+/** The trip goes to the server a moment after it changes, once there is a name. */
 function sendTrip() {
+  if (map.role !== 'comment' || !nameNow()) return
   clearTimeout(tripTimer)
   tripTimer = setTimeout(() => post('trip', trip).catch(() => {}), 800)
 }
 
 // ---- Showing a screen
 
+/** The margin's width beside the screen; a narrower window has it under the screen. */
+const MARGIN_W = 280
 let frameH = 0
-/** Fit the device to the window: a desktop screen shrinks on a phone. */
+/** Fit the device to the window: a desktop screen shrinks on a phone. The margin goes right of it when there is room. */
 function layout() {
   const s = current()
   if (!s) return
-  const w = s.device ? DEVICES[s.device].width : 800, k = Math.min(1, (innerWidth - 32) / w)
+  const w = s.device ? DEVICES[s.device].width : 800, room = innerWidth - 32, k = Math.min(1, room / w)
   const h = Math.max(frameH, s.device ? DEVICES[s.device].height : 800)
+  $('stage').classList.toggle('wide', map.role === 'comment' && room >= w + 16 + MARGIN_W)
   frame.style.height = `${h}px`
   Object.assign($('device').style, { width: `${w}px`, transform: `scale(${k})` })
   Object.assign($('fit').style, { width: `${w * k}px`, height: `${h * k}px` })
@@ -81,16 +88,30 @@ function show(key: string, push = true) {
     if (b instanceof HTMLButtonElement) b.addEventListener('click', () => { history = history.slice(0, i + 1); show(k, false) })
     return i ? [' → ', b] : [b]
   }))
-  $('up').classList.toggle('on', thumbs[key] === true)
-  $('down').classList.toggle('on', thumbs[key] === false)
+  // A new screen: no picking, no card open, its pins once the frame says where its parts are.
+  picking = false
+  draft = null
+  located = null
+  spots = []
   trip.screens.push(s.title)
   sendTrip()
   layout()
+  showThumbs()
+  renderMargin()
+  drawPins()
   scrollTo(0, 0)
 }
 
+interface Part { text: string; tag: string; nth: number; x: number; y: number; w: number; h: number }
+/** A part as the frame described it, checked; null without words. */
+function partOf(d: any): Part | null {
+  if (typeof d?.text !== 'string' || !d.text) return null
+  const n = (v: unknown) => (Number.isFinite(v) ? Math.round(v as number) : 0)
+  return { text: d.text.slice(0, 120), tag: typeof d.tag === 'string' ? d.tag : '', nth: Math.max(0, n(d.nth)), x: n(d.x), y: n(d.y), w: n(d.w), h: n(d.h) }
+}
+
 /** A click in the screen: open the screen it names, else it is a dead control. */
-function go(action: string, label: string) {
+function go(action: string, label: string, part: Part | null) {
   const s = current()
   if (!s) return
   const t = linkTarget(action)
@@ -99,17 +120,24 @@ function go(action: string, label: string) {
   if (to) return show(to.key)
   trip.dead.push(label || 'a control')
   sendTrip()
-  if (map.role === 'comment') ask('Not designed yet. What did you expect here?', { kind: 'dead', label }, false)
-  else toast('Not designed yet')
+  if (map.role !== 'comment') return toast('Not designed yet')
+  withName(() => openDraft({ kind: 'comment', label: label || 'a control', ...part && { part } }, '', 'Not designed yet. What did you expect here?'))
 }
 
 addEventListener('message', (e) => {
   const d = e.data
   if (e.source !== frame.contentWindow || typeof d?.uxwoz !== 'string') return
-  if (d.uxwoz === 'size' && Number.isFinite(d.height)) { frameH = Math.min(8000, Math.round(d.height)); layout() }
+  if (d.uxwoz === 'size' && Number.isFinite(d.height)) { frameH = Math.min(8000, Math.round(d.height)); layout(); locate() }
   else if (d.uxwoz === 'wheel') scrollBy(Number(d.dx) || 0, Number(d.dy) || 0)
-  else if (d.uxwoz === 'action' && typeof d.prompt === 'string') go(d.prompt, typeof d.label === 'string' ? d.label.slice(0, 80) : '')
-  else if (d.uxwoz === 'part' && naming) { naming = false; $<HTMLInputElement>('about').value = String(d.text ?? '').slice(0, 120); $<HTMLDialogElement>('ask').showModal() }
+  else if (d.uxwoz === 'action' && typeof d.prompt === 'string') go(d.prompt, typeof d.label === 'string' ? d.label.slice(0, 80) : '', partOf(d.part))
+  else if (d.uxwoz === 'part' && picking) { const p = partOf(d); if (p) openDraft({ kind: 'comment', part: p }, '', 'Your comment') }
+  else if (d.uxwoz === 'located' && Array.isArray(d.spots)) {
+    spots = d.spots.filter((x: any) => typeof x?.id === 'string').map((x: any) => ({ ...partOf({ ...x, text: '-' })!, id: x.id as string }))
+    located = new Set(spots.map((x) => x.id))
+    drawPins()
+    renderMargin()
+  }
+  else if (d.uxwoz === 'key' && d.key === 'Escape' && picking) setPicking(false)
 })
 
 $('back').addEventListener('click', () => {
@@ -120,56 +148,154 @@ $('back').addEventListener('click', () => {
 
 // ---- Feedback (comment links only)
 
-/** What the open question sends with the answer. */
-let asking: { kind: string; label?: string } | null = null
-let naming = false
+/** Comment mode: the next click in the screen names a part. */
+let picking = false
+/** The card being written: a comment (on a part, a dead control or the whole screen) or the closing answer. */
+let draft: { kind: 'comment' | 'done'; part?: Part; label?: string } | null = null
+/** What waits for the name card. */
+let pending: (() => void) | null = null
+/** The ids of this screen's comments the frame found, and where; null until it answers. */
+let located: Set<string> | null = null
+let spots: Spot[] = []
 
-function ask(question: string, what: { kind: string; label?: string }, about: boolean) {
-  asking = what
-  $('askQ').textContent = question
-  $('aboutRow').hidden = !about
-  $<HTMLInputElement>('about').value = ''
-  $<HTMLTextAreaElement>('askText').value = ''
-  $<HTMLInputElement>('who').value = nameNow()
-  $<HTMLDialogElement>('ask').showModal()
-  $('askText').focus()
+const thisScreen = () => mine.filter((f) => f.screen === current()?.key)
+const pinned = () => numbered(thisScreen()).filter((x) => x.n != null)
+
+/** Run `then` now if the visitor has a name, else after the name card. */
+function withName(then: () => void) {
+  if (nameNow()) return then()
+  pending = then
+  renderMargin()
+  $('nameCard').scrollIntoView({ block: 'nearest' })
+  $('who').focus()
 }
-
-async function send(body: object, thanks: string) {
-  const res = await post('feedback', { screen: current()?.key, ...body }).catch(() => null)
-  const b = await res?.json().catch(() => null)
-  toast(res?.ok ? thanks : `Could not send: ${b?.error ?? 'no answer'}`)
-}
-
-$('askForm').addEventListener('submit', (e) => {
+$('nameCard').addEventListener('submit', (e) => {
   e.preventDefault()
-  const text = $<HTMLTextAreaElement>('askText').value.trim()
-  if (!text) return $('askText').focus()
-  store.set('uxwoz:visitor-name', $<HTMLInputElement>('who').value.trim())
-  const about = $<HTMLInputElement>('about').value.trim()
-  send({ ...asking, text, ...(about && { about }) }, 'Thanks, sent.')
-  $<HTMLDialogElement>('ask').close()
+  const name = $<HTMLInputElement>('who').value.trim()
+  if (!name) return $('who').focus()
+  store.set('uxwoz:visitor-name', name)
+  const then = pending
+  pending = null
+  sendTrip()
+  renderMargin()
+  then?.()
 })
+
+function setPicking(on: boolean) {
+  picking = on
+  if (on) draft = null
+  frame.contentWindow?.postMessage(on ? { uxwoz: 'name-part' } : { uxwoz: 'name-part', off: true }, '*')
+  if (on) toast('Click the part you mean')
+  renderMargin()
+  drawPins()
+}
+addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape' && picking) setPicking(false) })
+
+/** Open the card beside the screen: the part's words and its pin to come, a question or a placeholder. */
+function openDraft(d: NonNullable<typeof draft>, question: string, placeholder: string) {
+  picking = false
+  draft = d
+  $('composerQ').textContent = question
+  $('composerQ').hidden = !question
+  $('composerPin').textContent = String(pinned().length + 1)
+  $('composerAbout').textContent = d.part?.text ?? 'The whole screen'
+  $('composer').querySelector('.head')!.toggleAttribute('hidden', d.kind === 'done')
+  Object.assign($<HTMLTextAreaElement>('composerText'), { value: '', placeholder })
+  renderMargin()
+  drawPins()
+  $('composer').scrollIntoView({ block: 'nearest' })
+  $('composerText').focus()
+}
+function closeDraft() {
+  draft = null
+  renderMargin()
+  drawPins()
+}
+$('composerCancel').addEventListener('click', closeDraft)
+$('whole').addEventListener('click', () => openDraft({ kind: 'comment' }, '', 'Your comment'))
 // Enter sends, Shift+Enter adds a line.
-$('askText').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $<HTMLFormElement>('askForm').requestSubmit() } })
-$('askCancel').addEventListener('click', () => $<HTMLDialogElement>('ask').close())
-$('pickPart').addEventListener('click', () => {
-  naming = true
-  $<HTMLDialogElement>('ask').close()
-  frame.contentWindow?.postMessage({ uxwoz: 'name-part' }, '*')
-  toast('Click the part you mean')
+$('composerText').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $<HTMLFormElement>('composer').requestSubmit() } })
+$('composer').addEventListener('submit', async (e) => {
+  e.preventDefault()
+  const d = draft, s = current(), text = $<HTMLTextAreaElement>('composerText').value.trim()
+  if (!d || !s) return
+  if (!text) return $('composerText').focus()
+  const f = { kind: d.kind, screen: s.key, title: s.title, text, ...d.label && { label: d.label }, ...d.part && { about: d.part.text, tag: d.part.tag, nth: d.part.nth } }
+  const id = await send(f)
+  if (id == null) return
+  mine.push({ id, at: new Date().toISOString(), visitor, name: nameNow(), ...f })
+  toast('Thanks, sent.')
+  if (draft === d) closeDraft()
+  locate()
 })
-for (const [id, up] of [['up', true], ['down', false]] as const) $(id).addEventListener('click', () => {
+
+/** Send one feedback; its id, or null after saying why it failed. */
+async function send(body: object): Promise<string | null> {
+  const res = await post('feedback', body).catch(() => null)
+  const b = await res?.json().catch(() => null)
+  if (res?.ok) return String(b?.id ?? '')
+  toast(`Could not send: ${b?.error ?? 'no answer'}`)
+  return null
+}
+
+/** The thumbs show this visitor's newest for the screen. */
+function showThumbs() {
+  const t = thisScreen().filter((f) => f.kind === 'thumb').at(-1)
+  $('up').classList.toggle('on', t?.up === true)
+  $('down').classList.toggle('on', t?.up === false)
+}
+for (const [id, up] of [['up', true], ['down', false]] as const) $(id).addEventListener('click', () => withName(async () => {
   const s = current()
   if (!s) return
-  thumbs[s.key] = up
-  store.set(thumbsKey, JSON.stringify(thumbs))
-  $('up').classList.toggle('on', up)
-  $('down').classList.toggle('on', !up)
-  send({ kind: 'thumb', up }, 'Thanks.')
-})
-$('comment').addEventListener('click', () => ask(`Your comment on ${current()?.title ?? 'this screen'}`, { kind: 'comment' }, true))
-$('done').addEventListener('click', () => ask('Would you use this? Why or why not?', { kind: 'done' }, false))
+  const got = await send({ kind: 'thumb', screen: s.key, up })
+  if (got == null) return
+  mine = mine.filter((f) => !(f.kind === 'thumb' && f.screen === s.key))
+  mine.push({ id: got, at: new Date().toISOString(), visitor, name: nameNow(), screen: s.key, title: s.title, kind: 'thumb', up })
+  showThumbs()
+  toast('Thanks.')
+}))
+$('comment').addEventListener('click', () => withName(() => setPicking(!picking)))
+$('done').addEventListener('click', () => withName(() => openDraft({ kind: 'done' }, 'Would you use this? Why or why not?', '')))
+
+/** The margin: the name card, the card being written, then this screen's comments by pin number. */
+function renderMargin() {
+  if (map.role !== 'comment') return
+  const list = numbered(thisScreen())
+  $('comment').classList.toggle('on', picking)
+  $('comment').setAttribute('aria-pressed', String(picking))
+  $('whole').hidden = !picking
+  $('nameCard').hidden = !pending
+  $('composer').hidden = !draft
+  $('hint').hidden = list.length > 0 || picking || !!draft || !!pending
+  $('slips').replaceChildren(...list.map(({ f, n }) => {
+    const gone = !f.resolved && anchorOf(f) && located && !located.has(f.id)
+    const state = f.resolved ? 'Resolved' : gone ? 'About an earlier version' : ''
+    const li = el('li', 'slip', el('div', 'head', n ? el('span', 'dot', String(n)) : '', el('small', '', f.about || f.label || 'The whole screen')),
+      el('p', '', f.text ?? ''), ...state ? [el('small', 'state', state)] : [])
+    li.dataset.id = f.id
+    return li
+  }))
+}
+
+/** Ask the frame where this screen's open, anchored comments are; the pins follow its answer. */
+function locate() {
+  if (map.role !== 'comment') return
+  const anchors = pinned().map((x) => anchorOf(x.f)).filter((a) => a != null)
+  frame.contentWindow?.postMessage({ uxwoz: 'locate', anchors }, '*')
+}
+
+/** The pins over the screen: one per located comment, and the one of the card being written. */
+function drawPins() {
+  const numbers = new Map(pinned().map((x) => [x.f.id, x.n!] as [string, number]))
+  const all = [...spots]
+  if (draft?.kind === 'comment' && draft.part) { all.push({ ...draft.part, id: 'new' }); numbers.set('new', numbers.size + 1) }
+  pinLayer($('pins'), all, numbers, (id) => {
+    const card = id === 'new' ? $('composer') : $('slips').querySelector<HTMLElement>(`[data-id="${id}"]`)
+    for (const x of document.querySelectorAll('.ring')) x.classList.remove('ring')
+    card?.classList.add('ring')
+    card?.scrollIntoView({ block: 'nearest' })
+  })
+}
 
 // ---- Start
 
@@ -188,7 +314,11 @@ async function init() {
   if (!byKey.has(map.root)) return note('Nothing to show yet.')
   const [pico, mockup] = await Promise.all(['pico', 'mockup'].map((t) => fetch(`/themes/${t}.css`).then((r) => r.text())))
   css = `${pico}\n${mockup}`
-  $('tools').hidden = map.role !== 'comment'
+  if (map.role === 'comment') {
+    const got = await fetch(`/api/s/${token}/feedback?visitor=${visitor}`).then((r) => r.json()).catch(() => null)
+    mine = Array.isArray(got?.feedback) ? got.feedback : []
+  }
+  $('tools').hidden = $('margin').hidden = map.role !== 'comment'
   show(map.root)
 }
 

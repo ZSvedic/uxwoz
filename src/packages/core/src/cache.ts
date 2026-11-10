@@ -86,8 +86,17 @@ export interface Visit { at: string; ask?: string; undone?: boolean; ms: number;
 
 /** A share link of a mockup: its role, its cap on the screens and changes it may ask for (edit links), and how much it was used. */
 export interface Share { token: string; role: 'view' | 'comment' | 'edit'; createdAt: string; cap?: number; used: number; opens: number }
-/** What a visitor of a share link said: a comment (`about` a part), a thumb, the answer at a dead control, or the closing answer. */
-export interface Feedback { at: string; visitor: string; name: string; screen: string; title: string; kind: 'comment' | 'thumb' | 'dead' | 'done'; text?: string; about?: string; up?: boolean; label?: string }
+/**
+ * What a visitor of a share link said: a comment (pinned by `about`, `tag` and `nth` to a part, by `label` to a dead
+ * control), a thumb, or the closing answer. Kind `dead` is an answer at a dead control from before names: read, no
+ * longer written. `resolved` is when the owner resolved it.
+ */
+export interface Feedback {
+  id: string; at: string; visitor: string; name: string; screen: string; title: string; kind: 'comment' | 'thumb' | 'dead' | 'done'
+  text?: string; about?: string; tag?: string; nth?: number; up?: boolean; label?: string; resolved?: string
+}
+/** A feedback's id: 16 hex characters, from what it is, so an old entry gets the same id on every load. */
+export const feedbackId = (seed: string) => Bun.hash(seed).toString(16).padStart(16, '0').slice(-16)
 /** One visit of a share link: the screens seen in order and the dead controls clicked. */
 export interface Trip { id: string; visitor: string; name: string; at: string; screens: string[]; dead: string[] }
 /** A mockup's share links and what came back through them. */
@@ -134,7 +143,18 @@ export class ScreenCache {
       for (const e of data.entries as CacheEntry[]) if (e.name || e.key === normalizePrompt(e.app)) this.entries.set(e.key, { name: HOME_NAME, ...e })
       for (const [root, b] of Object.entries(data.boxes ?? {})) this.boxes.set(root, b as Boxes)
       for (const [root, s] of Object.entries(data.states ?? {})) this.states.set(root, s as Record<BoxName, BoxState[]>)
-      for (const [root, s] of Object.entries(data.shared ?? {})) this.shared.set(root, s as Shared)
+      for (const [root, s] of Object.entries(data.shared ?? {}) as [string, Shared][]) {
+        // Feedback from before ids gets one; a second entry with the same words gets its place in the list too.
+        const ids = new Set<string>()
+        s.feedback?.forEach((f, i) => {
+          if (!f.id || ids.has(f.id)) {
+            const seed = JSON.stringify([f.at, f.visitor, f.kind, f.screen, f.text])
+            f.id = ids.has(feedbackId(seed)) ? feedbackId(seed + i) : feedbackId(seed)
+          }
+          ids.add(f.id)
+        })
+        this.shared.set(root, s)
+      }
     } catch (err) {
       this.entries.clear()
       const aside = `${file}.corrupt-${Date.now()}`

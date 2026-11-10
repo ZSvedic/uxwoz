@@ -440,19 +440,39 @@ browser and says what they think. Nothing is real-time and nobody signs in: a li
   control opens the screen it names; `back` goes to the screen it hangs under; a control whose
   action names no screen (plain words) leads nowhere, as in the app. A desktop screen
   shrinks to fit a phone.
-- **Feedback** (comment links), on the wooden bar at the bottom, **Done** in ember: 👍 and 👎 for the screen (a visitor's
-  newest counts), **Comment on this screen** (with an optional part: **Pick a part** and click it in
-  the screen, and its words fill *About*), and **Done**, which asks *Would you use this? Why or why
-  not?*. A dead control asks *Not designed yet. What did you expect here?* and keeps the control's
-  words. The visitor's name is asked once in each form, optional, and kept in the browser.
-- **Trips** (comment links): the player sends each visit's screens, in order, and the dead controls
-  clicked, as they change (the first 50 of each).
+- **A name first, once** (comment links): the first press of **Comment**, a thumb or **Done**, or a
+  dead control, asks *Your name, so the owner knows who said it* in a card beside the screen, with
+  **Continue**; then what the reviewer started carries on. The browser keeps the name, so it is never
+  asked again. Nothing is stored about a visitor without a name: no feedback, no trip.
+- **Feedback** (comment links), on the wooden bar at the bottom, **Done** in ember: 👍 and 👎 for the
+  screen (a visitor's newest counts), **Comment** and **Done**. **Comment** is a mode for one click:
+  pressed, it says *Click the part you mean*, and the margin offers *The whole screen*; Esc or a second
+  press ends it. A click on a part opens a card pinned to that part, with a gold pin on it numbered by
+  time; *The whole screen* opens one pinned to no part. **Send** (Enter) keeps it, Shift+Enter adds a
+  line, **Cancel** drops it. A dead control opens the same card pinned to the control, asking *Not
+  designed yet. What did you expect here?*; it is a comment too. **Done** asks *Would you use this? Why
+  or why not?* in the margin. There are no dialogs.
+- **The margin** sits right of the screen when the window has room for the device and about 280 px,
+  and under it otherwise. It lists this screen's comments by this visitor, by pin number: the part's
+  words (or *The whole screen*), the text, and *Resolved* once the owner resolved it. A comment whose
+  part is not in the screen any more says *About an earlier version* and has no pin. A pin's click
+  shows its card. Before the first comment the margin says *Comment pins what you say to a part of the
+  screen.* A reviewer sees only their own comments, which load with the page; nothing polls. Why: a
+  potential customer who reads the others' comments first is no longer a fresh pair of eyes.
+- **An anchor** is the part's words, its tag and its place among the parts with the same tag and
+  words. To find it again, the screen looks for the same tag and words, then the same words under any
+  tag. The model rewrites the markup on every Edit; the words are what survive.
+- **Trips** (comment links): from the moment there is a name, the player sends each visit's screens,
+  in order, and the dead controls clicked, as they change (the first 50 of each), the ones seen before
+  the name included.
 - **What the owner sees**: **Feedback** (project menu) opens the same pane at *Feedback*: by screen,
-  the newest first, with its thumbs (*👍 2 · 👎 1*) and each comment and dead-control answer with the
-  visitor's name; then the answers to *Would you use this?*; then the trips, as
+  the newest first, with its thumbs (*👍 2 · 👎 1*) and each comment with the visitor's name and the
+  part it is about; then the answers to *Would you use this?*; then the trips, as
   *Ana: Home → Nights → Settings, 1 dead click (Pair watch)*. A screen's Info lists its thumbs and
-  comments too. A mockup keeps its last 500 comments, 500 thumbs, 500 answers and 500 trips; a text
-  is at most 1,000 characters. Deleting the mockup, or Start over, deletes its links and feedback.
+  comments too. The owner resolves a comment, and the reviewer sees *Resolved* on reload. A mockup
+  keeps its last 500 comments, 500 thumbs, 500 answers and 500 trips; a text is at most 1,000
+  characters. Feedback from before names loads as it was (from *Someone*, and the old answers at dead
+  controls). Deleting the mockup, or Start over, deletes its links and feedback.
 - **The owner** (`UXWOZ_OWNER`): when set, the app and its API answer only a browser that opened
   `/?owner=<secret>` once (it keeps a cookie); others see *This UX Woz is private.* Share links work
   for everyone. Unset, the app is as before.

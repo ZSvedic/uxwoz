@@ -52,8 +52,8 @@ const thumbsOf = (list: Feedback[]) => {
   const up = list.filter((f) => f.kind === 'thumb' && f.up).length, down = list.filter((f) => f.kind === 'thumb' && !f.up).length
   return up + down ? `👍 ${up} · 👎 ${down}` : ''
 }
-/** One line of feedback: what was said, about which part or at which dead control. */
-const lineOf = (f: Feedback) => f.kind === 'dead' ? `At "${f.label || 'a control'}" expected: ${f.text}` : `${f.text}${f.about ? ` (about: ${f.about})` : ''}`
+/** One line of feedback: what was said, about which part or at which dead control (an old answer, or a comment with its label). */
+const lineOf = (f: Feedback) => f.kind === 'dead' || f.label ? `At "${f.label || 'a control'}" expected: ${f.text}` : `${f.text}${f.about ? ` (about: ${f.about})` : ''}`
 const screenTitle = (key: string, title: string) => { const e = state.entries.get(key); return e?.versions.length ? labelOf(e) : title || 'A deleted screen' }
 
 /** The Info tab's rows for a screen: its thumbs and its comments, newest first. */

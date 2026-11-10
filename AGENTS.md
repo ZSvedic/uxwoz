@@ -48,7 +48,8 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
   cache.ts       screen cache: find by name, proposals (the open A OR B) and pick, versions and undo, parents,
                  delete with pruning, the boxes (components as entries, rules, tables, limits, IDs), the fixer's
                  notes and their Undo, JSON file
-  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix); devices and their size;
+  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix, picking and locating
+                 a part for a comment); devices and their size;
                  name, idea; paste by ID and the current link
   zip.ts         a zip of stored entries (CRC-32, central directory), for Export project
 src/packages/web/src/
@@ -73,11 +74,14 @@ src/packages/web/src/
                  rails at the canvas's scale, pan and zoom, fits
   boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes and their rails, editing and adding in
                  place, Export
-  share.ts       share links per role, the player's map, feedback and trips, an edit link's scope and cap, the
-                 owner's gate (UXWOZ_OWNER); `guard` wraps server.ts's routes
+  share.ts       share links per role, the player's map, feedback (a name first; a visitor's own; Resolve) and
+                 trips, an edit link's scope and cap, the owner's gate (UXWOZ_OWNER); `guard` wraps server.ts's routes
   sharing.ts     browser: the drawer's Share and feedback pane, a screen's feedback in Info, an edit link's token
                  on every API call
-  player.html, player.ts   the player at /s/<token>: one screen in its device frame, Back, the trail, feedback, trips
+  player.html, player.ts   the player at /s/<token>: one screen in its device frame, Back, the trail, the name card,
+                 comments pinned to parts in the margin beside the screen, thumbs, Done, trips
+  pins.ts        browser: a comment's anchor, the pin numbers of a screen's comments, the layer of pins over a frame
+                 (the player's now, the app's next)
   index.html     the page around the canvas; links design/index.css
   design/        the look: tokens.css (every colour), base.css (shared by parts), one file per part (bar,
                  canvas, boxes, drawer, panel), motion.css; index.css imports them all; fx.ts (sparks, sounds, pickFx);

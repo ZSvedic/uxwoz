@@ -48,23 +48,60 @@ export const isDevice = (v: unknown): v is Device => typeof v === 'string' && Ob
 const bootstrap = (final: boolean, vh: number) => `(() => {
   const final = ${final}
   // Only a real click opens a screen: a script cannot start paid generations.
-  const go = (prompt, label) => {
+  const go = (prompt, label, part) => {
     if (!final || typeof prompt !== 'string' || !prompt.trim()) return
     if (navigator.userActivation && !navigator.userActivation.isActive) return
-    parent.postMessage({ uxwoz: 'action', prompt: prompt.trim().slice(0, 500), label: String(label || '').slice(0, 80) }, '*')
+    parent.postMessage({ uxwoz: 'action', prompt: prompt.trim().slice(0, 500), label: String(label || '').slice(0, 80), part }, '*')
   }
   const labelOf = (el) => el ? (el.getAttribute('aria-label') || el.textContent || el.value || '').trim().replace(/\\s+/g, ' ') : ''
   addEventListener('pointerdown', () => parent.postMessage({ uxwoz: 'touch' }, '*'), true)
-  // The player's comment mode: after { uxwoz: 'name-part' }, the next click names the part clicked instead of using it.
-  let naming = false
-  addEventListener('message', (e) => { if (e.source === parent && e.data && e.data.uxwoz === 'name-part') naming = true })
+  // A part of the screen, as the page pins a comment to it: its words, its tag, its place among the elements with the
+  // same tag and words, and where it is. The frame never scrolls, so its rectangle is in the page's own pixels.
+  const PARTS = '[data-action],[aria-label],button,a,label,h1,h2,h3,h4,li,td,th,p,input,select'
+  const all = (sel) => [...document.querySelectorAll(sel)]
+  const textOf = (el) => { const t = labelOf(el) || el.tagName.toLowerCase(); return t.length > 60 ? t.slice(0, 57) + '…' : t }
+  const partAt = (t) => t instanceof Element ? t.closest(PARTS) || t : null
+  const describe = (el) => {
+    const text = textOf(el), tag = el.tagName.toLowerCase(), r = el.getBoundingClientRect()
+    const nth = Math.max(0, all(tag).filter((x) => textOf(x) === text).indexOf(el))
+    return { text, tag, nth, x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }
+  }
+  // An anchor found again: the nth with the same tag and words (the first if there are fewer), else any part with the words.
+  const find = (q, a) => {
+    const same = /^[a-z][a-z0-9]*$/.test(a.tag) ? q(a.tag).filter((x) => textOf(x) === a.text) : []
+    return same[a.nth] || same[0] || q(PARTS).find((x) => textOf(x) === a.text) || null
+  }
+  // The page's comment mode: after { uxwoz: 'name-part' }, the part under the pointer has an outline and the next
+  // click names it instead of using it; { uxwoz: 'name-part', off: true } stops it. Until then this does nothing.
+  let naming = false, lit = null, litStyle = ''
+  const light = (el) => {
+    if (el === lit) return
+    if (lit) lit.style.outline = litStyle
+    lit = el
+    if (el) { litStyle = el.style.outline; el.style.outline = '2px solid #f5c542' }
+  }
+  addEventListener('message', (e) => {
+    const d = e.source === parent && e.data
+    if (!d) return
+    if (d.uxwoz === 'name-part') { naming = !d.off; if (!naming) light(null) }
+    if (d.uxwoz === 'locate' && Array.isArray(d.anchors)) {
+      const spots = []
+      for (const a of d.anchors.slice(0, 200)) {
+        if (!a || typeof a.text !== 'string') continue
+        const el = find(all, { id: a.id, text: a.text, tag: String(a.tag || ''), nth: Math.max(0, Number(a.nth) || 0) })
+        if (el) { const p = describe(el); spots.push({ id: a.id, x: p.x, y: p.y, w: p.w, h: p.h }) }
+      }
+      parent.postMessage({ uxwoz: 'located', spots }, '*')
+    }
+  })
+  addEventListener('pointerover', (e) => { if (naming) light(partAt(e.target)) }, true)
   addEventListener('click', (e) => {
     if (!naming) return
     naming = false
+    light(null)
     e.preventDefault(); e.stopImmediatePropagation()
-    const t = e.target instanceof Element ? e.target.closest('[data-action],[aria-label],button,a,label,h1,h2,h3,h4,li,td,th,p,input,select') || e.target : null
-    const text = labelOf(t) || (t ? t.tagName.toLowerCase() : '')
-    parent.postMessage({ uxwoz: 'part', text: text.length > 60 ? text.slice(0, 57) + '…' : text }, '*')
+    const t = partAt(e.target)
+    if (t) parent.postMessage({ uxwoz: 'part', ...describe(t) }, '*')
   }, true)
   // The app's keys work while a screen has the focus.
   addEventListener('keydown', (e) => {
@@ -87,13 +124,14 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     if (!el) return
     if (!final) { e.preventDefault(); e.stopImmediatePropagation(); return }
     const prompt = el.getAttribute('data-action')
-    if (prompt) { e.preventDefault(); go(prompt, labelOf(el)) }
+    if (prompt) { e.preventDefault(); go(prompt, labelOf(el), describe(el)) }
   }, true)
   // A followed link would show another page in the frame.
   window.addEventListener('click', (e) => { if (e.target instanceof Element && e.target.closest('a[href]')) e.preventDefault() })
   document.addEventListener('submit', (e) => {
     const p = e.target.getAttribute('data-action') || e.submitter?.getAttribute('data-action')
-    if (p) { e.preventDefault(); go(p, labelOf(e.submitter) || labelOf(e.target.querySelector('button,[type=submit]'))) }
+    const by = e.submitter || e.target.querySelector('button,[type=submit]') || e.target
+    if (p) { e.preventDefault(); go(p, labelOf(e.submitter) || labelOf(e.target.querySelector('button,[type=submit]')), describe(by)) }
   }, true)
   // A sandboxed submit would blank the frame; the model's handlers run first.
   window.addEventListener('submit', (e) => e.preventDefault())
