@@ -18,6 +18,8 @@
 .box .card .name { color: var(--text); }
 .box .card .idea { color: var(--muted); }
 .box .card.current .name { font-weight: 700; }
+.box .card .head.open { background: var(--surface-2); }
+.box .card :is(.more, .note) { color: var(--mark); }
 .box-body { min-height: 0; overflow-y: auto; }
 .box-components .box-body { display: flex; flex-direction: column; }
 /* A component card is at least as tall as its rail, so the rail never covers the card below; far out, its name is shorter. */

@@ -6,7 +6,7 @@
 /* The palette, by day: the night sky, parchment chrome, ink, ember and gold, wood and rope. */
 :root {
   color-scheme: light dark;
-  --sky1: #1b2160; --sky2: #0b1030; --ch: #f6ecd2; --ch2: #eadbb4; --edge: #c9ad72; --ink: #2a1f3d; --muted: #6d5f7c;
+  --sky1: #1b2160; --sky2: #0b1030; --ch: #f6ecd2; --ch2: #eadbb4; --edge: #c9ad72; --ink: #2a1f3d; --muted: #64567a;
   --ivory: #fffdf6; --blue: #2f5bff; --ember: #ff6a2b; --ember-ink: #a83a0a; --gold: #f5c542; --chip: #2a1f3d14;
   --wood1: #8f5c3a; --wood2: #7d4e30; --rope: #c9a46a; --rope2: #6e4b22; --red: #b3261e; --dull: #85788f; --dull-wood: #dcbf98;
   --field-bg: var(--ivory);
@@ -15,14 +15,14 @@
 @media (prefers-color-scheme: dark) {
   :root { --ch: #1a1f4a; --ch2: #252b63; --edge: #2e3680; --ink: #e6e4ff; --muted: #a4a6d6; --ivory: #fbf4e2; --blue: #6f8cff;
     --ember: #ff7a3d; --ember-ink: #ff7a3d; --gold: #ffd166; --chip: #ffffff17; --wood1: #6b4430; --wood2: #43281a;
-    --rope: #d9b77c; --rope2: #7a5428; --red: #ff8a80; --dull: #6a6fa6; --dull-wood: #c9a07a; --field-bg: var(--ch2); }
+    --rope: #d9b77c; --rope2: #7a5428; --red: #ff8a80; --dull: #7a7fb8; --dull-wood: #c9a07a; --field-bg: var(--ch2); }
 }
 /* The same by day and night: the indigo plate and pale text on the sky, the corner glows, the dim behind the panel,
    the cream of the bar's text, the dark text on ember and on gold, a screen's paper. */
 :root {
   --indigo: #1a1f4a; --star-ink: #e6e4ff; --star-muted: #a4a6d6; --violet-glow: #7c5cff40; --green-glow: #2ecc9a26;
   --night-dim: #05082099; --cream: #fbf4e2; --brown: #3a1500; --gold-ink: #3a2600; --paper: #fff;
-  --deck-stripe: #3b5fb5;
+  --deck-stripe: #3b5fb5; --deck-blue: #2f5bff;
   /* The wood's grain and its lit and shaded edges; the light and the line on wood for hover and separators. */
   --grain: repeating-linear-gradient(100deg, transparent 0 22px, rgba(255, 255, 255, .05) 22px 24px);
   --wood-shadow: 0 2px 0 rgba(255, 255, 255, .15) inset, 0 -3px 0 rgba(0, 0, 0, .25) inset, 0 16px 34px -8px rgba(0, 0, 0, .55);
@@ -44,10 +44,10 @@
   /* Gold: the current screen or box, the OR, the box numbers, the focus ring (with a dark inner ring). */
   --current: var(--gold); --or: var(--gold); --badge: var(--gold); --on-badge: var(--gold-ink);
   --focus: var(--gold); --focus-in: var(--sky2);
-  /* The bar: wood, cream text, a dimmer cream when disabled, the deck (New mockup) a blue card. */
-  --bar-text: var(--cream); --bar-disabled: var(--dull-wood); --deck: var(--blue); --deck-edge: var(--ivory);
-  /* The logo: "Woz" in ember. */
-  --wordmark: var(--ember);
+  /* The bar: wood, cream text, a dimmer cream when disabled, the deck (New mockup) a blue card, deep in both modes so its + reads. */
+  --bar-text: var(--cream); --bar-disabled: var(--dull-wood); --deck: var(--deck-blue); --deck-edge: var(--ivory);
+  /* The logo: "Woz" in ember, the darker ink by day so it reads on parchment. */
+  --wordmark: var(--ember-ink);
   /* The sky behind the canvas and the bar, and what sits straight on it. */
   --sky-text: var(--star-ink); --sky-muted: var(--star-muted); --plate: var(--indigo); --dim: var(--night-dim);
   /* Lines between screens are ropes: a tan strand and a dark twist. */

@@ -8,21 +8,26 @@
 .logo img { display: block; width: 40px; height: 40px; }
 .logo b { font-size: 20px; font-weight: 700; }
 .logo b span { color: var(--wordmark); }
-/* The wooden tray: grain over a vertical gradient, a lit top edge and a shaded bottom one. It never scrolls sideways. */
-.bar { grid-column: 2; min-width: 0; max-width: 100%; display: flex; align-items: center; gap: 4px; padding: 6px; border-radius: 20px;
-  background: var(--grain), linear-gradient(var(--wood1), var(--wood2)); box-shadow: var(--wood-shadow); }
-.tb-left, .tb-mid, .tb-right, .pop { position: relative; display: flex; gap: 4px; align-items: center; min-width: 0; }
-.tb-left, .tb-right { flex: none; }
-/* Only the names of the mockup and the screen (on a phone also the theme) get shorter when the bar is short of room. */
-.bar #boxesButton, .pop:has(> #boxesButton, > #zoomValue) { flex: none; }
+/* The wooden tray: grain over a vertical gradient, a lit top edge and a shaded bottom one. It never scrolls sideways.
+   Its three groups are one row of items (two on a phone), so the names can give way in a set order. */
+.bar { grid-column: 2; min-width: 0; max-width: 100%; display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 4px; padding: 6px; border-radius: 20px; background: var(--grain), linear-gradient(var(--wood1), var(--wood2)); box-shadow: var(--wood-shadow); }
+.tb-left, .tb-mid, .tb-right { display: contents; }
+.pop { position: relative; flex: none; display: flex; gap: 4px; align-items: center; min-width: 0; }
+/* The names of the theme, the screen and the mockup start at a few letters and grow in that order, so the mockup's
+   name is cut short first and the theme's last. When even the few letters do not fit, the bar takes another row. */
+.pop:has(> #themeButton) { flex: 10000 0 4.4em; max-width: max-content; }
+.nav-pop:has(> #navButton:not([hidden])) { flex: 100 0 calc(74px + 4.6em); max-width: max-content; }
+.pop:has(> #projectButton:not([hidden])) { flex: 1 0 4em; max-width: max-content; }
 .bar button { flex: none; display: inline-flex; gap: 5px; align-items: center; padding: 6px 10px; border-radius: 12px; white-space: nowrap; }
 .bar button:hover:not(:disabled) { background: var(--wood-hover); }
 .bar button:disabled { color: var(--bar-disabled); }
-.bar .trail { font-size: 18px; line-height: 1; }
+.bar .trail { width: 34px; padding: 0; justify-content: center; font-size: 18px; line-height: 1; }
 /* The deck: New mockup, a blue card with an ivory edge. */
 .bar .deck { width: 42px; height: 46px; padding: 0; justify-content: center; border: 3px solid var(--deck-edge); border-radius: 8px;
   background: repeating-linear-gradient(45deg, var(--deck-stripe) 0 4px, var(--deck) 4px 8px);
   box-shadow: 2px 2px 0 var(--deck-edge), 4px 4px 0 var(--wood-line); font-size: 22px; color: var(--deck-edge); }
+.bar .deck:focus-visible { box-shadow: 0 0 0 2px var(--focus-in), 2px 2px 0 var(--deck-edge), 4px 4px 0 var(--wood-line); }
 .bar .deck:hover:not(:disabled) { background: repeating-linear-gradient(45deg, var(--deck) 0 4px, var(--deck-stripe) 4px 8px); }
 #zoomValue { min-width: 4.6em; font-variant-numeric: tabular-nums; }
 .bar .menu-button { flex: 0 1 auto; max-width: 100%; min-width: 0; }
@@ -30,11 +35,14 @@
 .caret { flex: none; width: 6px; height: 6px; margin: 4px 1px 0 3px; border: solid currentColor; border-width: 0 1.8px 1.8px 0;
   transform: rotate(-135deg); opacity: .7; }
 .sep { flex: none; width: 2px; height: 26px; margin: 0 3px; background: var(--wood-line); }
-.tb-left:has(#navButton[hidden]) .sep, .toolbar:not(.has-boxes) .box-sep { display: none; }
+/* What is not there takes no room and leaves no line: Nav before a mockup, + and the mockup menu on an edit link. */
+.tb-left:has(#navButton[hidden]) :is(.sep, .nav-pop), .tb-left:has(#menuNew[hidden]) > .sep, .pop:has(> #projectButton[hidden]),
+.tb-mid:has(#projectButton[hidden]) > .sep:first-child, .toolbar:not(.has-boxes) :is(.box-sep, .pop:has(> #boxNav)) { display: none; }
 .icon { display: block; width: 1em; height: 1.4em; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
 #projectButton { max-width: min(36ch, 24vw); }
-.pop:has(> #projectButton) { min-width: 7.5em; }
 #navButton { max-width: min(40ch, 30vw); }
+/* Short of room: closer items first; then the boxes fold (below); then the zoom icons and the wordmark go. */
+@media (max-width: 1400px) { .bar, .pop, .bar .box-nav { gap: 3px; } .bar button { padding: 6px 7px; } .sep { margin: 0 1px; } }
 @media (max-width: 900px) { .bar .wide-only, .logo b { display: none; } #projectName { max-width: 12ch; } .logo { padding: 4px; } }
 
 /* Menus open upward from their button and are never taller than the window above the bar; they scroll inside. */
@@ -65,33 +73,28 @@
 /* The box buttons in the bar: each moves the view to its box; the gold number counts what is new. In a narrow window
    they fold into the Boxes menu. */
 .box-nav { position: static; display: flex; flex-direction: row; align-items: center; min-width: 0; max-height: none; padding: 0; border: 0;
-  box-shadow: none; background: none; color: inherit; font: inherit; gap: 4px; }
+  box-shadow: none; background: none; color: inherit; font: inherit; gap: 4px; overflow: visible; }
 .box-nav b, #boxesButton b { min-width: 20px; padding: 0 6px; border-radius: 99px; background: var(--badge); color: var(--on-badge);
   font-size: 12px; font-weight: 600; line-height: 20px; text-align: center; }
-.toolbar b:empty, #boxesButton, .toolbar:not(.has-boxes) .box-nav { display: none; }
+.toolbar b:empty, #boxesButton { display: none; }
 .toolbar.has-boxes .box-nav[hidden] { display: flex !important; }
 @media (max-width: 1200px) {
   .toolbar.has-boxes #boxesButton { display: inline-flex; }
   .box-nav { position: absolute; bottom: calc(100% + 16px); flex-direction: column; align-items: stretch; min-width: 200px; padding: 6px;
-    max-height: calc(100vh - var(--bar-h) - 12px); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
+    max-height: calc(100vh - var(--bar-h) - 12px); overflow: auto; border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
     background: var(--surface); color: var(--text); font: 13px/1.4 system-ui, -apple-system, sans-serif; }
   .toolbar.has-boxes .box-nav[hidden] { display: none !important; }
-  .bar button { padding: 6px 7px; }
-  .sep { margin: 0 1px; }
-  .pop:has(> #projectButton) { min-width: 6em; }
   .bar .box-nav button { justify-content: space-between; padding: 5px 8px; border-radius: 6px; }
   .bar .box-nav button:hover:not(:disabled) { background: var(--surface-2); }
   .box-nav .sep { display: none; }
 }
 
-/* A phone: two rows (the deck and Nav above, the rest below); menus span the window; no logo. */
+/* A phone: two rows (the deck and Nav above, the rest below, with no lines); menus span the window; no logo. */
 @media (max-width: 720px) {
   .toolbar { grid-template-columns: 1fr; padding: 0 8px; }
-  .logo, .tb-mid > .sep:first-child { display: none; }
-  .bar { grid-column: 1; justify-self: center; display: grid; grid-template-columns: minmax(0, auto) auto; row-gap: 4px; gap: 4px 2px; }
-  .tb-left { grid-column: 1 / -1; justify-content: center; }
-  .tb-mid .sep, .tb-right > .sep { display: none; }
-  .pop:has(> .menu-button) { min-width: 4.5em; }
+  .logo, .tb-mid .sep, .tb-right > .sep { display: none; }
+  .bar { grid-column: 1; justify-self: center; row-gap: 2px; }
+  .tb-left::after { content: ''; flex-basis: 100%; }
   #projectButton, #navButton { max-width: none; }
   .bar button { padding: 6px 5px; }
   .bar .deck { height: 40px; width: 38px; }

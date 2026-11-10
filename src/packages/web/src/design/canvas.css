@@ -67,4 +67,5 @@
 .card:hover .rail, .card.current .rail, .box:hover > .rail, .box.current > .rail, .rail:focus-within { opacity: 1; }
 .rail .tool { width: 40px; height: 40px; padding: 0; border-radius: 10px; font-size: 18px; line-height: 1; color: var(--muted);
   box-shadow: var(--shadow-tool); }
+.rail .tool:focus-visible { box-shadow: 0 0 0 2px var(--focus-in), var(--shadow-tool); }
 .rail .tool:hover:not(:disabled) { color: var(--text); border-color: var(--current); }

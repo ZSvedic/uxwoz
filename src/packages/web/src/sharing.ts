@@ -22,6 +22,7 @@ if (shareToken) {
     return plain(input, { ...init, headers })
   }) as typeof fetch
   $('projectButton').hidden = true
+  $('menuNew').hidden = true
 }
 
 /** The mockup an edit link opens. */

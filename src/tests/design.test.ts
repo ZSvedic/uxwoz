@@ -96,6 +96,9 @@ const PAIRS: [string, string, number][] = [
   ['--sky-text', '--sky1', 4.5], ['--sky-text', '--sky2', 4.5], ['--sky-muted', '--sky1', 4.5], ['--sky-muted', '--sky2', 4.5],
   ['--sky-mark', '--sky1', 4.5], ['--sky-text', '--plate', 4.5], ['--sky-muted', '--plate', 4.5],
   ['--disabled', '--surface', 3], ['--bar-disabled', '--wood1', 3], ['--bar-disabled', '--wood2', 3],
+  // The wordmark is large text; an idea opened in a box lies on surface-2; the deck's + on both of its stripes.
+  ['--wordmark', '--surface', 3], ['--text', '--surface-2', 4.5], ['--muted', '--surface-2', 4.5], ['--mark', '--surface-2', 4.5],
+  ['--disabled', '--surface-2', 3], ['--deck-edge', '--deck', 4.5], ['--deck-edge', '--deck-stripe', 4.5],
 ]
 
 describe('contrast in tokens.css', () => {

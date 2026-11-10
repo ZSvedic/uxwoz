@@ -9,6 +9,7 @@
   font-size: 15px; field-sizing: content; min-height: 3.2em; max-height: 14em; }
 .gen-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
 .generate .go { padding: 10px; border-radius: 99px; font-size: 17px; font-weight: 600; box-shadow: var(--pick-shadow); }
+.generate .go:focus-visible { box-shadow: 0 0 0 2px var(--focus-in), var(--pick-shadow); }
 .workspace:has(> .generate.open:not([hidden]))::after { content: ''; position: absolute; inset: 0; z-index: 14; background: var(--dim); }
 .gen-row label { display: flex; gap: 6px; align-items: center; color: var(--muted); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }

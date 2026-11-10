@@ -45,10 +45,12 @@ one, and the other is gone. After that, the user changes a screen by asking for 
 
 One wooden bar, about 58 px tall, at the bottom centre of the window, with the logo at the left
 end of its strip. A thin vertical line stands between its items: **+** | ← Nav → | the mockup menu |
-Rules | Fixer | Components | Data | Theme | zoom | the microphone. **+** opens the generate panel
-(New mockup). The four menus (mockup, Nav, Theme, zoom) look alike, have the same chevron, and open
-upward, never taller than the window above the bar. The bar never scrolls sideways. Under 720 px it
-has two rows (**+** and ← Nav → above, the rest below), menus span the window, and the logo goes.
+Rules | Fixer | Components | Data | Theme | zoom | the microphone (in a browser with speech input).
+**+** opens the generate panel (New mockup). The four menus (mockup, Nav, Theme, zoom) look alike,
+have the same chevron, and open upward, never taller than the window above the bar. The bar never
+scrolls sideways and nothing in it runs past its edge: short of room, the mockup's name gets shorter
+first, then the screen's, then the theme's. Under 720 px it has two rows (**+** and ← Nav → above,
+the rest below, with no lines), menus span the window, and the logo goes.
 
 - **Project menu**: a button with the mockup's prompt, cut short (at 12 characters under 900 px).
   Its menu has **Recent mockups** (the last ten, the open one

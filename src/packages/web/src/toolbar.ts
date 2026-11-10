@@ -133,7 +133,7 @@ for (const [b, m] of MENUS) $(b).addEventListener('click', () => {
 document.addEventListener('pointerdown', (e) => {
   const t = e.target as Node
   if (!MENUS.some(([b, m]) => $(b).contains(t) || $(m).contains(t))) closeMenus()
-  if (state.app && generate.classList.contains('open') && !generate.contains(t) && !$('projectMenu').contains(t)) closeGenerate()
+  if (state.app && generate.classList.contains('open') && !generate.contains(t) && !$('menuNew').contains(t)) closeGenerate()
 })
 addEventListener('blur', closeMenus)
 addEventListener('keydown', (e: KeyboardEvent) => {
@@ -144,6 +144,7 @@ addEventListener('keydown', (e: KeyboardEvent) => {
 })
 
 export function openGenerate() {
+  if (!generate.hidden) return promptInput.focus() // already showing: keep what was typed
   restorePickers()
   generate.classList.add('open')
   promptInput.value = ''
