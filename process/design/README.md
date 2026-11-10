@@ -1,6 +1,6 @@
 # Design variants: UX Woz as a game
 
-This folder holds five looks for the app around the screens, so the user can pick one by trying it.
+This folder holds seven looks for the app around the screens, so the user can pick one by trying it.
 On 2026-11-09 the user kept C, dropped the sticker book, the sketchbook and an Oz-book variant (git
 history has them), and asked for the wizard theme in four readings next to C.
 It does not change the app: the mockup screens stay wobbly sketches, and no file here is loaded by `src/`.
@@ -97,6 +97,28 @@ lines, one clean sans.
 - **Sounds:** a synth shimmer on pick, a blip on hover, a filtered whoosh for the panels.
 - **Cost:** about +5 KB: backdrop blur, the aurora and the rail.
 
+## F and G: the blend (`variant-f.html`, `variant-g.html`)
+
+The user's pick of parts from A to E, on B as the base. F and G are the same page except the background.
+
+- **From B:** the night sky in both modes, the gold OR, the ember Pick, the pinned index cards, the drawer as a
+  card in your hand, the generate panel, the sheet, Fredoka.
+- **From D:** the segmented pill toolbar, placed at the bottom, text 15 px at weight 500, the arrows pointing up,
+  and the violet and green corner glows.
+- **From A:** the pick: gold glow, levitation, star sparks, the loser dissolves into motes; the chime and the hover tinkle.
+- **From E:** the filtered whoosh, on deal and when the drawer opens.
+- **New:** the hat alone as the logo, shaded (a gradient on the cone, a dark brim underside, a highlight, a thin
+  gold rim), and as the favicon. Both Pick buttons go after a pick. The tool buttons (Edit, Info, Undo and so on)
+  sit in a column to the right of a screen, so the space below is free for lines. IDs like `snore-count` are in
+  ink on a faint chip, not blue. The boxes sit right of the tree, or below it when narrow.
+- **Connecting lines**, which no earlier variant had: an SVG in the board draws a 2 px line from the bottom of
+  the picked screen (before a pick, faintly from under the OR) down into a lane, across, and up into each child
+  screen, with rounded corners; redrawn on resize, after a pick and after ↺.
+- **F's background:** B's stars on three hand-placed tiles of 547, 443 and 389 px with 6 to 11 stars each, so no
+  repeat shows, and D's corner glows on top.
+- **G's background:** D's 22 px dot grid and its corner glows, on B's sky.
+- **Cost:** about +7 KB on `shell.css`, plus the line drawing, which the real app already has in `canvas.ts`.
+
 ## Two rules for AGENTS.md
 
 These go under a new heading **Design**:
@@ -131,4 +153,20 @@ first among the earlier set; the four others are readings of the wizard theme.
 My order: D, E, B, A, C for the wizard brief, with C as the user's earlier pick kept for comparison. D and E
 are the two that answer "modern"; B is the one to choose if the game feel matters more than the modern feel.
 Not checked by ear: the sounds, in any of them.
+
+## Judge's notes, 2026-11-10: F and G
+
+Opened both at 800 px, light and dark, picked A in F: the Pick buttons go, the chosen screen glows and the line
+runs from under it to Nights and Settings (`shots/f-picked.jpg`). No console errors. Screenshots: `f-light.jpg`,
+`f-dark.jpg`, `g-light.jpg`, `g-dark.jpg`. The screens blur in with a "summon" animation on load; in a hidden
+browser pane it pauses, which is a quirk of the pane, not the page.
+
+- **F, stars.** The sky reads as a sky now: no visible repeat at 800 px. The corner glows are subtle enough to
+  miss at a glance, which is right.
+- **G, dots.** Calmer and more "tool" than F; the dot grid reads as a canvas you can place things on. The dots
+  are faint in light mode's parchment chrome areas, fine on the sky.
+- Both: the shaded hat is the best logo so far, and the bottom pill bar frees the top of the canvas. One thing
+  to look at on a real screen: after a pick the page scrolls so the chosen screen slides under the logo.
+
+Not checked by ear: the sounds.
 
