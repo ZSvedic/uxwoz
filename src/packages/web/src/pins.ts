@@ -22,6 +22,27 @@ export function numbered(list: Feedback[]): { f: Feedback; n: number | null }[] 
     .map((f) => ({ f, n: f.resolved ? null : ++n }))
 }
 
+/** Where a comment is: at a dead control, on a part (its words), or the whole screen. */
+export const whereOf = (f: Feedback) => (f.kind === 'dead' || f.label ? `At "${f.label || 'a control'}", not designed yet` : f.about || 'The whole screen')
+
+/** A comment as the owner's Comments tab shows it: its pin number (open ones), whether its pin is drawn, where it is,
+ * and whether its part was not found in the newest version. */
+export interface CommentRow { f: Feedback; n: number | null; pin: boolean; where: string; earlier: boolean }
+
+/** A screen's comments for the owner, the open ones by pin number, then the resolved ones. `located` is the ids its
+ * frame found (null until it answers). An edit link sees none. */
+export function commentRows(all: Feedback[], screen: string, located: Set<string> | null, editLink = false): CommentRow[] {
+  if (editLink) return []
+  const rows = numbered(all.filter((f) => f.screen === screen)).map(({ f, n }) => {
+    const live = n != null && !!anchorOf(f), found = !!located?.has(f.id)
+    return { f, n, pin: live && found, where: whereOf(f), earlier: live && !!located && !found }
+  })
+  return [...rows.filter((r) => r.n != null), ...rows.filter((r) => r.n == null)]
+}
+
+/** The open comments of a screen, for the tab's count. */
+export const openCount = (all: Feedback[], screen: string, editLink = false) => commentRows(all, screen, null, editLink).filter((r) => r.n != null).length
+
 /** Draw or update the pins in `host`, a layer over a frame: one per spot with a number, at its top right corner, inside the layer. */
 export function pinLayer(host: HTMLElement, spots: Spot[], numbers: Map<string, number>, onClick: (id: string) => void) {
   const old = new Map([...host.querySelectorAll<HTMLButtonElement>('button.pin')].map((b) => [b.dataset.id!, b]))

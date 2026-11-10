@@ -49,12 +49,6 @@ body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-even
 .note { max-width: min(420px, calc(100% - 32px)); margin: 80px auto; padding: 20px; text-align: center; font-size: 16px;
   background: var(--surface); color: var(--muted); border: 2px solid var(--border); border-radius: 20px; box-shadow: var(--halo), var(--lift); }
 
-/* The pins over the screen, drawn by pins.ts: gold dots with dark numbers; clicks pass through the layer to the screen. */
-.pins { position: absolute; inset: 0; pointer-events: none; }
-.pin, .dot { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; padding: 0; border-radius: 50%;
-  background: var(--badge); color: var(--on-badge); font: 600 12px/1 Fredoka, system-ui, sans-serif; }
-.pin { position: absolute; pointer-events: auto; border: 2px solid var(--frame); box-shadow: var(--lift); }
-
 /* The margin: parchment slips (the name card, the card being written, the comments), the hint on the sky. */
 .margin { width: min(100%, 420px); display: flex; flex-direction: column; gap: 10px; }
 .wide .margin { width: 280px; }

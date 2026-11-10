@@ -87,6 +87,9 @@ interface CanvasHandlers {
 }
 
 export interface Box { x: number; y: number; w: number; h: number }
+
+/** The comments' pins (comments.ts): told when a picked screen's frame has its size, and its answers to `locate`. */
+export const pinHook = { size: (_key: string) => {}, located: (_key: string, _d: any) => {} }
 export interface View { z: number; left: number; top: number }
 
 /**
@@ -104,10 +107,11 @@ function newCard(key: string, on: CanvasHandlers) {
   frame.title = 'Generated screen'
   frame.style.height = `${START_H}px`
   const shield = el('div', 'shield', el('span', 'pick-hint', 'Pick this design'))
-  const screen = el('div', 'screen', frame, shield)
+  const pins = el('div', 'pins')
+  const screen = el('div', 'screen', frame, pins, shield)
   const { el: rail, tools } = railOf(RAIL, (tool) => on.tool(c.key, tool))
   const c = {
-    el: el('article', 'card', head, screen, error, rail), name, idea, more, note, screen, frame, shield, error, rail, tools, key,
+    el: el('article', 'card', head, screen, error, rail), name, idea, more, note, screen, frame, pins, shield, error, rail, tools, key,
     view: null as CardView | null, width: 0, height: START_H, shown: null as { html: string; final: boolean; css: string } | null, sized: false,
   }
   shield.addEventListener('click', () => { if (c.view?.side?.pickable) on.pick(c.key, c.view.side.index) })
@@ -338,6 +342,7 @@ export class Canvas {
         c.screen.hidden = !!v.error
         c.shield.title = v.side ? (v.side.pickable ? 'Pick this design' : 'Wait until it is finished') : ''
         c.rail.hidden = !!v.side
+        c.pins.hidden = !!v.side || v.streaming
         c.tools[2]!.hidden = !s.undo
         c.tools[1]!.hidden = !!s.component
         c.tools[4]!.title = s.component ? 'Delete this component: screens that paste it show nothing in its place' : RAIL[4]![2]
@@ -360,7 +365,14 @@ export class Canvas {
     if (!c || (s && s.html === html && s.final === final && s.css === css)) return
     c.shown = { html, final, css }
     c.sized = false
+    c.pins.replaceChildren()
     c.frame.srcdoc = framePage(html, css, final, c.view?.device, c.view?.fit)
+  }
+
+  /** A picked, finished screen's frame and the layer of its pins; null while it streams, and for an A OR B side. */
+  pinTarget(key: string) {
+    const c = this.cards.get(key)
+    return c?.view && !c.view.side && !c.view.streaming && c.shown?.final ? { win: c.frame.contentWindow, layer: c.pins } : null
   }
 
   /** A card takes another id, keeping its frame: the picked side becomes the screen. */
@@ -523,10 +535,14 @@ export class Canvas {
     if (d.uxwoz === 'size' && Number.isFinite(d.height)) {
       if (c.shown?.final) c.sized = true
       const h = Math.min(MAX_SCREEN_H, Math.max(c.view?.fit ? MIN_COMPONENT_H : MIN_SCREEN_H, Math.round(d.height)))
-      if (c.height === h) return
-      c.height = h
-      c.frame.style.height = `${h}px`
-      this.queue()
+      if (c.height !== h) {
+        c.height = h
+        c.frame.style.height = `${h}px`
+        this.queue()
+      }
+      if (this.pinTarget(c.el.dataset.id ?? '')) pinHook.size(c.key)
+    } else if (d.uxwoz === 'located' && this.pinTarget(c.el.dataset.id ?? '')) {
+      pinHook.located(c.key, d)
     } else if (d.uxwoz === 'key' && typeof d.key === 'string' && typeof d.code === 'string') {
       // A key pressed in a screen, handed on as if pressed in the app.
       dispatchEvent(new KeyboardEvent('keydown', { key: d.key, code: d.code, shiftKey: !!d.shift, metaKey: !!d.mod }))

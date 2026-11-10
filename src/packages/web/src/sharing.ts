@@ -1,9 +1,10 @@
 // Sharing, the owner's side: the drawer's Share pane (a link per role, copy, revoke, the cap used) and the
-// feedback that came back, grouped by screen, with the trips. An edit link opens this app on one mockup:
+// feedback that came back, grouped by screen (a comment jumps to it in Comments), with the trips. An edit link opens this app on one mockup:
 // every API call then carries its token.
 
 import type { Feedback, Share, Trip } from '@uxwoz/core'
 import { button, el } from './boxes.ts'
+import { jump, relocate } from './comments.ts'
 import { openDrawer, renderDrawer } from './drawer.ts'
 import { hint, post, showError } from './net.ts'
 import { labelOf } from './screens.ts'
@@ -43,8 +44,11 @@ export async function loadShared() {
   if (!res?.ok || app !== state.app) return
   shared = { app, ...await res.json() }
   renderDrawer()
+  relocate()
 }
 const mine = () => (shared && shared.app === state.app ? shared : null)
+/** The open mockup's feedback, as last loaded. */
+export const feedbackOf = (): Feedback[] => mine()?.feedback ?? []
 
 const ROLE_NAMES = { view: 'View: click through', comment: 'Comment: click through and leave feedback', edit: 'Edit: change this mockup' }
 const when = (at: string) => new Date(at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
@@ -56,11 +60,10 @@ const thumbsOf = (list: Feedback[]) => {
 const lineOf = (f: Feedback) => f.kind === 'dead' || f.label ? `At "${f.label || 'a control'}" expected: ${f.text}` : `${f.text}${f.about ? ` (about: ${f.about})` : ''}`
 const screenTitle = (key: string, title: string) => { const e = state.entries.get(key); return e?.versions.length ? labelOf(e) : title || 'A deleted screen' }
 
-/** The Info tab's rows for a screen: its thumbs and its comments, newest first. */
+/** The Info tab's row for a screen: its thumbs (its comments are in Comments). */
 export function screenFeedback(key: string): [string, string][] {
-  const list = (mine()?.feedback ?? []).filter((f) => f.screen === key && f.kind !== 'done')
-  const t = thumbsOf(list)
-  return [...t ? [['Thumbs', t] as [string, string]] : [], ...list.filter((f) => f.kind !== 'thumb').reverse().map((f) => [f.name, lineOf(f)] as [string, string])]
+  const t = thumbsOf(feedbackOf().filter((f) => f.screen === key))
+  return t ? [['Thumbs', t]] : []
 }
 
 /** A trip in one line: "Ana: Home → Nights → Settings, 1 dead click (Export)". */
@@ -90,9 +93,16 @@ export function renderShare() {
   for (const f of [...all].reverse()) if (f.kind !== 'done') groups.set(f.screen, [...groups.get(f.screen) ?? [], f])
   const done = all.filter((f) => f.kind === 'done').reverse()
   const said = (f: Feedback) => el('li', '', el('b', '', f.name), `: ${lineOf(f)}`, el('small', '', ` ${when(f.at)}`))
+  // A comment on a drawn screen is a button to it in Comments.
+  const comment = (f: Feedback) => {
+    if (!state.entries.get(f.screen)?.versions.length) return said(f)
+    const b = button('', 'Show this comment on its screen', () => jump(f.screen, f.id), 'jump')
+    b.append(el('b', '', f.name), `: ${lineOf(f)}`, el('small', '', ` ${when(f.at)}`))
+    return el('li', '', b)
+  }
   const feedback = [...groups].flatMap(([key, list]) => [
     el('h4', '', screenTitle(key, list[0]!.title), thumbsOf(list) ? el('small', '', `  ${thumbsOf(list)}`) : ''),
-    el('ul', 'feedback', ...list.filter((f) => f.kind !== 'thumb').map(said)),
+    el('ul', 'feedback', ...list.filter((f) => f.kind !== 'thumb').map(comment)),
   ])
   $('sharePane').replaceChildren(
     el('h3', '', 'Share this mockup'), role, capRow, make,

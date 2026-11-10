@@ -64,7 +64,7 @@ src/packages/web/src/
   screens.ts     browser: views and draw, A OR B streaming, refit and pick, clicks (@names, back), Regenerate, Edit,
                  Undo, delete
   nav.ts         browser: the current screen, ← → trail, the map after filing, Nav
-  drawer.ts      browser: box changes and rail tools, the drawer (Edit, Info) for a screen or a box
+  drawer.ts      browser: box changes and rail tools, the drawer (Edit, Info, and Comments for a screen) for a screen or a box
   toolbar.ts     browser: generate panel and pickers, toolbar menus (Theme too), Recent, zoom and its keys
   net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill and the hint
   voice.ts       browser: voice input's state machine (wake phrase as Chrome hears it, what was heard, countdown,
@@ -77,12 +77,14 @@ src/packages/web/src/
                  place, Export
   share.ts       share links per role, the player's map, feedback (a name first; a visitor's own; Resolve) and
                  trips, an edit link's scope and cap, the owner's gate (UXWOZ_OWNER); `guard` wraps server.ts's routes
-  sharing.ts     browser: the drawer's Share and feedback pane, a screen's feedback in Info, an edit link's token
-                 on every API call
+  sharing.ts     browser: the drawer's Share and feedback pane (a comment jumps to it), a screen's thumbs in Info,
+                 an edit link's token on every API call
+  comments.ts    browser: the owner's comments: pins over every drawn screen with open ones, the Comments tab with
+                 Resolve and Reopen, the jump to a comment from its pin or the Feedback pane
   player.html, player.ts   the player at /s/<token>: one screen in its device frame, Back, the trail, the name card,
                  comments pinned to parts in the margin beside the screen, thumbs, Done, trips
   pins.ts        browser: a comment's anchor, the pin numbers of a screen's comments, the layer of pins over a frame
-                 (the player's now, the app's next)
+                 (the player's and the app's), the rows of the owner's Comments tab (no DOM, tested)
   index.html     the page around the canvas; links design/index.css
   design/        the look: tokens.css (every colour), base.css (shared by parts), one file per part (bar,
                  canvas, boxes, drawer, panel), motion.css; index.css imports them all; fx.ts (sparks, sounds, pickFx);

@@ -211,7 +211,7 @@ buttons wait (Info still works).
 A 360 px card docked at the right edge, level, rounded, with a double gold line inside its edge,
 for the current screen or box (see Boxes for a box's). It swings in over 0.45 s and closes at once.
 The canvas gets narrower and scrolls so the screen stays fully visible beside it. Esc or ✕ closes
-it. It has two tabs:
+it. It has two tabs, and a third for a screen of a mockup with share links (**Comments**, see Sharing):
 
 - **Edit**: *What should change?* Type it and click **Make the change** (or press Enter): the
   model gets this screen and the request, and returns the same screen with only that change, as a
@@ -497,11 +497,25 @@ browser and says what they think. Nothing is real-time and nobody signs in: a li
 - **What the owner sees**: **Feedback** (project menu) opens the same pane at *Feedback*: by screen,
   the newest first, with its thumbs (*👍 2 · 👎 1*) and each comment with the visitor's name and the
   part it is about; then the answers to *Would you use this?*; then the trips, as
-  *Ana: Home → Nights → Settings, 1 dead click (Pair watch)*. A screen's Info lists its thumbs and
-  comments too. The owner resolves a comment, and the reviewer sees *Resolved* on reload. A mockup
+  *Ana: Home → Nights → Settings, 1 dead click (Pair watch)*. A comment there is a button: it makes
+  its screen current and opens **Comments** at it (a comment on a deleted screen stays a plain line).
+  A screen's Info lists its thumbs. The owner resolves a comment, and the reviewer sees *Resolved* on reload. A mockup
   keeps its last 500 comments, 500 thumbs, 500 answers and 500 trips; a text is at most 1,000
   characters. Feedback from before names loads as it was (from *Someone*, and the old answers at dead
   controls). Deleting the mockup, or Start over, deletes its links and feedback.
+- **Pins on the canvas**: every drawn screen with open comments shows their gold pins on its parts,
+  numbered by time as in the player, at the canvas's scale. A screen being made or changed, and an
+  open A OR B, show none; a comment about the whole screen, or whose part is gone, has no pin. A pin
+  takes only its own click: it makes its screen current and opens **Comments** at its comment, which
+  gets a gold ring for a moment. Pointing at a comment in the tab rings its pin. The comments load
+  when a mockup opens and when Share or Comments opens; nothing polls.
+- **Comments** (the drawer's third tab, for a screen; *💬 Comments 3* with 3 open) lists the
+  screen's comments from every reviewer: the open ones by pin number, then the resolved ones, muted.
+  Each shows its pin number in a gold dot (when it has a pin), the reviewer's name, the part's words
+  (*The whole screen*; *At "Pair watch", not designed yet* for a dead control), the text, when it was
+  sent, *About an earlier version* when its part is not in the screen any more, and **Resolve** (or
+  **Reopen**). With none: *No comments on this screen yet.* An edit link shows no feedback, so it has
+  no pins and no Comments tab.
 - **The owner** (`UXWOZ_OWNER`): when set, the app and its API answer only a browser that opened
   `/?owner=<secret>` once (it keeps a cookie); others see *This UX Woz is private.* Share links work
   for everyone. Unset, the app is as before.

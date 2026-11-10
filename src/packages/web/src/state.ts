@@ -36,7 +36,7 @@ export const state = {
   picking: false,
   /** A picked screen getting a new version: an Edit with `change`, else a Regenerate. */
   revising: null as { key: string; change: string | null } | null,
-  drawer: null as 'edit' | 'info' | 'share' | null,
+  drawer: null as 'edit' | 'info' | 'comments' | 'share' | null,
   busy: null as AbortController | null,
   /** The view before an A OR B was fitted, to go back to after the pick. */
   before: null as View | null,

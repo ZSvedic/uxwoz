@@ -92,6 +92,7 @@
       <div class="tabs" role="tablist">
         <button role="tab" data-tab="edit">✎ Edit</button>
         <button role="tab" data-tab="info">ⓘ Info</button>
+        <button role="tab" data-tab="comments" id="commentsTab">💬 Comments</button>
       </div>
       <button id="drawerClose" class="close" title="Close (Esc)">✕</button>
     </div>
@@ -104,6 +105,7 @@
       <ol id="history" class="history" reversed></ol>
     </form>
     <div id="infoPane" class="pane"><dl id="info" class="info"></dl></div>
+    <div id="commentsPane" class="pane comments-pane" hidden></div>
     <div id="sharePane" class="pane share-pane" hidden></div>
   </aside>
   <form id="generate" class="generate">

@@ -41,3 +41,15 @@
 .share-pane h4 { margin: 8px 0 0; font-size: 13px; }
 .share-pane small, .share-pane .none { color: var(--muted); }
 .share-pane li.none { list-style: none; }
+
+/* Comments: a card each, with its pin's gold dot; the resolved ones muted; a gold ring when its pin was clicked.
+   In the Feedback pane a comment is a plain-looking button to it. */
+.comments { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.comments li { padding: 10px 12px; border: 2px solid var(--border); border-radius: 14px; overflow-wrap: anywhere; outline: none; }
+.comments li.ring { box-shadow: 0 0 0 3px var(--current); }
+.comments .head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.comments p { margin: 4px 0; white-space: pre-wrap; }
+.comments li > small { display: block; margin-bottom: 6px; }
+.comments small, .comments li.resolved, .comments-pane .none { color: var(--muted); }
+.feedback .jump { display: block; width: 100%; padding: 2px 6px; margin-left: -6px; text-align: left; border-color: transparent; background: none; }
+.feedback .jump:hover { border-color: var(--border); }

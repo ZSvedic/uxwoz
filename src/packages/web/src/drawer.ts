@@ -1,4 +1,4 @@
-// The boxes' changes and the rail tools, and the drawer: Edit and Info for the current box or screen.
+// The boxes' changes and the rail tools, and the drawer: Edit and Info for the current box or screen, Comments for a screen.
 
 import { DEVICES } from '@uxwoz/core/frame'
 import { BOX_STATES, BOX_TITLES, LIMITS, VISIT_EVERY, VISITS_KEPT } from '@uxwoz/core/keys'
@@ -10,7 +10,8 @@ import { fmtS, fmtUsd, post, showError } from './net.ts'
 import { applyMap, currentAt, setCurrent } from './nav.ts'
 import { components, draw, ideaOf, labelOf, pastedOn, removeScreen, revise, undo, views } from './screens.ts'
 import { closeMenus } from './toolbar.ts'
-import { loadShared, renderShare, screenFeedback } from './sharing.ts'
+import { loadShared, renderShare, screenFeedback, shareToken } from './sharing.ts'
+import { commentsTab, renderComments } from './comments.ts'
 import { $, changeInput, drawer, enterSubmits, modelSelect, state } from './state.ts'
 
 /** A change to the boxes, an Undo, or a visit asked for (an Edit is one); the server answers with the whole mockup. True when it was done. */
@@ -77,9 +78,9 @@ export function onTool(key: string, tool: string) {
 
 const modelLabel = (id: string) => [...modelSelect.options].find((o) => o.value === id)?.text ?? id
 
-export function openDrawer(tab: 'edit' | 'info' | 'share') {
+export function openDrawer(tab: NonNullable<typeof state.drawer>) {
   state.drawer = tab
-  if (tab === 'share' || (tab === 'info' && !state.box)) loadShared()
+  if (tab === 'share' || tab === 'comments' || (tab === 'info' && !state.box)) loadShared()
   renderDrawer()
   if (tab === 'edit') changeInput.focus()
   // The canvas got narrower: keep the current box or screen in view beside the drawer.
@@ -91,6 +92,8 @@ export const closeDrawer = () => { state.drawer = null; renderDrawer() }
 /** The drawer shows the current box or screen: Edit (the change box and the past changes) or Info. */
 export function renderDrawer() {
   const e = state.current && !state.box ? state.entries.get(state.current) : undefined
+  // Comments is a screen's tab, and an edit link has none: a box (or that link) shows Info instead.
+  if (state.drawer === 'comments' && (state.box || shareToken)) state.drawer = 'info'
   const v = e?.versions.at(-1)
   const open = !!(state.drawer && (state.drawer === 'share' ? state.app : state.box ? state.boxes : v))
   if (drawer.hidden === open) {
@@ -102,6 +105,9 @@ export function renderDrawer() {
   $('editPane').hidden = state.drawer !== 'edit'
   $('infoPane').hidden = state.drawer !== 'info'
   $('sharePane').hidden = state.drawer !== 'share'
+  $('commentsPane').hidden = state.drawer !== 'comments'
+  $('commentsTab').hidden = !!state.box || !!shareToken || !e
+  if (e) $('commentsTab').textContent = commentsTab(e.key)
   if (state.drawer === 'share') return renderShare()
   const box = state.box
   $('changeLabel').textContent = `What should change${box ? ` in ${BOX_TITLES[box]}` : ''}?`
@@ -110,6 +116,7 @@ export function renderDrawer() {
   if (box) return renderBoxDrawer(box, state.boxes!)
   if (!e || !v) return
   $('drawerName').textContent = labelOf(e)
+  if (state.drawer === 'comments') return renderComments(e.key)
   const history = $('history')
   const comp = isComponent(e)
   const node = state.tree.get(e.key)
@@ -148,7 +155,7 @@ export function renderDrawer() {
     // What filing made of the screen's last decision, and the lines it refused.
     ...(f ? [['Filing', f.error ? `failed: ${f.error}` : `${[...f.added.map((x) => `added ${x}`), ...f.changed.map((x) => `changed ${x}`)].join(', ') || 'nothing new'}, `
       + `${fmtS(f.ms)}${f.costUsd == null ? '' : `, ~${fmtUsd(f.costUsd)}`}`], ...f.refused.map((r) => ['Refused', r])] as [string, string][] : []),
-    // What reviewers said about it through a comment link.
+    // Its thumbs from reviewers through a comment link (their comments are in Comments).
     ...screenFeedback(e.key),
   ]
   showInfo(info)
@@ -181,6 +188,6 @@ $('editPane').addEventListener('submit', (ev) => {
   else if (state.current) revise(state.current, change)
 })
 enterSubmits(changeInput, $('editPane') as HTMLFormElement)
-for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.addEventListener('click', () => openDrawer(b.dataset.tab as 'edit' | 'info'))
+for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.addEventListener('click', () => openDrawer(b.dataset.tab as 'edit' | 'info' | 'comments'))
 $('drawerClose').addEventListener('click', closeDrawer)
 

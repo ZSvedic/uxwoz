@@ -24,3 +24,10 @@ h2, .box h3, .drawer-name, .toolbar, button.primary, .pick-hint, .or b, .card .n
 .menu .item > span, .recent button span { flex: 1; min-width: 0; }
 /* The red hover of the buttons that delete or drop. */
 .rail .tool[data-tool="delete"]:hover:not(:disabled), .or .drop:hover, .menu-foot .danger:hover { color: var(--err); border-color: var(--err); }
+/* The pins over a screen, drawn by pins.ts, in the player and on the canvas: gold dots with dark numbers; clicks pass
+   through the layer to the screen. A pin is ringed while its comment in the drawer is pointed at. */
+.pins { position: absolute; inset: 0; pointer-events: none; }
+.pin, .dot { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; padding: 0; border-radius: 50%;
+  background: var(--badge); color: var(--on-badge); font: 600 12px/1 Fredoka, system-ui, sans-serif; }
+.pin { position: absolute; pointer-events: auto; border: 2px solid var(--frame); box-shadow: var(--lift); }
+.pin.ring { box-shadow: 0 0 0 3px var(--focus-in), 0 0 0 5px var(--current), var(--lift); }
