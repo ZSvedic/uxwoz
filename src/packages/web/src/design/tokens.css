@@ -1,0 +1,13 @@
+/* Every colour of the app, light and dark. Other design files use these names and no colour literals. */
+:root {
+  /* The app's own colour is burnt orange; blue belongs to the mockups (controls that open a screen). */
+  --bg: #f6f6f4; --fg: #1d1d1f; --muted: #6b6b70; --line: #d9d9d6; --accent: #c2501a; --card: #fff; --err: #b3261e;
+  --dot: #cfcfca; --shadow: 0 6px 24px rgba(0, 0, 0, .18);
+  /* The same in light and dark: a screen's paper, text on the accent, the small shadows of screens and rail tools. */
+  --screen: #fff; --on-accent: #fff; --shadow-screen: 0 2px 10px rgba(0, 0, 0, .12); --shadow-tool: 0 1px 4px rgba(0, 0, 0, .1);
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #151517; --fg: #ececee; --muted: #9a9aa0; --line: #33333a; --accent: #f08a4b; --card: #1e1e22; --err: #ff8a80;
+    --dot: #34343b; --shadow: 0 6px 24px rgba(0, 0, 0, .5); }
+}

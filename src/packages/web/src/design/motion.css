@@ -1,0 +1,7 @@
+/* Every transition and animation of the app. */
+/* The Pick hint and the rails fade in. */
+.pick-hint { transition: opacity .15s; }
+.rail { transition: opacity .15s; }
+/* The microphone's dot pulses while it listens. */
+.voice:is(.voice-awake, .voice-countdown)::after { animation: voice-pulse 1s ease-in-out infinite alternate; }
+@keyframes voice-pulse { to { opacity: .25; } }

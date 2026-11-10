@@ -1,0 +1,18 @@
+/* The app around the screens. Generated screens get only the theme CSS, inside their iframe. */
+/* The reset, plain buttons and fields, and every rule whose selectors reach into more than one part. */
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, -apple-system, sans-serif;
+  height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+input, select, button, textarea { font: inherit; color: inherit; }
+button, select { padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); cursor: pointer; }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.toolbar button, .recent button, .drawer :is(.tabs button, .close) { border-color: transparent; background: none; }
+/* Small uppercase headings of menus, the generate panel and the drawer. */
+.menu h3, .generate h3, .pane h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+/* Text cut off with an ellipsis: menu buttons, menu items, Recent, a screen's name and idea. */
+.menu-button > span:first-child, .menu .item > span, .recent button span, .card .head > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu .item > span, .recent button span { flex: 1; min-width: 0; }
+/* The red hover of the buttons that delete or drop. */
+.rail .tool[data-tool="delete"]:hover:not(:disabled), .or .drop:hover, .menu-foot .danger:hover { color: var(--err); border-color: var(--err); }

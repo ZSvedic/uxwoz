@@ -78,7 +78,10 @@ src/packages/web/src/
   sharing.ts     browser: the drawer's Share and feedback pane, a screen's feedback in Info, an edit link's token
                  on every API call
   player.html, player.ts   the player at /s/<token>: one screen in its device frame, Back, the trail, feedback, trips
-  index.html, shell.css   the page around the canvas
+  index.html     the page around the canvas; links design/index.css
+  design/        the look: tokens.css (every colour), base.css (shared by parts), one file per part (bar,
+                 canvas, boxes, drawer, panel), motion.css; index.css imports them all
+  design/brand/  the logo, the favicon and the three star tiles as SVG files
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
 src/scripts/fixer-reply.ts   run by hand: Terra's raw reply to a visit of a cache file
@@ -110,7 +113,10 @@ at the running app. Bun's `--hot` dev server cannot pick up a newly added fronte
 
 ## Design
 
-- **`shell.css` stays under 300 lines and 24 KB.** A change that crosses the cap removes something first.
+- **All CSS in `src/packages/web/src/design/` together stays under 700 lines and 52 KB, no file there over
+  130 lines, colours only in `tokens.css`.** A change that crosses a cap removes something first.
+  `tests/design.test.ts` checks it. To find the file for a look change: a colour is in `tokens.css`, a
+  shape in the part's file, a rule two parts share in `base.css`, movement in `motion.css`.
 - **No design tweak without a request.** Change colours, spacing, fonts, motion or sounds only when the
   user asked for that change. A bug fix keeps the look as it is. The design variants the user chooses
   from are in `process/design/`.

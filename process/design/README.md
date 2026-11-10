@@ -53,13 +53,14 @@ second round of fixes on 2026-11-10.
   repeat shows, in a layer inside the zoomed board so the stars scale with it and reach the page bottom (each
   tile needs both sizes in `background-size`: with the width alone the SVG tile stretched to the layer's height
   and the stars stopped after 550 px); D's corner glows stay on the stage, unzoomed. At 50 % the stars shrink to a pixel and nearly vanish.
-- **Cost:** about +7 KB on `shell.css`, plus the line drawing, which the real app already has in `canvas.ts`.
+- **Cost:** about +7 KB on the app's CSS (`src/packages/web/src/design/`), plus the line drawing, which the real app already has in `canvas.ts`.
 
 ## Two rules for AGENTS.md
 
 These are in `AGENTS.md` under **Design** since 2026-11-09:
 
-- **`shell.css` stays under 300 lines and 24 KB.** Today it is 234 lines and 18 KB; the cap leaves room
-  for one of these variants and little else. A change that crosses it removes something first.
+- **All CSS in `src/packages/web/src/design/` stays under 700 lines and 52 KB, no file over 130 lines,
+  colours only in `tokens.css`.** It replaced the cap of 300 lines on `shell.css` on 2026-11-10, when
+  `shell.css` was cut into that folder. A change that crosses a cap removes something first.
 - **No design tweak without a request.** Change colours, spacing, fonts, motion or sounds only when the
   user asked for that change. A fix for a bug keeps the look as it is.

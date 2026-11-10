@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+<defs>
+<linearGradient id="hc"><stop stop-color="#86a0ff"/><stop offset=".38" stop-color="#3a63ff"/><stop offset=".75" stop-color="#2140d0"/><stop offset="1" stop-color="#121f80"/></linearGradient>
+<linearGradient id="hr" x1="0" x2="0" y1="33" y2="47" gradientUnits="userSpaceOnUse"><stop stop-color="#4a66e8"/><stop offset="1" stop-color="#16278c"/></linearGradient>
+<linearGradient id="he"><stop stop-color="#ffa066"/><stop offset=".5" stop-color="#ff6a2b"/><stop offset="1" stop-color="#b83a0c"/></linearGradient>
+<radialGradient id="hs" cx=".4" cy=".35" r=".7"><stop stop-color="#fff6cf"/><stop offset=".55" stop-color="#f5c542"/><stop offset="1" stop-color="#c98a00"/></radialGradient>
+</defs>
+<ellipse cx="24" cy="41.8" rx="22" ry="6.5" fill="#090f45"/>
+<ellipse cx="24" cy="40" rx="22" ry="6.5" fill="url(#hr)"/>
+<ellipse cx="24" cy="39.6" rx="12.5" ry="3.2" fill="#050a33" opacity=".5"/>
+<path d="M12.5 39Q17 22 21 13Q24 5 36 7Q28.5 9.5 28.5 16Q30 28 35.5 39Q24 42 12.5 39z" fill="url(#hc)"/>
+<path d="M14 33.5Q24 37 34 33.5L35.5 39Q24 42 12.5 39z" fill="url(#he)"/>
+<path d="M23.5 18.5l1.5 3.1 3.4.5-2.5 2.4.6 3.4-3-1.6-3 1.6.6-3.4-2.5-2.4 3.4-.5z" fill="url(#hs)"/>
+<path d="M2 40A22 6.5 0 0 0 46 40" fill="url(#hr)"/>
+<path d="M2 40A22 6.5 0 0 0 46 40" fill="none" stroke="#f5c542" stroke-width=".8" stroke-opacity=".85"/>
+</svg>

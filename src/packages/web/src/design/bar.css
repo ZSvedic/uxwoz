@@ -1,0 +1,68 @@
+/* The toolbar: project menu on the left, Nav in the middle, zoom on the right. */
+.toolbar { flex: none; height: 44px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px;
+  padding: 0 10px; border-bottom: 1px solid var(--line); background: var(--card); position: relative; z-index: 20; }
+.tb-left, .tb-mid, .tb-right { position: relative; display: flex; gap: 4px; align-items: center; }
+.tb-left { gap: 8px; min-width: 0; }
+.tb-mid { justify-content: center; min-width: 0; }
+.tb-right { justify-content: flex-end; }
+.toolbar .trail { border: 0; font-size: 18px; line-height: 1; }
+.trail:disabled { opacity: .3; }
+.logo { font-size: 15px; white-space: nowrap; color: var(--accent); }
+.toolbar button { padding: 4px 9px; }
+.toolbar button:hover:not(:disabled) { border-color: var(--line); background: var(--bg); }
+#zoomValue { min-width: 5em; font-variant-numeric: tabular-nums; }
+.menu-button { display: inline-flex; gap: 4px; align-items: center; max-width: 100%; min-width: 0; }
+/* One chevron for every menu; a thin line between the toolbar's items; icons drawn at the size of the text. */
+.caret { flex: none; width: 7px; height: 7px; margin: 0 2px 3px 4px; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.sep { flex: none; width: 1px; height: 20px; margin: 0 4px; background: var(--line); }
+.tb-mid:has(#navButton[hidden]) .sep, .toolbar:not(.has-boxes) .box-sep { display: none; }
+.icon { display: block; width: 1em; height: 1.4em; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+.pop { position: relative; display: flex; align-items: center; }
+#projectButton { max-width: min(36ch, 40vw); }
+#navButton { max-width: min(40ch, 36vw); }
+@media (max-width: 900px) { .wide-only { display: none; } .logo { display: none; } }
+/* Dropdowns from the toolbar. */
+.menu { position: absolute; top: calc(100% + 6px); z-index: 30; min-width: 240px; max-width: min(440px, calc(100vw - 20px));
+  max-height: calc(100vh - 70px); overflow: auto; display: flex; flex-direction: column; padding: 6px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); font-size: 13px; }
+.tb-left .menu { left: 0; }
+.tb-mid .menu { left: 50%; transform: translateX(-50%); }
+.tb-right .menu { right: 0; }
+.pop .menu { min-width: 160px; }
+.menu h3 { margin: 8px 8px 2px; font-size: 11px; font-weight: 600; }
+.menu hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.menu .item { display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left; border: 0; background: none; padding: 5px 8px;
+  border-radius: 6px; }
+.menu .item:hover, .menu .item:focus-visible { background: var(--bg); }
+.menu .item small, .menu kbd { color: var(--muted); font: inherit; margin-left: auto; white-space: nowrap; }
+.menu-recent { display: flex; flex-direction: column; min-width: 320px; max-width: 460px; }
+.menu-recent .item.current { font-weight: 700; }
+.menu-foot { display: flex; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.menu-foot button { flex: 1; }
+/* Nav: every screen as an indented tree; the path to the current screen in the accent colour. */
+.nav-menu .item { padding-left: calc(8px + var(--depth, 0) * 16px); }
+.nav-menu .item b { font-variant-numeric: tabular-nums; color: var(--muted); }
+.nav-menu .item.path, .nav-menu .item.path b { color: var(--accent); }
+.nav-menu .item.current { font-weight: 700; background: var(--bg); }
+.nav-menu .item.planned { color: var(--muted); font-style: italic; }
+
+/* The box buttons in the toolbar: each moves the view to its box; the number counts what is new. In a
+   narrow window they fold into the Boxes menu. */
+.box-nav { position: static; display: flex; flex-direction: row; align-items: center; min-width: 0; padding: 0; border: 0; box-shadow: none; background: none; gap: 2px; }
+.box-nav button { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; padding: 4px 6px; }
+.box-nav b, #boxesButton b { color: var(--on-accent); background: var(--accent); border-radius: 9px; padding: 0 6px; font-size: 11px; }
+.toolbar b:empty, #boxesButton, .toolbar:not(.has-boxes) .box-nav { display: none; }
+.toolbar.has-boxes .box-nav[hidden] { display: flex !important; }
+@media (max-width: 1200px) {
+  .toolbar.has-boxes #boxesButton { display: inline-flex; }
+  .box-nav { position: absolute; flex-direction: column; align-items: stretch; min-width: 200px; padding: 6px; border: 1px solid var(--line);
+    box-shadow: var(--shadow); background: var(--card); margin: 0; }
+  .toolbar.has-boxes .box-nav[hidden] { display: none !important; }
+  .box-nav button { justify-content: space-between; }
+  .box-nav .sep { display: none; }
+}
+
+/* Voice: the microphone in the toolbar, a pulsing dot while it listens. */
+.toolbar .voice { position: relative; }
+.toolbar .voice:not(.voice-off) { color: var(--accent); }
+.voice:is(.voice-awake, .voice-countdown)::after { content: ''; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }

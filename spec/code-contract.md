@@ -31,7 +31,7 @@ GET /api/map?app=A%20coffee%20shop%20ordering%20app&wait=1      (answers once fi
   no Node or Bun APIs.
 - `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`
   as the entry, `state.ts`, `screens.ts`, `nav.ts`, `drawer.ts`, `toolbar.ts`, `net.ts`, `canvas.ts`,
-  `boxes.ts`, `sharing.ts`, `shell.css`, bundled by Bun's HTML import), the player (`player.html`,
+  `boxes.ts`, `sharing.ts`, the CSS in `design/`, bundled by Bun's HTML import), the player (`player.html`,
   `player.ts`), the share routes (`share.ts`), and the themes in `themes/`.
 
 There are no runtime dependencies; `@types/bun` and `typescript` are dev-only.
