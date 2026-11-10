@@ -1,6 +1,6 @@
 // The design sheet's script (sheet.html, at /design): the colour table read from the app's own CSS, and a ▶ per
 // sound through fx.ts. Bun does not bundle an inline module script, so it is a file of its own.
-import { play } from './fx.ts'
+import { playSound } from './fx.ts'
 
 /** Every custom property on :root, by day and inside the dark rule by night, from every sheet and its imports; not the
     ones Bun adds when it bundles. */
@@ -31,4 +31,4 @@ document.getElementById('colours')!.append(...names.flatMap((n) => {
   return [head, ...[false, true].map((night) => { const v = night ? dark.get(n) ?? light.get(n)! : light.get(n)!; const r = resolve(v, at(night)); return span(r, r) })]
 }))
 
-for (const b of document.querySelectorAll<HTMLButtonElement>('[data-sound]')) b.addEventListener('click', () => play(b.dataset.sound as Parameters<typeof play>[0]))
+for (const b of document.querySelectorAll<HTMLButtonElement>('[data-sound]')) b.addEventListener('click', () => playSound(b.dataset.sound as Parameters<typeof playSound>[0]))
