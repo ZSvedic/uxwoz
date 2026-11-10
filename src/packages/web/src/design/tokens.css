@@ -49,7 +49,7 @@
   /* UX Woz's actions (Generate, Make the change, Pick) are ember with dark text; ember also marks what is new. */
   --pick: var(--ember); --on-pick: var(--brown); --mark: var(--ember-ink); --sky-mark: var(--ember);
   /* Gold: the current screen or box, the OR, the box numbers, the focus ring (with a dark inner ring). */
-  --current: var(--gold); --or: var(--gold); --badge: var(--gold); --on-badge: var(--gold-ink);
+  --current: var(--gold); --badge: var(--gold); --on-badge: var(--gold-ink);
   --focus: var(--gold); --focus-in: var(--sky2);
   /* The bar: wood, cream text, a dimmer cream when disabled, the deck (New mockup) a blue card, deep in both modes so its + reads. */
   --bar-text: var(--cream); --bar-disabled: var(--dull-wood); --deck: var(--deck-blue); --deck-edge: var(--ivory);

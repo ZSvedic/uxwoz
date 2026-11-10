@@ -11,8 +11,8 @@ const cssFiles = readdirSync(DESIGN).filter((f) => f.endsWith('.css')).sort()
 const css = Object.fromEntries(cssFiles.map((f) => [f, read(resolve(DESIGN, f))]))
 const lineCount = (text: string) => text.split('\n').length - (text.endsWith('\n') ? 1 : 0)
 
-// Set at run time by the code (canvas.ts, nav.ts) or on one element in CSS (a box's glow), so tokens.css does not define them.
-const RUNTIME_VARS = ['--z', '--depth', '--box-h', '--bar-h', '--glow']
+// Set at run time by the code (canvas.ts, nav.ts) or on one element in CSS (a box's glow, a rope's width), so tokens.css does not define them.
+const RUNTIME_VARS = ['--z', '--depth', '--box-h', '--bar-h', '--glow', '--rope-w']
 const COLOUR = /#[0-9a-f]{3,8}\b|\b(rgba?|hsla?)\(/i
 
 describe('design/', () => {

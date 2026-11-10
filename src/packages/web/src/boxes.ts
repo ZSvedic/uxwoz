@@ -108,7 +108,7 @@ const typing = (box: HTMLElement) => document.activeElement instanceof HTMLEleme
 export const countOf = (boxes: Boxes, components: CacheEntry[], name: Box) => name === 'notes' ? boxes.visits?.length ?? 0 : name === 'components' ? components.length : boxes[name].length
 export const countLabel = (n: number, name: Box) => name === 'notes' ? `${n} visits` : `${n} of ${LIMITS[name]}`
 
-/** Mark the current box: an orange border, its rail at full strength. */
+/** Mark the current box: a gold border, its rail at full strength. */
 export const markBox = (side: ReturnType<typeof createSide>, current: Box | null) => { for (const [name, s] of Object.entries(side.sections)) s.classList.toggle('current', name === current) }
 
 /** True when Undo of the fixer's notes has a visit to undo. */

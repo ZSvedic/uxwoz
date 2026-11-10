@@ -144,7 +144,7 @@ addEventListener('keydown', (e: KeyboardEvent) => {
 })
 
 export function openGenerate() {
-  if (!generate.hidden) return promptInput.focus() // already showing: keep what was typed
+  if (state.app && generate.classList.contains('open')) return promptInput.focus() // already over a mockup: keep what was typed
   restorePickers()
   generate.classList.add('open')
   promptInput.value = ''

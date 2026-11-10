@@ -1,8 +1,8 @@
 // The rope between a screen and its parent: down to the bottom of the parent's row, then one S-curve in the gap.
 import { describe, expect, test } from 'bun:test'
-import { curve } from '../packages/web/src/canvas.ts'
+import { curve, headH, rope } from '../packages/web/src/canvas.ts'
 
-/** Points along a path of the form curve() writes: M, V, then at most one C. */
+/** Points along a path of the form curve() writes: M, V, then at most one C and a last V. */
 function sample(d: string): { x: number; y: number }[] {
   const n = d.match(/-?[\d.]+/g)!.map(Number)
   const [x1, y1, yRow] = n as [number, number, number]
@@ -14,6 +14,8 @@ function sample(d: string): { x: number; y: number }[] {
     const t = i / 100, u = 1 - t
     points.push({ x: u ** 3 * x1 + 3 * u * u * t * ax! + 3 * u * t * t * bx! + t ** 3 * x2!, y: u ** 3 * yRow + 3 * u * u * t * ay! + 3 * u * t * t * by! + t ** 3 * y2! })
   }
+  const y3 = n[9]
+  if (y3 != null) for (let i = 1; i <= 20; i++) points.push({ x: x2!, y: y2! + ((y3 - y2!) * i) / 20 })
   return points
 }
 
@@ -37,4 +39,28 @@ describe('curve', () => {
     expect(curve(40, 600, 40, 750, 880)).toBe('M40 600 V880')
     expect(curve(40, 600, 40.6, 750, 880)).toBe('M40 600 V880')
   })
+})
+
+describe('rope', () => {
+  // Two parents side by side; below them one row with an A OR B (a tall idea above it) and a plain screen (a short name).
+  // The ropes overlap across: the left parent's goes to the A OR B, the right parent's to the plain screen beyond it.
+  for (const z of [0.1, 0.25]) {
+    for (const [name, common] of [['the row', true], ['each child (as before)', false]] as const) {
+      test(`ropes ending at ${name}'s height at ${z * 100}%: ${common ? 'no crossing, no head entered' : 'the test sees the fault'}`, () => {
+        const p1 = { x: 600, y: 600, w: 400, h: 800 }, p2 = { x: 1120, y: 600, w: 400, h: 800 }, rowBottom = 1400
+        const y = rowBottom + 150 + headH(true, z), end = common ? y - headH(true, z) - 6 / z : Infinity
+        const choice = { x: 1700, y, w: 1000, h: 800 }, plain = { x: 2800, y, w: 400, h: 800 }
+        const a = sample(rope(p1, choice, z, true, rowBottom, end)), b = sample(rope(p2, plain, z, false, rowBottom, end))
+        // At every height both pass, the rope that starts left stays left.
+        let crossed = false
+        for (const p of a) for (const q of b) if (Math.abs(p.y - q.y) < 0.5 && p.x > q.x) crossed = true
+        // Neither enters the other's head band.
+        const band = (c: typeof choice, isChoice: boolean) => (p: { x: number; y: number }) =>
+          p.x >= c.x && p.x <= c.x + c.w && p.y > c.y - headH(isChoice, z) - 1e-9
+        const entered = a.some(band(plain, false)) || b.some(band(choice, true))
+        expect(crossed || entered).toBe(!common)
+        if (common) expect([crossed, entered]).toEqual([false, false])
+      })
+    }
+  }
 })

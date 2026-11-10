@@ -14,7 +14,7 @@
 .box-notes { --glow: var(--notes-glow); transform: rotate(1deg); border-radius: 2px 2px 18px 2px; }
 .box-components { --glow: var(--components-glow); }
 .box-data { --glow: var(--data-glow); transform: rotate(-1deg); }
-.box.current, .box:focus-within { transform: none; }
+.box.current { transform: none; }
 .box.current { --glow: var(--current); box-shadow: 0 0 0 1px var(--glow), 0 0 28px var(--glow), var(--lift); }
 .box h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font-size: 18px; }
 .box h3 small { color: var(--muted); font-weight: 400; font-size: 13px; flex: 1; }
@@ -39,8 +39,8 @@
 .box-body { min-height: 0; overflow-y: auto; }
 .box-components .box-body { display: flex; flex-direction: column; }
 /* A component card is at least as tall as its rail, so the rail never covers the card below; far out, its name is shorter. */
-.box-components .card { position: relative; flex: none; margin-top: calc(62px / var(--z)); min-height: 190px; }
-.surface.far .box-components .card { margin-top: calc(26px / var(--z)); }
+.box-components .card { position: relative; flex: none; margin-top: calc(62px / var(--z) + 8px); min-height: 190px; }
+.surface.far .box-components .card { margin-top: calc(26px / var(--z) + 8px); }
 .rule { display: flex; gap: 6px; align-items: baseline; padding: 4px 0; border-top: 1px dashed var(--border); }
 .rule:first-child { border-top: 0; }
 .rule-text { flex: 1; min-width: 0; }

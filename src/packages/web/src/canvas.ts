@@ -33,6 +33,10 @@ const IDEA_H = 76
 const FAR = 0.5
 const NAME_H = 26
 const labelH = (z: number) => (z < FAR ? NAME_H : LABEL_H)
+/** The ivory frame drawn round a screen, in canvas pixels: the head stands above it. */
+const FRAME = 8
+/** The room above a screen (a side's idea or a name), in canvas pixels. */
+export const headH = (choice: boolean, z: number) => (choice ? IDEA_H : labelH(z)) / z + FRAME
 const SVG_NS = 'http://www.w3.org/2000/svg'
 const MIN_ZOOM = 0.1
 export const MAX_ZOOM = 2
@@ -128,6 +132,7 @@ export class Canvas {
   private screens: ScreenView[] = []
   /** From the last layout: each screen's row bottom, where its ropes start to bend. */
   private rowBottom = new Map<string, number>()
+  private ropeEnd = new Map<string, number>()
   /** Each screen's place from the last layout, in canvas pixels. */
   private boxes = new Map<string, Box>()
   private extent: Box = { x: 0, y: 0, w: 0, h: 0 }
@@ -236,7 +241,7 @@ export class Canvas {
     const b = this.boxes.get(key) ?? (comp && this.components.contains(comp.el) ? this.elBox(comp.el) : undefined)
     if (!b) return undefined
     const choice = !!this.screens.find((s) => s.key === key)?.cards[0]?.side
-    const above = (choice ? IDEA_H : labelH(this.z)) / this.z
+    const above = headH(choice, this.z)
     return { x: b.x, y: b.y - above, w: b.w + (choice ? 0 : RAIL_W), h: b.h + above }
   }
 
@@ -433,7 +438,7 @@ export class Canvas {
     }
     // Each row holds the names above its screens, which keep their size on screen.
     const rowH = rows.map((row, d) => Math.max(d || !side ? 0 : this.side.offsetHeight, ...row.map((k) => sizes.get(k)!.h)))
-    const above = (d: number) => (rows[d]!.some((k) => sizes.get(k)!.parts.length > 1) ? IDEA_H : labelH(z)) / z
+    const above = (d: number) => headH(rows[d]!.some((k) => sizes.get(k)!.parts.length > 1), z)
     const rowY: number[] = []
     let y = PAD
     for (let d = 0; d < rows.length; d++) {
@@ -442,9 +447,11 @@ export class Canvas {
       y += rowH[d]! + GAP_Y
     }
     this.rowBottom.clear()
+    this.ropeEnd.clear()
     rows.forEach((row, d) => row.forEach((k) => {
       this.boxes.set(k, { x: xs.get(k)!, y: rowY[d]!, w: sizes.get(k)!.w, h: sizes.get(k)!.h })
       this.rowBottom.set(k, rowY[d]! + rowH[d]!)
+      this.ropeEnd.set(k, rowY[d]! - above(d) - 6 / z)
     }))
     y -= rows.length ? GAP_Y : 0
     Object.assign(this.side.style, { left: `${sideX}px`, top: `${rowY[0] ?? PAD}px` })
@@ -488,8 +495,7 @@ export class Canvas {
         const b = this.boxes.get(k)
         if (!b) continue
         const choice = this.screens.find((s) => s.key === k)!.cards.length > 1
-        const x1 = a.x + LINE_X, y1 = a.y + a.h, x2 = b.x + (Math.abs(b.x - a.x) < 1 ? LINE_X : ENTRY_X), y2 = b.y - (choice ? IDEA_H : labelH(z)) / z - 6 / z
-        const d = curve(x1, y1, x2, Math.min(this.rowBottom.get(p) ?? y1, y2), y2)
+        const d = rope(a, b, z, choice, this.rowBottom.get(p) ?? a.y + a.h, this.ropeEnd.get(k) ?? b.y)
         for (const cls of ['line', 'line twist']) {
           const path = document.createElementNS(SVG_NS, 'path')
           path.setAttribute('d', d)
@@ -540,9 +546,18 @@ export class Canvas {
   }
 }
 
-/** Down from (x1, y1) to yRow, then one S-curve to (x2, y2), upright at both ends; straight when x1 is x2. */
-export function curve(x1: number, y1: number, x2: number, yRow: number, y2: number): string {
+/** Down from (x1, y1) to yRow, then one S-curve to (x2, yEnd), upright at both ends, then straight down to y2; straight
+ *  all the way when x1 is x2. */
+export function curve(x1: number, y1: number, x2: number, yRow: number, y2: number, yEnd = y2): string {
   if (Math.abs(x2 - x1) < 1) return `M${x1} ${y1} V${y2}`
-  const m = (yRow + y2) / 2
-  return `M${x1} ${y1} V${yRow} C${x1} ${m} ${x2} ${m} ${x2} ${y2}`
+  const m = (yRow + yEnd) / 2
+  return `M${x1} ${y1} V${yRow} C${x1} ${m} ${x2} ${m} ${x2} ${yEnd}` + (y2 > yEnd ? ` V${y2}` : '')
+}
+
+/** The rope from parent box a to child box b. Every rope into a row bends down to the row's common end (`ropeEnd`: above
+ *  the tallest head in the row), so ropes of a row keep their order; a shorter head is reached straight down. */
+export function rope(a: Box, b: Box, z: number, choice: boolean, rowBottom: number, ropeEnd: number): string {
+  const x1 = a.x + LINE_X, x2 = b.x + (Math.abs(b.x - a.x) < 1 ? LINE_X : ENTRY_X), y2 = b.y - headH(choice, z) - 6 / z
+  const yEnd = Math.min(ropeEnd, y2)
+  return curve(x1, a.y + a.h, x2, Math.min(rowBottom, yEnd), y2, yEnd)
 }
