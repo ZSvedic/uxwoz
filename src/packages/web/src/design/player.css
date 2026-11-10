@@ -1,0 +1,56 @@
+/* The player at /s/<token>: one screen of a mockup in an ivory frame on the night sky, a parchment strip at the top,
+   the feedback buttons on the wooden bar. A light F: no tilt, sparks, sounds or animation. Loaded after base.css. */
+
+/* The page scrolls (the app's body does not); the sky and its stars stay put behind it and do not zoom. */
+body { height: auto; min-height: 100vh; display: block; overflow: visible; padding-bottom: 0; }
+body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: url("./brand/stars-1.svg") 0 0 / 547px 547px, url("./brand/stars-2.svg") 131px 71px / 443px 443px,
+    url("./brand/stars-3.svg") 257px 193px / 389px 389px, radial-gradient(40% 40% at 85% 5%, var(--violet-glow), transparent),
+    radial-gradient(40% 35% at 5% 95%, var(--green-glow), transparent), linear-gradient(var(--sky1), var(--sky2)); }
+
+/* The top strip: a parchment plate with the hat, Back, the screen's name and the trail. */
+.bar { position: sticky; top: 8px; z-index: 2; display: flex; align-items: center; gap: 10px; margin: 8px; padding: 6px 12px;
+  background: var(--surface); border: 2px solid var(--border); border-radius: 14px; box-shadow: var(--halo), var(--lift); }
+.hat { flex: none; display: block; }
+.where { flex: 1; min-width: 0; }
+.where b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 600 17px/1.3 Fredoka, system-ui, sans-serif; }
+.trail { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trail button { border: 0; background: none; padding: 0; color: inherit; font: inherit; text-decoration: underline; }
+
+/* The screen, fitted to the window by player.ts: white paper in a 7 px ivory frame with the halo, as on the canvas. */
+.stage { display: flex; justify-content: center; padding: 16px 16px 104px; }
+.fit { position: relative; }
+.device { position: absolute; top: 0; left: 0; transform-origin: top left; overflow: hidden; background: var(--screen);
+  border-radius: 10px; box-shadow: 0 0 0 7px var(--frame), 0 0 0 8px var(--frame-edge), var(--halo), var(--lift); }
+.device iframe { display: block; width: 100%; border: 0; }
+
+/* Feedback on the wooden bar at the bottom; Done is the ember button. */
+.tools { position: fixed; bottom: 10px; left: 8px; right: 8px; z-index: 2; width: fit-content; margin: 0 auto;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 6px; border-radius: 20px;
+  background: var(--grain), linear-gradient(var(--wood1), var(--wood2)); box-shadow: var(--wood-shadow);
+  color: var(--bar-text); font: 500 15px/1.4 Fredoka, system-ui, sans-serif; }
+.tools button { padding: 6px 12px; border-color: transparent; border-radius: 12px; background: none; }
+.tools button:not(.primary):hover { background: var(--wood-hover); }
+.tools button.on { background: var(--badge); color: var(--on-badge); }
+.tools .primary, dialog .primary { padding: 6px 18px; border-radius: 99px; background: var(--pick); color: var(--on-pick);
+  box-shadow: var(--pick-shadow); }
+
+/* A short message, and a link that shows nothing: parchment. */
+.toast { position: fixed; bottom: 76px; left: 16px; right: 16px; z-index: 3; width: fit-content; margin: 0 auto; padding: 8px 16px;
+  background: var(--surface); color: var(--text); border: 2px solid var(--border); border-radius: 99px; box-shadow: var(--lift); }
+.note { max-width: min(420px, calc(100% - 32px)); margin: 80px auto; padding: 20px; text-align: center; font-size: 16px;
+  background: var(--surface); color: var(--muted); border: 2px solid var(--border); border-radius: 20px; box-shadow: var(--halo), var(--lift); }
+
+/* The question (a comment, Done, a dead control): a parchment card with the gold line inside its edge, F's fields. */
+dialog { width: min(420px, calc(100vw - 32px)); padding: 18px 20px; border: 2px solid var(--border); border-radius: 20px;
+  background: var(--surface); color: var(--text);
+  box-shadow: inset 0 0 0 5px var(--surface), inset 0 0 0 6px var(--current), var(--halo), var(--hand-shadow); }
+dialog::backdrop { background: var(--dim); }
+dialog p { margin: 0 0 10px; font: 600 17px/1.3 Fredoka, system-ui, sans-serif; }
+dialog label { display: block; margin: 8px 0 4px; color: var(--muted); font-size: 12px; }
+dialog :is(input, textarea) { width: 100%; padding: 6px 8px; border: 2px solid var(--border); border-radius: 10px; background: var(--field); }
+dialog textarea { resize: vertical; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row input { flex: 1; min-width: 0; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }

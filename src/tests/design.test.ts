@@ -1,8 +1,10 @@
 // The look's own rules: the size caps, colours only in tokens.css, every token defined, every file imported, text
-// contrast worked out from tokens.css, no request to Google, and the brand files.
-import { describe, expect, test } from 'bun:test'
+// contrast worked out from tokens.css, no request to Google, the brand files, the player's page and the design sheet.
+import { afterEach, describe, expect, test } from 'bun:test'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { ScreenCache } from '@uxwoz/core'
+import { createServer } from '@uxwoz/web/src/server.ts'
 
 const WEB = resolve(import.meta.dir, '../packages/web/src')
 const DESIGN = resolve(WEB, 'design')
@@ -27,7 +29,7 @@ describe('design/', () => {
     for (const [file, text] of Object.entries(css)) {
       if (file !== 'tokens.css') expect([file, text.match(COLOUR)?.[0] ?? null]).toEqual([file, null])
     }
-    expect(read(resolve(WEB, 'index.html')).match(COLOUR)?.[0] ?? null).toBeNull()
+    for (const page of ['index.html', 'player.html', 'design/sheet.html']) expect([page, read(resolve(WEB, page)).match(COLOUR)?.[0] ?? null]).toEqual([page, null])
   })
 
   test('every var() it uses is defined in tokens.css or set at run time', () => {
@@ -37,16 +39,32 @@ describe('design/', () => {
     expect(missing).toEqual([])
   })
 
-  test('index.css imports every other CSS file in design/', () => {
+  test('index.css imports every other CSS file in design/ but the player\'s', () => {
     const imported = [...css['index.css']!.matchAll(/@import\s+["']\.\/([\w-]+\.css)["']/g)].map((m) => m[1]).sort()
-    expect(imported).toEqual(cssFiles.filter((f) => f !== 'index.css'))
+    expect(imported).toEqual(cssFiles.filter((f) => f !== 'index.css' && f !== 'player.css'))
+  })
+
+  test('player.html has no <style>, and every id player.ts looks up is in it', () => {
+    const html = read(resolve(WEB, 'player.html'))
+    expect(html.includes('<style')).toBe(false)
+    const ids = new Set([...read(resolve(WEB, 'player.ts')).matchAll(/\$(?:<\w+>)?\('([\w-]+)'\)/g)].map((m) => m[1]!))
+    expect(ids.size).toBeGreaterThan(10)
+    expect([...ids].filter((id) => !html.includes(`id="${id}"`))).toEqual([])
+  })
+
+  test('every class the design sheet uses, but its own sheet- ones, has a rule in design/', () => {
+    const all = Object.values(css).join('\n')
+    const classes = new Set([...read(resolve(DESIGN, 'sheet.html')).matchAll(/class="([^"]+)"/g)].flatMap((m) => m[1]!.split(/\s+/)))
+    const missing = [...classes].filter((c) => !c.startsWith('sheet-') && !new RegExp(`\\.${c}(?![\\w-])`).test(all))
+    expect(classes.size).toBeGreaterThan(40)
+    expect(missing).toEqual([])
   })
 
   test('the brand files exist; the SVGs are SVGs', () => {
     for (const name of ['logo', 'favicon', 'stars-1', 'stars-2', 'stars-3']) {
       expect([name, read(resolve(DESIGN, 'brand', `${name}.svg`)).trimStart().startsWith('<svg')]).toEqual([name, true])
     }
-    for (const file of ['fredoka.woff2', 'LICENSE-fredoka.md', 'favicon-32.png', 'apple-touch-icon.png']) {
+    for (const file of ['fredoka.woff2', 'LICENSE-fredoka.md', 'favicon-32.png', 'apple-touch-icon.png', 'og.png']) {
       expect([file, existsSync(resolve(DESIGN, 'brand', file))]).toEqual([file, true])
     }
   })
@@ -64,6 +82,35 @@ describe('design/', () => {
     })
     const hits = walk(resolve(WEB, '../..')).filter((f) => !/\.(woff2|png)$/.test(f) && /fonts\.(googleapis|gstatic)\.com/.test(read(f)))
     expect(hits).toEqual([])
+  })
+})
+
+describe('/design and /og.png', () => {
+  let server: ReturnType<typeof createServer> | null = null
+  afterEach(() => { server?.stop(true); server = null; delete process.env.UXWOZ_OWNER })
+  const start = () => (server = createServer({ port: 0, cache: new ScreenCache(), log: () => {}, fileWaitMs: 0 }))
+  const get = (path: string, headers: Record<string, string> = {}) => fetch(new URL(path, server!.url), { headers })
+
+  test('the design sheet is an HTML page and the share preview a PNG', async () => {
+    start()
+    const sheet = await get('/design')
+    expect(sheet.status).toBe(200)
+    expect(sheet.headers.get('content-type')).toContain('text/html')
+    expect(await sheet.text()).toContain('design sheet')
+    const og = await get('/og.png')
+    expect(og.status).toBe(200)
+    expect(og.headers.get('content-type')).toBe('image/png')
+    expect((await og.arrayBuffer()).byteLength).toBeLessThan(200 * 1024)
+  })
+
+  test('with UXWOZ_OWNER set, /og.png still answers everyone and /design asks for the owner\'s cookie', async () => {
+    process.env.UXWOZ_OWNER = 'sesame'
+    start()
+    expect((await get('/og.png')).status).toBe(200)
+    expect((await get('/design')).status).toBe(403)
+    const sheet = await get('/design', { cookie: 'uxwoz_owner=sesame' })
+    expect(sheet.status).toBe(200)
+    expect(await sheet.text()).toContain('design sheet')
   })
 })
 

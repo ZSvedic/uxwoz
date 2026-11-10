@@ -10,6 +10,7 @@ import {
 import { exportRoute } from './export.ts'
 import index from './index.html'
 import player from './player.html'
+import sheet from './design/sheet.html'
 import { sharing } from './share.ts'
 
 const THEMES_DIR = resolve(import.meta.dir, '../themes')
@@ -312,6 +313,8 @@ export function createServer(opts: ServerOptions = {}) {
     development: process.env.NODE_ENV !== 'production',
     routes: guard({
       '/': index,
+      '/design': sheet,
+      '/og.png': () => new Response(Bun.file(join(import.meta.dir, 'design/brand/og.png')), { headers: { 'Content-Type': 'image/png' } }),
       '/themes/:name': (req) => {
         const name = req.params.name.replace(/\.css$/, '')
         if (!THEME_FILES.has(name)) return new Response('Not found', { status: 404 })

@@ -32,7 +32,7 @@ GET /api/map?app=A%20coffee%20shop%20ordering%20app&wait=1      (answers once fi
 - `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`
   as the entry, `state.ts`, `screens.ts`, `nav.ts`, `drawer.ts`, `toolbar.ts`, `net.ts`, `canvas.ts`,
   `boxes.ts`, `sharing.ts`, the CSS in `design/`, bundled by Bun's HTML import), the player (`player.html`,
-  `player.ts`), the share routes (`share.ts`), and the themes in `themes/`.
+  `player.ts`, its CSS in `design/player.css` on the shared tokens), the design sheet (`design/sheet.html`, `design/sheet.ts`), the share routes (`share.ts`), and the themes in `themes/`.
 
 There are no runtime dependencies; `@types/bun` and `typescript` are dev-only.
 
@@ -168,10 +168,14 @@ can spend model credits.
   screen that is not a cache hit, a pick (its filing), `/api/revise`, and `/api/box` with `edit` or
   `visit`. A unit is taken before the call and given back when the call is refused; past the cap,
   429 *This link's budget is used up.*
-- **The owner**: with `UXWOZ_OWNER` set, `/` and every `/api` route but `/api/s/*` need the cookie
-  `uxwoz_owner=<secret>` (401 on the API, a one-line 403 page on `/`); `/?owner=<secret>` sets it
+- **The owner**: with `UXWOZ_OWNER` set, `/`, `/design` and every `/api` route but `/api/s/*` need the cookie
+  `uxwoz_owner=<secret>` (401 on the API, a one-line 403 page on `/` and `/design`; `/og.png` and share links
+  answer everyone); `/?owner=<secret>` sets it
   (`HttpOnly; SameSite=Lax`, and `Secure` over https) and redirects to `/`. The server fetches the
   pages it proxies from itself (`127.0.0.1` and its port), never from the request's Host.
+- `GET /design`: the design sheet, built from the app's own CSS and classes on static markup: the logo, every
+  colour token by day and night, type, controls, surfaces, motion, and a ▶ per sound.
+- `GET /og.png`: the share preview image (1200×630, `design/brand/og.png`) that `player.html`'s `og:image` names.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
   `pico.css` followed by `mockup.css`.
 

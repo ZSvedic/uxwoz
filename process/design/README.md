@@ -1,5 +1,8 @@
 # Design: UX Woz as a game
 
+The look is now built in `src/packages/web/src/design/` and shown at `/design`; `variant-f.html` stays here as
+the reference until the user says the app matches it.
+
 This folder holds the chosen look for the app around the screens, `variant-f.html`: one self-contained page
 that shows the chrome (bar, canvas, boxes, drawer, generate panel) with faked content, plus a design sheet.
 It does not change the app: the mockup screens stay wobbly sketches, and no file here is loaded by `src/`.

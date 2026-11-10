@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UX Woz design sheet</title>
+<link rel="icon" type="image/svg+xml" href="./brand/favicon.svg">
+<link rel="stylesheet" href="./index.css">
+<!-- The sheet's own layout. Everything else is the app's CSS on the app's classes, so the sheet follows any change. -->
+<style>
+  html body { height: auto; display: block; overflow: auto; overflow-x: clip; padding: 16px; background-attachment: fixed; --z: 1; }
+  .sheet-card { max-width: 900px; margin: 0 auto; padding: 20px; background: var(--surface); border: 2px solid var(--border); border-radius: 20px;
+    box-shadow: inset 0 0 0 5px var(--surface), inset 0 0 0 6px var(--current), var(--halo); }
+  .sheet-card > section { padding: 14px 0; border-top: 1px dashed var(--border); }
+  .sheet-card > section > h2 { margin: 0 0 10px; font-size: 18px; color: var(--mark); }
+  .sheet-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin: 8px 0; } .sheet-top { align-items: flex-start; }
+  .sheet-fig { margin: 0; text-align: center; font-size: 11px; color: var(--muted); }
+  .sheet-wordmark { font: 700 28px Fredoka, system-ui, sans-serif; color: var(--text); }
+  .sheet-wordmark span { color: var(--wordmark); }
+  .sheet-fredoka { font: 500 20px Fredoka, system-ui, sans-serif; } .sheet-fredoka b { font-weight: 600; } .sheet-fredoka strong { font-weight: 700; }
+  .sheet-colours { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 4px 12px;
+    font: 12px ui-monospace, monospace; overflow-wrap: anywhere; }
+  .sheet-colours em { color: var(--muted); font-style: normal; }
+  .sheet-sw { display: inline-block; width: 22px; height: 16px; margin-right: 5px; vertical-align: middle; border: 1px solid var(--border); border-radius: 4px; }
+  .sheet-card .toolbar { position: static; height: auto; display: block; padding: 0; }
+  .sheet-card .toolbar .box-nav { position: static; flex-direction: row; min-width: 0; padding: 0; border: 0; box-shadow: none; background: none; color: inherit; font: inherit; }
+  .sheet-card .sheet-menu.bar { justify-content: flex-start; padding: 0; background: none; box-shadow: none; }
+  .sheet-card .sheet-menu .menu { position: static; }
+  .sheet-card .pick-hint { opacity: 1; }
+  .sheet-hold { position: relative; flex: none; width: 90px; height: 140px; }
+  .sheet-hold > .or { inset: 0; }
+  .sheet-rail .rail { position: static; flex-direction: row; padding: 0; opacity: 1; }
+  .sheet-cards { display: flex; flex-wrap: wrap; gap: 80px 90px; padding: 70px 16px 16px; border-radius: 14px;
+    background: radial-gradient(40% 40% at 85% 5%, var(--violet-glow), transparent), linear-gradient(var(--sky1), var(--sky2)); }
+  .sheet-cards .card { position: relative; width: 200px; }
+  .sheet-paper { height: 150px; padding: 10px; color: var(--plate); font-size: 12px; }
+  .sheet-boxes { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; padding-top: 10px; }
+  .sheet-boxes .box { width: min(100%, 380px); }
+  .sheet-pills { display: flex; flex-wrap: wrap; gap: 12px; } .sheet-pills > :is(.error-pill, .hint-pill) { position: static; transform: none; }
+  .drawer.sheet-drawer { position: static; margin: 0; }
+  .sheet-moves { margin: 0; padding-left: 1.2em; } .sheet-moves button { margin-right: 6px; padding: 0 9px; border-radius: 99px; }
+</style>
+</head>
+<body>
+<article class="sheet-card">
+<h1 class="sheet-wordmark">UX <span>Woz</span> design sheet</h1>
+<p>The app's own CSS on static markup: change a token or a part's rule and this page changes with it.</p>
+
+<section><h2>Logo</h2><div class="sheet-row">
+  <figure class="sheet-fig"><img src="./brand/logo.svg" alt="" width="96" height="96"><br>logo 96</figure>
+  <figure class="sheet-fig"><img src="./brand/logo.svg" alt="" width="48" height="48"><br>48</figure>
+  <figure class="sheet-fig"><img src="./brand/logo.svg" alt="" width="24" height="24"><br>24</figure>
+  <figure class="sheet-fig"><img src="./brand/favicon.svg" alt="" width="32" height="32"><br>favicon 32</figure>
+  <figure class="sheet-fig"><img src="./brand/favicon.svg" alt="" width="16" height="16"><br>16</figure>
+  <figure class="sheet-fig"><span class="sheet-wordmark">UX <span>Woz</span></span><br>wordmark, Fredoka 700</figure>
+  <figure class="sheet-fig"><div class="logo"><img src="./brand/logo.svg" alt="" width="40" height="40"><b>UX <span>Woz</span></b></div><br>in the bar (hidden under 720 px)</figure>
+</div></section>
+
+<section><h2>Colours</h2><p>Every custom property on <code>:root</code>: the palette first, then the roles and the token each one plays.</p>
+  <div class="sheet-colours" id="colours"><em>token</em><em>light</em><em>dark</em></div></section>
+
+<section><h2>Type</h2>
+  <p class="sheet-fredoka">Fredoka 500, the bar · <b>600, headings and names</b> · <strong>700, the wordmark</strong></p>
+  <p>The system font for body text, menus and fields: what should change in this screen?</p>
+  <div class="rule"><b>snore-count:</b> <span class="rule-text">an ID in ui-monospace on its faint chip</span></div></section>
+
+<section><h2>Controls</h2>
+  <div class="sheet-row"><button class="primary">Make the change</button><button>Plain</button><button disabled>Disabled</button>
+    <span class="pick-hint">Pick this design</span><select aria-label="Model"><option>Haiku</option><option>Luna</option></select>
+    <div class="sheet-hold"><div class="or"><b>OR</b><button class="drop" title="Drop both designs">✕</button></div></div></div>
+  <div class="toolbar has-boxes"><nav class="bar" aria-label="A piece of the bar">
+    <div class="tb-left"><button class="deck" title="New mockup">+</button><i class="sep"></i>
+      <span class="pop nav-pop"><button class="trail">←</button><button class="menu-button"><span>Home</span> <span class="caret"></span></button><button class="trail" disabled>→</button></span></div>
+    <div class="tb-mid"><i class="sep"></i><span class="box-nav menu"><button>Rules <b>2</b></button><i class="sep"></i><button>Data <b></b></button></span></div>
+    <div class="tb-right"><i class="sep"></i><button id="sound" class="sound off" title="Sounds off" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></button></div>
+  </nav></div>
+  <div class="sheet-row sheet-rail"><div class="rail"><button class="tool" data-tool="edit" title="Edit">✎</button><button class="tool" disabled title="Regenerate, disabled">↻</button>
+    <button class="tool" data-tool="info" title="Info">ⓘ</button><button class="tool" data-tool="delete" title="Delete: red on hover">✕</button></div></div></section>
+
+<section><h2>Surfaces</h2>
+  <div class="sheet-cards">
+    <article class="card"><div class="head"><b class="name">Nights</b><div class="idea-row"><span class="idea">Every night as a row, with its snores</span><button class="more">more</button></div></div>
+      <div class="screen"><div class="sheet-paper">A screen: white paper in the ivory frame.</div></div></article>
+    <article class="card current fresh"><div class="head open"><b class="name">Home</b><div class="idea-row"><span class="idea">Last night first, the week's chart below it, opened with more</span><button class="more">less</button></div></div>
+      <div class="screen"><div class="sheet-paper">The current screen, new, with its rail.</div></div>
+      <div class="rail"><button class="tool" data-tool="edit">✎</button><button class="tool" data-tool="undo">↶</button><button class="tool" data-tool="info">ⓘ</button></div></article>
+    <div class="sheet-hold"><svg class="lines" width="90" height="140" aria-hidden="true"><path class="line" d="M20 0V40C20 80 70 70 70 140"/><path class="line twist" d="M20 0V40C20 80 70 70 70 140"/></svg></div>
+  </div>
+  <div class="sheet-boxes">
+    <section class="box box-rules"><h3>Rules<small> 2 rules</small></h3><p class="box-hint">What every screen keeps.</p><div class="box-body">
+      <div class="rule fresh"><b>snore-count:</b> <span class="rule-text">Snores show as a count per night</span><small class="yours"> yours</small><button class="box-btn">✕</button></div>
+      <div class="rule"><b>tab-bar:</b> <span class="rule-text">Every screen pastes the tab bar</span><small class="yours"></small><button class="box-btn">✕</button></div></div></section>
+    <section class="box box-notes current"><h3>Fixer's notes<small> 1 visit</small></h3><div class="box-body"><div class="visit fresh"><b>10/11/26, 21:14</b><span> Read 4 screens, made 2 changes · 3.1 s</span>
+      <ul><li>Merged snores into snore-count<small> one rule was enough</small> <button class="box-btn">Undo</button></li><li class="undone">Redrew Nights</li><li class="refused">Refused a rule over 200 characters</li></ul></div></div></section>
+    <section class="box box-components"><h3>Components<small> 1 component</small></h3><div class="box-body">
+      <article class="card"><div class="head"><b class="name">tab-bar</b><div class="idea-row"><span class="idea">On every screen</span></div></div><div class="screen"><div class="sheet-paper">Home · Nights · Settings</div></div></article></div></section>
+    <section class="box box-data"><h3>Data<small> 1 table</small></h3><div class="box-body"><div class="data-table"><div class="table-head"><b>nights</b><small class="yours"> yours</small><button class="box-btn">+ row</button><button class="box-btn">✕</button></div>
+      <table><tr><th>night</th><th>sleep</th><th>snores</th></tr><tr><td>Mon</td><td>7:12</td><td>14</td></tr><tr><td>Tue</td><td>6:40</td><td>22</td></tr></table></div></div></section>
+  </div>
+  <div class="sheet-row sheet-top">
+    <div class="toolbar"><div class="bar sheet-menu"><span class="pop"><div class="menu nav-menu" role="menu">
+      <h3>Every screen</h3><button class="item path"><span>Home</span><small></small></button>
+      <button class="item path current" style="--depth: 1"><span>Nights</span><small>via Nights</small></button>
+      <button class="item planned" style="--depth: 1"><span>Settings</span><small>not made yet</small></button><hr>
+      <button class="item"><span>Zoom in</span> <kbd>⌘+</kbd></button>
+      <div class="menu-foot"><button>↺ Start over</button><button class="danger">✕ Delete</button></div></div></span></div></div>
+    <aside class="drawer sheet-drawer"><div class="drawer-head"><div class="tabs" role="tablist"><button role="tab" aria-selected="true">✎ Edit</button><button role="tab" aria-selected="false">ⓘ Info</button></div><button class="close">✕</button></div>
+      <p class="drawer-name">Home</p><div class="pane"><label for="change">What should change?</label><textarea id="change" rows="2">Show a moon next to quiet nights</textarea>
+      <button class="primary">Make the change</button><h3>Past changes</h3><ol class="history" reversed><li class="now">Edit: one level indicator</li><li class="undone">Edit: a red alarm</li><li>Drawn</li></ol></div></aside>
+  </div>
+  <div class="sheet-row"><div class="sheet-pills"><div class="error-pill" role="alert"><span>The model did not answer in 20 s.</span><button>✕</button></div><div class="hint-pill">One screen at a time.</div></div>
+</div></section>
+
+<section><h2>Motion and sound</h2><ul class="sheet-moves">
+  <li>Summon: a design appears out of a blur, the second 0.15 s later, 0.8 s</li>
+  <li>Lift: hovering a finished design raises it with a gold glow, 0.9 s</li>
+  <li>Won and lost: the picked design rises and glows, the other dissolves, 0.8 s; sparks fly for 0.9 s</li>
+  <li>Hand: the drawer swings in and rests level, 0.45 s; it closes at once</li>
+  <li>Fades: the Pick pill and the rails 0.15 s, a box straightening 0.2 s; the microphone's dot pulses every 1 s</li>
+  <li>Reduced motion: every move jumps to its end, no sparks. <code>?design=still</code>: no motion, sound or tilt</li>
+  <li><button data-sound="whoosh">▶</button>Whoosh: a design appears, the drawer swings in</li>
+  <li><button data-sound="chime">▶</button>Chime: a pick</li>
+  <li><button data-sound="tinkle">▶</button>Tinkle: hovering a finished design</li>
+  <li>Sounds play only while the speaker above is on (off by default, kept in this browser)</li></ul></section>
+</article>
+<script type="module" src="./sheet.ts"></script>
+</body>
+</html>
