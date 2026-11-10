@@ -32,7 +32,7 @@ body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-even
 
 /* Feedback on the wooden bar; Done is the ember button. */
 .tools { max-width: 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 6px; border-radius: 20px;
-  background: var(--grain), linear-gradient(var(--wood1), var(--wood2)); box-shadow: var(--wood-shadow);
+  background: linear-gradient(var(--wood1), var(--wood2)); box-shadow: var(--wood-shadow);
   color: var(--bar-text); font: 500 15px/1.4 Fredoka, system-ui, sans-serif; }
 .tools button { padding: 6px 12px; border-color: transparent; border-radius: 12px; background: none; }
 .tools button:not(.primary):hover { background: var(--wood-hover); }

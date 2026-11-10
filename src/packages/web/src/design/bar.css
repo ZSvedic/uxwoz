@@ -1,17 +1,15 @@
-/* The bar's strip along the bottom of the window: the logo at its left end, the wooden bar in the middle (or as near
-   it as the logo allows). No transform here or on the bar: it would trap the menus, which are fixed on a phone. */
+/* The bar's strip along the bottom of the window, the wooden bar in its middle. No transform here or on the bar: it
+   would trap the menus, which are fixed on a phone. The logo is the bar's first item: the hat and the name on the wood. */
 .toolbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--bar-h); padding: 0 16px;
-  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; font-size: 15px; font-weight: 500; color: var(--bar-text); }
-.logo { justify-self: start; display: flex; align-items: center; gap: 8px; padding: 4px 14px 4px 6px; white-space: nowrap;
-  background: var(--surface); border: 2px solid var(--border); border-radius: 14px; box-shadow: var(--halo), var(--lift);
-  transform: rotate(-2deg); color: var(--text); }
-.logo img { display: block; width: 40px; height: 40px; }
-.logo b { font-size: 20px; font-weight: 700; }
-.logo b span { color: var(--wordmark); }
-/* The wooden tray: grain over a vertical gradient, a lit top edge and a shaded bottom one. It never scrolls sideways.
+  display: grid; grid-template-columns: 1fr; align-items: center; font-size: 15px; font-weight: 500; color: var(--bar-text); }
+.logo { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 2px; white-space: nowrap; }
+.logo img { display: block; width: 36px; height: 36px; }
+.logo b { font-size: 19px; font-weight: 700; }
+.logo b span { color: var(--bar-wordmark); }
+/* The wooden tray: a vertical gradient, a lit top edge and a shaded bottom one. It never scrolls sideways.
    Its three groups are one row of items (two on a phone), so the names can give way in a set order. */
-.bar { grid-column: 2; min-width: 0; max-width: 100%; display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
-  gap: 4px; padding: 6px; border-radius: 20px; background: var(--grain), linear-gradient(var(--wood1), var(--wood2)); box-shadow: var(--wood-shadow); }
+.bar { justify-self: center; min-width: 0; max-width: 100%; display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 4px; padding: 6px; border-radius: 20px; background: linear-gradient(var(--wood1), var(--wood2)); box-shadow: var(--wood-shadow); }
 .tb-left, .tb-mid, .tb-right { display: contents; }
 .pop { position: relative; flex: none; display: flex; gap: 4px; align-items: center; min-width: 0; }
 /* The names of the theme, the screen and the mockup start at a few letters and grow in that order, so the mockup's
@@ -36,14 +34,14 @@
   transform: rotate(-135deg); opacity: .7; }
 .sep { flex: none; width: 2px; height: 26px; margin: 0 3px; background: var(--wood-line); }
 /* What is not there takes no room and leaves no line: Nav before a mockup, + and the mockup menu on an edit link. */
-.tb-left:has(#navButton[hidden]) :is(.sep, .nav-pop), .tb-left:has(#menuNew[hidden]) > .sep, .pop:has(> #projectButton[hidden]),
-.tb-mid:has(#projectButton[hidden]) > .sep:first-child, .toolbar:not(.has-boxes) :is(.box-sep, .pop:has(> #boxNav)) { display: none; }
+.tb-left:has(#navButton[hidden]) :is(.nav-sep, .nav-pop), .tb-left:has(#menuNew[hidden]) .new-sep, .pop:has(> #projectButton[hidden]),
+.tb-left:has(#projectButton[hidden]) .nav-sep, .toolbar:not(.has-boxes) :is(.box-sep, .pop:has(> #boxNav)) { display: none; }
 .icon { display: block; width: 1em; height: 1.4em; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
 #projectButton { max-width: min(36ch, 24vw); }
 #navButton { max-width: min(40ch, 30vw); }
 /* Short of room: closer items first; then the boxes fold (below); then the zoom icons and the wordmark go. */
 @media (max-width: 1400px) { .bar, .pop, .bar .box-nav { gap: 3px; } .bar button { padding: 6px 7px; } .sep { margin: 0 1px; } }
-@media (max-width: 900px) { .bar .wide-only, .logo b { display: none; } #projectName { max-width: 12ch; } .logo { padding: 4px; } }
+@media (max-width: 900px) { .bar .wide-only, .logo b { display: none; } #projectName { max-width: 12ch; } .logo { padding: 0; } }
 
 /* Menus open upward from their button and are never taller than the window above the bar; they scroll inside. */
 .menu { position: absolute; left: 0; bottom: calc(100% + 16px); z-index: 30; min-width: 240px; max-width: min(440px, calc(100vw - 20px));
@@ -89,11 +87,12 @@
   .box-nav .sep { display: none; }
 }
 
-/* A phone: two rows (the deck and Nav above, the rest below, with no lines); menus span the window; no logo. */
+/* A phone: two rows (the hat, the mockup, Nav and + above, the rest below, with no lines); menus span the window. */
 @media (max-width: 720px) {
-  .toolbar { grid-template-columns: 1fr; padding: 0 8px; }
-  .logo, .tb-mid .sep, .tb-right > .sep { display: none; }
-  .bar { grid-column: 1; justify-self: center; row-gap: 2px; }
+  .toolbar { padding: 0 8px; }
+  .bar .sep { display: none; }
+  .bar { row-gap: 2px; }
+  .logo img { width: 30px; height: 30px; }
   .tb-left::after { content: ''; flex-basis: 100%; }
   #projectButton, #navButton { max-width: none; }
   .bar button { padding: 6px 5px; }

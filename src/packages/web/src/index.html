@@ -11,21 +11,9 @@
 </head>
 <body>
 <header class="toolbar" id="toolbar">
-  <div class="logo"><img src="./design/brand/logo.svg" alt="" width="40" height="40"><b>UX <span>Woz</span></b></div>
   <nav class="bar" aria-label="Commands">
   <div class="tb-left">
-    <button id="menuNew" class="deck" title="New mockup" aria-label="New mockup">+</button>
-    <i class="sep"></i>
-    <span class="pop nav-pop">
-    <button id="trailBack" class="trail" title="Back to the screen you looked at before (⌘[)" hidden>←</button>
-    <button id="navButton" class="menu-button" aria-haspopup="menu" title="Every screen of this mockup" hidden>
-      <span id="navName"></span> <span class="caret"></span></button>
-    <button id="trailForward" class="trail" title="Forward again (⌘])" hidden>→</button>
-    <div id="navMenu" class="menu nav-menu" role="menu" hidden></div>
-    </span>
-  </div>
-  <div class="tb-mid">
-    <i class="sep"></i>
+    <div class="logo"><img src="./design/brand/logo.svg" alt="" width="36" height="36"><b>UX <span>Woz</span></b></div>
     <span class="pop">
     <button id="projectButton" class="menu-button" aria-haspopup="menu" title="Mockup: recent, start over, delete">
       <span id="projectName">New mockup</span> <span class="caret"></span></button>
@@ -40,6 +28,18 @@
       </div>
     </div>
     </span>
+    <i class="sep nav-sep"></i>
+    <span class="pop nav-pop">
+    <button id="trailBack" class="trail" title="Back to the screen you looked at before (⌘[)" hidden>←</button>
+    <button id="navButton" class="menu-button" aria-haspopup="menu" title="Every screen of this mockup" hidden>
+      <span id="navName"></span> <span class="caret"></span></button>
+    <button id="trailForward" class="trail" title="Forward again (⌘])" hidden>→</button>
+    <div id="navMenu" class="menu nav-menu" role="menu" hidden></div>
+    </span>
+    <i class="sep new-sep"></i>
+    <button id="menuNew" class="deck" title="New mockup" aria-label="New mockup">+</button>
+  </div>
+  <div class="tb-mid">
     <i class="sep box-sep"></i>
     <span class="pop">
     <button id="boxesButton" class="menu-button" aria-haspopup="menu" title="Show a box">Boxes <b id="boxesSum"></b> <span class="caret"></span></button>

@@ -31,8 +31,7 @@
   --coin: radial-gradient(#fff3c4, var(--gold)); --coin-shadow: 0 0 18px var(--gold), inset 0 -3px 0 #0003;
   /* Sparks (fx.ts): gold, white and blue round a picked design, two greens round the other; the winner's glow. */
   --spark-gold: var(--gold); --spark-white: var(--paper); --spark-blue: #6f8cff; --spark-green: #34d38a; --spark-mint: #9fe9c4;
-  /* The wood's grain and its lit and shaded edges; the light and the line on wood for hover and separators. */
-  --grain: repeating-linear-gradient(100deg, transparent 0 22px, rgba(255, 255, 255, .05) 22px 24px);
+  /* The wood's lit and shaded edges; the light and the line on wood for hover and separators. */
   --wood-shadow: 0 2px 0 rgba(255, 255, 255, .15) inset, 0 -3px 0 rgba(0, 0, 0, .25) inset, 0 16px 34px -8px rgba(0, 0, 0, .55);
   --wood-hover: rgba(255, 255, 255, .15); --wood-line: rgba(0, 0, 0, .25);
   /* The two shadows of F: a lift under a card, a blue halo around it. And the small ones of screens and rail tools. */
@@ -55,8 +54,8 @@
   --focus: var(--gold); --focus-in: var(--sky2);
   /* The bar: wood, cream text, a dimmer cream when disabled, the deck (New mockup) a blue card, deep in both modes so its + reads. */
   --bar-text: var(--cream); --bar-disabled: var(--dull-wood); --deck: var(--deck-blue); --deck-edge: var(--ivory);
-  /* The logo: "Woz" in ember, the darker ink by day so it reads on parchment. */
-  --wordmark: var(--ember-ink);
+  /* The logo: "Woz" in ember, the darker ink by day so it reads on parchment; in gold on the bar's wood. */
+  --wordmark: var(--ember-ink); --bar-wordmark: var(--gold);
   /* The sky behind the canvas and the bar, and what sits straight on it. */
   --sky-text: var(--star-ink); --sky-muted: var(--star-muted); --plate: var(--indigo); --dim: var(--night-dim);
   /* Lines between screens are ropes: a tan strand and a dark twist. */
