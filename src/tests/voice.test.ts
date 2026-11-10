@@ -1,6 +1,6 @@
 // Voice input's state machine: the wake phrase, the countdown, stop and cancel, with a fake clock.
 import { expect, test } from 'bun:test'
-import { GAVE_UP, SpeechInput, VoiceMachine, voiceField, type Clock, type Recognition, type VoiceEvent } from '../packages/web/src/voice.ts'
+import { BLOCKED, GAVE_UP, SpeechInput, VoiceMachine, voiceField, type Clock, type Recognition, type VoiceEvent } from '../packages/web/src/voice.ts'
 
 class FakeClock implements Clock {
   t = 0
@@ -28,6 +28,23 @@ function setup() {
   const m = new VoiceMachine((e) => events.push(e), { clock })
   const sent = () => events.filter((e) => e.type === 'send').map((e) => (e as { text: string }).text)
   return { clock, events, m, sent }
+}
+
+/** A SpeechInput on a fake recognition, turned on: `rec` is the one it made. */
+function speech() {
+  const clock = new FakeClock()
+  const events: VoiceEvent[] = []
+  const recs: FakeRecognition[] = []
+  class FakeRecognition implements Recognition {
+    continuous = false; interimResults = false; lang = ''; starts = 0
+    onresult: Recognition['onresult'] = null; onerror: Recognition['onerror'] = null; onend: Recognition['onend'] = null
+    constructor() { recs.push(this) }
+    start() { this.starts++ }
+    stop() {}
+  }
+  const input = new SpeechInput(new VoiceMachine((e) => events.push(e), { clock }), { Recognition: FakeRecognition, clock })
+  input.start()
+  return { clock, events, input, rec: recs[0]! }
 }
 
 test('stays off until started', () => {
@@ -145,7 +162,7 @@ test('while asleep, the words after the wake phrase show at once; the state chan
   expect(m.state).toBe('asleep')
   expect(events.at(-1)).toEqual({ type: 'interim', text: 'use swi' })
   m.hear('so they said', false)
-  expect(events.at(-1)).toEqual({ type: 'interim', text: 'use swi' })
+  expect(events.filter((e) => e.type === 'interim').at(-1)).toEqual({ type: 'interim', text: 'use swi' })
 })
 
 test('a stop phrase, as the whole piece, puts it to sleep without sending', () => {
@@ -181,19 +198,7 @@ test('voice never overwrites typed text: it keeps it in front of the spoken word
 })
 
 test('the microphone gives up after five failures in a row, "aborted" included', () => {
-  const clock = new FakeClock()
-  const events: VoiceEvent[] = []
-  const recs: FakeRecognition[] = []
-  class FakeRecognition implements Recognition {
-    continuous = false; interimResults = false; lang = ''; starts = 0
-    onresult: Recognition['onresult'] = null; onerror: Recognition['onerror'] = null; onend: Recognition['onend'] = null
-    constructor() { recs.push(this) }
-    start() { this.starts++ }
-    stop() {}
-  }
-  const input = new SpeechInput(new VoiceMachine((e) => events.push(e), { clock }), { Recognition: FakeRecognition, clock })
-  input.start()
-  const rec = recs[0]!
+  const { clock, events, input, rec } = speech()
   expect(rec.lang).toBe('en-US')
   // A silence is routine: it restarts without counting.
   for (let i = 0; i < 10; i++) { rec.onerror!({ error: 'no-speech' }); rec.onend!(); clock.advance(10000) }
@@ -250,4 +255,105 @@ test('fail stops it and says why', () => {
   m.fail('The browser blocked the microphone.')
   expect(m.state).toBe('off')
   expect(events.at(-1)).toEqual({ type: 'error', message: 'The browser blocked the microphone.' })
+})
+
+test('what Chrome hears for "hey Woz" and "hey wizard" wakes it, and the words after it are the Edit', () => {
+  const cases: [string, string][] = [
+    [' he was you switches', 'you switches'], [' hey was make the title bigger', 'make the title bigger'],
+    [' they was make the title bigger', 'make the title bigger'], [' There Was You switches', 'You switches'],
+    ['hey wizard you switchers', 'you switchers'], [' he wizard use switches', 'use switches'], [' very wizard use switches', 'use switches'],
+  ]
+  for (const [said, edit] of cases) {
+    const { m, clock, sent } = setup()
+    m.start()
+    m.hear(said, true)
+    clock.advance(3000)
+    expect([said, sent()]).toEqual([said, [edit]])
+  }
+})
+
+test('a bare " he was" wakes it; the next settled piece is the Edit', () => {
+  const { m, clock, sent } = setup()
+  m.start()
+  m.hear(' he was', true)
+  expect(m.state).toBe('awake')
+  m.hear(' use switches', true)
+  clock.advance(3000)
+  expect(sent()).toEqual(['use switches'])
+})
+
+test('these do not wake it: the phrase mid-piece, wizard in a longer word or after two words, "wasn\'t", hey alone', () => {
+  for (const said of ['hello this is a test he was you switches', 'wizardry is fun', "he wasn't there", 'the old grey wizard came', ' hey make the title bigger']) {
+    const { m } = setup()
+    m.start()
+    m.hear(said, false)
+    m.hear(said, true)
+    expect([said, m.state]).toEqual([said, 'asleep'])
+  }
+})
+
+test('the stop phrases as Chrome hears them, and with wizard, alone or after the wake phrase', () => {
+  for (const said of ['was stop', 'Was stopped.', 'was sleep', 'wizard stop', 'Wizard, sleep']) {
+    const { m, clock, sent } = setup()
+    m.start()
+    m.hear('hey woz use switches', true)
+    m.hear(said, true)
+    expect([said, m.state]).toEqual([said, 'asleep'])
+    m.hear(said, true)
+    m.hear(` he was ${said}`, true)
+    m.hear(`hey wizard, ${said}`, true)
+    expect([said, m.state]).toEqual([said, 'asleep'])
+    clock.advance(5000)
+    expect(sent()).toEqual([])
+  }
+})
+
+test('every piece with words is heard, interim and final, with whether it woke; none for empty pieces or while off', () => {
+  const { m, events } = setup()
+  const heard = () => events.filter((e) => e.type === 'heard')
+  m.hear('hey woz use switches', true)
+  expect(heard()).toEqual([])
+  m.start()
+  m.hear('', true)
+  m.hear(' ', false)
+  expect(heard()).toEqual([])
+  m.hear(' so they said', false)
+  m.hear(' so they said', true)
+  m.hear(' he was use', false)
+  m.hear(' he was use switches', true)
+  m.hear(' and a title', false)
+  expect(heard()).toEqual([
+    { type: 'heard', text: 'so they said', final: false, woke: false },
+    { type: 'heard', text: 'so they said', final: true, woke: false },
+    { type: 'heard', text: 'he was use', final: false, woke: true },
+    { type: 'heard', text: 'he was use switches', final: true, woke: true },
+    { type: 'heard', text: 'and a title', final: false, woke: true },
+  ])
+})
+
+test('no speech says so and is no failure; no microphone and no network show at once, once per kind until turned on again', () => {
+  const { clock, events, input, rec } = speech()
+  const errors = () => events.filter((e) => e.type === 'error').map((e) => (e as { message: string }).message)
+  for (let i = 0; i < 6; i++) { rec.onerror!({ error: 'no-speech' }); rec.onend!(); clock.advance(10000) }
+  expect(events.filter((e) => e.type === 'quiet')).toHaveLength(6)
+  expect(errors()).toEqual([])
+  expect(input.machine.state).toBe('asleep')
+  for (const kind of ['audio-capture', 'network', 'audio-capture']) { rec.onerror!({ error: kind }); rec.onend!(); clock.advance(10000) }
+  expect(errors()).toEqual(['No microphone found.', 'Speech recognition needs the internet.'])
+  expect(input.machine.state).toBe('asleep')
+  input.stop()
+  input.start()
+  rec.onerror!({ error: 'network' })
+  rec.onerror!({ error: 'bad-grammar' })
+  expect(errors().slice(2)).toEqual(['Speech recognition needs the internet.', 'Voice input had a problem (bad-grammar). Trying again.'])
+})
+
+test('a blocked microphone says how to allow it and turns voice off', () => {
+  for (const kind of ['not-allowed', 'service-not-allowed']) {
+    const { events, input, rec } = speech()
+    rec.onerror!({ error: kind })
+    expect(input.machine.state).toBe('off')
+    expect(events.at(-1)).toEqual({ type: 'error', message: BLOCKED })
+    expect(BLOCKED).toContain('address bar')
+  }
 })

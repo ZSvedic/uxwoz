@@ -67,9 +67,10 @@ src/packages/web/src/
   drawer.ts      browser: box changes and rail tools, the drawer (Edit, Info) for a screen or a box
   toolbar.ts     browser: generate panel and pickers, toolbar menus (Theme too), Recent, zoom and its keys
   net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill and the hint
-  voice.ts       browser: voice input's state machine (wake phrase, countdown, stop, cancel; no DOM, tested) and
-                 speech recognition that restarts itself
-  voice-ui.ts    browser: the microphone button, the words in the drawer's Edit field, Sending in 3… and Cancel
+  voice.ts       browser: voice input's state machine (wake phrase as Chrome hears it, what was heard, countdown,
+                 stop, cancel; no DOM, tested) and speech recognition that restarts itself and says why it stops
+  voice-ui.ts    browser: the microphone button, the label with what was heard, the words in the drawer's Edit
+                 field, Sending in 3… and Cancel
   canvas.ts      browser: the boxes right of Home, the tree layout (packed rows, ropes that bend in the gap), cards and frames, A OR B sides,
                  rails at the canvas's scale, pan and zoom, fits
   boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes and their rails, editing and adding in
@@ -91,6 +92,7 @@ src/packages/web/src/
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
 src/scripts/fixer-reply.ts   run by hand: Terra's raw reply to a visit of a cache file
+src/scripts/voice-check.ts   run by hand: a macOS voice says an Edit to a separate Chrome; PASS if the Edit was sent
 ```
 
 ## Do not read (large or generated)

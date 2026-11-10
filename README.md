@@ -55,11 +55,30 @@ cd src && bun run test:record
 
 `bun run typecheck` checks the types.
 
+## Check voice
+
+`bun test` cannot check voice input: that needs a microphone. A script checks it by hand on a Mac,
+with the app running and a mockup with a screen in it:
+
+```bash
+cd src && bun scripts/voice-check.ts --url http://localhost:3000 --say "Hey Woz, use switches." --voice Samantha
+```
+
+It makes the clip with macOS `say`, starts a separate Google Chrome with its own profile (yours is
+never touched), opens the app, turns the microphone on and plays the clip through the speakers
+(`--player`, `afplay` by default). It prints what Chrome heard, what the label showed and the Edit
+field, then `PASS: the Edit was sent: "…"` or `FAIL:` with the link that broke. It stops the Edit's
+request before it reaches the server, so a run costs nothing. `--keep` keeps the clip and the profile.
+
+It needs a quiet room and speakers the microphone can hear. Chrome sends the audio to Google, as its
+voice input always does. The clip plays through the speakers because Chrome's fake microphone
+(`--use-file-for-fake-audio-capture`) does not reach speech recognition in Chrome 157.
+
 ## Project layout
 
 ```
 spec/        what the app does: behavior, UI generation, code contract, prompts
-src/         the app (bun workspace): packages/core (engine), packages/web (server + page), tests/, scripts/ (one debugging script)
+src/         the app (bun workspace): packages/core (engine), packages/web (server + page), tests/, scripts/ (run by hand)
 cassettes/   recorded model replies the tests replay
 process/     product brief, writing style, journal
 temp/        local scratch, ignored by git (the screen cache lives here)

@@ -10,6 +10,10 @@ export type VoiceEvent =
   | { type: 'countdown'; text: string; secondsLeft: number }
   | { type: 'send'; text: string }
   | { type: 'error'; message: string }
+  /** Every piece with words while on; `woke`: it starts with the wake phrase, or the machine was awake already. */
+  | { type: 'heard'; text: string; final: boolean; woke: boolean }
+  /** The browser heard no speech: routine, it keeps listening. */
+  | { type: 'quiet' }
 
 /** The time and timers the machine uses; tests pass a fake one. */
 export interface Clock {
@@ -27,10 +31,12 @@ const realClock: Clock = {
 /** Lower case, letters and digits only, one space between words. */
 const words = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
 
-// "hey woz", and what recognizers often hear instead. Only at the start of a piece: in the middle of one it is
-// more likely part of an unrelated sentence ("they say hey was a greeting").
-const WAKE = /^[^\p{L}\p{N}]*hey[\s,]+(?:woz|was|waz)\b[\s,.!?;:]*/iu
-const STOP = ['woz sleep', 'woz stop', 'stop listening']
+// "hey woz", and what Chrome hears instead (it never writes "woz": "he was" most often, then "hey was", "they was",
+// "there was"); or "wizard" as the first or second word ("hey wizard", "he wizard", "very wizard"). Only at the
+// start of a piece: in the middle of one it is more likely part of an unrelated sentence ("they say hey was a
+// greeting"). The word must end there: "he wasn't" and "wizardry" do not wake it.
+const WAKE = /^[^\p{L}\p{N}]*(?:(?:hey|he|they|there)[\s,]+(?:woz|was|waz)|(?:\p{L}+[\s,]+)?wizard)(?![\p{L}\p{N}'’])[\s,.!?;:]*/iu
+const STOP = ['woz sleep', 'woz stop', 'stop listening', 'was stop', 'was stopped', 'was sleep', 'wizard stop', 'wizard sleep']
 const CANCEL = ['cancel', 'never mind', 'nevermind']
 
 export class VoiceMachine {
@@ -70,6 +76,12 @@ export class VoiceMachine {
   /** Stop for good after a failure, with the reason. */
   fail(message: string) { this.stop(); this.emit({ type: 'error', message }) }
 
+  /** Say what went wrong and keep listening. */
+  warn(message: string) { if (this.state !== 'off') this.emit({ type: 'error', message }) }
+
+  /** The browser heard no speech. */
+  quiet() { if (this.state !== 'off') this.emit({ type: 'quiet' }) }
+
   /** The Cancel button, or "cancel" said: drop the text and keep listening. */
   cancel() {
     if (this.state !== 'awake' && this.state !== 'countdown') return
@@ -86,6 +98,7 @@ export class VoiceMachine {
   hear(text: string, final: boolean) {
     if (this.state === 'off') return
     const w = words(text)
+    if (w) this.emit({ type: 'heard', text: text.trim(), final, woke: this.state !== 'asleep' || WAKE.test(text) })
     if (!final) {
       if (!w) return
       if (this.state === 'asleep') {
@@ -176,15 +189,23 @@ const recognitionClass = (): RecognitionClass | undefined => {
 /** Whether this browser can turn speech into text. */
 export const speechSupported = () => !!recognitionClass()
 
-export const BLOCKED = 'The browser blocked the microphone.'
+export const BLOCKED = 'The browser blocked the microphone. To allow it, click the lock or tune icon in the address bar.'
 export const GAVE_UP = 'Voice input stopped. Click the microphone to start again.'
 const MAX_FAILURES = 5
+/** What the red pill says for an error the browser reports, by its kind. */
+const PROBLEMS: Record<string, string> = {
+  'audio-capture': 'No microphone found.',
+  network: 'Speech recognition needs the internet.',
+}
+const problem = (kind: string) => PROBLEMS[kind] ?? `Voice input had a problem (${kind}). Trying again.`
 
 /** Feeds the machine from the microphone. The browser stops listening after a silence or an error; this starts it again while the machine is on. */
 export class SpeechInput {
   private rec: Recognition | null = null
   private failures = 0
   private retry: unknown
+  /** The kinds of error already shown since the microphone was turned on. */
+  private shown = new Set<string>()
 
   /** Tests pass a fake recognition and clock. */
   constructor(readonly machine: VoiceMachine, private opts: { Recognition?: RecognitionClass; clock?: Clock } = {}) {}
@@ -214,12 +235,16 @@ export class SpeechInput {
       }
       rec.onerror = (e) => {
         if (e.error === 'not-allowed' || e.error === 'service-not-allowed') return this.give(BLOCKED)
-        // A silence is routine. Anything else counts, "aborted" too, so two tabs cannot take the microphone from each other forever.
-        if (e.error !== 'no-speech') this.failures++
+        // A silence is routine: say so and keep listening.
+        if (e.error === 'no-speech') return this.machine.quiet()
+        // Anything else counts, "aborted" too, so two tabs cannot take the microphone from each other forever.
+        this.failures++
+        if (!this.shown.has(e.error)) { this.shown.add(e.error); this.machine.warn(problem(e.error)) }
       }
       rec.onend = () => { this.machine.ended(); this.again() }
     }
     this.failures = 0
+    this.shown.clear()
     this.machine.start()
     this.listen()
   }

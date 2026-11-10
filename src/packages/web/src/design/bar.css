@@ -109,3 +109,12 @@
 .toolbar .voice { position: relative; }
 .toolbar .voice:not(.voice-off) { color: var(--current); }
 .voice:is(.voice-awake, .voice-countdown)::after { content: ''; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--current); }
+/* What voice heard: a parchment label just above the microphone, on one line, cut short; it never moves the bar.
+   The words give way to the hint after them. On a phone it sits above the bar's right end, inside the window. */
+.voice-pop { position: relative; flex: none; display: flex; }
+.voice-heard:not([hidden]) { position: absolute; right: -6px; bottom: calc(100% + 16px); z-index: 30; display: flex; width: max-content;
+  max-width: min(320px, calc(100vw - 16px)); padding: 5px 10px; white-space: nowrap; background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--lift); font: 13px/1.4 system-ui, -apple-system, sans-serif; }
+.voice-heard span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.voice-heard span:last-child { flex: none; color: var(--muted); }
+@media (max-width: 720px) { .voice-heard:not([hidden]) { position: fixed; right: 8px; bottom: calc(var(--bar-h) + 6px); } }

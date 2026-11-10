@@ -1,5 +1,6 @@
-// The microphone button and what voice input shows: the words in the drawer's Edit field, "Sending in 3…" with
-// Cancel, then the same submit as Enter in that field. voice.ts does the listening.
+// The microphone button and what voice input shows: the label above it with what was heard, the words in the
+// drawer's Edit field, "Sending in 3…" with Cancel, then the same submit as Enter in that field. voice.ts does the
+// listening.
 // Imported by toolbar.ts; at the top level this module uses only itself and state.ts (see app.ts).
 
 import { renderDrawer } from './drawer.ts'
@@ -10,7 +11,7 @@ import { $, changeInput, state } from './state.ts'
 const GOOGLE = 'In Chrome, the audio goes to Google to be turned into text.'
 const TITLES: Record<VoiceState, string> = {
   off: 'Voice: click to turn the microphone on',
-  asleep: "Voice is on: say 'hey Woz', then the change. Click to turn it off",
+  asleep: "Voice is on: say 'hey Woz', then the change ('hey wizard' works too). Click to turn it off",
   awake: 'Listening: say the change, then pause',
   countdown: 'Sending the change',
 }
@@ -24,7 +25,23 @@ export function initVoice(button: HTMLButtonElement) {
   button.type = 'button'
   button.className = 'voice voice-off'
   button.innerHTML = MIC
-  button.before(Object.assign(document.createElement('i'), { className: 'sep' }))
+  // The button and the label above it with what was heard: the words, then a hint when they do not wake it.
+  const wrap = Object.assign(document.createElement('span'), { className: 'voice-pop' })
+  button.replaceWith(wrap)
+  wrap.before(Object.assign(document.createElement('i'), { className: 'sep' }))
+  const label = Object.assign(document.createElement('div'), { className: 'voice-heard', hidden: true })
+  label.setAttribute('aria-live', 'polite')
+  const said = document.createElement('span'), tip = document.createElement('span')
+  label.append(said, tip)
+  wrap.append(button, label)
+  let labelTimer: ReturnType<typeof setTimeout> | undefined
+  const tell = (words: string, hint = '') => {
+    said.textContent = words
+    tip.textContent = hint
+    label.hidden = false
+    clearTimeout(labelTimer)
+    labelTimer = setTimeout(() => { label.hidden = true }, 4000)
+  }
 
   // "Sending in 3…" and Cancel, under the Edit field.
   const count = Object.assign(document.createElement('div'), { className: 'voice-count', hidden: true })
@@ -49,13 +66,20 @@ export function initVoice(button: HTMLButtonElement) {
     changeInput.value = shown = f.value
   }
 
+  let was: VoiceState = 'off'
   const machine = new VoiceMachine((e) => {
     if (e.type === 'state') {
       button.className = `voice voice-${e.state}`
       button.title = `${TITLES[e.state]}. ${GOOGLE}`
       button.setAttribute('aria-pressed', String(e.state !== 'off'))
       count.hidden = e.state !== 'countdown'
-    } else if (e.type === 'interim') show(e.text)
+      if (e.state === 'off') { clearTimeout(labelTimer); label.hidden = true }
+      // Woken with nowhere to send the Edit: say so now, not at the end of the countdown.
+      if (was === 'asleep' && e.state === 'awake' && !target()) hint('Click a screen first.')
+      was = e.state
+    } else if (e.type === 'heard') tell(`Heard: ${e.text}`, e.final && !e.woke ? '. Start with "hey Woz".' : '')
+    else if (e.type === 'quiet') tell('I hear nothing. Check the microphone.')
+    else if (e.type === 'interim') show(e.text)
     else if (e.type === 'countdown') { show(e.text); left.textContent = `Sending in ${e.secondsLeft}…` }
     else if (e.type === 'error') showError(e.message)
     else if (e.type === 'send') {
