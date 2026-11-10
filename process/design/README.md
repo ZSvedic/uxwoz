@@ -99,23 +99,28 @@ lines, one clean sans.
 
 ## F and G: the blend (`variant-f.html`, `variant-g.html`)
 
-The user's pick of parts from A to E, on B as the base. F and G are the same page except the background.
+The user's pick of parts from A to E, on B as the base. G is the first cut with D's dot background; F went
+through a second round on 2026-11-10 and is the one to judge.
 
 - **From B:** the night sky in both modes, the gold OR, the ember Pick, the pinned index cards, the drawer as a
   card in your hand, the generate panel, the sheet, Fredoka.
-- **From D:** the segmented pill toolbar, placed at the bottom, text 15 px at weight 500, the arrows pointing up,
-  and the violet and green corner glows.
+- **From C:** the wooden command bar at the bottom, with the deck as New, gold badges, text 15 px at weight 500,
+  the arrows pointing up. (G still has D's pill bar.)
+- **From D:** the violet and green corner glows.
 - **From A:** the pick: gold glow, levitation, star sparks, the loser dissolves into motes; the chime and the hover tinkle.
 - **From E:** the filtered whoosh, on deal and when the drawer opens.
-- **New:** the hat alone as the logo, shaded (a gradient on the cone, a dark brim underside, a highlight, a thin
-  gold rim), and as the favicon. Both Pick buttons go after a pick. The tool buttons (Edit, Info, Undo and so on)
-  sit in a column to the right of a screen, so the space below is free for lines. IDs like `snore-count` are in
-  ink on a faint chip, not blue. The boxes sit right of the tree, or below it when narrow.
-- **Connecting lines**, which no earlier variant had: an SVG in the board draws a 2 px line from the bottom of
-  the picked screen (before a pick, faintly from under the OR) down into a lane, across, and up into each child
-  screen, with rounded corners; redrawn on resize, after a pick and after ↺.
+- **New:** the hat alone as the logo, shaded (a gradient on the cone, a dark brim underside, a thin gold rim, no
+  highlight line), and as the favicon. Both Pick buttons and the "pick one" hint go after a pick. The tool buttons
+  (Edit, Info, Undo and so on) sit in a column to the right of a screen. IDs like `snore-count` are in ink on a
+  faint chip, not blue. The boxes sit right of the tree, or below it when narrow.
+- **Connecting lines** (F): none before a pick; after it, 4 px S-curves from the bottom of the chosen screen to the
+  top of each child. Three styles, switched by the *Lines* pills under the favicons: rope (tan with a twisted
+  dash), dotted (gold sparks), glow (blue with a halo). Drawn in an SVG inside the board, so they zoom; redrawn
+  on resize, pick and ↺. G still has the first cut: a faint lane line from under the OR.
+- **Zoom** (F): the 100 % item in the bar cycles 50 to 150 % (also ⌘+ and ⌘−), scaling the board from the top left.
 - **F's background:** B's stars on three hand-placed tiles of 547, 443 and 389 px with 6 to 11 stars each, so no
-  repeat shows, and D's corner glows on top.
+  repeat shows, in a layer inside the zoomed board so the stars scale with it and reach the page bottom; D's
+  corner glows stay on the stage, unzoomed. At 50 % the stars shrink to a pixel and nearly vanish.
 - **G's background:** D's 22 px dot grid and its corner glows, on B's sky.
 - **Cost:** about +7 KB on `shell.css`, plus the line drawing, which the real app already has in `canvas.ts`.
 
@@ -169,4 +174,11 @@ browser pane it pauses, which is a quirk of the pane, not the page.
   to look at on a real screen: after a pick the page scrolls so the chosen screen slides under the logo.
 
 Not checked by ear: the sounds.
+
+## Judge's notes, 2026-11-10 afternoon: F's second round
+
+Checked at 1000 px, light and dark: the pick removes both buttons and the hint, the rope, dotted and glow lines
+curve from the chosen screen into Nights and Settings with no stubs, zoom cycles and the stars and lines scale
+with it, the stars reach the bottom of the sheet, no console errors. A jump of the page after a pick that I saw
+earlier was the browser tool scrolling the button into view, not the page. Not checked by ear: the sounds.
 
