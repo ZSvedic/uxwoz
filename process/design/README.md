@@ -114,13 +114,13 @@ through a second round on 2026-11-10 and is the one to judge.
   (Edit, Info, Undo and so on) sit in a column to the right of a screen. IDs like `snore-count` are in ink on a
   faint chip, not blue. The boxes sit right of the tree, or below it when narrow.
 - **Connecting lines** (F): none before a pick; after it, 4 px S-curves from the bottom of the chosen screen to the
-  top of each child. Three styles, switched by the *Lines* pills under the favicons: rope (tan with a twisted
-  dash), dotted (gold sparks), glow (blue with a halo). Drawn in an SVG inside the board, so they zoom; redrawn
-  on resize, pick and ↺. G still has the first cut: a faint lane line from under the OR.
+  top of each child, drawn as a rope: tan with a twisted dash (the user chose it over a dotted and a glow
+  style on 2026-11-10). An SVG inside the board, so they zoom; redrawn on resize, pick and ↺. G still has the first cut: a faint lane line from under the OR.
 - **Zoom** (F): the 100 % item in the bar cycles 50 to 150 % (also ⌘+ and ⌘−), scaling the board from the top left.
 - **F's background:** B's stars on three hand-placed tiles of 547, 443 and 389 px with 6 to 11 stars each, so no
-  repeat shows, in a layer inside the zoomed board so the stars scale with it and reach the page bottom; D's
-  corner glows stay on the stage, unzoomed. At 50 % the stars shrink to a pixel and nearly vanish.
+  repeat shows, in a layer inside the zoomed board so the stars scale with it and reach the page bottom (each
+  tile needs both sizes in `background-size`: with the width alone the SVG tile stretched to the layer's height
+  and the stars stopped after 550 px); D's corner glows stay on the stage, unzoomed. At 50 % the stars shrink to a pixel and nearly vanish.
 - **G's background:** D's 22 px dot grid and its corner glows, on B's sky.
 - **Cost:** about +7 KB on `shell.css`, plus the line drawing, which the real app already has in `canvas.ts`.
 
