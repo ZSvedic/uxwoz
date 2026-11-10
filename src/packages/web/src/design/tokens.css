@@ -9,13 +9,14 @@
   --sky1: #1b2160; --sky2: #0b1030; --ch: #f6ecd2; --ch2: #eadbb4; --edge: #c9ad72; --ink: #2a1f3d; --muted: #64567a;
   --ivory: #fffdf6; --blue: #2f5bff; --ember: #ff6a2b; --ember-ink: #a83a0a; --gold: #f5c542; --chip: #2a1f3d14;
   --wood1: #8f5c3a; --wood2: #7d4e30; --rope: #c9a46a; --rope2: #6e4b22; --red: #b3261e; --dull: #85788f; --dull-wood: #dcbf98;
-  --field-bg: var(--ivory);
+  --field-bg: var(--ivory); --green: #2e9d5b; --tab-ink: #fff;
 }
 /* The palette, by night: indigo chrome with pale text, darker wood. */
 @media (prefers-color-scheme: dark) {
   :root { --ch: #1a1f4a; --ch2: #252b63; --edge: #2e3680; --ink: #e6e4ff; --muted: #a4a6d6; --ivory: #fbf4e2; --blue: #6f8cff;
     --ember: #ff7a3d; --ember-ink: #ff7a3d; --gold: #ffd166; --chip: #ffffff17; --wood1: #6b4430; --wood2: #43281a;
-    --rope: #d9b77c; --rope2: #7a5428; --red: #ff8a80; --dull: #7a7fb8; --dull-wood: #c9a07a; --field-bg: var(--ch2); }
+    --rope: #d9b77c; --rope2: #7a5428; --red: #ff8a80; --dull: #7a7fb8; --dull-wood: #c9a07a; --field-bg: var(--ch2);
+    --green: #4cd18a; --tab-ink: #1a1f4a; }
 }
 /* The same by day and night: the indigo plate and pale text on the sky, the corner glows, the dim behind the panel,
    the cream of the bar's text, the dark text on ember and on gold, a screen's paper. */
@@ -23,6 +24,11 @@
   --indigo: #1a1f4a; --star-ink: #e6e4ff; --star-muted: #a4a6d6; --violet-glow: #7c5cff40; --green-glow: #2ecc9a26;
   --night-dim: #05082099; --cream: #fbf4e2; --brown: #3a1500; --gold-ink: #3a2600; --paper: #fff;
   --deck-stripe: #3b5fb5; --deck-blue: #2f5bff;
+  /* A screen's ivory frame and its fine edges; the gold glow of the current one; a box's margin line and ruled lines. */
+  --frame-line: #ddd3bf; --frame-edge: #fff8; --gold-glow: #f5c54299; --margin-ink: #ff6a2b88; --ruling: #7f8cff26;
+  /* The gold pin of a box and the gold coin of the OR: a lit face, a glow, a shadow under them. */
+  --pin: radial-gradient(circle at 35% 35%, #ffe9a8, var(--gold) 55%, #8a5a00); --pin-shadow: 0 0 8px var(--gold), 0 3px 4px #0006;
+  --coin: radial-gradient(#fff3c4, var(--gold)); --coin-shadow: 0 0 18px var(--gold), inset 0 -3px 0 #0003;
   /* The wood's grain and its lit and shaded edges; the light and the line on wood for hover and separators. */
   --grain: repeating-linear-gradient(100deg, transparent 0 22px, rgba(255, 255, 255, .05) 22px 24px);
   --wood-shadow: 0 2px 0 rgba(255, 255, 255, .15) inset, 0 -3px 0 rgba(0, 0, 0, .25) inset, 0 16px 34px -8px rgba(0, 0, 0, .55);
@@ -31,7 +37,8 @@
   --lift: 0 2px 4px #0006, 0 16px 34px -8px #000b; --halo: 0 0 24px #8fb0ff55;
   /* The ember glow and pressed edge of a primary button; the blue glow around the generate panel. */
   --pick-shadow: 0 0 14px #ff6a2b88, 0 3px 0 #a8380e; --panel-glow: 0 0 40px var(--blue);
-  --shadow-screen: 0 2px 10px rgba(0, 0, 0, .12); --shadow-tool: 0 1px 4px rgba(0, 0, 0, .1);
+  /* The deep shadow of the drawer, a card held over the canvas. */
+  --hand-shadow: 0 30px 60px -10px #000c;
 }
 
 /* Roles: what each colour is for. Change a role to change every place that plays it. */
@@ -52,6 +59,10 @@
   --sky-text: var(--star-ink); --sky-muted: var(--star-muted); --plate: var(--indigo); --dim: var(--night-dim);
   /* Lines between screens are ropes: a tan strand and a dark twist. */
   --rope-twist: var(--rope2);
-  /* A screen is white paper in both modes. */
-  --screen: var(--paper);
+  /* A screen is white paper in both modes, in an ivory frame. */
+  --screen: var(--paper); --frame: var(--ivory);
+  /* Each box's edge glows in its colour; a box's ID sits on a faint chip. */
+  --rules-glow: var(--blue); --notes-glow: var(--ember); --components-glow: var(--gold); --data-glow: var(--green);
+  /* The drawer's open tab: blue, with white text by day and dark text by night. */
+  --tab: var(--blue); --on-tab: var(--tab-ink);
 }

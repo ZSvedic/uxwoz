@@ -13,8 +13,8 @@ button, select { padding: 5px 10px; border: 1px solid var(--border); border-radi
 button:disabled { color: var(--disabled); cursor: default; }
 button.primary { background: var(--pick); border-color: var(--pick); color: var(--on-pick); font-weight: 600; }
 .toolbar button, .recent button, .drawer :is(.tabs button, .close) { border-color: transparent; background: none; }
-/* Fredoka: headings, the bar, the logo, primary buttons, the Pick pill and the OR. */
-h2, .box h3, .drawer-name, .toolbar, button.primary, .pick-hint, .or b { font-family: Fredoka, system-ui, sans-serif; }
+/* Fredoka: headings, the bar, the logo, primary buttons, the Pick pill, the OR and the names of screens. */
+h2, .box h3, .drawer-name, .toolbar, button.primary, .pick-hint, .or b, .card .name { font-family: Fredoka, system-ui, sans-serif; }
 /* Focus: a gold ring around a dark one, so it shows on parchment, wood and sky. */
 :focus-visible:not(.stage, [contenteditable]) { outline: 2px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 2px var(--focus-in); }
 /* Small uppercase headings of menus, the generate panel and the drawer. */

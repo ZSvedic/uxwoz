@@ -1,7 +1,21 @@
 /* The boxes side by side right of the first screen, at canvas scale: they zoom with the screens. */
 .boxes { position: absolute; display: flex; align-items: flex-start; gap: 120px; font-size: 15px; }
-.box { position: relative; flex: none; display: flex; flex-direction: column; width: 520px; max-height: var(--box-h); padding: 14px 18px 18px; border: 2px solid var(--border); border-radius: 12px; background: var(--surface); }
-.box.current { border-color: var(--current); }
+/* A box is an index card: ruled lines and an ember margin line under the title, a gold pin, an edge that glows in the
+   box's colour (gold and stronger while current). Rules, Data and Fixer's notes lean a little and stand straight while
+   current; Components holds live screens and never leans. A transform does not move the layout, so sizes stay. */
+.box { --glow: var(--rules-glow); position: relative; flex: none; display: flex; flex-direction: column; width: 520px;
+  max-height: var(--box-h); padding: 14px 18px 18px; border: 1.5px solid var(--glow); border-radius: 4px;
+  background: linear-gradient(transparent 43px, var(--margin-ink) 43px 44.5px, transparent 44.5px),
+    repeating-linear-gradient(transparent 0 23px, var(--ruling) 23px 24px), var(--surface);
+  box-shadow: 0 0 16px var(--glow), var(--lift); }
+.box::before { content: ''; position: absolute; top: -7px; left: 50%; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%;
+  background: var(--pin); box-shadow: var(--pin-shadow); }
+.box-rules { transform: rotate(-1.5deg); }
+.box-notes { --glow: var(--notes-glow); transform: rotate(1deg); border-radius: 2px 2px 18px 2px; }
+.box-components { --glow: var(--components-glow); }
+.box-data { --glow: var(--data-glow); transform: rotate(-1deg); }
+.box.current, .box:focus-within { transform: none; }
+.box.current { --glow: var(--current); box-shadow: 0 0 0 1px var(--glow), 0 0 28px var(--glow), var(--lift); }
 .box h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font-size: 18px; }
 .box h3 small { color: var(--muted); font-weight: 400; font-size: 13px; flex: 1; }
 .box-hint { margin: 0; color: var(--muted); font-size: 13px; }
@@ -13,7 +27,9 @@
 .visit small, .visit .refused, .yours { color: var(--muted); }
 .visit .undone { text-decoration: line-through; color: var(--muted); }
 .fresh > b:first-child::after, .card.fresh .name::after { content: " new"; color: var(--mark); font-size: 12px; font-weight: 600; }
-.card.fresh:not(.box *) .name::after { color: var(--sky-mark); }
+/* An ID (a rule's, a table's): ink in a monospace on a faint chip. */
+.rule > b:first-child, .table-head > b { padding: 0 4px; border-radius: 4px; background: var(--chip); color: var(--text);
+  font: 600 13px ui-monospace, monospace; }
 /* A component card sits on the box, not the sky: its name and idea in ink. */
 .box .card .name { color: var(--text); }
 .box .card .idea { color: var(--muted); }
@@ -35,7 +51,7 @@
 [contenteditable]:hover, [contenteditable]:focus { background: var(--field); box-shadow: 0 0 0 2px var(--border); }
 .data-table + .data-table { margin-top: 16px; }
 .table-head { display: flex; gap: 6px; align-items: baseline; margin-bottom: 4px; }
-.table-head b { flex: 1; }
+.table-head > .yours { flex: 1; }
 .data-table table { border-collapse: collapse; width: 100%; font-size: 13px; }
 .data-table th, .data-table td { border: 1px solid var(--border); padding: 3px 6px; text-align: left; height: 1.6em; }
 .data-table th { color: var(--muted); font-weight: 600; }

@@ -11,8 +11,8 @@ const cssFiles = readdirSync(DESIGN).filter((f) => f.endsWith('.css')).sort()
 const css = Object.fromEntries(cssFiles.map((f) => [f, read(resolve(DESIGN, f))]))
 const lineCount = (text: string) => text.split('\n').length - (text.endsWith('\n') ? 1 : 0)
 
-// Set at run time by the code (canvas.ts, nav.ts) or on one element in CSS, so tokens.css does not define them.
-const RUNTIME_VARS = ['--z', '--depth', '--box-h', '--bar-h']
+// Set at run time by the code (canvas.ts, nav.ts) or on one element in CSS (a box's glow), so tokens.css does not define them.
+const RUNTIME_VARS = ['--z', '--depth', '--box-h', '--bar-h', '--glow']
 const COLOUR = /#[0-9a-f]{3,8}\b|\b(rgba?|hsla?)\(/i
 
 describe('design/', () => {
@@ -75,9 +75,15 @@ const decls = (text: string) => Object.fromEntries([...text.matchAll(/(--[\w-]+)
 const light = decls(tokens.slice(0, darkStart) + tokens.slice(darkEnd))
 const modes = { light, dark: { ...light, ...decls(tokens.slice(darkStart, darkEnd)) } }
 
+/** A token as an opaque #rrggbb; a see-through #rrggbbaa (a chip) is laid over --surface, where it sits. */
 function hex(map: Record<string, string>, name: string): string {
   let v = map[name]
   for (let m; v && (m = v.match(/^var\((--[\w-]+)\)$/)); ) v = map[m[1]!]
+  if (v && /^#[0-9a-f]{8}$/i.test(v)) {
+    const under = hex(map, '--surface'), a = parseInt(v.slice(7), 16) / 255
+    return '#' + [1, 3, 5].map((i) => Math.round(parseInt(v!.slice(i, i + 2), 16) * a + parseInt(under.slice(i, i + 2), 16) * (1 - a))
+      .toString(16).padStart(2, '0')).join('')
+  }
   if (!v || !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) throw new Error(`${name} is not an opaque hex colour: ${v}`)
   return v.length === 4 ? '#' + [...v.slice(1)].map((c) => c + c).join('') : v
 }
@@ -99,6 +105,8 @@ const PAIRS: [string, string, number][] = [
   // The wordmark is large text; an idea opened in a box lies on surface-2; the deck's + on both of its stripes.
   ['--wordmark', '--surface', 3], ['--text', '--surface-2', 4.5], ['--muted', '--surface-2', 4.5], ['--mark', '--surface-2', 4.5],
   ['--disabled', '--surface-2', 3], ['--deck-edge', '--deck', 4.5], ['--deck-edge', '--deck-stripe', 4.5],
+  // An ID on its chip, and the "new" after it; the drawer's open tab. A screen's name chip is --text on --surface.
+  ['--text', '--chip', 4.5], ['--mark', '--chip', 4.5], ['--on-tab', '--tab', 4.5],
 ]
 
 describe('contrast in tokens.css', () => {

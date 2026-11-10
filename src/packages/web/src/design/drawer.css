@@ -1,17 +1,23 @@
-/* The drawer: docked at the right edge for Edit and Info; the canvas gets narrower. */
-.drawer { flex: none; width: 360px; max-width: 100%; display: flex; flex-direction: column; gap: 10px; padding: 10px 14px 14px;
-  border-left: 1px solid var(--border); background: var(--surface); overflow: auto; z-index: 14; }
-@media (max-width: 700px) { .drawer { position: absolute; right: 0; top: 0; bottom: 0; box-shadow: var(--shadow); } }
+/* The drawer: a card held over the canvas, docked at the right for Edit and Info, level; the canvas gets narrower.
+   Rounded, a double gold line inside its edge, a halo, a small ember star in the corner. */
+.drawer { flex: none; width: 360px; max-width: calc(100% - 10px); margin: 10px 10px 10px 0; display: flex; flex-direction: column; gap: 10px;
+  padding: 16px 18px; border: 2px solid var(--border); border-radius: 20px; background: var(--surface); overflow: auto; z-index: 14;
+  box-shadow: inset 0 0 0 5px var(--surface), inset 0 0 0 6px var(--current), var(--halo), var(--hand-shadow); }
+.drawer::after { content: '★'; position: sticky; bottom: 0; align-self: flex-end; margin: auto -4px -8px 0; color: var(--pick); font-size: 15px; }
+@media (max-width: 700px) { .drawer { position: absolute; right: 0; top: 0; bottom: 0; } }
 .drawer-head { display: flex; align-items: center; gap: 8px; }
-.drawer .tabs { flex: 1; display: flex; gap: 4px; }
-.drawer .tabs button { color: var(--muted); font-weight: 600; }
-.drawer .tabs button[aria-selected="true"] { color: var(--text); background: var(--surface-2); border-color: var(--border); }
+.drawer .tabs { flex: 1; display: flex; gap: 6px; }
+/* Tabs are pills; the open one is blue. */
+.drawer .tabs button { padding: 3px 12px; border-color: var(--border); border-radius: 99px; color: var(--muted); font-weight: 600; }
+.drawer .tabs button[aria-selected="true"] { color: var(--on-tab); background: var(--tab); border-color: var(--tab); }
 .drawer .close { color: var(--muted); }
-.drawer-name { margin: 0; font-weight: 600; }
+.drawer-name { margin: 0; font-size: 19px; font-weight: 600; }
 .pane { display: flex; flex-direction: column; gap: 8px; }
 .pane label { color: var(--muted); }
-.pane textarea { width: 100%; resize: vertical; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--field); }
-.pane .primary { align-self: flex-start; }
+.pane textarea { width: 100%; resize: vertical; padding: 6px 8px; border: 2px solid var(--border); border-radius: 10px; background: var(--field); }
+/* Make the change: the ember button, as Generate. */
+.pane .primary { align-self: flex-start; padding: 6px 18px; border-radius: 99px; box-shadow: var(--pick-shadow); }
+.pane .primary:focus-visible { box-shadow: 0 0 0 2px var(--focus-in), var(--pick-shadow); }
 .pane h3 { margin: 10px 0 0; }
 .history { margin: 0; padding-left: 1.8em; display: flex; flex-direction: column; gap: 4px; color: var(--muted); }
 .history li.now { color: var(--text); }

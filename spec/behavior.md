@@ -124,16 +124,16 @@ hidden when the user branches.
   one, else the first other. The screens of a row sit side by side, children in the order of their
   parents; a screen's first child sits straight below it when that place is free, else in the next
   free place to the right. A parent never moves to make room for its children.
-- **Lines**: one thin tan line from each screen to the screen it hangs under: straight down in
-  the same column, else down, across and down. Each parent whose lines bend has its own height in
-  the gap below its row where they go across, the leftmost parent lowest, so no two lines cross or
-  run together; the gap grows with them. Other buttons between screens draw no line.
-- **Names**: above each screen, its level and the short name the model gave it (*L2 Camera*), and
-  under that, its idea, on up to two lines; a longer idea ends in **more**, which shows the rest
-  (and **less** folds it again). Names and ideas keep their size on screen at any zoom; below
-  50% only the names show. Hovering a name shows it whole.
+- **Lines**: a rope from each screen to the screen it hangs under, an open A OR B too: straight
+  down to the bottom of the parent's row, then one S-curve across the gap to the child, ending
+  above the child's name; straight down all the way in the same column. Every rope has the same
+  shape, and their ends keep their order, so no two cross. Other buttons between screens draw no line.
+- **Names**: above each screen, on a parchment chip, its level and the short name the model gave it
+  (*L2 Camera*), and under that, its idea, on up to two lines; a longer idea ends in **more**, which
+  shows the rest (and **less** folds it again). Names and ideas keep their size on screen at any
+  zoom; below 50% only the names show. Hovering a name shows it whole.
 - **Current screen**: the one the user last picked, clicked in, or chose in Nav. It has a gold
-  outline and its rail at full strength; other screens show their rail on hover. Fit screen uses
+  ring and glow and its rail at full strength; other screens show their rail on hover. Fit screen uses
   it. A box can be current instead (see Boxes): then Fit screen and Fit screen width fit the box
   and its rail, top first, and opening the drawer keeps the box in view. A click in a screen makes
   the screen current again.
@@ -169,7 +169,7 @@ says nothing about which is which.
   (*One big clean button on top*).
 - **Locked previews**: both stream in live, and their scripts run once finished, so charts draw.
   Nothing inside them can be clicked. A side can be picked once it has finished: hovering it
-  outlines it and shows **Pick this design**.
+  rings it in gold and shows **Pick this design**.
 - **Picking**: a click anywhere on a finished side keeps it as the screen's first version and
   deletes the other. If the other is still streaming, it stops and nothing of it is kept. The
   frame does not reload, so the picked screen stays as it was.
@@ -183,8 +183,8 @@ says nothing about which is which.
 
 ## Rail
 
-A column of large icon buttons right of each picked screen, at the canvas's scale like the
-screens: 60 px of canvas wide, 40 px buttons at 100%. So a full view packs tight and a rail stays the
+A column of large round parchment buttons right of each picked screen, at the canvas's scale like
+the screens: 60 px of canvas wide, 40 px buttons at 100%. So a full view packs tight and a rail stays the
 same size beside its screen; far out its buttons are too small to hit, so the user zooms in to
 use them:
 
@@ -202,7 +202,8 @@ buttons wait (Info still works).
 
 ## Drawer
 
-A 360 px panel docked at the right edge, for the current screen or box (see Boxes for a box's).
+A 360 px card docked at the right edge, level, rounded, with a double gold line inside its edge,
+for the current screen or box (see Boxes for a box's).
 The canvas gets narrower and scrolls so the screen stays fully visible beside it. Esc or ✕ closes
 it. It has two tabs:
 
@@ -261,8 +262,10 @@ row is as tall as the first screen, and the rows below start under it; a child t
 the boxes, and another screen with no parent goes right of the boxes. Every model call reads
 Components, Rules and Data in full, so what is in them is what the screens share.
 
-A click in a box (not in a component card) or on its toolbar button makes it current: a gold
-border and its rail at full strength, as a current screen has; other boxes show their rail on
+The boxes are index cards with ruled lines, a gold pin and an edge that glows in the box's colour.
+Rules, Data and Fixer's notes lean by at most 1.5° and stand straight while current; Components,
+which holds live screens, never leans. A click in a box (not in a component card) or on its toolbar
+button makes it current: its glow turns gold and its rail is at full strength, as a current screen has; other boxes show their rail on
 hover. Each box's rail is like a screen's, right of it: first its own button (Rules **+ Rule**,
 Fixer's notes **▶ Visit now**, Data **+ Table**; Components has none), then:
 
@@ -452,4 +455,5 @@ browser and says what they think. Nothing is real-time and nobody signs in: a li
 Black and white is the mockup, and blue is a control in a mockup that opens another screen, in
 both themes. UX Woz itself sits on a night sky, its menus and panels parchment by day and indigo
 by night. Ember is UX Woz's actions: Generate, Make the change, Pick; it also marks Nav's path and
-what is *new*. Gold is the OR, the box numbers and the current screen or box. Lines are ropes.
+what is *new*. Gold is the OR, the box numbers, the pins, and the ring and glow of the current
+screen or box. Lines are tan ropes with a dark twist.

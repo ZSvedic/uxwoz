@@ -1,5 +1,5 @@
 // The canvas: every screen on one panning, zooming surface, a tree with a row per level, a first child
-// below its parent when there is room, each parent's lines at a height of their own so they never cross.
+// below its parent when there is room, a rope from each screen to its parent that bends only in the gap below.
 // Names keep their size on screen; rails scale with the canvas. Right of the first screen: the boxes (boxes.ts).
 
 import { DEFAULT_DEVICE, DEVICES, FRAME_SANDBOX, framePage, type Device } from '@uxwoz/core/frame'
@@ -23,11 +23,9 @@ const RAIL_W = 60
 const OR_MIN = 120
 /** Margin so any screen can be scrolled to the middle. */
 const PAD = 600
-/** Where lines leave and bent lines enter a screen: apart, so a line into a screen below another parent does not run on from it. */
+/** Where ropes leave and bent ropes enter a screen: apart, so a rope into a screen below another parent does not run on from it. */
 const LINE_X = 40
 const ENTRY_X = 110
-/** Spacing of parents' branch heights, in pixels on screen. */
-const LANE = 14
 /** Label height above a screen and above a side, in pixels on screen. */
 const LABEL_H = 62
 const IDEA_H = 76
@@ -35,8 +33,6 @@ const IDEA_H = 76
 const FAR = 0.5
 const NAME_H = 26
 const labelH = (z: number) => (z < FAR ? NAME_H : LABEL_H)
-/** Line corner radius. */
-const BEND = 10
 const SVG_NS = 'http://www.w3.org/2000/svg'
 const MIN_ZOOM = 0.1
 export const MAX_ZOOM = 2
@@ -130,9 +126,8 @@ export class Canvas {
   /** The OR of each open A OR B, by screen key. */
   private ors = new Map<string, HTMLElement>()
   private screens: ScreenView[] = []
-  /** From the last layout: each screen's row bottom, each parent's branch height (0 highest). */
+  /** From the last layout: each screen's row bottom, where its ropes start to bend. */
   private rowBottom = new Map<string, number>()
-  private lanes = new Map<string, number>()
   /** Each screen's place from the last layout, in canvas pixels. */
   private boxes = new Map<string, Box>()
   private extent: Box = { x: 0, y: 0, w: 0, h: 0 }
@@ -216,7 +211,6 @@ export class Canvas {
     this.surface.style.zoom = String(z)
     this.surface.style.setProperty('--z', String(z))
     this.surface.classList.toggle('far', z < FAR)
-    this.stage.style.setProperty('--z', String(z)) // the dot grid behind the canvas scales with it
     this.layout() // names keep their size on screen, so the room they need changes
     this.on.zoomed(z)
   }
@@ -318,6 +312,7 @@ export class Canvas {
         const c = this.card(v.id, s.key, s.component ? this.components : this.surface)
         c.key = s.key
         c.view = v
+        c.el.dataset.id = v.id
         if (c.width !== v.width) { c.width = v.width; c.frame.style.width = `${v.width}px` }
         // A component card flows in its box: only its width is set.
         if (s.component) c.el.style.width = c.screen.style.width = `${v.width}px`
@@ -370,6 +365,7 @@ export class Canvas {
     this.cards.get(to)?.el.remove()
     this.cards.delete(from)
     this.cards.set(to, c)
+    c.el.dataset.id = to
   }
 
   private queue() {
@@ -435,14 +431,6 @@ export class Canvas {
         maxX = Math.max(maxX, cursor - GAP_X)
       }
     }
-    // Each bending parent gets its own branch height, the leftmost lowest, so no lines cross; the gap grows.
-    const lane = Math.max(LANE / z, 10)
-    this.lanes.clear()
-    const lanesIn = rows.map((row) => {
-      const bending = row.filter((k) => (kids.get(k) ?? []).some((c) => Math.abs(xs.get(c)! - xs.get(k)!) >= 1))
-      bending.forEach((k, i) => this.lanes.set(k, bending.length - 1 - i))
-      return bending.length
-    })
     // Each row holds the names above its screens, which keep their size on screen.
     const rowH = rows.map((row, d) => Math.max(d || !side ? 0 : this.side.offsetHeight, ...row.map((k) => sizes.get(k)!.h)))
     const above = (d: number) => (rows[d]!.some((k) => sizes.get(k)!.parts.length > 1) ? IDEA_H : labelH(z)) / z
@@ -451,14 +439,14 @@ export class Canvas {
     for (let d = 0; d < rows.length; d++) {
       y += above(d)
       rowY[d] = y
-      y += rowH[d]! + GAP_Y + Math.max(0, lanesIn[d]! - 1) * lane
+      y += rowH[d]! + GAP_Y
     }
     this.rowBottom.clear()
     rows.forEach((row, d) => row.forEach((k) => {
       this.boxes.set(k, { x: xs.get(k)!, y: rowY[d]!, w: sizes.get(k)!.w, h: sizes.get(k)!.h })
       this.rowBottom.set(k, rowY[d]! + rowH[d]!)
     }))
-    y -= rows.length ? GAP_Y + Math.max(0, lanesIn.at(-1)! - 1) * lane : 0
+    y -= rows.length ? GAP_Y : 0
     Object.assign(this.side.style, { left: `${sideX}px`, top: `${rowY[0] ?? PAD}px` })
     this.extent = { x: PAD, y: PAD, w: Math.max(0, maxX - PAD), h: Math.max(0, y - PAD) }
     for (const s of screens) {
@@ -486,7 +474,7 @@ export class Canvas {
     requestAnimationFrame(() => { for (const c of this.cards.values()) c.more.hidden = !!c.view?.side || (c.more.textContent !== 'less' && c.idea.scrollHeight <= c.idea.clientHeight + 1) })
   }
 
-  /** A line from each screen to its parent: straight down, else an elbow at the parent's branch height. */
+  /** A rope from each screen to its parent, drawn twice: the strand and its twist. */
   private drawLines(kids: Map<string, string[]>) {
     const svg = this.lines
     svg.setAttribute('width', this.surface.style.width)
@@ -501,12 +489,13 @@ export class Canvas {
         if (!b) continue
         const choice = this.screens.find((s) => s.key === k)!.cards.length > 1
         const x1 = a.x + LINE_X, y1 = a.y + a.h, x2 = b.x + (Math.abs(b.x - a.x) < 1 ? LINE_X : ENTRY_X), y2 = b.y - (choice ? IDEA_H : labelH(z)) / z - 6 / z
-        const lane = Math.max(LANE / z, 10) * (this.lanes.get(p) ?? 0)
-        const mid = Math.min((this.rowBottom.get(p) ?? y1) + GAP_Y / 2 + lane, y2 - 1)
-        const path = document.createElementNS(SVG_NS, 'path')
-        path.setAttribute('d', elbow(x1, y1, x2, mid, y2))
-        path.setAttribute('class', 'line')
-        parts.push(path)
+        const d = curve(x1, y1, x2, Math.min(this.rowBottom.get(p) ?? y1, y2), y2)
+        for (const cls of ['line', 'line twist']) {
+          const path = document.createElementNS(SVG_NS, 'path')
+          path.setAttribute('d', d)
+          path.setAttribute('class', cls)
+          parts.push(path)
+        }
       }
     }
     svg.replaceChildren(...parts)
@@ -551,10 +540,9 @@ export class Canvas {
   }
 }
 
-/** Down from (x1, y1) to y, across to x2, down to y2, with rounded corners; straight when x1 is x2. */
-function elbow(x1: number, y1: number, x2: number, y: number, y2: number): string {
-  const dx = x2 - x1
-  if (Math.abs(dx) < 2 * BEND) return `M${x1} ${y1} V${y2}`
-  const s = Math.sign(dx)
-  return `M${x1} ${y1} V${y - BEND} Q${x1} ${y} ${x1 + s * BEND} ${y} H${x2 - s * BEND} Q${x2} ${y} ${x2} ${y + BEND} V${y2}`
+/** Down from (x1, y1) to yRow, then one S-curve to (x2, y2), upright at both ends; straight when x1 is x2. */
+export function curve(x1: number, y1: number, x2: number, yRow: number, y2: number): string {
+  if (Math.abs(x2 - x1) < 1) return `M${x1} ${y1} V${y2}`
+  const m = (yRow + y2) / 2
+  return `M${x1} ${y1} V${yRow} C${x1} ${m} ${x2} ${m} ${x2} ${y2}`
 }
