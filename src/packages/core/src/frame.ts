@@ -91,7 +91,7 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
         const el = find(all, { id: a.id, text: a.text, tag: String(a.tag || ''), nth: Math.max(0, Number(a.nth) || 0) })
         if (el) { const p = describe(el); spots.push({ id: a.id, x: p.x, y: p.y, w: p.w, h: p.h }) }
       }
-      parent.postMessage({ uxwoz: 'located', spots }, '*')
+      parent.postMessage({ uxwoz: 'located', n: d.n, spots }, '*')
     }
   })
   addEventListener('pointerover', (e) => { if (naming) light(partAt(e.target)) }, true)

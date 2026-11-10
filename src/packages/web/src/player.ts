@@ -19,9 +19,12 @@ const store = {
   set: (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* private mode */ } },
 }
 const random = () => [...crypto.getRandomValues(new Uint8Array(12))].map((b) => b.toString(16).padStart(2, '0')).join('')
+// The visitor's id and name live here; the browser's storage only restores and keeps them, so a browser that
+// blocks it can still comment (as a new visitor on each load).
 const visitor = store.get('uxwoz:visitor') ?? random()
 store.set('uxwoz:visitor', visitor)
-const nameNow = () => store.get('uxwoz:visitor-name') ?? ''
+let name = store.get('uxwoz:visitor-name') ?? ''
+const nameNow = () => name
 
 const frame = $<HTMLIFrameElement>('frame')
 frame.setAttribute('sandbox', FRAME_SANDBOX)
@@ -31,6 +34,8 @@ const byKey = new Map<string, Screen>(), byName = new Map<string, Screen>()
 /** The screens visited in this tab, for Back and the trail; the last one shows. */
 let history: string[] = []
 const trip = { id: random(), screens: [] as string[], dead: [] as string[] }
+/** A trip keeps the first 50 screens and dead clicks, as the server does. */
+const addTo = (list: string[], v: string) => { if (list.length < 50) list.push(v) }
 /** This visitor's own feedback on this mockup, from the server, and what they sent since. */
 let mine: Feedback[] = []
 const current = () => byKey.get(history.at(-1) ?? '')
@@ -85,15 +90,16 @@ function show(key: string, push = true) {
   $('trail').replaceChildren(...history.flatMap((k, i) => {
     const t = byKey.get(k)?.title ?? '?'
     const b = i === history.length - 1 ? el('span', '', t) : el('button', '', t)
-    if (b instanceof HTMLButtonElement) b.addEventListener('click', () => { history = history.slice(0, i + 1); show(k, false) })
+    if (b instanceof HTMLButtonElement) b.addEventListener('click', () => { if (!leave()) return; history = history.slice(0, i + 1); show(k, false) })
     return i ? [' → ', b] : [b]
   }))
-  // A new screen: no picking, no card open, its pins once the frame says where its parts are.
+  // A new screen (its frame starts out not picking): no card open, its pins once the frame says where its parts are.
   picking = false
   draft = null
   located = null
   spots = []
-  trip.screens.push(s.title)
+  shown++
+  addTo(trip.screens, s.title)
   sendTrip()
   layout()
   showThumbs()
@@ -118,7 +124,9 @@ function go(action: string, label: string, part: Part | null) {
   const to = !t ? undefined : 'back' in t ? byKey.get(s.parent ?? map.root) : t.name === 'home' ? byKey.get(map.root) : byName.get(t.name)
   if (to && to.key === s.key) return
   if (to) return show(to.key)
-  trip.dead.push(label || 'a control')
+  // A screen's own script can post an action without a click: it never drops what the visitor is typing.
+  if (typing()) return
+  addTo(trip.dead, label || 'a control')
   sendTrip()
   if (map.role !== 'comment') return toast('Not designed yet')
   withName(() => openDraft({ kind: 'comment', label: label || 'a control', ...part && { part } }, '', 'Not designed yet. What did you expect here?'))
@@ -131,7 +139,7 @@ addEventListener('message', (e) => {
   else if (d.uxwoz === 'wheel') scrollBy(Number(d.dx) || 0, Number(d.dy) || 0)
   else if (d.uxwoz === 'action' && typeof d.prompt === 'string') go(d.prompt, typeof d.label === 'string' ? d.label.slice(0, 80) : '', partOf(d.part))
   else if (d.uxwoz === 'part' && picking) { const p = partOf(d); if (p) openDraft({ kind: 'comment', part: p }, '', 'Your comment') }
-  else if (d.uxwoz === 'located' && Array.isArray(d.spots)) {
+  else if (d.uxwoz === 'located' && d.n === shown && Array.isArray(d.spots)) {
     spots = d.spots.filter((x: any) => typeof x?.id === 'string').map((x: any) => ({ ...partOf({ ...x, text: '-' })!, id: x.id as string }))
     located = new Set(spots.map((x) => x.id))
     drawPins()
@@ -140,8 +148,11 @@ addEventListener('message', (e) => {
   else if (d.uxwoz === 'key' && d.key === 'Escape' && picking) setPicking(false)
 })
 
+// A new frame asks again where its parts are (its first size may come before the answer is wanted).
+frame.addEventListener('load', () => locate())
+
 $('back').addEventListener('click', () => {
-  if (history.length < 2) return
+  if (history.length < 2 || !leave()) return
   history.pop()
   show(history.at(-1)!, false)
 })
@@ -157,6 +168,13 @@ let pending: (() => void) | null = null
 /** The ids of this screen's comments the frame found, and where; null until it answers. */
 let located: Set<string> | null = null
 let spots: Spot[] = []
+/** Counts the screens shown: `locate` carries it, and an answer about the screen before is dropped. */
+let shown = 0
+
+/** Whether the open card has words typed in it. */
+const typing = () => !!draft && !!$<HTMLTextAreaElement>('composerText').value.trim()
+/** Leaving the screen drops the card being written: ask first when it has words. */
+const leave = () => !typing() || confirm('Drop the comment you are writing?')
 
 const thisScreen = () => mine.filter((f) => f.screen === current()?.key)
 const pinned = () => numbered(thisScreen()).filter((x) => x.n != null)
@@ -171,9 +189,10 @@ function withName(then: () => void) {
 }
 $('nameCard').addEventListener('submit', (e) => {
   e.preventDefault()
-  const name = $<HTMLInputElement>('who').value.trim()
-  if (!name) return $('who').focus()
-  store.set('uxwoz:visitor-name', name)
+  const typed = $<HTMLInputElement>('who').value.trim()
+  if (!typed) return $('who').focus()
+  name = typed
+  store.set('uxwoz:visitor-name', typed)
   const then = pending
   pending = null
   sendTrip()
@@ -181,10 +200,15 @@ $('nameCard').addEventListener('submit', (e) => {
   then?.()
 })
 
-function setPicking(on: boolean) {
+/** Start or end picking, in the page and in the frame together: every way out of picking goes through here. */
+function pick(on: boolean) {
+  if (!on && !picking) return
   picking = on
-  if (on) draft = null
   frame.contentWindow?.postMessage(on ? { uxwoz: 'name-part' } : { uxwoz: 'name-part', off: true }, '*')
+}
+function setPicking(on: boolean) {
+  pick(on)
+  if (on) draft = null
   if (on) toast('Click the part you mean')
   renderMargin()
   drawPins()
@@ -193,7 +217,7 @@ addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape' && pi
 
 /** Open the card beside the screen: the part's words and its pin to come, a question or a placeholder. */
 function openDraft(d: NonNullable<typeof draft>, question: string, placeholder: string) {
-  picking = false
+  pick(false)
   draft = d
   $('composerQ').textContent = question
   $('composerQ').hidden = !question
@@ -254,8 +278,9 @@ for (const [id, up] of [['up', true], ['down', false]] as const) $(id).addEventL
   showThumbs()
   toast('Thanks.')
 }))
-$('comment').addEventListener('click', () => withName(() => setPicking(!picking)))
-$('done').addEventListener('click', () => withName(() => openDraft({ kind: 'done' }, 'Would you use this? Why or why not?', '')))
+// With words typed in the open card, Comment keeps that card and does not start picking.
+$('comment').addEventListener('click', () => withName(() => (typing() ? $('composerText').focus() : setPicking(!picking))))
+$('done').addEventListener('click', () => withName(() => (typing() ? $('composerText').focus() : openDraft({ kind: 'done' }, 'Would you use this? Why or why not?', ''))))
 
 /** The margin: the name card, the card being written, then this screen's comments by pin number. */
 function renderMargin() {
@@ -281,7 +306,7 @@ function renderMargin() {
 function locate() {
   if (map.role !== 'comment') return
   const anchors = pinned().map((x) => anchorOf(x.f)).filter((a) => a != null)
-  frame.contentWindow?.postMessage({ uxwoz: 'locate', anchors }, '*')
+  frame.contentWindow?.postMessage({ uxwoz: 'locate', n: shown, anchors }, '*')
 }
 
 /** The pins over the screen: one per located comment, and the one of the card being written. */

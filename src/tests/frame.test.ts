@@ -58,7 +58,7 @@ test('spec/prompt-screen.md holds the exact system prompt the app sends, and it 
 test('the frame script parses, and finds a part again by its words, its tag and its place among equals', () => {
   const script = framePage('', '', true).match(/<script>([\s\S]*?)<\/script>/)![1]!
   expect(() => new Function(script)).not.toThrow()
-  for (const s of ["uxwoz: 'located'", "uxwoz: 'part'", "d.uxwoz === 'locate'", 'd.off', 'describe(el))']) expect(script).toContain(s)
+  for (const s of ["uxwoz: 'located'", "uxwoz: 'part'", "d.uxwoz === 'locate'", 'd.off', 'describe(el))', "uxwoz: 'located', n: d.n"]) expect(script).toContain(s)
   // The matching helpers as the browser sees them, run against fake elements.
   const lines = ['labelOf', 'PARTS', 'textOf'].map((n) => script.match(new RegExp(`const ${n} = [^\\n]*`))![0])
   const find = script.match(/const find = [\s\S]*?\n {2}\}\n/)![0]

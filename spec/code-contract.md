@@ -205,16 +205,16 @@ only from a card's own frame.
                                      // its words (60 characters), tag, place among the parts with the same
                                      // tag and words, and its rectangle in the frame's own pixels; while
                                      // picking, the part under the pointer has an outline
-{ uxwoz: 'located', spots: [{ id, x, y, w, h }] } // the answer to locate: an anchor not found is left out
+{ uxwoz: 'located', n, spots: [{ id, x, y, w, h }] } // the answer to locate (n echoed): an anchor not found is left out
 ```
 
 An `action` also carries `part`, the control clicked as above. The page sends the frame
 `{ uxwoz: 'name-part' }` to pick a part, `{ uxwoz: 'name-part', off: true }` to stop picking, and
 `{ uxwoz: 'locate', anchors: [{ id, text, tag, nth }] }` (at most 200) to find parts again: the `nth`
 element with that tag and words (the first if there are fewer), else the first part of any tag with
-those words. The frame accepts these from its parent only and does nothing until asked.
-
-```
+those words. `locate` may carry `n`, a number the page bumps for each screen it shows; `located` echoes it
+back, so the page drops a late answer about the screen before. The frame accepts these from its parent only and
+does nothing until asked.
 
 ## Types
 
