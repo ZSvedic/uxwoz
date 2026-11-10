@@ -88,8 +88,8 @@ interface CanvasHandlers {
 
 export interface Box { x: number; y: number; w: number; h: number }
 
-/** The comments' pins (comments.ts): told when a picked screen's frame has its size, and its answers to `locate`. */
-export const pinHook = { size: (_key: string) => {}, located: (_key: string, _d: any) => {} }
+/** The comments' pins (comments.ts): told when a screen's frame is rebuilt, when a picked one has its size, and its answers to `locate`. */
+export const pinHook = { rebuilt: (_key: string) => {}, size: (_key: string) => {}, located: (_key: string, _d: any) => {} }
 export interface View { z: number; left: number; top: number }
 
 /**
@@ -366,6 +366,7 @@ export class Canvas {
     c.shown = { html, final, css }
     c.sized = false
     c.pins.replaceChildren()
+    pinHook.rebuilt(c.key)
     c.frame.srcdoc = framePage(html, css, final, c.view?.device, c.view?.fit)
   }
 

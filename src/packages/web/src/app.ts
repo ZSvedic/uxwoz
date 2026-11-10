@@ -13,7 +13,7 @@ import { mapOf, post, showError, themeCss } from './net.ts'
 import { applyMap, currentKey, resetTrail, setCurrent } from './nav.ts'
 import { all, components, dropChoice, draw, fitChoice, fitScreenSoon, onAction, openScreen, pick, stopMaking } from './screens.ts'
 import { PICKERS, closeMenus, loadRecent, openGenerate, warmUp } from './toolbar.ts'
-import { editLinkApp, shareToken } from './sharing.ts'
+import { editLinkApp, loadShared, shareToken } from './sharing.ts'
 import { $, deviceSelect, generate, modelSelect, promptInput, state, store } from './state.ts'
 
 export const side = createSide(boxOp, (box, tab) => { focusBox(box); openDrawer(tab) })
@@ -57,6 +57,7 @@ export async function start(app: string, make = true) {
   if (device) deviceSelect.value = device // for this mockup only: the saved choice stays
   if (!state.entries.has(root)) return openScreen(null, null, null)
   await draw()
+  loadShared()
   const open = all().find((e) => !e.versions.length)
   if (open) fitChoice(open.key)
   else fitScreenSoon(state.current ?? root)

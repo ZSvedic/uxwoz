@@ -1,6 +1,7 @@
 // The owner's side of comments: the pins over every drawn screen with open comments, the drawer's Comments tab with
 // Resolve and Reopen, and the jump to a comment from its pin or from the Feedback pane. The data is sharing.ts's.
 // canvas.ts is outside the circle of modules app.ts names, so its pin hook may be set at the top level here.
+// app.ts loads the comments when a mockup opens (loadShared), and the pins follow (relocate).
 
 import type { Feedback } from '@uxwoz/core'
 import { button, el } from './boxes.ts'
@@ -17,8 +18,8 @@ import { $, state } from './state.ts'
 const asked = new Map<string, number>()
 const found = new Map<string, Set<string>>()
 let count = 0
-/** The mockup opening (state.starts) whose feedback was asked for: a mockup's first sized screen loads it. */
-let loadedAt = -1
+/** The mockup opening (state.starts) that `asked` and `found` are about. */
+let openedAt = -1
 /** The comment to ring in the tab, until when. */
 let ring = { id: '', until: 0, scroll: false }
 
@@ -34,17 +35,16 @@ function locate(key: string) {
   t.win?.postMessage({ uxwoz: 'locate', n: count, anchors }, '*')
 }
 
-/** After the feedback changed: every drawn screen asks again. */
+/** After the feedback changed: every drawn screen asks again. Another mockup opened starts afresh. */
 export function relocate() {
+  if (openedAt !== state.starts) { openedAt = state.starts; asked.clear(); found.clear() }
   for (const e of state.entries.values()) if (e.versions.length) locate(e.key)
 }
 
 Object.assign(pinHook, {
-  size(key: string) {
-    if (shareToken) return
-    if (loadedAt !== state.starts) { loadedAt = state.starts; return void loadShared() }
-    locate(key)
-  },
+  // A rebuilt frame (an Edit, an Undo) has no pins until it answers again.
+  rebuilt(key: string) { asked.delete(key); found.delete(key) },
+  size: locate,
   located(key: string, d: any) {
     const t = canvas.pinTarget(key)
     if (!t || d?.n !== asked.get(key) || !Array.isArray(d.spots)) return
@@ -78,6 +78,7 @@ function lightPin(key: string, id: string, on: boolean) {
 
 /** The Comments pane: the screen's comments, open ones by pin number, then the resolved ones. */
 export function renderComments(key: string) {
+  for (const p of document.querySelectorAll('.pin.ring')) p.classList.remove('ring')
   const items = rowsOf(key).map((r) => {
     const li = el('li', r.n == null ? 'resolved' : '',
       el('div', 'head', r.pin ? el('span', 'dot', String(r.n)) : '', el('b', '', r.f.name), el('small', '', r.where)),

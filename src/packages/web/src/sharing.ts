@@ -49,6 +49,8 @@ export async function loadShared() {
 const mine = () => (shared && shared.app === state.app ? shared : null)
 /** The open mockup's feedback, as last loaded. */
 export const feedbackOf = (): Feedback[] => mine()?.feedback ?? []
+/** Whether the open mockup has share links or feedback: then its screens have a Comments tab. */
+export const isShared = () => { const s = mine(); return !!s && (s.shares.length > 0 || s.feedback.length > 0) }
 
 const ROLE_NAMES = { view: 'View: click through', comment: 'Comment: click through and leave feedback', edit: 'Edit: change this mockup' }
 const when = (at: string) => new Date(at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })

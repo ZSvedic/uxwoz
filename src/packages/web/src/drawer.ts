@@ -10,7 +10,7 @@ import { fmtS, fmtUsd, post, showError } from './net.ts'
 import { applyMap, currentAt, setCurrent } from './nav.ts'
 import { components, draw, ideaOf, labelOf, pastedOn, removeScreen, revise, undo, views } from './screens.ts'
 import { closeMenus } from './toolbar.ts'
-import { loadShared, renderShare, screenFeedback, shareToken } from './sharing.ts'
+import { isShared, loadShared, renderShare, screenFeedback, shareToken } from './sharing.ts'
 import { commentsTab, renderComments } from './comments.ts'
 import { $, changeInput, drawer, enterSubmits, modelSelect, state } from './state.ts'
 
@@ -92,23 +92,25 @@ export const closeDrawer = () => { state.drawer = null; renderDrawer() }
 /** The drawer shows the current box or screen: Edit (the change box and the past changes) or Info. */
 export function renderDrawer() {
   const e = state.current && !state.box ? state.entries.get(state.current) : undefined
-  // Comments is a screen's tab, and an edit link has none: a box (or that link) shows Info instead.
-  if (state.drawer === 'comments' && (state.box || shareToken)) state.drawer = 'info'
+  // Comments is the tab of a screen of a shared mockup; an edit link has none. Elsewhere it shows Info, and the
+  // drawer comes back to Comments on the next screen that has it.
+  const comments = !state.box && !shareToken && !!e && isShared()
+  const tab = state.drawer === 'comments' && !comments ? 'info' : state.drawer
   const v = e?.versions.at(-1)
-  const open = !!(state.drawer && (state.drawer === 'share' ? state.app : state.box ? state.boxes : v))
+  const open = !!(tab && (tab === 'share' ? state.app : state.box ? state.boxes : v))
   if (drawer.hidden === open) {
     drawer.hidden = !open
     if (!open) requestAnimationFrame(() => { const at = currentAt(); if (at) canvas.reveal(at) })
   }
   if (!open) return
-  for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === state.drawer))
-  $('editPane').hidden = state.drawer !== 'edit'
-  $('infoPane').hidden = state.drawer !== 'info'
-  $('sharePane').hidden = state.drawer !== 'share'
-  $('commentsPane').hidden = state.drawer !== 'comments'
-  $('commentsTab').hidden = !!state.box || !!shareToken || !e
+  for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab))
+  $('editPane').hidden = tab !== 'edit'
+  $('infoPane').hidden = tab !== 'info'
+  $('sharePane').hidden = tab !== 'share'
+  $('commentsPane').hidden = tab !== 'comments'
+  $('commentsTab').hidden = !comments
   if (e) $('commentsTab').textContent = commentsTab(e.key)
-  if (state.drawer === 'share') return renderShare()
+  if (tab === 'share') return renderShare()
   const box = state.box
   $('changeLabel').textContent = `What should change${box ? ` in ${BOX_TITLES[box]}` : ''}?`
   changeInput.placeholder = box ? 'e.g. Merge the two rules about scores' : 'e.g. Show one level indicator, not four'
@@ -116,7 +118,7 @@ export function renderDrawer() {
   if (box) return renderBoxDrawer(box, state.boxes!)
   if (!e || !v) return
   $('drawerName').textContent = labelOf(e)
-  if (state.drawer === 'comments') return renderComments(e.key)
+  if (tab === 'comments') return renderComments(e.key)
   const history = $('history')
   const comp = isComponent(e)
   const node = state.tree.get(e.key)
