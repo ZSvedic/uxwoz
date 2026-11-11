@@ -69,13 +69,13 @@ export function buttonOf(me: Me): { text: string; letter: boolean } {
 
 export type Row = { kind: 'text' | 'email' | 'register' | 'ask' | 'signout' | 'delete' | 'privacy'; text: string }
 
-/** The menu, top to bottom. */
+/** The menu, top to bottom; Ask for more only while no request waits for its answer. */
 export function menuOf(me: Me): Row[] {
   const n = me.screensLeft ?? 0, user = me.role === 'user'
   return [
     { kind: 'text', text: `About ${n} free screen${n === 1 ? '' : 's'} left` },
     user ? { kind: 'email', text: me.email ?? '' } : { kind: 'register', text: 'Register' },
-    ...user && n === 0 ? [{ kind: 'ask', text: 'Ask for more' } as Row] : [],
+    ...user && n === 0 && !(me.request && !me.request.answer) ? [{ kind: 'ask', text: 'Ask for more' } as Row] : [],
     ...user ? [{ kind: 'signout', text: 'Sign out' }, { kind: 'delete', text: 'Delete my account…' }] as Row[] : [],
     { kind: 'privacy', text: 'Privacy' },
   ]
@@ -105,12 +105,21 @@ let me: Me | null = null
 /** The card's own state, kept while it is closed: why it opened, the step, what was typed, the last error. */
 const card = { why: 'register' as Why, step: 'email' as CardStep, email: '', code: '', note: '', error: '' }
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
+/** The email and a code on its way also outlive a reload of this tab. */
+const KEPT = 'uxwoz:signin'
+function keep() {
+  try { sessionStorage.setItem(KEPT, JSON.stringify({ email: card.email, code: card.step === 'code' })) } catch { /* private mode */ }
+}
 
 /** Start once the config is known: the button goes last in the toolbar, `me` loads; private mode shows none of it. */
 export function initAccount(d: AccountDeps, cfg: { public?: boolean }) {
   deps = d
   isPublic = !!cfg.public
   if (!isPublic) return
+  try {
+    const k = JSON.parse(sessionStorage.getItem(KEPT) ?? 'null')
+    if (typeof k?.email === 'string') Object.assign(card, { email: k.email, step: k.code ? 'code' : 'email' })
+  } catch { /* none kept */ }
   $('toolbar').querySelector('.tb-right')!.append($('accountPop'))
   const form = $<HTMLFormElement>('account')
   form.addEventListener('submit', (e) => { e.preventDefault(); send() })
@@ -171,7 +180,7 @@ export function renderAccountMenu() {
 async function leave(url: string, body: object) {
   const res = await deps!.post(url, body).catch(() => null)
   if (!res?.ok) return deps!.showError((await res?.json().catch(() => null))?.error ?? 'No answer: try again.')
-  try { localStorage.setItem('uxwoz:app', '') } catch { /* private mode */ }
+  try { localStorage.setItem('uxwoz:app', ''); sessionStorage.removeItem(KEPT) } catch { /* private mode */ }
   location.reload()
 }
 
@@ -231,7 +240,8 @@ function renderCard() {
   $('accountAgain').hidden = !v.again
   $('accountError').textContent = card.error
   $('accountError').hidden = !card.error
-  if (v.field) requestAnimationFrame(() => f.focus())
+  if (v.field) f.focus()
+  keep()
 }
 
 /** The card's button, or Enter in its field. */
@@ -268,6 +278,7 @@ function verify() {
     card.code = ''
     // A new account waits for its top-up; an account that existed takes the visitor's mockups at once.
     card.step = m.topupDue ? 'thanks' : 'email'
+    keep()
     setMe(m)
     if (card.step === 'email') closeCard()
     deps!.loadRecent()

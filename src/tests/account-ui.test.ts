@@ -27,6 +27,7 @@ describe('the account button', () => {
     expect(menuOf({ ...visitor, screensLeft: 1 })[0]!.text).toBe('About 1 free screen left')
     expect(menuOf(user).map((r) => r.text)).toEqual(['About 0 free screens left', 'ana@example.com', 'Ask for more', 'Sign out', 'Delete my account…', 'Privacy'])
     expect(menuOf({ ...user, screensLeft: 5 }).some((r) => r.kind === 'ask')).toBe(false)
+    expect(menuOf({ ...user, request: { at: 1 } }).some((r) => r.kind === 'ask')).toBe(false)
   })
 })
 

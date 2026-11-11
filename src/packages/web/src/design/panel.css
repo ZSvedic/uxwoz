@@ -21,7 +21,7 @@
 .recent button { text-align: left; padding: 4px 8px; display: flex; gap: 8px; }
 .recent button small { color: var(--muted); white-space: nowrap; }
 /* The account card (account-ui.ts): the generate panel's card, narrower, over the dim and over the panel itself. */
-.workspace:has(> .account-card:not([hidden]))::after { z-index: 16; }
+.workspace:has(> .generate.account-card:not([hidden]))::after { z-index: 16; }
 .generate.account-card { z-index: 17; top: 16vh; width: min(460px, calc(100% - 32px)); gap: 10px; }
 .account-card p { margin: 0; }
 .account-card .lead { font-size: 16px; }

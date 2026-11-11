@@ -38,8 +38,9 @@ export async function start(app: string, make = true) {
   state.before = null
   const n = ++state.starts
   const res = await mapOf(app)
-  if (!res.ok) throw new Error(`could not load the mockup: HTTP ${res.status}`)
-  const map = await res.json() as { entries: CacheEntry[] }
+  // 401: a first-time visitor of the public app, who has no person (and so no mockups) until the first screen.
+  if (!res.ok && res.status !== 401) throw new Error(`could not load the mockup: HTTP ${res.status}`)
+  const map = res.ok ? await res.json() as { entries: CacheEntry[] } : { entries: [] }
   if (n !== state.starts) return // a newer mockup was opened meanwhile
   if (!make && !map.entries.length) { store.set('uxwoz:app', ''); return draw() }
   state.app = app
