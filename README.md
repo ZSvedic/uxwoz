@@ -17,6 +17,10 @@ screen comes as two designs side by side, A OR B; click the one you like to keep
 blue control inside a screen makes the next screen below it. Change a screen with the buttons to
 its right: ✎ Edit, ↻ Regenerate, ↶ Undo, ⓘ Info, ✕ Delete. `PORT=3001 bun run dev` picks another port.
 
+To look around without keys or your own mockups, `bun run demo` starts the app on a temporary copy
+of a made-up mockup at http://127.0.0.1:3100 (`PORT` picks another) and prints its share links. It
+reads no `.env`, so anything that needs a model fails there.
+
 Right of the first screen, side by side, are four boxes: **Rules**, **Fixer's notes**,
 **Components** (parts that look the same on every screen that has them; screens paste them by ID)
 and **Data**. Every model call reads Components, Rules and Data. After each pick or Edit, filing
@@ -45,6 +49,8 @@ the live reload cannot add a new frontend file.
 ```bash
 cd src && bun test
 ```
+
+`bun run check` runs the tests and then the typecheck.
 
 The tests replay recorded model replies from `cassettes/` and make no API calls. After changing the
 prompt or the request shape, re-record them (live calls, a few cents):

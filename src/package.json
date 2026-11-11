@@ -8,7 +8,9 @@
     "start": "NODE_ENV=production bun --env-file=../.env packages/web/src/server.ts",
     "test": "bun test",
     "test:record": "UXWOZ_RECORD=1 bun --env-file=../.env test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check": "bun test && tsc --noEmit",
+    "demo": "bun --no-env-file scripts/demo.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.4.3",

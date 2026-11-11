@@ -96,6 +96,9 @@ src/packages/web/src/
                  og.png (the share preview)
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
+src/tests/fixtures/demo-cache.json   the demo mockup (a habit tracker); made by scripts/make-demo-cache.ts
+src/scripts/make-demo-cache.ts   writes the demo mockup through ScreenCache, the same on every run
+src/scripts/demo.ts          `bun run demo`: the app on a temporary copy of the demo mockup, no keys, prints the URLs
 src/scripts/voice-check.ts   run by hand: a macOS voice says an Edit to a separate Chrome; PASS if the Edit was sent
 ```
 
@@ -119,9 +122,19 @@ The repo is organized by lifecycle; the tree is in [README.md](README.md#project
 
 ## Before you commit
 
-From `src/`: `bun test` (offline, under a second) and `bun run typecheck`. For UI changes, also look
-at the running app. Bun's `--hot` dev server cannot pick up a newly added frontend file: restart
-`bun run dev` after adding one.
+From `src/`: `bun run check` (`bun test`, offline and quick, then the typecheck). In a fresh worktree
+run `bun install --frozen-lockfile` from `src/` first. For UI changes, also look at the running app.
+Bun's `--hot` server cannot pick up a newly added frontend file: restart it after adding one.
+
+**Look at the app.** `PORT=3131 bun run demo` (3100 if no PORT) starts the app on a fresh temporary
+copy of a made-up mockup, a habit tracker, and prints four URLs: the app, and the view, comment and
+edit links. Use your own browser tab. It reads no `.env` and clears the model keys, so a model call
+is impossible: a new screen, Edit, Regenerate, filing after a pick and a fixer visit fail by design.
+You can still exercise the tree, the boxes (add, change, delete, Undo), Undo on Habit detail, the
+fixer's Undo, picking the open A OR B on History, Delete, Share, Comments, Export, and the player:
+walking the screens, thumbs, a new comment, Done. The pinned comment on Habit detail shows in the
+player only for its visitor (the demo prints how). Frontend edits show on reload. The mockup is
+`src/tests/fixtures/demo-cache.json`; to change it, edit `src/scripts/make-demo-cache.ts` and run it.
 
 ## Design
 
