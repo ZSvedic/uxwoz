@@ -204,6 +204,8 @@ export function gate(o: GateOptions) {
 
     // A pick calls no model itself: its filing and visit start only while `may` says so.
     const warm = path === '/api/warmup'
+    // A warm-up is checked for coming from another site here, before it can take the public's slot.
+    if (warm) { const foreign = o.refuse(req); if (foreign) return answer(foreign) }
     const paid = warm || (path !== '/api/pick' && paidOf(b, desk.cache) && !desk.draw.replayed(path, b))
     if (warm && Date.now() - Math.max(store.lastCall(PUBLIC_MODEL) ?? 0, warmClaim) < WARM_MS) return answer(new Response(null, { status: 204 }))
     if (paid && (path === '/api/screen' || path === '/api/revise') && Buffer.byteLength(desk.cache.serialize()) > FILE_CAP)

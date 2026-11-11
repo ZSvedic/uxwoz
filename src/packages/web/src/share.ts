@@ -233,7 +233,7 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
     return res
   }
 
-  const closed = () => new Response('This UX Woz is private.', { status: 403, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+  const closed = () => new Response(pub ? 'Only the owner can open this.' : 'This UX Woz is private.', { status: 403, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
   /** Every /api route but the visitors' goes through `wrap`; with UXWOZ_OWNER set, `/` and `/design` ask for the owner's cookie. */
   function guard<R extends string>(all: Bun.Serve.Routes<unknown, R>): Bun.Serve.Routes<unknown, R> {
     const out: Record<string, Route> = { ...all, ...routes }

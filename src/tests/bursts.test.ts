@@ -69,6 +69,20 @@ describe('bursts against the meter', () => {
     expect(calls.haiku).toBe(1)
   })
 
+  test('a warm-up sent from another site is refused and does not take the public\'s slot', async () => {
+    start()
+    const ana = browser()
+    await starterHome(ana, 'plants')
+    const foreign = await fetch(url('/api/warmup'), { method: 'POST', headers: { 'Content-Type': 'application/json', cookie: ana.cookie, 'x-real-ip': '10.0.0.1', 'Sec-Fetch-Site': 'cross-site' }, body: '{}' })
+    expect(foreign.status).toBe(403)
+    await settle()
+    expect(calls.haiku).toBe(0)
+    // The slot is still free: the page's own warm-up makes the call.
+    expect((await ana.post('/api/warmup', {})).status).toBe(204)
+    await settle()
+    expect(calls.haiku).toBe(1)
+  })
+
   test('25 Regenerates judged replayed while a live filing runs wake to an Edit and go live: spend stays within the allowance and one reservation', async () => {
     start({ fileWaitMs: 300 })
     store.setCaps({ visitor: 0.02 })
