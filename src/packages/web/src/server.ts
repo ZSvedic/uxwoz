@@ -75,7 +75,7 @@ export function createServer(opts: ServerOptions = {}) {
   const log = opts.log ?? ((m: string) => console.warn(m))
   const random = opts.random ?? Math.random
   const fileWaitMs = opts.fileWaitMs ?? 5000
-  const io = { fetch: opts.fetch, env: opts.env, record: opts.record, spent: opts.spent, sleep: opts.sleep }
+  const io = { fetch: opts.fetch, env: opts.env, record: opts.record, spent: opts.spent, allow: opts.allow, sleep: opts.sleep }
   const env = () => opts.env ?? process.env
   const owner = opts.owner ?? process.env.UXWOZ_OWNER
   // Public mode: a person's request passes the gate onto their own desk, and their calls are charged to them.

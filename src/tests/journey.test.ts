@@ -129,6 +129,24 @@ describe('a person\'s journey', () => {
     expect((await ana.me()).request).toMatchObject({ answer: 'approved' })
   })
 
+  test('a first visit opens a starter as the browser does: the map with no cookie, the screen, the map with the cookie', async () => {
+    start()
+    const ana = browser()
+    const q = `/api/map?app=${encodeURIComponent(PLANTS)}`
+    const empty = await ana.get(q)
+    expect(empty.status).toBe(200)
+    expect(await empty.json()).toMatchObject({ entries: [], filing: false, visiting: false })
+    expect(ana.cookie).toBe('')
+    expect((await ana.get(`/api/shares?app=${encodeURIComponent(PLANTS)}`)).status).toBe(200)
+    expect(store.summary().people).toHaveLength(0)
+    expect((await screen(ana, PLANTS)).status).toBe(200)
+    expect(ana.cookie).toMatch(/^uxwoz_who=/)
+    const map = await (await ana.get(q)).json() as any
+    expect(map.entries.length).toBe(1)
+    // A visitor's /api/shares is 403 register, which the page passes over.
+    expect((await ana.get(`/api/shares?app=${encodeURIComponent(PLANTS)}`)).status).toBe(403)
+  })
+
   test('at zero a pick starts no filing, and Visit now is refused', async () => {
     start()
     store.setCaps({ visitor: 0.03 })

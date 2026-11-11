@@ -348,6 +348,11 @@ export abstract class ScreenCacheBase {
     return JSON.stringify({ version: FORMAT, entries: [...this.entries.values()], boxes: Object.fromEntries(this.boxes), states: Object.fromEntries(this.states), shared: Object.fromEntries(this.shared) }, null, 1)
   }
 
+  /** Stop writing the file: the cache stays in memory, and a save after this writes nothing (a deleted person's). */
+  detach() {
+    this.file = null
+  }
+
   save() {
     if (!this.file) return
     mkdirSync(dirname(this.file), { recursive: true })

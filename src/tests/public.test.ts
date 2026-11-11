@@ -68,7 +68,9 @@ describe('public mode', () => {
     expect(await ana.me()).toMatchObject({ role: 'new', left: 0.1, allowance: 0.1, screensLeft: 14, paused: false, may: { share: false, exportZip: false } })
     // With no person yet: an empty Recent, nothing else, and a warm-up that calls nothing.
     expect(await (await ana.get('/api/apps')).json()).toEqual({ apps: [] })
-    expect((await ana.get('/api/map?app=x')).status).toBe(401)
+    // Opening a mockup reads its map first: an empty one, and no person is made.
+    expect((await ana.get('/api/map?app=x')).status).toBe(200)
+    expect((await ana.post('/api/undo', { key: 'x' })).status).toBe(401)
     expect((await ana.post('/api/warmup', {})).status).toBe(204)
     expect((await ana.post('/api/step', { step: 'arrived' })).status).toBe(204)
     expect(calls.haiku).toBe(0)
