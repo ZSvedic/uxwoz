@@ -102,7 +102,7 @@ src/packages/web/src/
   boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes and their rails, editing and adding in
                  place, Export
   people.ts      the public's people and money over bun:sqlite (spec/public.md): visitors, sessions, the meter
-                 (mayCall, reserve: $0.004 held per running call, hold, charge), sign-in codes and verify, top-ups, quota requests, steps, caps, share
+                 (mayCall, reserve: $0.004 held per running call, hold, charge), sign-in codes (per network, per email and day) and verify, blocked emails, top-ups, quota requests, steps, caps, share
                  tokens, the admin's summary, deletes, the day's address HMAC; no routes
   mail.ts        mail through Resend (logs with no key off production) and the texts of the emails
   admin.ts       adminRoutes(store, extras): GET and POST /api/admin (the ops, their checks, their emails), /admin,

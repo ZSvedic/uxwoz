@@ -119,7 +119,8 @@ test('topup: hands out the waiting top-up now and emails the user; once only', a
   expect(a.mailed).toBe(true)
   expect(a.people[0].allowance).toBeCloseTo(0.25)
   expect(a.people[0].topupDue).toBeNull()
-  expect(a.mailToday).toBe(1)
+  // The sign-in code's mail is counted when the code is made, and the ready mail after it.
+  expect(a.mailToday).toBe(2)
   expect(mails).toEqual([expect.objectContaining({ to: ['ana@example.com'], subject: 'Your free screens are ready', text: expect.stringContaining('https://uxwoz.example/') })])
   expect(await status({ op: 'topup', id: u.id })).toBe(409)
   expect(mails).toHaveLength(1)
@@ -171,7 +172,8 @@ test('a mail that does not go is said, and not counted', async () => {
   const u = user('ana@example.com')
   const a = await ok({ op: 'topup', id: u.id })
   expect(a.mailed).toBe(false)
-  expect(a.mailToday).toBe(0)
+  // Only the sign-in code's mail, counted when the code was made.
+  expect(a.mailToday).toBe(1)
   expect(a.people[0].topupDue).toBeNull()
 })
 

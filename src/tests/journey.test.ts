@@ -169,6 +169,7 @@ describe('a person\'s journey', () => {
 
     // A browser with no cookie may sign in.
     const phone = browser()
+    clock.t += 60_000
     await signUp(phone, 'ana@example.com')
     expect(personOf(phone).id).toBe(id)
     expect((await (await phone.get('/api/apps')).json() as any).apps.map((a: any) => a.app)).toEqual(['Dog walks'])
@@ -179,6 +180,7 @@ describe('a person\'s journey', () => {
     const visitor = personOf(laptop).id
     await server!.desks.desk(visitor)!.cache.save()
     expect(existsSync(fileOf(visitor))).toBe(true)
+    clock.t += 60_000
     await signUp(laptop, 'ana@example.com')
     expect(personOf(laptop).id).toBe(id)
     expect((await (await laptop.get('/api/apps')).json() as any).apps.map((a: any) => a.app).sort()).toEqual(['Cat sits', 'Dog walks'])

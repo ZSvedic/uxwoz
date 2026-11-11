@@ -69,7 +69,7 @@ export function adminRoutes(store: People, extras: AdminExtras) {
       const c = b.caps
       if (!c || typeof c !== 'object' || Array.isArray(c) || !Object.keys(c).length) return fail(400, 'caps must be an object of numbers')
       for (const [k, v] of Object.entries(c)) {
-        if (!(k in CAPS)) return fail(400, `unknown cap ${k}`)
+        if (!Object.hasOwn(CAPS, k)) return fail(400, `unknown cap ${k}`)
         const max = CAP_MAX[k as keyof Caps]
         if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > max) return fail(400, `${k} must be a number from 0 to ${max}`)
       }

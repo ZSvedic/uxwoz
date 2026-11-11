@@ -40,6 +40,8 @@ const fail = (status: number, error: string, reason?: string) => json(reason ? {
 const none = () => new Response(null, { status: 204 })
 const FULL = 'Sign-ups are full for today.'
 const SOON = 'A code is on its way: wait a minute before asking again.'
+const LOCKED = 'Too many codes for this email today. Try again tomorrow.'
+const CLOSED = 'This account is closed.'
 const REGISTER = 'Register first.'
 
 async function body(req: Request): Promise<Record<string, unknown> | null> {
@@ -88,7 +90,12 @@ export function accountRoutes(store: People, extras: AccountExtras) {
         if (made === 'email') return fail(400, 'That email does not look right.')
         if (made === 'mail' || made === 'codes') return fail(429, FULL)
         if (made === 'soon') return fail(429, SOON)
-        if (!(await mail(codeMail(normalEmail(email), made.code)))) return fail(503, 'The email did not go. Try again in a minute.')
+        if (made === 'locked') return fail(429, LOCKED)
+        // The day's mail was counted by makeCode before the send; a code whose mail did not go dies.
+        if (!(await send(codeMail(normalEmail(email), made.code), extras.io))) {
+          store.dropCode(email)
+          return fail(503, 'The email did not go. Try again in a minute.')
+        }
         if (asker) store.step(asker.id, 'asked', address)
         return none()
       },
@@ -102,6 +109,8 @@ export function accountRoutes(store: People, extras: AccountExtras) {
         const done = store.verify(email, code.trim(), extras.who(req)?.id ?? null, address)
         if (done === 'code') return fail(400, 'That code is not right.')
         if (done === 'address') return fail(429, FULL)
+        if (done === 'locked') return fail(429, LOCKED)
+        if (done === 'blocked') return fail(403, CLOSED)
         if (done.merged) await extras.move(done.merged, done.person.id)
         store.step(done.person.id, 'verified', address)
         return extras.cookie(json({ me: me(store.person(done.person.id) ?? done.person) }), done.token, req)
@@ -133,6 +142,7 @@ export function accountRoutes(store: People, extras: AccountExtras) {
         if (typeof b?.note !== 'string') return fail(400, `Say what you are building, in 1 to ${NOTE_CHARS} characters.`)
         const id = store.ask(p.id, b.note)
         if (id === 'register') return fail(403, REGISTER, 'register')
+        if (id === 'blocked') return fail(403, CLOSED)
         if (id === 'note') return fail(400, `Say what you are building, in 1 to ${NOTE_CHARS} characters.`)
         if (id === 'open') return fail(409, 'You asked already: the answer comes by email.')
         const owner = env().UXWOZ_ADMIN_EMAIL?.trim()
@@ -164,7 +174,7 @@ export function startTopups(store: People, extras: Pick<AccountExtras, 'io' | 'a
       if (p?.email && room()) await mailer(store, extras.io, readyMail(p.email, caps().topup, app()))
     }
     const owner = (extras.io.env ?? process.env).UXWOZ_ADMIN_EMAIL?.trim()
-    const waiting = store.summary().people.filter((p) => p.email && p.topupDue !== null)
+    const waiting = store.summary().people.filter((p) => p.email && p.topupDue !== null && !p.blocked)
     for (const id of told) if (!waiting.some((p) => p.id === id)) told.delete(id)
     if (!owner || !waiting.some((p) => !told.has(p.id)) || now() - lastWaiting < WAITING_MAIL_MS || !room()) return
     if (await mailer(store, extras.io, waitingMail(owner, waiting.length, new URL('/admin', app()).href))) {

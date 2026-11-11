@@ -31,6 +31,9 @@ export const CODE_TRIES = 5
 /** Sign-in codes a network may ask for in a day, and how soon one email may ask again. */
 export const CODES_PER_ADDRESS = 10
 export const CODE_AGAIN_MS = 60_000
+/** Per email and UTC day, whatever the mails did: codes it may ask for, wrong tries it may make. */
+export const CODES_PER_EMAIL = 5
+export const WRONG_PER_EMAIL = 15
 export const ARRIVED_PER_ADDRESS = 50
 export const IDLE_DAYS = 30
 export const ASK_USD = 0.5
@@ -81,6 +84,9 @@ CREATE TABLE IF NOT EXISTS requests (id INTEGER PRIMARY KEY AUTOINCREMENT, perso
 CREATE TABLE IF NOT EXISTS steps (day TEXT NOT NULL, step TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (day, step));
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS shares (token TEXT PRIMARY KEY, person TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS emails (day TEXT NOT NULL, hash TEXT NOT NULL, codes INTEGER NOT NULL DEFAULT 0, wrong INTEGER NOT NULL DEFAULT 0,
+  asked INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, hash));
+CREATE TABLE IF NOT EXISTS blocked (hash TEXT PRIMARY KEY);
 `
 
 type Row = { id: string; email: string | null; created: number; seen: number; allowance: number; spent: number; blocked: number; topupDue: number | null; steps: string }
@@ -175,14 +181,29 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
   const requestOf = (r: any): Request => ({ ...r, usd: r.usd === null ? null : usd(r.usd) })
 
   const spent = () => ({ today: usd(spentSince(dayStart())), month: usd(spentSince(monthStart())) })
-  /** True once for the right code within its 15 minutes; a wrong one counts a try, and the fifth kills it. */
-  function checkCode(email: string, code: string): boolean {
+  /** An email's day: its codes asked, wrong tries and when it last asked. The email itself is kept only as a hash. */
+  const emailHash = (e: string) => sha(`email:${normalEmail(e)}`)
+  type EmailDay = { codes: number; wrong: number; asked: number }
+  function emailDay(e: string): EmailDay & { hash: string } {
+    const hash = emailHash(e)
+    db.query('DELETE FROM emails WHERE day < ?').run(day())
+    db.query('INSERT OR IGNORE INTO emails (day, hash) VALUES (?, ?)').run(day(), hash)
+    return { hash, ...(db.query('SELECT codes, wrong, asked FROM emails WHERE day = ? AND hash = ?').get(day(), hash) as EmailDay) }
+  }
+  const bumpEmail = (hash: string, set: string) => db.query(`UPDATE emails SET ${set} WHERE day = ? AND hash = ?`).run(day(), hash)
+  const isBlocked = (e: string) => !!db.query('SELECT 1 FROM blocked WHERE hash = ?').get(emailHash(e))
+  /** True for the right code within its 15 minutes (used up unless `keep`); a wrong one counts a try for the code
+   * (the fifth kills it) and for the email's day. */
+  function checkCode(email: string, code: string, keep = false): boolean {
     const e = normalEmail(email)
     const c = db.query('SELECT hash, expires, tries FROM codes WHERE email = ?').get(e) as { hash: string; expires: number; tries: number } | null
+    if (c && now() <= c.expires && sha(`${e}:${String(code).trim()}`) === c.hash) {
+      if (!keep) db.query('DELETE FROM codes WHERE email = ?').run(e)
+      return true
+    }
+    bumpEmail(emailDay(e).hash, 'wrong = wrong + 1')
     if (!c) return false
-    if (now() > c.expires) { db.query('DELETE FROM codes WHERE email = ?').run(e); return false }
-    if (sha(`${e}:${String(code).trim()}`) === c.hash) { db.query('DELETE FROM codes WHERE email = ?').run(e); return true }
-    if (c.tries + 1 >= CODE_TRIES) db.query('DELETE FROM codes WHERE email = ?').run(e)
+    if (now() > c.expires || c.tries + 1 >= CODE_TRIES) db.query('DELETE FROM codes WHERE email = ?').run(e)
     else db.query('UPDATE codes SET tries = tries + 1 WHERE email = ?').run(e)
     return false
   }
@@ -283,41 +304,53 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
 
     // ── Sign-in ──
     /** A six-digit code for `email` (a new one replaces the old), or why not: `mail` when today's mail is used up,
-     * `codes` when this network asked for its 10 today, `soon` when this email asked less than a minute ago. It never
-     * depends on the address's accounts or on whether the email has one: the accounts are checked at verify. */
-    makeCode(email: string, asker: string | null, address: string): { code: string } | 'email' | 'mail' | 'codes' | 'soon' {
+     * `codes` when this network asked for its 10 today, `locked` when this email asked for its 5 today or made its 15
+     * wrong tries, `soon` when it asked less than a minute ago. The email's counts are kept apart from the code, and
+     * the day's mail is counted here, before the send, and never given back. It never depends on the address's
+     * accounts or on whether the email has one: the accounts are checked at verify. */
+    makeCode(email: string, asker: string | null, address: string): { code: string } | 'email' | 'mail' | 'codes' | 'locked' | 'soon' {
       if (!validEmail(email)) return 'email'
       const e = normalEmail(email)
       return db.transaction(() => {
         if (mailToday() >= caps().mailPerDay) return 'mail'
         const a = addr(address)
         if (a.codes >= CODES_PER_ADDRESS) return 'codes'
-        const old = db.query('SELECT expires FROM codes WHERE email = ?').get(e) as { expires: number } | null
-        if (old && now() < old.expires - CODE_MS + CODE_AGAIN_MS) return 'soon'
+        const m = emailDay(e)
+        if (m.codes >= CODES_PER_EMAIL || m.wrong >= WRONG_PER_EMAIL) return 'locked'
+        if (m.asked && now() < m.asked + CODE_AGAIN_MS) return 'soon'
         bump(a.hash, 'codes')
+        db.query('UPDATE emails SET codes = codes + 1, asked = ? WHERE day = ? AND hash = ?').run(now(), day(), m.hash)
+        put('mail', `${day()}:${mailToday() + 1}`)
         const code = String(randomBytes(4).readUInt32BE() % 1_000_000).padStart(6, '0')
         db.query('INSERT OR REPLACE INTO codes (email, hash, person, expires, tries) VALUES (?, ?, ?, ?, 0)').run(e, sha(`${e}:${code}`), asker, now() + CODE_MS)
         return { code }
       })()
     },
-    checkCode,
+    checkCode: (email: string, code: string) => checkCode(email, code),
+    /** A code whose mail did not go: it can never be used. */
+    dropCode(email: string) { db.query('DELETE FROM codes WHERE email = ?').run(normalEmail(email)) },
     /** Sign in by code, with a new session. A new email takes over the visitor (or makes a person) and its
      * top-up waits; an existing account comes back with `merged`, the visitor's id, whose rows are gone: the
-     * caller moves that cache file in. `code` for a wrong code, `address` when the address made its accounts. */
-    verify(email: string, code: string, visitor: string | null, address: string): Verified | 'code' | 'address' {
+     * caller moves that cache file in. `code` for a wrong code, `locked` when the email made its 15 wrong tries today,
+     * `blocked` for a blocked email (after the right code, so only its owner learns it), `address` when the address
+     * made its accounts (the right code stays good then). */
+    verify(email: string, code: string, visitor: string | null, address: string): Verified | 'code' | 'locked' | 'blocked' | 'address' {
       const e = normalEmail(email)
       if (!validEmail(e)) return 'code'
-      return db.transaction((): Verified | 'code' | 'address' => {
-        if (!checkCode(e, code)) return 'code'
+      return db.transaction((): Verified | 'code' | 'locked' | 'blocked' | 'address' => {
+        if (emailDay(e).wrong >= WRONG_PER_EMAIL) return 'locked'
+        if (!checkCode(e, code, true)) return 'code'
+        const account = byEmail(e)
+        if (isBlocked(e) || account?.blocked) { db.query('DELETE FROM codes WHERE email = ?').run(e); return 'blocked' }
+        const a = addr(address)
+        if (!account && a.accounts >= caps().addressAccounts) return 'address'
+        db.query('DELETE FROM codes WHERE email = ?').run(e)
         const v = visitor ? row(visitor) : null
         const fromVisitor = v && v.email === null ? v.id : null
-        const account = byEmail(e)
         if (account) {
           if (fromVisitor) remove(fromVisitor)
           return { person: account, token: session(account.id), merged: fromVisitor }
         }
-        const a = addr(address)
-        if (a.accounts >= caps().addressAccounts) return 'address'
         bump(a.hash, 'accounts')
         let id = fromVisitor
         if (id) db.query('UPDATE people SET email = ?, topupDue = ? WHERE id = ?').run(e, topupAt(), id)
@@ -331,7 +364,7 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
 
     // ── Top-ups and requests ──
     /** The people whose waiting top-up is due now. */
-    topupsDue(): Person[] { return (db.query('SELECT * FROM people WHERE topupDue IS NOT NULL AND topupDue <= ?').all(now()) as Row[]).map(toPerson) },
+    topupsDue(): Person[] { return (db.query('SELECT * FROM people WHERE topupDue IS NOT NULL AND topupDue <= ? AND blocked = 0').all(now()) as Row[]).map(toPerson) },
     /** Hands out a person's waiting top-up now; null when none waits (so it never comes twice). */
     grantTopup(id: string): Person | null {
       return db.transaction(() => {
@@ -342,9 +375,10 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
       })()
     },
     /** A quota request: its id, or `register` (a visitor), `note` (empty or over 500), `open` (one waits already). */
-    ask(id: string, note: string): number | 'register' | 'note' | 'open' {
+    ask(id: string, note: string): number | 'register' | 'blocked' | 'note' | 'open' {
       const p = row(id)
       if (!p || p.email === null) return 'register'
+      if (p.blocked) return 'blocked'
       const n = note.trim()
       if (!n || n.length > NOTE_CHARS) return 'note'
       if (db.query('SELECT 1 FROM requests WHERE person = ? AND answer IS NULL').get(id)) return 'open'
@@ -396,7 +430,7 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
     /** Changes the caps given; a value that is not a number at or above 0 is ignored. */
     setCaps(change: Partial<Caps>) {
       const next = { ...JSON.parse(get('caps') ?? '{}') }
-      for (const [k, v] of Object.entries(change)) if (k in CAPS && typeof v === 'number' && Number.isFinite(v) && v >= 0) next[k] = v
+      for (const [k, v] of Object.entries(change)) if (Object.hasOwn(CAPS, k) && typeof v === 'number' && Number.isFinite(v) && v >= 0) next[k] = v
       put('caps', JSON.stringify(next))
       return caps()
     },
@@ -417,7 +451,16 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
         requests: (db.query('SELECT r.*, p.email FROM requests r LEFT JOIN people p ON p.id = r.person ORDER BY r.answer IS NOT NULL, r.id DESC LIMIT 200').all()).map(requestOf),
       }
     },
-    block(id: string, blocked: boolean) { db.query('UPDATE people SET blocked = ? WHERE id = ?').run(blocked ? 1 : 0, id); return byId(id) },
+    /** Blocks or unblocks a person, and their email (hashed) in `blocked`, which outlives the person. */
+    block(id: string, blocked: boolean) {
+      db.transaction(() => {
+        db.query('UPDATE people SET blocked = ? WHERE id = ?').run(blocked ? 1 : 0, id)
+        const e = row(id)?.email
+        if (e && blocked) db.query('INSERT OR IGNORE INTO blocked (hash) VALUES (?)').run(emailHash(e))
+        else if (e) db.query('DELETE FROM blocked WHERE hash = ?').run(emailHash(e))
+      })()
+      return byId(id)
+    },
     /** Adds `amount` USD to an allowance (a negative one takes away, never below 0). */
     give(id: string, amount: number) {
       if (!Number.isFinite(amount)) return byId(id)
