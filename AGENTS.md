@@ -82,6 +82,10 @@ src/packages/web/src/
                  rails at the canvas's scale, pan and zoom, fits
   boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes and their rails, editing and adding in
                  place, Export
+  people.ts      the public's people and money over bun:sqlite (spec/public.md): visitors, sessions, the meter
+                 (mayCall, hold, charge), sign-in codes and verify, top-ups, quota requests, steps, caps, share
+                 tokens, the admin's summary, deletes, the day's address HMAC; no routes
+  mail.ts        mail through Resend (logs with no key off production) and the texts of the emails
   share.ts       share links per role, the player's map, feedback (a name first; a visitor's own; Resolve) and
                  trips, an edit link's scope and cap, the owner's gate (UXWOZ_OWNER); `guard` wraps server.ts's routes
   sharing.ts     browser: the drawer's Share and feedback pane (a comment jumps to it), a screen's thumbs in Info,
@@ -168,7 +172,7 @@ same time only in different parts.
 |---|---|---|---|
 | Engine | core: `models`, `prompt`, `providers`, `generate` | `generate-screen`, `cut-off` | `prompt-screen.md`, `ui-generation.md` |
 | Cache | core: `cache`, `cache-boxes`, `keys`, `tree` | `cache`, `boxes`, `tree`, `demo-cache` | contract: Types |
-| Server | web: `server`, `drawing`, `desks`, `export`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks` | contract: HTTP API |
+| Server | web: `server`, `drawing`, `desks`, `export`, `people`, `mail`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks`, `people`, `mail` | contract: HTTP API, `public.md` |
 | Canvas | web: `app`, `state`, `screens`, `nav`, `canvas`, `toolbar`, `net`; core: `frame` | `ropes`, `frame` | behavior: Toolbar to Rail, Navigation |
 | Boxes and drawer | web: `boxes`, `drawer`, `voice`, `voice-ui` | `boxes`, `voice` | behavior: Drawer, Voice, Boxes |
 | Sharing | web: `share`, `sharing`, `comments`, `pins`, `player.*` | `share`, `comments`, `pins` | behavior: Sharing |
