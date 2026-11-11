@@ -148,6 +148,62 @@ player only for its visitor (the demo prints how). Frontend edits show on reload
 ## Before a change
 
 Read the file you change and its line in the code map, plus the section of `spec/behavior.md` or
-`spec/code-contract.md` it implements. Read neighbours only when the change crosses into them. A
-change that must touch `app.ts`, `screens.ts`, `server.ts` and `canvas.ts` at once is a sign to stop
-and ask.
+`spec/code-contract.md` it implements: search for it and read that section, not the whole file. Read
+neighbours only when the change crosses into them.
+
+## Parts
+
+Seven parts. A change inside one part reads that part's files and no others; two builders work at the
+same time only in different parts.
+
+| Part | Files | Tests | Spec |
+|---|---|---|---|
+| Engine | core: `models`, `prompt`, `providers`, `generate` | `generate-screen`, `cut-off` | `prompt-screen.md`, `ui-generation.md` |
+| Cache | core: `cache`, `cache-boxes`, `keys`, `tree` | `cache`, `boxes`, `tree`, `demo-cache` | contract: Types |
+| Server | web: `server`, `drawing`, `export`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export` | contract: HTTP API |
+| Canvas | web: `app`, `state`, `screens`, `nav`, `canvas`, `toolbar`, `net`; core: `frame` | `ropes`, `frame` | behavior: Toolbar to Rail, Navigation |
+| Boxes and drawer | web: `boxes`, `drawer`, `voice`, `voice-ui` | `boxes`, `voice` | behavior: Drawer, Voice, Boxes |
+| Sharing | web: `share`, `sharing`, `comments`, `pins`, `player.*` | `share`, `comments`, `pins` | behavior: Sharing |
+| Design | web: `design/` | `design`, `fx` | **Design** above |
+
+Facts that cost builders a search:
+
+- On a canvas card `note` is the status line (*Making the change…*), and "notes" is the fixer's box.
+- A card's name is `labelOf` in `screens.ts`; Nav, the drawer and Delete use it too.
+- The player's map (`playerMap` in `share.ts`) lists drawn screens only, each with its `parent`, in no
+  promised order. Share tokens are hex.
+- `guard` in `share.ts` wraps every `/api` route: a route that takes `key` or `app` is already limited
+  to an edit link's own mockup, view and comment links get 403, and `/api/apps` is cut there too.
+- A click inside a screen's frame never reaches the page around it. The frame posts messages (see
+  Frame messages in the contract); of the keys, only Escape and the zoom keys are passed on.
+
+## How a request is built
+
+The lead sizes the request, then runs builders (Opus, each in its own worktree). Measured on
+2026-11-11: a small feature takes a builder 2 minutes, a medium one 3 to 5.
+
+- **Small** (one part, about 50 lines): one builder, no plan file, no critic. The lead reads the diff,
+  runs `bun run check`, merges.
+- **Medium** (crosses parts, or a new route, or stored data): one builder, then one critic on the
+  diff while the lead looks at the app. Fixes go back to the same builder.
+- **Large**: cut it into medium steps by part. Steps in different parts run together, three at most;
+  one critic reads two steps' diffs at once. Write a plan file only when the user must choose
+  something first.
+
+A critic gets the diff and the spec section, looks for behaviour that is wrong with a failing case
+each, and is told to say so plainly when it finds nothing.
+
+Pictures are slow to read. A builder checks the page by its text and by script, and takes two
+screenshots at most; the lead looks once before merging. Design work is the exception.
+
+The brief, under 1,500 characters:
+
+```
+You are a builder on UX Woz. Read AGENTS.md first and follow it. Part: <part>.
+Feature: <what the user sees, in the user's words; the edge cases that matter; what must not change>.
+Done means: the code; tests for <what>; the sentences in spec/<file>; the code map if a line is no
+longer true; `bun run check` green; looked at with `PORT=<own port> bun run demo`; committed on your
+worktree's branch (do not merge, do not push).
+Rules: do not touch <files another builder has>; no design change beyond <x>; no prompt byte changes.
+Report, short: what changed (files, lines), what you could not check, what slowed you down.
+```
