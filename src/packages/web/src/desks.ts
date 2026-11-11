@@ -61,6 +61,9 @@ export function desks(owner: ScreenCache, opts: DeskOptions) {
     return d ?? null
   }
 
+  /** Fix a request to the desk its edit link was checked on, so a link revoked meanwhile cannot leave it with none. */
+  const bind = (req: Request, d: Desk) => void byReq.set(req, d)
+
   /** Close the desks idle for `idleMs`, each saved first; never one whose filing or visit runs. */
   function sweep(now = Date.now()) {
     if (!opts.dir) return
@@ -72,6 +75,6 @@ export function desks(owner: ScreenCache, opts: DeskOptions) {
   }
   setInterval(sweep, Math.min(60_000, idleMs)).unref()
 
-  return { owner: own, desk, whose, of, sweep, open: () => [...open.keys()] }
+  return { owner: own, desk, whose, of, bind, sweep, open: () => [...open.keys()] }
 }
 export type Desks = ReturnType<typeof desks>

@@ -209,6 +209,7 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
     const f = desks.whose(t)
     if (!f || f.share.role !== 'edit') return fail('This link does not work any more.', 403)
     const cache = f.desk.cache
+    desks.bind(req, f.desk)
     if (OWNER_ONLY.has(path)) return fail('Only the owner can do this.', 403)
     if (path === '/api/apps') return json({ apps: cache.apps().filter((a) => normalizePrompt(a.app) === f.root) })
     const scope = await scopeOf(req)
