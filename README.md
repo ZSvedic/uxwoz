@@ -81,6 +81,69 @@ It needs a quiet room and speakers the microphone can hear. Chrome sends the aud
 voice input always does. The clip plays through the speakers because Chrome's fake microphone
 (`--use-file-for-fake-audio-capture`) does not reach speech recognition in Chrome 157.
 
+## Put it on GitHub
+
+The repo has no remote yet. Git history holds no key (checked on 2026-11-11), `.env` and `temp/` are
+ignored, and the tracked files come to about 2 MB. With the `gh` CLI signed in, from the repo root:
+
+```bash
+gh repo create uxwoz --private --source=. --remote=origin --push
+```
+
+That makes a private repo under your account, adds it as `origin` and pushes `main`. Later pushes are
+`git push`. To make it public, first choose a licence for the code (the font's OFL and Pico's MIT
+licence files are already in the tree) and decide whether `process/` and `cassettes/` go with it.
+
+## Host it
+
+The app is one Bun process that writes one JSON file, so it needs one always-on machine with a disk:
+[Fly.io](https://fly.io) with a 1 GB volume, about $4 a month. `Dockerfile` and `fly.toml` are in the
+repo root. Hosts with no disk (Vercel, Cloudflare Workers) cannot keep the cache file.
+
+```bash
+brew install flyctl
+```
+
+```bash
+fly auth login
+```
+
+```bash
+fly apps create uxwoz
+```
+
+If the name is taken, pick another and change `app` in `fly.toml` to match.
+
+```bash
+fly volumes create uxwoz_data --region fra --size 1
+```
+
+```bash
+fly secrets set --stage OPENROUTER_API_KEY=... OPENAI_API_KEY=... UXWOZ_OWNER=...
+```
+
+Take the two keys from `.env`. `UXWOZ_OWNER` is a long password you make up: only a browser that
+opened `/?owner=<that password>` once can use the app and spend model credits.
+
+```bash
+fly deploy --ha=false
+```
+
+Open `https://uxwoz.fly.dev/?owner=<that password>`. Share links then start with that address. To
+bring your local mockups along, copy the cache up before you make anything on the host (the upload may
+refuse to replace a file that is already there), then restart:
+
+```bash
+fly ssh sftp put temp/screen-cache.json /data/screen-cache.json
+```
+
+```bash
+fly apps restart uxwoz
+```
+
+Fly keeps a daily snapshot of the volume for five days. A deploy restarts the one machine, so the app
+is away for a few seconds. `GET /healthz` answers `ok` for the host's check.
+
 ## Project layout
 
 ```

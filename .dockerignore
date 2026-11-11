@@ -1,0 +1,7 @@
+# The image needs src/ only: no keys, no cache, no tests.
+*
+!Dockerfile
+!src
+src/node_modules
+src/tests
+src/scripts
