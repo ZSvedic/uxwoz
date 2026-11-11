@@ -265,20 +265,22 @@ describe('sign-in codes', () => {
   })
 
   test('a bad email; the mail quota; 3 new accounts a day per address, refused at verify only', async () => {
-    const { s, at } = store()
+    const { s, at, later } = store()
     expect(s.makeCode('ana', null, IP)).toBe('email')
     expect(s.makeCode('ana@example', null, IP)).toBe('email')
     for (const n of [1, 2, 3]) await signUp(s, `u${n}@example.com`, null)
     // Asking for a code never depends on the address's accounts: the fourth new one is refused at verify.
     const four = s.makeCode('u4@example.com', null, IP) as { code: string }
     expect(s.verify('u4@example.com', four.code, null, IP)).toBe('address')
+    later(CODE_AGAIN_MS)
     expect(s.makeCode('u1@example.com', null, IP)).toHaveProperty('code')
     at('2026-11-12T00:00:00Z')
     expect(s.makeCode('u4@example.com', null, IP)).toHaveProperty('code')
-    for (let i = 0; i < CAPS.mailPerDay - 1; i++) s.mailed()
+    // Each code counts its mail when it is made: u4's is the day's first.
+    for (let i = 0; i < CAPS.mailPerDay - 2; i++) s.mailed()
     expect(s.makeCode('u5@example.com', null, IP)).toHaveProperty('code')
-    s.mailed()
     expect(s.mailToday()).toBe(100)
+    later(CODE_AGAIN_MS)
     expect(s.makeCode('u5@example.com', null, IP)).toBe('mail')
     at('2026-11-13T00:00:00Z')
     expect(s.mailToday()).toBe(0)
@@ -338,10 +340,11 @@ describe('verify: takeover and merge', () => {
   })
 
   test('an existing account: both ids come back and the visitor is gone', async () => {
-    const { s } = store()
+    const { s, later } = store()
     const account = (await signUp(s, 'ana@example.com', visitor(s).id)).person
     const v = s.makeVisitor(IP)!
     spend(s, v.person, 0.05)
+    later(CODE_AGAIN_MS)
     const r = await signUp(s, 'ANA@example.com', v.person.id)
     expect(r.person.id).toBe(account.id)
     expect(r.merged).toBe(v.person.id)
@@ -352,10 +355,11 @@ describe('verify: takeover and merge', () => {
   })
 
   test('signing in from a registered session or none merges nothing', async () => {
-    const { s } = store()
+    const { s, later } = store()
     const a = (await signUp(s, 'ana@example.com', visitor(s).id)).person
     const b = (await signUp(s, 'bo@example.com', null)).person
     expect(b).toMatchObject({ email: 'bo@example.com', allowance: 0.1 })
+    later(CODE_AGAIN_MS)
     const r = await signUp(s, 'ana@example.com', b.id)
     expect(r).toMatchObject({ person: { id: a.id }, merged: null })
     expect(s.person(b.id)).not.toBeNull()
@@ -429,7 +433,8 @@ describe('requests, steps, shares, the admin', () => {
     expect(sum.people.map((p) => p.id).sort()).toEqual([v.id, u.id].sort())
     expect(sum.requests).toMatchObject([{ person: u.id, email: 'ana@example.com', note: 'for a demo', answer: null }])
     expect(sum.steps).toEqual([{ day: '2026-11-11', own: 1 }])
-    expect(sum.mailToday).toBe(0)
+    // The sign-up's code mail, counted when the code was made.
+    expect(sum.mailToday).toBe(1)
   })
 
   test('deleting a person leaves no row about them; the day still counts the money', async () => {

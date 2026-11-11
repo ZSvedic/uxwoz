@@ -23,6 +23,8 @@ const json = (data: unknown, status = 200) => Response.json(data, { status })
 const fail = (error: string, status = 400) => json({ error }, status)
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
 const hex = (bytes: number) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, '0')).join('')
+/** Where the owner's pages hide in this process: made new at each start, never sent to a browser. */
+const PAGE_SECRET = hex(16)
 const token = () => hex(16)
 const VISITOR = /^[a-f0-9]{8,40}$/
 /** Keep the newest `SHARE_KEEP` of a list's items in the `same` group. */
@@ -245,11 +247,13 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
       if (secret === owner) return new Response(null, { status: 302, headers: { Location: '/', 'Set-Cookie': `uxwoz_owner=${owner}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${https ? '; Secure' : ''}` } })
       return isOwner(req) || pub ? page(server, '/_app') : closed()
     }
-    // The design sheet and the admin's page are the owner's too: each page moves to /_<name>, as the app's is at /_app.
+    // The design sheet and the admin's page are the owner's too. Each page moves to a path with a secret made for this
+    // process (a route cannot serve a page only to some requests), so only this server's own fetch finds it.
     for (const p of ['/design', '/admin']) {
       if (!owner || !out[p]) continue
-      out[`/_${p.slice(1)}`] = out[p]
-      out[p] = (req: Request, server: { port?: number }) => isOwner(req) ? page(server, `/_${p.slice(1)}`) : closed()
+      const hidden = `/_${p.slice(1)}-${PAGE_SECRET}`
+      out[hidden] = out[p]
+      out[p] = (req: Request, server: { port?: number }) => isOwner(req) ? page(server, hidden) : closed()
     }
     return out as Bun.Serve.Routes<unknown, R>
   }

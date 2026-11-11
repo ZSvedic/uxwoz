@@ -112,6 +112,7 @@ test('an account signs in from a second browser: the visitor\'s mockups move in,
   const v = store.makeVisitor('198.51.100.1')!
   mockup(v.person.id, 'Dog walks', '<h1>dogs</h1>')
   mockup(v.person.id, 'a cafe', '<h1>visitor cafe</h1>')
+  clock.t += 60_000
   const r = await signIn('BO@example.com', v.token, '198.51.100.1')
   expect(r.status).toBe(200)
   expect(((await r.json()) as any).me.email).toBe('bo@example.com')
@@ -140,6 +141,7 @@ test('sign-in checks the email and never says whether it has an account', async 
   // Three accounts from one address today; asking for a code is the same 204 for a known email and a new one,
   // so existing users are never locked out; the fourth new account is refused at verify.
   for (const e of ['a1@example.com', 'a2@example.com', 'a3@example.com']) expect((await signIn(e, null)).status).toBe(200)
+  clock.t += 60_000
   expect((await signIn('a1@example.com', null)).status).toBe(200)
   const r = await signIn('a4@example.com', null)
   expect(r.status).toBe(429)

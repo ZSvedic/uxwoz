@@ -60,6 +60,8 @@ store's methods take and give USD. Times are milliseconds since 1970, days and m
 | `steps` | per day and step: how many people |
 | `settings` | the mode (`open` or `starters`), the caps, the day's salt, the day's count of emails sent |
 | `shares` | share token → person |
+| `emails` | per UTC day and hashed email: codes asked, wrong tries, when it last asked. Kept apart from `codes`, whatever the mails did; the days before go |
+| `blocked` | hashed emails the owner blocked; it outlives the person |
 
 ## The meter
 
@@ -149,33 +151,42 @@ the index.
 - `POST /api/signin {email}` → 204, and a code is sent: six digits, good for 15 minutes, dead after 5
   wrong tries; a new one replaces the old. 400 for a bad email, 429 *Sign-ups are full for today.*
   when the day's 100 emails are used or the network asked for its 10 codes today, 429 *A code is on its
-  way: wait a minute before asking again.* when this email asked less than a minute ago (both counted in
-  the store). Asking never depends on the address's accounts nor on whether the email has one, so a
+  way: wait a minute before asking again.* when this email asked less than a minute ago, 429 *Too many
+  codes for this email today. Try again tomorrow.* when it asked for its 5 codes today or made its 15
+  wrong tries (all counted in the store, the email's in `emails`, whatever the mails did). The day's
+  email is counted when the code is made, before the send, and never given back, so emails sent
+  together cannot pass the day's cap; a code whose email did not go is deleted. A blocked email gets 204
+  like any other. Asking never depends on the address's accounts nor on whether the email has one, so a
   network that made its 3 accounts still lets its users sign in; the fourth new account is refused at
   verify only. 503 *Sign-up is not set up yet.* in production with no mail
   key, 503 when the email did not go. The code is never logged in production.
 - `POST /api/verify {email, code}` → `{me}` and a new session cookie. A new email takes over the
   visitor's person (the mockups stay where they are) and sets `topupDue` 12 hours ahead. An email with
   an account signs in to it: the visitor's mockups move in, except those whose prompt the account
-  already has, and the visitor's person is deleted. 400 *That code is not right.*, 429 when the address
-  made its accounts and the email is new.
+  already has, and the visitor's person is deleted. 400 *That code is not right.* (each wrong one counts
+  toward the email's 15 a day), 429 *Too many codes…* past them, 403 *This account is closed.* for a
+  blocked email (after the right code, so only its owner learns it), 429 when the address made its
+  accounts and the email is new; the right code stays good then, to use from another network.
 - `POST /api/signout` → 204, the session is deleted and the cookie cleared.
 - `POST /api/delete-account {email}` (registered; `email` must be the account's) → 204 and the cookie
   cleared: the cache file, every row and share link of the person go (their `calls` stay with no
   person). 400 for another email.
 - `POST /api/ask {note}` (registered, 1 to 500 characters) → 204, and the owner gets it by email at
-  once. One open request per person (409).
+  once. One open request per person (409). A blocked person gets 403 *This account is closed.*
 - `GET /api/admin` (owner) → `{spent: {today, month}, caps, mode, steps: {day, …counts}[] (30 days),
   people: {id, email, created, seen, allowance, spent, mockups, blocked, topupDue}[], requests[],
   address, mailToday, startersCurrent}`. `address` is the caller's as the server sees it.
 - `POST /api/admin {op, …}` (owner): `mode`, `caps`, `give {id, usd}`, `block {id, blocked}`,
-  `delete {id}`, `topup {id}` (now), `answer {request, approved, usd?}`. It answers the same body as
+  `delete {id}`, `topup {id}` (now), `answer {request, approved, usd?}`. `block` blocks the person's
+  email too (hashed, in `blocked`); a blocked person may still delete their account, and the email stays
+  blocked; unblocking takes it off. `caps` takes only `CAPS`'s own keys. It answers the same body as
   `GET /api/admin`, with `mailed: false` when the op's email did not go. A bad input is 400 (an unknown
   op or cap, a cap below 0 or over its ceiling, an amount over $100, `give` of 0 or below −$100, an
   `answer` amount of 0 or less), an unknown person or request 404, a top-up that no longer waits or an
   answered request 409. `topup` emails *Your free screens are ready*, `answer` the answer; each sent
   email counts toward the day's.
-- `GET /admin` (owner: anyone else gets 403, as at `/design`), `GET /privacy` (everyone): pages. The privacy page names `UXWOZ_OPERATOR` as who
+- `GET /admin` (owner: anyone else gets 403, as at `/design`; the page itself is served from a path with a
+  secret made per process, which only the server's own fetch knows), `GET /privacy` (everyone): pages. The privacy page names `UXWOZ_OPERATOR` as who
   runs the site and `UXWOZ_CONTACT` (else `UXWOZ_ADMIN_EMAIL`) as whom to write to.
 - `GET /api/config` gains `public: true`, `starters: Starter[]` (both only in public mode, the owner's
   too) and, for the public, one model.
@@ -183,9 +194,9 @@ the index.
   (a snapshot of the database) and `users/<id>.json` for every person with a cache, open or on disk.
   `src/scripts/backup.sh` keeps either kind.
 
-A check once a minute hands out the top-ups that are due and emails each user *Your free screens are
+A check once a minute hands out the top-ups that are due (never a blocked person's) and emails each user *Your free screens are
 ready* (not when the day's emails are used up). Approving in the admin's page does the same at once.
-The same check tells the owner of sign-ups that started waiting since its last such email, one email an
+The same check tells the owner of sign-ups (not blocked) that started waiting since its last such email, one email an
 hour at most. These routes and the check are `web/src/account.ts`. The links in every email start with
 `UXWOZ_URL` (default `https://app.uxwoz.com/`).
 
