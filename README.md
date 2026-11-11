@@ -66,7 +66,7 @@ one machine holds the disk.
 
 **Backups.** Railway's scheduled volume backups need its Pro plan, so the repo has its own:
 `src/scripts/backup.sh` fetches the host's whole cache from `GET /api/backup` (owner only) into
-`backups/`, which git ignores. It reads two lines from a root `.env.local`, also ignored:
+`backups/`, which git ignores. Run it by hand, or weekly from a scheduler (cron, or launchd on a Mac). It reads two lines from a root `.env.local`, also ignored:
 
 ```
 UXWOZ_BACKUP_URL=https://<your domain>
