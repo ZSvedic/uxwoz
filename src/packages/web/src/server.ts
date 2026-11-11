@@ -1,11 +1,12 @@
 // The UX Woz web server: serves the app, streams screens from the models, keeps the screen cache.
 // API keys stay here; the browser only ever sees generated HTML.
 
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import {
   BOX_TITLES, DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, ScreenCache, canonicalAction, isComponent, isDevice, isModelId, normalizePrompt,
   screenKey, screenRef, VISIT_EVERY, warmUp, type BoxName, type Io,
 } from '@uxwoz/core'
+import { desks } from './desks.ts'
 import { drawing, ndjson } from './drawing.ts'
 import { exportRoute } from './export.ts'
 import index from './index.html'
@@ -27,6 +28,12 @@ interface ServerOptions extends Io {
   random?: () => number
   /** How long a new screen or a change waits for a running filing before it goes on without it. */
   fileWaitMs?: number
+  /** Who sent a request: 'owner' (the default, always) or a person's id, whose own cache it reaches. */
+  who?: (req: Request) => string
+  /** Where people's cache files live, `<id>.json`; else UXWOZ_USERS_DIR, else in memory. */
+  usersDir?: string
+  /** How long a person's desk stays open after their last request; 10 minutes. */
+  idleMs?: number
 }
 
 const json = (data: unknown, status = 200) => Response.json(data, { status })
@@ -48,12 +55,19 @@ const appOf = (b: any): string => (typeof b?.app === 'string' ? b.app.trim() : '
 const badApp = (app: string) => (!app || app.length > 2000 ? fail('app must be 1-2000 characters') : null)
 
 export function createServer(opts: ServerOptions = {}) {
-  const cache = opts.cache ?? new ScreenCache()
   const log = opts.log ?? ((m: string) => console.warn(m))
   const random = opts.random ?? Math.random
   const fileWaitMs = opts.fileWaitMs ?? 5000
   const io = { fetch: opts.fetch, env: opts.env }
-  const { file, visit, mapOf, forget, idle, screenEvents, reviseEvents } = drawing(cache, io, log, random, fileWaitMs)
+  // Every route takes the cache and its work from the request's desk, never from here.
+  const all = desks(opts.cache ?? new ScreenCache(), {
+    dir: opts.usersDir ?? process.env.UXWOZ_USERS_DIR ?? null,
+    who: opts.who ?? (() => 'owner'),
+    draw: (cache) => drawing(cache, io, log, random, fileWaitMs),
+    idleMs: opts.idleMs,
+  })
+  /** The request's desk: `guard` has refused a request without one. */
+  const at = (req: Request) => { const d = all.of(req)!; return { cache: d.cache, ...d.draw } }
 
   const pickers = (b: { model?: unknown; device?: unknown } | null) => {
     const model = b?.model ?? DEFAULT_MODEL, device = b?.device ?? DEFAULT_DEVICE
@@ -62,8 +76,8 @@ export function createServer(opts: ServerOptions = {}) {
     return { model, device }
   }
 
-  const { guard } = sharing(cache, api, { app: index, player })
-  return Bun.serve({
+  const { guard } = sharing(all, api, { app: index, player })
+  const server = Bun.serve({
     port: opts.port ?? Number(process.env.PORT ?? 3000),
     // Only this machine: the API spends the owner's model credits.
     hostname: process.env.UXWOZ_HOST ?? '127.0.0.1',
@@ -83,14 +97,14 @@ export function createServer(opts: ServerOptions = {}) {
         if (!THEME_FILES.has(name)) return new Response('Not found', { status: 404 })
         return new Response(Bun.file(join(THEMES_DIR, `${name}.css`)), { headers: { 'Content-Type': 'text/css' } })
       },
-      '/api/config': () => json({
+      '/api/config': (req) => json({
         defaultModel: DEFAULT_MODEL,
         models: Object.values(MODELS).filter((m) => !m.background).map((m) => ({ id: m.id, label: m.label, costEstimated: m.costEstimated })),
         themes: Object.entries(THEMES).map(([id, label]) => ({ id, label })),
         defaultTheme: 'mockup',
         devices: Object.entries(DEVICES).map(([id, d]) => ({ id, label: d.label, width: d.width })),
         defaultDevice: DEFAULT_DEVICE,
-        ...(cache.warning && { warning: cache.warning }),
+        ...(at(req).cache.warning && { warning: at(req).cache.warning }),
       }),
       '/api/screen': {
         POST: api(async (b, req) => {
@@ -101,11 +115,12 @@ export function createServer(opts: ServerOptions = {}) {
           const p = pickers(b)
           if (p instanceof Response) return p
           const click = typeof b?.from === 'string' && b.from ? { from: b.from.slice(0, 3000), label: String(b?.label ?? '').slice(0, 200) } : null
-          return ndjson(screenEvents(app, action, p.model, p.device, click, req.signal))
+          return ndjson(at(req).screenEvents(app, action, p.model, p.device, click, req.signal))
         }),
       },
       '/api/pick': {
-        POST: api(async (b) => {
+        POST: api(async (b, req) => {
+          const { cache, file, visit } = at(req)
           const key = String(b?.key ?? ''), index = Number(b?.index)
           const other = cache.get(key)?.proposals?.find((p, i) => p && i !== index)?.html
           const entry = cache.pick(key, index)
@@ -118,6 +133,7 @@ export function createServer(opts: ServerOptions = {}) {
       },
       '/api/revise': {
         POST: api(async (b, req) => {
+          const { cache, reviseEvents } = at(req)
           const change = typeof b?.change === 'string' ? b.change.trim() : null
           if (b?.change != null && (!change || change.length > 1000)) return fail('change must be 1-1000 characters')
           const p = pickers(b)
@@ -130,19 +146,21 @@ export function createServer(opts: ServerOptions = {}) {
         }),
       },
       '/api/undo': {
-        POST: api(async (b) => {
-          const entry = cache.undo(String(b?.key ?? ''))
+        POST: api(async (b, req) => {
+          const entry = at(req).cache.undo(String(b?.key ?? ''))
           return entry ? json({ entry }) : fail('no such screen, or nothing to undo', 404)
         }),
       },
       '/api/map': async (req) => {
+        const { idle, mapOf } = at(req)
         const url = new URL(req.url), app = url.searchParams.get('app')?.trim() ?? ''
         if (badApp(app)) return badApp(app)!
         if (url.searchParams.get('wait') === '1') await Promise.race([idle(app), Bun.sleep(60_000)])
         return json(mapOf(app))
       },
       '/api/box': {
-        POST: api(async (b) => {
+        POST: api(async (b, req) => {
+          const { cache, visit, mapOf } = at(req)
           const app = appOf(b)
           if (!cache.get(screenKey(app, null))) return fail('no such mockup', 404)
           const box = b?.box as BoxName | 'notes', op = b?.op, any = Object.hasOwn(BOX_TITLES, String(box))
@@ -165,15 +183,16 @@ export function createServer(opts: ServerOptions = {}) {
           return why ? fail(why) : json(mapOf(app))
         }),
       },
-      '/api/apps': () => json({ apps: cache.apps() }),
-      '/api/export': exportRoute(cache),
+      '/api/apps': (req) => json({ apps: at(req).cache.apps() }),
+      '/api/export': exportRoute((req) => at(req).cache),
       // The whole cache file, as it would be saved now: the owner's only (see share.ts).
       '/api/backup': {
-        GET: () => new Response(cache.serialize(), { headers: { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="screen-cache.json"', 'Cache-Control': 'no-store' } }),
+        GET: (req) => new Response(at(req).cache.serialize(), { headers: { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="screen-cache.json"', 'Cache-Control': 'no-store' } }),
       },
       // Returns the whole mockup: a delete can give other screens new parents.
       '/api/delete': {
-        POST: api(async (b) => {
+        POST: api(async (b, req) => {
+          const { cache, forget, mapOf } = at(req)
           const key = String(b?.key ?? ''), app = cache.get(key)?.app
           const removed = cache.delete(key)
           if (app && key === normalizePrompt(app)) forget(app)
@@ -181,7 +200,8 @@ export function createServer(opts: ServerOptions = {}) {
         }),
       },
       '/api/delete-app': {
-        POST: api(async (b) => {
+        POST: api(async (b, req) => {
+          const { cache, forget } = at(req)
           const app = appOf(b)
           if (badApp(app)) return badApp(app)!
           forget(app)
@@ -200,11 +220,12 @@ export function createServer(opts: ServerOptions = {}) {
     }),
     fetch: () => new Response('Not found', { status: 404 }),
   })
+  return Object.assign(server, { desks: all })
 }
 
 if (import.meta.main) {
   const file = process.env.UXWOZ_CACHE_FILE ?? resolve(import.meta.dir, '../../../../temp/screen-cache.json')
   const cache = new ScreenCache(file)
-  const server = createServer({ cache })
+  const server = createServer({ cache, usersDir: process.env.UXWOZ_USERS_DIR ?? join(dirname(file), 'users') })
   console.log(`UX Woz on ${server.url} (cache: ${file}, ${cache.size} screens)`)
 }

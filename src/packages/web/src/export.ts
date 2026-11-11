@@ -169,7 +169,8 @@ export function exportFiles(app: string, entries: CacheEntry[], boxes: Boxes, cs
 const themeCss = () => ['pico', 'mockup'].map((n) => readFileSync(join(THEMES_DIR, `${n}.css`), 'utf8')).join('\n')
 
 /** GET /api/export?app=…: the mockup as a zip download; 404 for an unknown mockup. */
-export const exportRoute = (cache: ScreenCache) => (req: Request): Response => {
+export const exportRoute = (cacheOf: (req: Request) => ScreenCache) => (req: Request): Response => {
+  const cache = cacheOf(req)
   const app = new URL(req.url).searchParams.get('app')?.trim() ?? ''
   if (!app || app.length > 2000) return Response.json({ error: 'app must be 1-2000 characters' }, { status: 400 })
   const { entries, boxes } = cache.map(app)

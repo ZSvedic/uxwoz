@@ -32,7 +32,7 @@ GET /api/map?app=A%20coffee%20shop%20ordering%20app&wait=1      (answers once fi
 - `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`
   as the entry, `state.ts`, `screens.ts`, `nav.ts`, `drawer.ts`, `toolbar.ts`, `net.ts`, `canvas.ts`,
   `boxes.ts`, `sharing.ts`, `comments.ts`, the CSS in `design/`, bundled by Bun's HTML import), the player (`player.html`,
-  `player.ts`, `pins.ts` (shared with the app), its CSS in `design/player.css` on the shared tokens), the design sheet (`design/sheet.html`, `design/sheet.ts`), the share routes (`share.ts`), and the themes in `themes/`.
+  `player.ts`, `pins.ts` (shared with the app), its CSS in `design/player.css` on the shared tokens), the design sheet (`design/sheet.html`, `design/sheet.ts`), the share routes (`share.ts`), the desks (`desks.ts`), and the themes in `themes/`.
 
 There are no runtime dependencies; `@types/bun` and `typescript` are dev-only.
 
@@ -44,6 +44,15 @@ can spend model credits. The `Origin`'s host is compared with the request's host
 so a proxy that ends HTTPS and forwards plain HTTP still passes; a request with no `Origin` passes.
 A link the server builds (a share's `url`, the player's `og:image`) uses the request's public origin: the
 scheme from `X-Forwarded-Proto` (its first value) when present, else the request's own, and that same host.
+
+- **Desks**: every `/api` request works on one person's desk, a screen cache with its own filing chains
+  and visits, and no route can name another's. `createServer`'s `who(req)` says whose request it is
+  (default: always `owner`, the cache it is given). Any other id must be 16-40 lowercase hex, else
+  400; it opens `<dir>/<id>.json` (today's format) on its first request, where `dir` is the option
+  `usersDir`, else `UXWOZ_USERS_DIR`, else `users/` beside the cache file (`server.ts` run directly;
+  no dir keeps it in memory), and closes after 10 idle minutes, saved first, never while its filing or
+  a visit runs. A share token (`/s/:token`, `/api/s/*`, `x-uxwoz-share`) finds its desk with
+  `whose(token)`: the owner's and the open ones are searched, and an edit link works on its desk.
 
 - `GET /healthz` → 200 `ok` (text) for the host's health check: open with `UXWOZ_OWNER` set, touches nothing.
 
@@ -291,6 +300,7 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 | `PORT` | server port, default 3000 |
 | `UXWOZ_HOST` | listen address, default `127.0.0.1` |
 | `UXWOZ_CACHE_FILE` | screen cache `{version: 5, entries, boxes, states, shared}`, default `temp/screen-cache.json` |
+| `UXWOZ_USERS_DIR` | people's caches, `<id>.json` each (see Desks), default `users/` beside the cache file |
 | `UXWOZ_OWNER` | the owner's secret: when set, only a browser with its cookie uses the app (see Sharing) |
 | `UXWOZ_RECORD` | `1` makes tests call the live APIs and rewrite `cassettes/` |
 

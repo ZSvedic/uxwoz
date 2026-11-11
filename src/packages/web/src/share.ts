@@ -2,6 +2,7 @@
 // cap, and the owner's gate (UXWOZ_OWNER). server.ts registers it with `sharing(...)` and `guard(...)`.
 
 import { HOME_NAME, canonicalAction, componentsOf, isComponent, normalizePrompt, screenTree, type CacheEntry, type Feedback, type ScreenCache, type Share, type Trip } from '@uxwoz/core'
+import type { Desks } from './desks.ts'
 
 /** How many of each kind a mockup keeps (comments, thumbs, answers, trips; the oldest go), the most screens and dead clicks
  * a trip keeps, the longest text, an edit link's default cap. */
@@ -55,15 +56,18 @@ export function playerMap(cache: ScreenCache, root: string) {
   }
 }
 
-export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; player: Route }, owner = process.env.UXWOZ_OWNER) {
+export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Route }, owner = process.env.UXWOZ_OWNER) {
   const linkOf = (req: Request, s: Share) => ({ ...s, url: `${publicOrigin(req)}/s/${s.token}` })
-  const found = (req: Request & { params?: Record<string, string> }) => cache.share(req.params?.token ?? '')
+  /** A share link's desk, mockup and link, from the token in the path. */
+  const found = (req: Request & { params?: Record<string, string> }) => desks.whose(req.params?.token ?? '')
+  /** The cache of the desk the request works on (`wrap` has checked there is one). */
+  const cacheOf = (req: Request) => desks.of(req)!.cache
   const isOwner = (req: Request) => !owner || req.headers.get('cookie')?.split(/;\s*/).includes(`uxwoz_owner=${owner}`)
   /** Proxy one of our own pages (the app or the player), so a link keeps its own address; from this server itself, never from the request's Host. */
   const page = (server: { port?: number }, path: string) => fetch(`http://127.0.0.1:${server.port}${path}`)
-  /** Visitors write often: save the file at most once a second. */
-  let saving: ReturnType<typeof setTimeout> | undefined
-  const saveSoon = () => { saving ??= setTimeout(() => { saving = undefined; cache.save() }, 1000) }
+  /** Visitors write often: save each person's file at most once a second. */
+  const saving = new WeakMap<ScreenCache, ReturnType<typeof setTimeout>>()
+  const saveSoon = (cache: ScreenCache) => { if (!saving.has(cache)) saving.set(cache, setTimeout(() => { saving.delete(cache); cache.save() }, 1000)) }
 
   /** The link of a visitor's request: it must work, and a view link only views. */
   const linkFor = (req: Request) => {
@@ -71,12 +75,12 @@ export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; playe
     return !f ? fail('This link does not work any more.', 404) : f.share.role === 'view' ? fail('This link can only view.', 403) : f
   }
   /** A visitor's feedback or trip: a working comment link, and a name (nothing is stored about a nameless visitor). */
-  const visitor = (run: (b: any, root: string, who: { visitor: string; name: string }) => Response) => api((b, req) => {
+  const visitor = (run: (b: any, root: string, who: { visitor: string; name: string }, cache: ScreenCache) => Response) => api((b, req) => {
     const f = linkFor(req)
     if (f instanceof Response) return f
     const name = str(b?.name, 60)
     if (!name) return fail('Type your name first.')
-    return run(b, f.root, { visitor: VISITOR.test(String(b?.visitor)) ? String(b.visitor) : 'unknown', name })
+    return run(b, f.root, { visitor: VISITOR.test(String(b?.visitor)) ? String(b.visitor) : 'unknown', name }, f.desk.cache)
   })
 
   const routes: Record<string, Route> = {
@@ -95,9 +99,9 @@ export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; playe
       if (!f) return fail('This link does not work any more.', 404)
       // Counted in memory; the next save keeps it (a GET never writes the file).
       f.share.opens++
-      return json({ role: f.share.role, app: cache.get(f.root)?.app ?? f.root, ...playerMap(cache, f.root) })
+      return json({ role: f.share.role, app: f.desk.cache.get(f.root)?.app ?? f.root, ...playerMap(f.desk.cache, f.root) })
     },
-    '/api/s/:token/feedback': { POST: visitor((b, root, who) => {
+    '/api/s/:token/feedback': { POST: visitor((b, root, who, cache) => {
       const kind = b?.kind
       if (!['comment', 'thumb', 'done'].includes(kind)) return fail('unknown kind')
       const text = typeof b?.text === 'string' ? b.text.trim() : ''
@@ -116,7 +120,7 @@ export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; playe
       if (kind === 'thumb') list.splice(0, list.length, ...list.filter((x) => !(x.kind === 'thumb' && x.visitor === f.visitor && x.screen === f.screen)))
       list.push(f)
       capped(list, (x) => groupOf(x.kind) === groupOf(kind))
-      saveSoon()
+      saveSoon(cache)
       return json({ ok: true, id: f.id })
     }),
     // A visitor's own feedback, to show again on reload; never another visitor's.
@@ -124,9 +128,9 @@ export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; playe
       const f = linkFor(req)
       if (f instanceof Response) return f
       const v = new URL(req.url).searchParams.get('visitor') ?? ''
-      return json({ feedback: VISITOR.test(v) ? cache.sharedOf(f.root).feedback.filter((x) => x.visitor === v) : [] })
+      return json({ feedback: VISITOR.test(v) ? f.desk.cache.sharedOf(f.root).feedback.filter((x) => x.visitor === v) : [] })
     } },
-    '/api/s/:token/trip': { POST: visitor((b, root, who) => {
+    '/api/s/:token/trip': { POST: visitor((b, root, who, cache) => {
       const id = VISITOR.test(String(b?.id)) ? String(b.id) : null
       if (!id) return fail('a trip needs its id')
       const names = (v: unknown) => (Array.isArray(v) ? v.slice(0, TRIP_KEEP).map((x) => str(x, 80)).filter(Boolean) : [])
@@ -136,11 +140,11 @@ export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; playe
       if (old >= 0) trips[old] = t
       else trips.push(t)
       capped(trips)
-      saveSoon()
+      saveSoon(cache)
       return json({ ok: true })
     }) },
     '/api/share': { POST: api((b, req) => {
-      const app = str(b?.app, 2000), role = b?.role
+      const cache = cacheOf(req), app = str(b?.app, 2000), role = b?.role
       if (!cache.get(normalizePrompt(app))?.versions.length) return fail('no such mockup, or its first screen is not picked yet', 404)
       if (!ROLES.includes(role)) return fail('role must be view, comment or edit')
       const cap = role === 'edit' ? Math.max(1, Math.min(1000, Math.round(Number(b?.cap) || EDIT_CAP))) : undefined
@@ -151,19 +155,19 @@ export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; playe
     }) },
     '/api/shares': (req: Request) => {
       const app = new URL(req.url).searchParams.get('app')?.trim() ?? ''
-      const s = cache.sharedOf(app)
+      const s = cacheOf(req).sharedOf(app)
       return json({ shares: s.shares.map((x) => linkOf(req, x)), feedback: s.feedback, trips: s.trips })
     },
-    '/api/feedback': { POST: api((b) => {
-      const f = cache.sharedOf(str(b?.app, 2000)).feedback.find((x) => x.id === b?.id)
+    '/api/feedback': { POST: api((b, req) => {
+      const cache = cacheOf(req), f = cache.sharedOf(str(b?.app, 2000)).feedback.find((x) => x.id === b?.id)
       if (!f) return fail('no such feedback', 404)
       if (b?.resolved) f.resolved = new Date().toISOString()
       else delete f.resolved
       cache.save()
       return json({ ok: true })
     }) },
-    '/api/unshare': { POST: api((b) => {
-      const f = cache.share(String(b?.token ?? ''))
+    '/api/unshare': { POST: api((b, req) => {
+      const cache = cacheOf(req), f = cache.share(String(b?.token ?? ''))
       if (!f) return fail('no such link', 404)
       const list = cache.ownShared(f.root).shares
       list.splice(list.indexOf(f.share), 1)
@@ -189,25 +193,29 @@ export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; playe
   }
 
   /** Whether a request makes a model work: a new screen (not a cache hit), an Edit or a Regenerate, a pick (its filing), an Edit of a box or a visit. */
-  function costs(path: string, b: any): boolean {
+  function costs(path: string, b: any, cache: ScreenCache): boolean {
     if (path === '/api/box') return b?.op === 'edit' || b?.op === 'visit'
     if (path === '/api/screen') return !cache.find(String(b?.app ?? ''), canonicalAction(typeof b?.action === 'string' ? b.action : null))
     return PAID.has(path)
   }
 
-  /** An /api route as the owner (cookie, or no UXWOZ_OWNER), or through an edit link for its mockup, within its cap. */
+  /**
+   * An /api route as the owner (cookie, or no UXWOZ_OWNER) on the sender's desk, or through an edit link
+   * on its desk, for its mockup, within its cap.
+   */
   const wrap = (path: string, run: (req: Request) => Response | Promise<Response>) => async (req: Request) => {
     const t = req.headers.get('x-uxwoz-share')
-    if (!t) return isOwner(req) ? run(req) : fail('This UX Woz is private.', 401)
-    const f = cache.share(t)
+    if (!t) return !isOwner(req) ? fail('This UX Woz is private.', 401) : desks.of(req) ? run(req) : fail('Who sent this is not known.', 400)
+    const f = desks.whose(t)
     if (!f || f.share.role !== 'edit') return fail('This link does not work any more.', 403)
+    const cache = f.desk.cache
     if (OWNER_ONLY.has(path)) return fail('Only the owner can do this.', 403)
     if (path === '/api/apps') return json({ apps: cache.apps().filter((a) => normalizePrompt(a.app) === f.root) })
     const scope = await scopeOf(req)
     if (scope === 'refuse' || (scope.root != null && scope.root !== f.root)) return fail('This link opens one mockup only.', 403)
     // Deleting the first screen deletes the mockup, its links and its feedback: only the owner may.
     if (path === '/api/delete' && scope.b?.key === f.root) return fail('Only the owner can delete the whole mockup.', 403)
-    const paid = costs(path, scope.b)
+    const paid = costs(path, scope.b, cache)
     if (paid && f.share.used >= (f.share.cap ?? EDIT_CAP)) return fail('This link\'s budget is used up.', 429)
     // Counted before the call, so two at once cannot both pass the cap; given back when refused.
     if (paid) f.share.used++
