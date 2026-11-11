@@ -308,6 +308,31 @@ export abstract class ScreenCacheBase {
     return gone.filter((e) => !isComponent(e)).length
   }
 
+  /**
+   * Take in another cache's mockups (screens, components, boxes, states, share links, feedback), each mockup
+   * whole, skipping every mockup whose prompt this cache already has. The prompts taken, as first typed.
+   */
+  takeIn(other: ScreenCacheBase): string[] {
+    const have = new Set([...this.entries.values()].map((e) => normalizePrompt(e.app)))
+    for (const m of [this.boxes, this.states, this.shared]) for (const root of m.keys()) have.add(root)
+    const roots = new Set([...other.entries.values()].map((e) => normalizePrompt(e.app)))
+    for (const m of [other.boxes, other.states, other.shared]) for (const root of m.keys()) roots.add(root)
+    const taken: string[] = []
+    for (const root of roots) {
+      if (have.has(root)) continue
+      const all = [...other.entries.values()].filter((e) => normalizePrompt(e.app) === root)
+      for (const e of all) { this.entries.set(e.key, structuredClone(e)); this.removed.delete(e.key) }
+      this.removed.delete(root)
+      const b = other.boxes.get(root), s = other.states.get(root), sh = other.shared.get(root)
+      if (b) this.boxes.set(root, structuredClone(b))
+      if (s) this.states.set(root, structuredClone(s))
+      if (sh) this.shared.set(root, structuredClone(sh))
+      taken.push((all.find((e) => e.key === root) ?? all[0])?.app ?? root)
+    }
+    if (taken.length) this.save()
+    return taken
+  }
+
   get size(): number {
     return this.entries.size
   }

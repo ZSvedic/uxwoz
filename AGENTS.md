@@ -52,7 +52,7 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
                  shortest-path levels, the titles and lines of the paper
   cache.ts       screen cache, the screens (ScreenCacheBase): entry and version types, find by name, proposals
                  (the open A OR B) and pick, versions and undo, parents, delete with pruning, apps, sharing data,
-                 the JSON file (load, format, save)
+                 takeIn (another cache's mockups, at a sign-in), the JSON file (load, format, save)
   cache-boxes.ts screen cache, the boxes (ScreenCache extends the base): components as entries, rules, tables,
                  limits, IDs, a box's states, Past and Undo, the fixer's notes and their Undo, markSeen, the paper
   frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix, picking and locating
@@ -93,6 +93,8 @@ src/packages/web/src/
   mail.ts        mail through Resend (logs with no key off production) and the texts of the emails
   admin.ts       adminRoutes(store, extras): GET and POST /api/admin (the ops, their checks, their emails), /admin,
                  /privacy (privacy.html with the operator and contact from the env, the design inline); no gate
+  account.ts     accountRoutes(store, extras): /api/signin, /api/verify, /api/signout, /api/delete-account,
+                 /api/ask, meOf (/api/me's body); startTopups: the once-a-minute top-ups and the owner's emails
   admin.html, admin-page.ts   browser: the admin's page: spend and mode, caps, steps, Waiting, Requests, People
   share.ts       share links per role, the player's map, feedback (a name first; a visitor's own; Resolve) and
                  trips, an edit link's scope and cap, the owner's gate (UXWOZ_OWNER); `guard` wraps server.ts's routes
@@ -183,7 +185,7 @@ same time only in different parts.
 |---|---|---|---|
 | Engine | core: `models`, `prompt`, `providers`, `generate`, `starters`, `recordings` | `generate-screen`, `cut-off`, `recordings` | `prompt-screen.md`, `ui-generation.md` |
 | Cache | core: `cache`, `cache-boxes`, `keys`, `tree` | `cache`, `boxes`, `tree`, `demo-cache` | contract: Types |
-| Server | web: `server`, `drawing`, `desks`, `export`, `people`, `mail`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks`, `people`, `mail` | contract: HTTP API, `public.md` |
+| Server | web: `server`, `drawing`, `desks`, `export`, `people`, `mail`, `admin`, `account`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks`, `people`, `mail`, `admin`, `account` | contract: HTTP API, `public.md` |
 | Canvas | web: `app`, `state`, `screens`, `nav`, `canvas`, `toolbar`, `net`; core: `frame` | `ropes`, `frame` | behavior: Toolbar to Rail, Navigation |
 | Boxes and drawer | web: `boxes`, `drawer`, `voice`, `voice-ui` | `boxes`, `voice` | behavior: Drawer, Voice, Boxes |
 | Sharing | web: `share`, `sharing`, `comments`, `pins`, `player.*` | `share`, `comments`, `pins` | behavior: Sharing |

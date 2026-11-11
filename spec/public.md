@@ -112,17 +112,21 @@ new screen (413 *This account is full: delete a mockup first.*).
   times a day per address.
 - `POST /api/signin {email}` → 204, and a code is sent: six digits, good for 15 minutes, dead after 5
   wrong tries; a new one replaces the old. 400 for a bad email, 429 *Sign-ups are full for today.*
-  when the day's 100 emails or the address's 3 accounts are used (the accounts are checked again at
-  verify, so codes asked together cannot make a fourth), 503 *Sign-up is not set up yet.* in
-  production with no mail key.
+  when the day's 100 emails or the address's 3 accounts are used (for every email alike, so the answer
+  never tells whether an email has an account; the accounts are checked again at verify, so codes
+  asked together cannot make a fourth), 503 *Sign-up is not set up yet.* in production with no mail
+  key, 503 when the email did not go. The code is never logged in production.
 - `POST /api/verify {email, code}` → `{me}` and a new session cookie. A new email takes over the
   visitor's person (the mockups stay where they are) and sets `topupDue` 12 hours ahead. An email with
   an account signs in to it: the visitor's mockups move in, except those whose prompt the account
-  already has, and the visitor's person is deleted. 400 *That code is not right.*
+  already has, and the visitor's person is deleted. 400 *That code is not right.*, 429 when the address
+  made its accounts and the email is new.
 - `POST /api/signout` → 204, the session is deleted and the cookie cleared.
-- `POST /api/delete-account {email}` → 204: the cache file, every row and share link of the person go
-  (their `calls` stay with no person).
-- `POST /api/ask {note}` (registered, 1 to 500 characters) → 204. One open request per person (409).
+- `POST /api/delete-account {email}` (registered; `email` must be the account's) → 204 and the cookie
+  cleared: the cache file, every row and share link of the person go (their `calls` stay with no
+  person). 400 for another email.
+- `POST /api/ask {note}` (registered, 1 to 500 characters) → 204, and the owner gets it by email at
+  once. One open request per person (409).
 - `GET /api/admin` (owner) → `{spent: {today, month}, caps, mode, steps: {day, …counts}[] (30 days),
   people: {id, email, created, seen, allowance, spent, mockups, blocked, topupDue}[], requests[],
   address, mailToday, startersCurrent}`. `address` is the caller's as the server sees it.
@@ -139,7 +143,9 @@ new screen (413 *This account is full: delete a mockup first.*).
 - `GET /api/backup` in public mode is a zip: `screen-cache.json`, `uxwoz.db`, `users/<id>.json`.
 
 A check once a minute hands out the top-ups that are due and emails each user *Your free screens are
-ready*. Approving in the admin's page does the same at once.
+ready* (not when the day's emails are used up). Approving in the admin's page does the same at once.
+The same check tells the owner of sign-ups that started waiting since its last such email, one email an
+hour at most. These routes and the check are `web/src/account.ts`.
 
 ## Mail
 

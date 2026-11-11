@@ -216,3 +216,25 @@ describe('screen cache', () => {
     expect(again.get(screenKey('coffee app', '@cart'))?.proposals).toEqual([null, ver('<h1>Cart</h1>')])
   })
 })
+
+test('takeIn: another cache\'s mockups come in whole; a prompt this cache has is skipped', () => {
+  const from = new ScreenCache(), to = new ScreenCache()
+  const home = screen(from, 'Dog walks', null, '<a href="@map">Map</a>')
+  screen(from, 'Dog walks', 'map', '<h1>Map</h1>', { key: home.key, label: 'Map' })
+  from.addComponent('Dog walks', 'bar', 'top of every screen', ver('<nav>b</nav>'), 'user')
+  from.setBox('Dog walks', 'add', 'rules', { id: 'calm', text: 'Calm.' }, 'user')
+  from.ownShared('Dog walks').shares.push({ token: 'ab'.repeat(16), role: 'view', createdAt: '2026-11-11T00:00:00Z', used: 0, opens: 1 })
+  screen(from, 'A cafe', null, '<h1>visitor cafe</h1>')
+  screen(to, 'a  cafe!', null, '<h1>account cafe</h1>')
+
+  expect(to.takeIn(from)).toEqual(['Dog walks'])
+  expect(to.map('dog walks').entries.map((e) => e.name).sort()).toEqual(['bar', 'home', 'map'])
+  expect(to.boxesOf('Dog walks').rules.map((r) => r.id)).toEqual(['calm'])
+  expect(to.past('Dog walks').rules).toHaveLength(1)
+  expect(to.share('ab'.repeat(16))?.root).toBe('dog walks')
+  expect(to.find('a cafe', null)!.versions[0]!.html).toBe('<h1>account cafe</h1>')
+  // Copies: a change in one cache leaves the other as it was.
+  to.setBox('Dog walks', 'add', 'rules', { id: 'warm', text: 'Warm.' }, 'user')
+  expect(from.boxesOf('Dog walks').rules).toHaveLength(1)
+  expect(to.takeIn(from)).toEqual([])
+})
