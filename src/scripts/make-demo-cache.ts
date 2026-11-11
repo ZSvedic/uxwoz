@@ -25,7 +25,7 @@ const at = () => new Date().toISOString()
 
 const ver = (html: string, extra: Partial<Version> = {}): Version => ({
   html, model: 'claude-haiku-5.5', servedModel: 'anthropic/claude-haiku-5.5', createdAt: at(),
-  costUsd: 0, costEstimated: false, firstChunkMs: 900, totalMs: 4000, finishReason: 'stop', device: 'phone',
+  costUsd: 0.011, costEstimated: false, firstChunkMs: 900, totalMs: 4000, finishReason: 'stop', device: 'phone',
   name: html.match(/<title>([^<]*)/)?.[1], idea: html.match(/content="([^"]*)"/)?.[1], ...extra,
 })
 
@@ -98,7 +98,7 @@ export function makeDemoCache(file: string): ScreenCache {
   // One visit of the fixer, which added a rule; its Undo drops it.
   const visitAt = at()
   cache.setBox(app, 'add', 'rules', { id: 'streak-reset', text: 'A streak ends after a whole missed day.' }, 'fixer')
-  cache.noteVisit(app, { at: visitAt, ms: 6200, costUsd: 0, screens: 5, refused: [], seen: false, changes: [
+  cache.noteVisit(app, { at: visitAt, ms: 6200, costUsd: 0.004, screens: 5, refused: [], seen: false, changes: [
     { text: 'added rule streak-reset: A streak ends after a whole missed day.', note: 'Today and Habit detail counted a streak differently.', undo: { drop: 'rules', id: 'streak-reset' } },
   ] })
 

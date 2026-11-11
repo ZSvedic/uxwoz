@@ -64,7 +64,7 @@ src/packages/web/src/
                  visit's redraws as Edits; a screen's stream (A OR B at once, a revise) as NDJSON
   app.ts         browser entry: builds the canvas and the boxes, opens, closes and deletes a mockup, init
   state.ts       browser: the shared state, local storage, elements by id, Enter sends a form
-  screens.ts     browser: views and draw, A OR B streaming, refit and pick, clicks (@names, back), Regenerate, Edit,
+  screens.ts     browser: views (a card's name) and draw, A OR B streaming, refit and pick, clicks (@names, back), Regenerate, Edit,
                  Undo, delete
   nav.ts         browser: the current screen, ← → trail, the map after filing, Nav
   drawer.ts      browser: box changes and rail tools, the drawer (Edit, Info, and Comments for a screen) for a screen or a box
@@ -128,7 +128,10 @@ Bun's `--hot` server cannot pick up a newly added frontend file: restart it afte
 
 **Look at the app.** `PORT=3131 bun run demo` (3100 if no PORT) starts the app on a fresh temporary
 copy of a made-up mockup, a habit tracker, and prints four URLs: the app, and the view, comment and
-edit links. Use your own browser tab. It reads no `.env` and clears the model keys, so a model call
+edit links. Start it in the background (your shell tool's background option, or `nohup … &`) and stop
+it with `kill $(lsof -ti tcp:3131)`. Open the printed `127.0.0.1` URLs in a browser tab of your own and
+pass its tabId on every call: other agents share the pane. The app opens on Recent: click the mockup.
+A field's blur does not fire from script in a hidden pane, so click for real. It reads no `.env` and clears the model keys, so a model call
 is impossible: a new screen, Edit, Regenerate, filing after a pick and a fixer visit fail by design.
 You can still exercise the tree, the boxes (add, change, delete, Undo), Undo on Habit detail, the
 fixer's Undo, picking the open A OR B on History, Delete, Share, Comments, Export, and the player:
@@ -174,6 +177,8 @@ Facts that cost builders a search:
   promised order. Share tokens are hex.
 - `guard` in `share.ts` wraps every `/api` route: a route that takes `key` or `app` is already limited
   to an edit link's own mockup, view and comment links get 403, and `/api/apps` is cut there too.
+- Components are cache entries. The player's map and the paper the models get copy named fields, so a
+  new field on an entry stays private until you add it there.
 - A click inside a screen's frame never reaches the page around it. The frame posts messages (see
   Frame messages in the contract); of the keys, only Escape and the zoom keys are passed on.
 
