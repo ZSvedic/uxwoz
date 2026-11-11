@@ -1,7 +1,8 @@
 // Filing: after a pick or an Edit, the background model files the decision in plain lines; code
 // applies them to the boxes, refusing with a reason what breaks the manual's limits.
 
-import { refuseLine, type EntryBody, type Filing, type ScreenCache, type Version } from './cache.ts'
+import type { Version } from './cache.ts'
+import { refuseLine, type EntryBody, type Filing, type ScreenCache } from './cache-boxes.ts'
 import { LIMITS, normalizePrompt } from './keys.ts'
 import { elementEnd, type Device } from './frame.ts'
 import { FILING_MODEL, MODELS } from './models.ts'

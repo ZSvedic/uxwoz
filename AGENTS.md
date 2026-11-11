@@ -45,9 +45,11 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
                  states kept, visits kept and how often; a Data table as markdown
   tree.ts        the tree, worked out: links in each screen (components pasted), @names, planned screens,
                  shortest-path levels, the titles and lines of the paper
-  cache.ts       screen cache: find by name, proposals (the open A OR B) and pick, versions and undo, parents,
-                 delete with pruning, the boxes (components as entries, rules, tables, limits, IDs), the fixer's
-                 notes and their Undo, JSON file
+  cache.ts       screen cache, the screens (ScreenCacheBase): entry and version types, find by name, proposals
+                 (the open A OR B) and pick, versions and undo, parents, delete with pruning, apps, sharing data,
+                 the JSON file (load, format, save)
+  cache-boxes.ts screen cache, the boxes (ScreenCache extends the base): components as entries, rules, tables,
+                 limits, IDs, a box's states, Past and Undo, the fixer's notes and their Undo, markSeen, the paper
   frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix, picking and locating
                  a part for a comment); devices and their size;
                  name, idea; paste by ID and the current link
