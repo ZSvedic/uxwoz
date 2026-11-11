@@ -62,7 +62,8 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
 src/packages/web/src/
   desks.ts       a desk per person: their ScreenCache and its drawing; owner's is createServer's cache, others
                  open <dir>/<id>.json on demand and close after 10 idle minutes; whose(token) finds a share's desk
-                 (through the store's share index in public mode, opening a closed desk)
+                 (through the store's share index in public mode, opening a closed desk); move (a sign-in's
+                 takeIn), remove (desk and file gone for good), peek, people (for the backup)
   public.ts      public mode (UXWOZ_PUBLIC needs UXWOZ_OWNER), the uxwoz_who cookie, the address, who(req); the
                  gate a person's /api request passes onto their own desk: role table, Haiku only, 402 by the
                  meter, 409 one at a time, 413 at 5 MB, the warm-up rule, the steps counted; a person's metered
@@ -73,7 +74,8 @@ src/packages/web/src/
                  /api/map (wait=1 for filing and a visit), /api/apps, /api/delete, /api/delete-app,
                  /api/box (also undo, a box's Undo and Edit, Visit now), /api/warmup, /api/backup, /api/me, /api/step,
                  themes; request checks; a visit every 5 picks;
-                 every route takes its cache from the request's desk
+                 every route takes its cache from the request's desk; in public mode the account's and the
+                 admin's routes, the top-ups each minute, idle visitors swept each day, the backup as a zip
   drawing.ts     the work behind the routes: filing and visits in one chain per mockup (a click waits for it), a
                  visit's redraws as Edits; a screen's stream (A OR B at once, a revise) as NDJSON; a
                  starter's recording replayed in place of those calls, and `replayed` (would a request be)
@@ -126,7 +128,7 @@ src/scripts/record-starters.ts   `bun run starters:record [id…]`: live calls t
                              caches, writes recordings/<id>.json
 recordings/                  the starters' recordings (spec/public.md, Recordings); copied into the image
 src/scripts/demo.ts          `bun run demo`: the app on a temporary copy of the demo mockup, no keys, prints the URLs
-src/scripts/backup.sh        run by hand or weekly by launchd: the host's cache from GET /api/backup into backups/ (git-ignored)
+src/scripts/backup.sh        run by hand or weekly by launchd: GET /api/backup (the cache, or the public's zip) into backups/ (git-ignored)
 src/scripts/voice-check.ts   run by hand: a macOS voice says an Edit to a separate Chrome; PASS if the Edit was sent
 ```
 
@@ -191,7 +193,7 @@ same time only in different parts.
 |---|---|---|---|
 | Engine | core: `models`, `prompt`, `providers`, `generate`, `starters`, `recordings` | `generate-screen`, `cut-off`, `recordings` | `prompt-screen.md`, `ui-generation.md` |
 | Cache | core: `cache`, `cache-boxes`, `keys`, `tree` | `cache`, `boxes`, `tree`, `demo-cache` | contract: Types |
-| Server | web: `server`, `drawing`, `desks`, `public`, `export`, `people`, `mail`, `admin`, `account`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks`, `public`, `people`, `mail`, `admin`, `account`, `replay` | contract: HTTP API, `public.md` |
+| Server | web: `server`, `drawing`, `desks`, `public`, `export`, `people`, `mail`, `admin`, `account`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks`, `public`, `people`, `mail`, `admin`, `account`, `replay`, `journey` | contract: HTTP API, `public.md` |
 | Canvas | web: `app`, `state`, `screens`, `nav`, `canvas`, `toolbar`, `net`; core: `frame` | `ropes`, `frame` | behavior: Toolbar to Rail, Navigation |
 | Boxes and drawer | web: `boxes`, `drawer`, `voice`, `voice-ui` | `boxes`, `voice` | behavior: Drawer, Voice, Boxes |
 | Sharing | web: `share`, `sharing`, `comments`, `pins`, `player.*` | `share`, `comments`, `pins` | behavior: Sharing |

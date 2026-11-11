@@ -14,15 +14,15 @@ export interface AccountExtras {
   token: (req: Request) => string | null
   /** The caller's address as the server sees it (the header or the socket's), raw. */
   address: (req: Request) => string
-  /** The response with the session cookie set to `token`, or cleared when `token` is null. */
-  cookie: (res: Response, token: string | null) => Response
+  /** The response with the session cookie set to `token`, or cleared when `token` is null; `req` says whether it is https. */
+  cookie: (res: Response, token: string | null, req: Request) => Response
   /** Moves a visitor's mockups into an account's cache, skipping the prompts the account has, and deletes the visitor's file. */
   move: (fromId: string, toId: string) => unknown | Promise<unknown>
   /** Deletes a person's cache file; the store's rows go after it. */
   deleteFile: (id: string) => void | Promise<void>
   /** For mail (fetch, env, log). */
   io: Io
-  /** The app's address for the links in emails: by default the request's origin, and https://uxwoz.com/ for the check. */
+  /** The app's address for the links in emails: by default the request's origin, and https://app.uxwoz.com/ for the check. */
   appUrl?: (req?: Request) => string
   /** What /api/verify answers as `me`; by default `meOf`. */
   me?: (person: Person) => unknown
@@ -33,12 +33,13 @@ export interface AccountExtras {
 /** How often the check runs, and how often at most the owner hears of waiting sign-ups. */
 export const TOPUP_EVERY_MS = 60_000
 export const WAITING_MAIL_MS = 3600_000
-const APP_URL = 'https://uxwoz.com/'
+const APP_URL = 'https://app.uxwoz.com/'
 
 const json = (body: unknown, status = 200) => Response.json(body, { status })
 const fail = (status: number, error: string, reason?: string) => json(reason ? { error, reason } : { error }, status)
 const none = () => new Response(null, { status: 204 })
 const FULL = 'Sign-ups are full for today.'
+const SOON = 'A code is on its way: wait a minute before asking again.'
 const REGISTER = 'Register first.'
 
 async function body(req: Request): Promise<Record<string, unknown> | null> {
@@ -81,12 +82,12 @@ export function accountRoutes(store: People, extras: AccountExtras) {
         if (typeof email !== 'string' || !validEmail(email)) return fail(400, 'That email does not look right.')
         if (!mailReady(extras.io)) return fail(503, 'Sign-up is not set up yet.')
         const address = extras.address(req)
-        // Refused for every email alike, so the answer never tells whether one has an account.
-        if (store.accountsFull(address)) return fail(429, FULL)
+        // Never by the address's accounts nor by whether the email has one: a new account is refused at verify.
         const asker = extras.who(req)
         const made = store.makeCode(email, asker?.id ?? null, address)
         if (made === 'email') return fail(400, 'That email does not look right.')
-        if (made === 'mail' || made === 'address') return fail(429, FULL)
+        if (made === 'mail' || made === 'codes') return fail(429, FULL)
+        if (made === 'soon') return fail(429, SOON)
         if (!(await mail(codeMail(normalEmail(email), made.code)))) return fail(503, 'The email did not go. Try again in a minute.')
         if (asker) store.step(asker.id, 'asked', address)
         return none()
@@ -103,14 +104,14 @@ export function accountRoutes(store: People, extras: AccountExtras) {
         if (done === 'address') return fail(429, FULL)
         if (done.merged) await extras.move(done.merged, done.person.id)
         store.step(done.person.id, 'verified', address)
-        return extras.cookie(json({ me: me(store.person(done.person.id) ?? done.person) }), done.token)
+        return extras.cookie(json({ me: me(store.person(done.person.id) ?? done.person) }), done.token, req)
       },
     },
     '/api/signout': {
       POST: (req: Request) => {
         const t = extras.token(req)
         if (t) store.signOut(t)
-        return extras.cookie(none(), null)
+        return extras.cookie(none(), null, req)
       },
     },
     '/api/delete-account': {
@@ -121,7 +122,7 @@ export function accountRoutes(store: People, extras: AccountExtras) {
         if (typeof b?.email !== 'string' || normalEmail(b.email) !== p.email) return fail(400, 'That is not the email of this account.')
         await extras.deleteFile(p.id)
         store.deletePerson(p.id)
-        return extras.cookie(none(), null)
+        return extras.cookie(none(), null, req)
       },
     },
     '/api/ask': {

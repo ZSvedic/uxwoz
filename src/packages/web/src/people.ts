@@ -26,6 +26,9 @@ export const SCREEN_USD = 0.007
 /** A code's life and its wrong tries; how many `arrived` an address counts a day; idle days before a visitor goes; the default answer. */
 export const CODE_MS = 15 * 60_000
 export const CODE_TRIES = 5
+/** Sign-in codes a network may ask for in a day, and how soon one email may ask again. */
+export const CODES_PER_ADDRESS = 10
+export const CODE_AGAIN_MS = 60_000
 export const ARRIVED_PER_ADDRESS = 50
 export const IDLE_DAYS = 30
 export const ASK_USD = 0.5
@@ -70,7 +73,7 @@ CREATE TABLE IF NOT EXISTS codes (email TEXT PRIMARY KEY, hash TEXT NOT NULL, pe
 CREATE TABLE IF NOT EXISTS calls (at INTEGER NOT NULL, person TEXT, usd INTEGER NOT NULL, model TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS calls_at ON calls (at);
 CREATE TABLE IF NOT EXISTS addresses (day TEXT NOT NULL, hash TEXT NOT NULL, usd INTEGER NOT NULL DEFAULT 0, visitors INTEGER NOT NULL DEFAULT 0,
-  accounts INTEGER NOT NULL DEFAULT 0, arrived INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, hash));
+  accounts INTEGER NOT NULL DEFAULT 0, arrived INTEGER NOT NULL DEFAULT 0, codes INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, hash));
 CREATE TABLE IF NOT EXISTS requests (id INTEGER PRIMARY KEY AUTOINCREMENT, person TEXT NOT NULL, note TEXT NOT NULL, at INTEGER NOT NULL,
   answer TEXT, answeredAt INTEGER, usd INTEGER);
 CREATE TABLE IF NOT EXISTS steps (day TEXT NOT NULL, step TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (day, step));
@@ -95,6 +98,8 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
   const db = new Database(file, { create: true, strict: true })
   if (file !== ':memory:') db.exec('PRAGMA journal_mode = WAL')
   db.exec(SCHEMA)
+  // A database from before the codes count gets the column.
+  if (!(db.query('PRAGMA table_info(addresses)').all() as { name: string }[]).some((c) => c.name === 'codes')) db.exec('ALTER TABLE addresses ADD COLUMN codes INTEGER NOT NULL DEFAULT 0')
   const busy = new Set<string>()
 
   const get = (key: string) => (db.query('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | null)?.value
@@ -115,11 +120,11 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
     return key
   }
   const addressOf = (raw: string) => createHmac('sha256', salt()).update(network(raw)).digest('hex')
-  type AddrRow = { usd: number; visitors: number; accounts: number; arrived: number }
+  type AddrRow = { usd: number; visitors: number; accounts: number; arrived: number; codes: number }
   function addr(raw: string): AddrRow & { hash: string } {
     const hash = addressOf(raw)
     db.query('INSERT OR IGNORE INTO addresses (day, hash) VALUES (?, ?)').run(day(), hash)
-    return { hash, ...(db.query('SELECT usd, visitors, accounts, arrived FROM addresses WHERE day = ? AND hash = ?').get(day(), hash) as AddrRow) }
+    return { hash, ...(db.query('SELECT usd, visitors, accounts, arrived, codes FROM addresses WHERE day = ? AND hash = ?').get(day(), hash) as AddrRow) }
   }
   const bump = (hash: string, col: keyof AddrRow, by = 1) => db.query(`UPDATE addresses SET ${col} = ${col} + ? WHERE day = ? AND hash = ?`).run(by, day(), hash)
 
@@ -244,20 +249,25 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
     spent,
 
     // ── Sign-in ──
-    /** A six-digit code for `email` (a new one replaces the old), or why not. `mail` when today's mail is used up,
-     * `address` when this address made its accounts for today and the email has none. */
-    makeCode(email: string, asker: string | null, address: string): { code: string } | 'email' | 'mail' | 'address' {
+    /** A six-digit code for `email` (a new one replaces the old), or why not: `mail` when today's mail is used up,
+     * `codes` when this network asked for its 10 today, `soon` when this email asked less than a minute ago. It never
+     * depends on the address's accounts or on whether the email has one: the accounts are checked at verify. */
+    makeCode(email: string, asker: string | null, address: string): { code: string } | 'email' | 'mail' | 'codes' | 'soon' {
       if (!validEmail(email)) return 'email'
       const e = normalEmail(email)
-      if (mailToday() >= caps().mailPerDay) return 'mail'
-      if (!byEmail(e) && addr(address).accounts >= caps().addressAccounts) return 'address'
-      const code = String(randomBytes(4).readUInt32BE() % 1_000_000).padStart(6, '0')
-      db.query('INSERT OR REPLACE INTO codes (email, hash, person, expires, tries) VALUES (?, ?, ?, ?, 0)').run(e, sha(`${e}:${code}`), asker, now() + CODE_MS)
-      return { code }
+      return db.transaction(() => {
+        if (mailToday() >= caps().mailPerDay) return 'mail'
+        const a = addr(address)
+        if (a.codes >= CODES_PER_ADDRESS) return 'codes'
+        const old = db.query('SELECT expires FROM codes WHERE email = ?').get(e) as { expires: number } | null
+        if (old && now() < old.expires - CODE_MS + CODE_AGAIN_MS) return 'soon'
+        bump(a.hash, 'codes')
+        const code = String(randomBytes(4).readUInt32BE() % 1_000_000).padStart(6, '0')
+        db.query('INSERT OR REPLACE INTO codes (email, hash, person, expires, tries) VALUES (?, ?, ?, ?, 0)').run(e, sha(`${e}:${code}`), asker, now() + CODE_MS)
+        return { code }
+      })()
     },
     checkCode,
-    /** True when this address made its accounts for today: sign-in refuses every email then, so it never tells which have one. */
-    accountsFull(address: string) { return addr(address).accounts >= caps().addressAccounts },
     /** Sign in by code, with a new session. A new email takes over the visitor (or makes a person) and its
      * top-up waits; an existing account comes back with `merged`, the visitor's id, whose rows are gone: the
      * caller moves that cache file in. `code` for a wrong code, `address` when the address made its accounts. */

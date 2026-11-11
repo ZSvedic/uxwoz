@@ -5,7 +5,8 @@
 // /api/step live here. share.ts's `wrap` sends every non-owner request through `route`.
 
 import { STARTERS, canonicalAction, normalizePrompt, type Io, type ModelId } from '@uxwoz/core'
-import { left, screensOf, type People, type Person, type Reason, type Step } from './people.ts'
+import { screensOf, type People, type Person, type Reason, type Step } from './people.ts'
+import { meOf } from './account.ts'
 import type { Desk, Desks } from './desks.ts'
 
 /** The public's one model. */
@@ -133,19 +134,14 @@ export function gate(o: GateOptions) {
       const a = store.settings().caps.visitor
       return { role: 'new', left: a, allowance: a, screensLeft: screensOf(a), paused, may: { share: false, exportZip: false } }
     }
-    const p = store.person(w.person.id) ?? w.person, r = store.lastRequest(p.id), l = left(p)
-    return {
-      role: w.role, ...(p.email && { email: p.email }), left: l, allowance: p.allowance, screensLeft: screensOf(l),
-      ...(p.topupDue != null && { topupDue: p.topupDue }), ...(r && { request: { at: r.at, ...(r.answer && { answer: r.answer }) } }),
-      paused, may: { share: !!p.email, exportZip: !!p.email },
-    }
+    return meOf(store, store.person(w.person.id) ?? w.person)
   }
 
   /** Paths a person may never use, and those a visitor must register for. */
   const OWNERS = new Set(['/api/backup', '/api/admin'])
   const REGISTER = new Set(['/api/share', '/api/shares', '/api/unshare', '/api/feedback', '/api/export'])
-  /** The paths a request with no person yet may use. */
-  const OPEN = new Set(['/api/config', '/api/me', '/api/step'])
+  /** The paths a request with no person yet may use: signing in needs none (a second browser). */
+  const OPEN = new Set(['/api/config', '/api/me', '/api/step', '/api/signin', '/api/verify', '/api/signout'])
 
   /**
    * A non-owner's /api request (no edit link): onto their own desk, within the role table and the meter.

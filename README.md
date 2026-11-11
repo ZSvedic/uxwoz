@@ -76,6 +76,22 @@ UXWOZ_BACKUP_OWNER=<that password>
 ```
 
 To restore one, upload it as above, or run locally on it: `UXWOZ_CACHE_FILE=../backups/<file> bun run dev`.
+In public mode the backup is a `.zip`: `screen-cache.json`, `uxwoz.db` and `users/<id>.json`. Unzip it
+and upload each file to the same path under `/data` (`/uxwoz.db`, `/users/<id>.json`).
+
+**Open it to the public** ([spec/public.md](spec/public.md)). Add these variables, then redeploy:
+
+| Variable | Value |
+|---|---|
+| `UXWOZ_PUBLIC` | `1`; the server will not start without `UXWOZ_OWNER` |
+| `RESEND_API_KEY` | a sending-only key from Resend; without it sign-up answers *Sign-up is not set up yet.* |
+| `UXWOZ_ADMIN_EMAIL` | where quota requests and waiting sign-ups go |
+| `UXWOZ_URL` | the app's address in emails, default `https://app.uxwoz.com/` |
+| `UXWOZ_OPERATOR`, `UXWOZ_CONTACT` | who runs the site and whom to write to, on `/privacy` |
+| `UXWOZ_ADDRESS_HEADER` | the header with a visitor's address, default `x-real-ip` |
+| `UXWOZ_DB`, `UXWOZ_USERS_DIR` | default `uxwoz.db` and `users/` beside the cache file |
+
+The owner's page is `/admin`.
 
 ## Licence
 
