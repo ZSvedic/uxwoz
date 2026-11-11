@@ -86,6 +86,9 @@ src/packages/web/src/
                  (mayCall, hold, charge), sign-in codes and verify, top-ups, quota requests, steps, caps, share
                  tokens, the admin's summary, deletes, the day's address HMAC; no routes
   mail.ts        mail through Resend (logs with no key off production) and the texts of the emails
+  admin.ts       adminRoutes(store, extras): GET and POST /api/admin (the ops, their checks, their emails), /admin,
+                 /privacy (privacy.html with the operator and contact from the env, the design inline); no gate
+  admin.html, admin-page.ts   browser: the admin's page: spend and mode, caps, steps, Waiting, Requests, People
   share.ts       share links per role, the player's map, feedback (a name first; a visitor's own; Resolve) and
                  trips, an edit link's scope and cap, the owner's gate (UXWOZ_OWNER); `guard` wraps server.ts's routes
   sharing.ts     browser: the drawer's Share and feedback pane (a comment jumps to it), a screen's thumbs in Info,
@@ -99,7 +102,7 @@ src/packages/web/src/
   index.html     the page around the canvas; links design/index.css
   design/        the look: tokens.css (every colour), base.css (shared by parts), one file per part (bar,
                  canvas, boxes, drawer, panel), motion.css; index.css imports them all; fx.ts (sparks, sounds, pickFx);
-                 player.css (the player's, not in index.css), sheet.html and sheet.ts (the sheet at /design)
+                 player.css (the player's, not in index.css), admin.css (/admin and /privacy, not in index.css), sheet.html and sheet.ts (the sheet at /design)
   design/brand/  the logo, the favicons (SVG, PNG, home screen), the three star tiles, Fredoka and its licence,
                  og.png (the share preview)
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
