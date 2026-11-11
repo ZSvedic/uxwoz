@@ -4,7 +4,7 @@
 import { dirname, join, resolve } from 'node:path'
 import {
   BOX_TITLES, DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, ScreenCache, canonicalAction, isComponent, isDevice, isModelId, normalizePrompt,
-  screenKey, screenRef, VISIT_EVERY, warmUp, type BoxName, type Io,
+  screenKey, screenRef, STARTERS, VISIT_EVERY, warmUp, type BoxName, type Io,
 } from '@uxwoz/core'
 import { desks } from './desks.ts'
 import { drawing, ndjson } from './drawing.ts'
@@ -12,6 +12,8 @@ import { exportRoute } from './export.ts'
 import index from './index.html'
 import player from './player.html'
 import sheet from './design/sheet.html'
+import { people, type People } from './people.ts'
+import { PUBLIC_MODEL, gate, publicMode } from './public.ts'
 import { hostOf, sharing } from './share.ts'
 
 const THEMES_DIR = resolve(import.meta.dir, '../themes')
@@ -34,6 +36,14 @@ interface ServerOptions extends Io {
   usersDir?: string
   /** How long a person's desk stays open after their last request; 10 minutes. */
   idleMs?: number
+  /** Open to the public (spec/public.md); else UXWOZ_PUBLIC=1. Needs `owner`. */
+  public?: boolean
+  /** The owner's secret; else UXWOZ_OWNER. */
+  owner?: string
+  /** The people store in public mode; else one over UXWOZ_DB, else in memory. */
+  people?: People
+  /** The header with a visitor's address; else UXWOZ_ADDRESS_HEADER, else `x-real-ip`. */
+  addressHeader?: string
 }
 
 const json = (data: unknown, status = 200) => Response.json(data, { status })
@@ -59,15 +69,28 @@ export function createServer(opts: ServerOptions = {}) {
   const random = opts.random ?? Math.random
   const fileWaitMs = opts.fileWaitMs ?? 5000
   const io = { fetch: opts.fetch, env: opts.env, record: opts.record, spent: opts.spent }
+  const owner = opts.owner ?? process.env.UXWOZ_OWNER
+  // Public mode: a person's request passes the gate onto their own desk, and their calls are charged to them.
+  const store = publicMode(opts.public ?? process.env.UXWOZ_PUBLIC === '1', owner) ? (opts.people ?? people(process.env.UXWOZ_DB ?? ':memory:')) : null
+  let server: ReturnType<typeof Bun.serve> | null = null
+  const pub = store ? gate({
+    store, owner: owner!, desks: () => all, addressHeader: opts.addressHeader, refuse: refuseForeign,
+    socket: (req) => server?.requestIP(req)?.address ?? null,
+  }) : undefined
+  /** A desk's Io and whether its background work may start: the owner's as given, a person's metered. */
+  const ioOf = (id: string) => (pub && id !== 'owner' ? pub.io(id, io) : io)
   // Every route takes the cache and its work from the request's desk, never from here.
   const all = desks(opts.cache ?? new ScreenCache(), {
     dir: opts.usersDir ?? process.env.UXWOZ_USERS_DIR ?? null,
-    who: opts.who ?? (() => 'owner'),
-    draw: (cache) => drawing(cache, io, log, random, fileWaitMs),
+    who: pub ? pub.deskOf : (opts.who ?? (() => 'owner')),
+    draw: (cache, id) => drawing(cache, ioOf(id), log, random, fileWaitMs, pub && id !== 'owner' ? pub.may(id) : () => true),
     idleMs: opts.idleMs,
+    ...(store && { shareOwner: (t: string) => store.shareOwner(t) }),
   })
   /** The request's desk: `guard` has refused a request without one. */
   const at = (req: Request) => { const d = all.of(req)!; return { cache: d.cache, ...d.draw } }
+  /** A mockup's share tokens, for the index to drop when the mockup goes. */
+  const tokensOf = (cache: ScreenCache, app: string) => cache.sharedOf(app).shares.map((s) => s.token)
 
   const pickers = (b: { model?: unknown; device?: unknown } | null) => {
     const model = b?.model ?? DEFAULT_MODEL, device = b?.device ?? DEFAULT_DEVICE
@@ -76,8 +99,8 @@ export function createServer(opts: ServerOptions = {}) {
     return { model, device }
   }
 
-  const { guard } = sharing(all, api, { app: index, player })
-  const server = Bun.serve({
+  const { guard } = sharing(all, api, { app: index, player }, owner, pub)
+  server = Bun.serve({
     port: opts.port ?? Number(process.env.PORT ?? 3000),
     // Only this machine: the API spends the owner's model credits.
     hostname: process.env.UXWOZ_HOST ?? '127.0.0.1',
@@ -97,15 +120,24 @@ export function createServer(opts: ServerOptions = {}) {
         if (!THEME_FILES.has(name)) return new Response('Not found', { status: 404 })
         return new Response(Bun.file(join(THEMES_DIR, `${name}.css`)), { headers: { 'Content-Type': 'text/css' } })
       },
-      '/api/config': (req) => json({
-        defaultModel: DEFAULT_MODEL,
-        models: Object.values(MODELS).filter((m) => !m.background).map((m) => ({ id: m.id, label: m.label, costEstimated: m.costEstimated })),
-        themes: Object.entries(THEMES).map(([id, label]) => ({ id, label })),
-        defaultTheme: 'mockup',
-        devices: Object.entries(DEVICES).map(([id, d]) => ({ id, label: d.label, width: d.width })),
-        defaultDevice: DEFAULT_DEVICE,
-        ...(at(req).cache.warning && { warning: at(req).cache.warning }),
-      }),
+      '/api/config': (req) => {
+        // In public mode the public gets one model; a request with no person yet has no desk.
+        const one = pub?.isPublic(req), warning = all.of(req)?.cache.warning
+        return json({
+          defaultModel: one ? PUBLIC_MODEL : DEFAULT_MODEL,
+          models: Object.values(MODELS).filter((m) => !m.background && (!one || m.id === PUBLIC_MODEL)).map((m) => ({ id: m.id, label: m.label, costEstimated: m.costEstimated })),
+          themes: Object.entries(THEMES).map(([id, label]) => ({ id, label })),
+          defaultTheme: 'mockup',
+          devices: Object.entries(DEVICES).map(([id, d]) => ({ id, label: d.label, width: d.width })),
+          defaultDevice: DEFAULT_DEVICE,
+          ...(pub && { public: true, starters: STARTERS }),
+          ...(warning && { warning }),
+        })
+      },
+      '/api/me': (req) => json(pub ? pub.me(req) : { role: 'owner' }),
+      '/api/step': {
+        POST: api(async (b, req) => (pub ? pub.arrived(req, b) : new Response(null, { status: 204 }))),
+      },
       '/api/screen': {
         POST: api(async (b, req) => {
           const app = appOf(b)
@@ -194,8 +226,10 @@ export function createServer(opts: ServerOptions = {}) {
         POST: api(async (b, req) => {
           const { cache, forget, mapOf } = at(req)
           const key = String(b?.key ?? ''), app = cache.get(key)?.app
+          const gone = app && key === normalizePrompt(app) ? tokensOf(cache, app) : []
           const removed = cache.delete(key)
           if (app && key === normalizePrompt(app)) forget(app)
+          if (removed) pub?.unshared(gone)
           return removed && app ? json({ removed, ...mapOf(app) }) : fail('no such screen', 404)
         }),
       },
@@ -205,27 +239,31 @@ export function createServer(opts: ServerOptions = {}) {
           const app = appOf(b)
           if (badApp(app)) return badApp(app)!
           forget(app)
-          return json({ removed: cache.deleteApp(app) })
+          const gone = tokensOf(cache, app)
+          const removed = cache.deleteApp(app)
+          pub?.unshared(gone)
+          return json({ removed })
         }),
       },
       '/api/warmup': {
-        POST: api(async (b) => {
+        POST: api(async (b, req) => {
           const p = pickers(b)
           if (p instanceof Response) return p
           const { model } = p
-          warmUp(model, io).catch((e) => log(`warm-up failed (${model}): ${e.message}`))
+          warmUp(model, ioOf(all.of(req)?.id ?? 'owner')).catch((e) => log(`warm-up failed (${model}): ${e.message}`))
           return new Response(null, { status: 204 })
         }),
       },
     }),
     fetch: () => new Response('Not found', { status: 404 }),
   })
-  return Object.assign(server, { desks: all })
+  return Object.assign(server, { desks: all, people: store })
 }
 
 if (import.meta.main) {
   const file = process.env.UXWOZ_CACHE_FILE ?? resolve(import.meta.dir, '../../../../temp/screen-cache.json')
   const cache = new ScreenCache(file)
-  const server = createServer({ cache, usersDir: process.env.UXWOZ_USERS_DIR ?? join(dirname(file), 'users') })
-  console.log(`UX Woz on ${server.url} (cache: ${file}, ${cache.size} screens)`)
+  const open = process.env.UXWOZ_PUBLIC === '1'
+  const server = createServer({ cache, usersDir: process.env.UXWOZ_USERS_DIR ?? join(dirname(file), 'users'), ...(open && { people: people(process.env.UXWOZ_DB ?? join(dirname(file), 'uxwoz.db')) }) })
+  console.log(`UX Woz on ${server.url} (cache: ${file}, ${cache.size} screens${open ? ', open to the public' : ''})`)
 }

@@ -19,13 +19,16 @@ export interface DeskOptions {
   dir: string | null
   /** Who sent a request: 'owner' or a person's id. */
   who: (req: Request) => string
-  draw: (cache: ScreenCache) => Drawing
+  /** A desk's drawing; `id` is 'owner' or the person's, so their calls are charged to them. */
+  draw: (cache: ScreenCache, id: string) => Drawing
   idleMs?: number
+  /** The share index (public mode): whose a token is, so its desk opens even when closed. Without it, the open desks are searched. */
+  shareOwner?: (token: string) => string | null
 }
 
 export function desks(owner: ScreenCache, opts: DeskOptions) {
   const idleMs = opts.idleMs ?? IDLE_MS
-  const own: Desk = { id: 'owner', cache: owner, draw: opts.draw(owner), used: 0 }
+  const own: Desk = { id: 'owner', cache: owner, draw: opts.draw(owner, 'owner'), used: 0 }
   const open = new Map<string, Desk>()
 
   /** A person's desk, opened when it is not; null for an id that is neither `owner` nor a person's. */
@@ -35,15 +38,18 @@ export function desks(owner: ScreenCache, opts: DeskOptions) {
     let d = open.get(id)
     if (!d) {
       const cache = new ScreenCache(opts.dir ? join(opts.dir, `${id}.json`) : null)
-      open.set(id, (d = { id, cache, draw: opts.draw(cache), used: 0 }))
+      open.set(id, (d = { id, cache, draw: opts.draw(cache, id), used: 0 }))
     }
     d.used = Date.now()
     return d
   }
 
-  /** The desk that holds a share link, its mockup and the link: the owner's or an open one's. */
+  /** The desk that holds a share link, its mockup and the link: the owner's, else the index's person's
+   * (opened if closed), else, with no index, an open one's. */
   function whose(token: string): { desk: Desk; root: string; share: Share } | undefined {
-    for (const d of [own, ...open.values()]) {
+    const indexed = opts.shareOwner && /^[a-f0-9]{8,64}$/.test(token) ? opts.shareOwner(token) : null
+    const person = indexed && indexed !== 'owner' ? desk(indexed) : null
+    for (const d of opts.shareOwner ? [own, ...(person ? [person] : [])] : [own, ...open.values()]) {
       const f = d.cache.share(token)
       if (f) { d.used = Date.now(); return { desk: d, ...f } }
     }

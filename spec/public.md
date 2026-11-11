@@ -22,15 +22,21 @@ POST /api/verify {email, code} → {me}; the $0.15 arrives 12 hours later, or wh
 
 `UXWOZ_PUBLIC=1` opens the app to everyone; it needs `UXWOZ_OWNER`, and the server refuses to start
 without it. Unset, the app is as before (private, or open on a dev machine), `/api/me` answers
-`{role: "owner"}`, and nothing below applies.
+`{role: "owner"}`, `POST /api/step` is 204 and counts nothing, and nothing below applies. In public
+mode `/` is open to everyone; `/design` stays the owner's. `web/src/public.ts` holds who a request is,
+the address, the cookie, and the gate below; `createServer` takes `public`, `owner`, `people` and
+`addressHeader` as options for tests.
 
 ## Who a request is
 
 - The owner's cookie → `owner`: the owner's cache, every model, no meter.
 - Cookie `uxwoz_who=<token>` (32 hex; `HttpOnly; SameSite=Lax; Max-Age` a year; `Secure` on https) → the
   person whose session it is. The database keeps a SHA-256 of the token, never the token.
-- No cookie → `new`: may load the page, `/api/config`, `/api/me`, `/api/step`. The first
-  `POST /api/screen` makes a person (a visitor) and sets the cookie.
+- No cookie, or one that is no session → `new`: may load the page, `/api/config`, `/api/me`,
+  `/api/step`; `/api/apps` answers `{apps: []}` and `/api/warmup` 204 with no call; any other route is
+  401 `{error, reason: "new"}`. The first `POST /api/screen` (from this app's page: a cross-site one is
+  refused first) makes a person (a visitor) and sets the cookie, whatever it answers.
+- An edit link (`x-uxwoz-share`) works as before: the owner's mockup, the owner's models, its cap.
 
 A person has an id (hex, the name of their cache file, never sent to a browser), an email once
 registered, an allowance and what they spent, both in USD. A visitor is a person with no email.
@@ -59,10 +65,13 @@ store's methods take and give USD. Times are milliseconds since 1970, days and m
   it once per call when the call ends, however it ends. `null` means the cost never arrived; the
   server charges $0.002 for it. A replayed recording never calls it.
 - For a person, the server passes an `Io` whose `spent` adds a `calls` row, adds to the person's
-  `spent`, and to the day's address row when the person is a visitor.
-- **Paid** requests are the ones an edit link's cap counts (`costs` in `share.ts`) and `/api/warmup`.
-  A request a recording answers is free. A paid request is refused before any model call with 402
-  `{error, reason}`:
+  `spent`, and to the day's address row when the person is a visitor. A call in the background is
+  charged to the address of the person's last request.
+- **Paid** requests are the ones an edit link's cap counts (`costs` in `share.ts`) and `/api/warmup`,
+  except `/api/pick`: a pick is never refused (the two designs are paid for already), and its filing
+  and visit start only while the person may make a paid request (`may` in `drawing.ts`). A request a
+  recording answers is free (`replayed` in `drawing.ts`). A paid request is refused before any model
+  call with 402 `{error, reason}`:
 
 | `reason` | When | `error` |
 |---|---|---|
@@ -75,11 +84,15 @@ The store checks in the order `blocked`, `paused`, `allowance`, `address`: a rea
 comes before one that registering fixes, so a refused person is never sent to a sign-up that would not
 help. The 21st new visitor from an address in a day gets 402 `address` at their first `POST /api/screen`.
 
-- A person runs one paid request at a time (409 *One at a time: wait for this one.*). Background work
-  (filing, a visit) starts only while the person's balance is above zero. Two people can still pass a
+- A person runs one paid request at a time (409 *One at a time: wait for this one.*): a new screen or
+  a revise holds until its stream ends or the browser leaves. A warm-up, a box's Edit and Visit now
+  answer at once and are not held. Background work (filing, a visit) starts only while a paid request
+  of the person would pass (no 402 reason). Two people can still pass a
   shared cap (the address's, the day's) at once: each running call finishes, and the next is refused.
-- The public's model is Claude Haiku: `/api/config` lists only it, and another `model` is 403.
-- `/api/warmup` from the public calls the model only if no Haiku call ran in the last 4 minutes.
+- The public's model is Claude Haiku: `/api/config` lists only it (and makes it `defaultModel`), and
+  another `model` on any route is 403 *Only Claude Haiku is open to the public.*
+- `/api/warmup` from the public calls the model only if no Haiku call ran in the last 4 minutes (it
+  answers 204 without a call then, before the meter is asked).
 - Defaults, each changeable on the admin's page: visitor allowance $0.10, top-up $0.15 after 12 hours,
   $0.30 a day per address for visitors, 20 new visitors and 3 new accounts a day per address, $3 a day
   and $20 a month for the public as a whole, 100 emails a day (Resend's free plan).
@@ -100,16 +113,23 @@ for a visitor, plain 403 otherwise):
 | `/api/backup`, `/design`, `/admin`, `/api/admin` | no | no |
 
 A visitor's cache file is deleted after 30 days with no request. A cache file that passed 5 MB takes no
-new screen (413 *This account is full: delete a mockup first.*).
+new screen and no revise (413 *This account is full: delete a mockup first.*); a cache hit still opens.
+
+A person's share links are in the `shares` index: added by `/api/share`, dropped by `/api/unshare`, by
+`/api/delete` of a mockup's Home and by `/api/delete-app` (Start over). `whose(token)` looks in the
+owner's cache first, then opens the index's person's desk, closed or not. The owner's links are not in
+the index.
 
 ## Routes
 
 - `GET /api/me` → `{role: "owner" | "user" | "visitor" | "new", email?, left, allowance, screensLeft,
   topupDue?, request?: {at, answer?}, paused, may: {share, exportZip}}`. `left` is allowance minus spent, never below 0;
   `screensLeft` is `floor(left / 0.007)`; `paused` is true when a paid request would get `paused`.
-- `POST /api/step {step: "arrived"}` → 204. The other steps (`starter`, `picked`, `own`, `limit`,
-  `asked`, `verified`) the server counts itself, each once per person. `arrived` is counted at most 50
-  times a day per address.
+- `POST /api/step {step: "arrived"}` → 204 (another step is 400). The other steps (`starter`, `picked`, `own`, `limit`,
+  `asked`, `verified`) the server counts itself, each once per person: `starter` and `own` at a
+  `POST /api/screen` for a Home not in the person's cache, with a starter's prompt or another;
+  `picked` at a pick that worked; `limit` at a 402 `allowance`. `arrived` is counted at most 50 times
+  a day per address, and an `arrived` before the person exists counts for the day only.
 - `POST /api/signin {email}` → 204, and a code is sent: six digits, good for 15 minutes, dead after 5
   wrong tries; a new one replaces the old. 400 for a bad email, 429 *Sign-ups are full for today.*
   when the day's 100 emails or the address's 3 accounts are used (for every email alike, so the answer
@@ -139,7 +159,8 @@ new screen (413 *This account is full: delete a mockup first.*).
   email counts toward the day's.
 - `GET /admin` (owner), `GET /privacy` (everyone): pages. The privacy page names `UXWOZ_OPERATOR` as who
   runs the site and `UXWOZ_CONTACT` (else `UXWOZ_ADMIN_EMAIL`) as whom to write to.
-- `GET /api/config` gains `public: true`, `starters: Starter[]` and, for the public, one model.
+- `GET /api/config` gains `public: true`, `starters: Starter[]` (both only in public mode, the owner's
+  too) and, for the public, one model.
 - `GET /api/backup` in public mode is a zip: `screen-cache.json`, `uxwoz.db`, `users/<id>.json`.
 
 A check once a minute hands out the top-ups that are due and emails each user *Your free screens are
