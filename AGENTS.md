@@ -56,11 +56,14 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
                  name, idea; paste by ID and the current link
   zip.ts         a zip of stored entries (CRC-32, central directory), for Export project
 src/packages/web/src/
+  desks.ts       a desk per person: their ScreenCache and its drawing; owner's is createServer's cache, others
+                 open <dir>/<id>.json on demand and close after 10 idle minutes; whose(token) finds a share's desk
   export.ts      GET /api/export: a mockup as a zip for a coding or design agent (handoff, README with the tree,
                  the boxes, one page per drawn screen whose links work from disk)
   server.ts      Bun.serve: /api/config, /api/screen (NDJSON, A OR B at once), /api/pick, /api/revise, /api/undo,
                  /api/map (wait=1 for filing and a visit), /api/apps, /api/delete, /api/delete-app,
-                 /api/box (also undo, a box's Undo and Edit, Visit now), /api/warmup, /api/backup, themes; request checks; a visit every 5 picks
+                 /api/box (also undo, a box's Undo and Edit, Visit now), /api/warmup, /api/backup, themes; request checks; a visit every 5 picks;
+                 every route takes its cache from the request's desk
   drawing.ts     the work behind the routes: filing and visits in one chain per mockup (a click waits for it), a
                  visit's redraws as Edits; a screen's stream (A OR B at once, a revise) as NDJSON
   app.ts         browser entry: builds the canvas and the boxes, opens, closes and deletes a mockup, init
@@ -165,7 +168,7 @@ same time only in different parts.
 |---|---|---|---|
 | Engine | core: `models`, `prompt`, `providers`, `generate` | `generate-screen`, `cut-off` | `prompt-screen.md`, `ui-generation.md` |
 | Cache | core: `cache`, `cache-boxes`, `keys`, `tree` | `cache`, `boxes`, `tree`, `demo-cache` | contract: Types |
-| Server | web: `server`, `drawing`, `export`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export` | contract: HTTP API |
+| Server | web: `server`, `drawing`, `desks`, `export`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks` | contract: HTTP API |
 | Canvas | web: `app`, `state`, `screens`, `nav`, `canvas`, `toolbar`, `net`; core: `frame` | `ropes`, `frame` | behavior: Toolbar to Rail, Navigation |
 | Boxes and drawer | web: `boxes`, `drawer`, `voice`, `voice-ui` | `boxes`, `voice` | behavior: Drawer, Voice, Boxes |
 | Sharing | web: `share`, `sharing`, `comments`, `pins`, `player.*` | `share`, `comments`, `pins` | behavior: Sharing |

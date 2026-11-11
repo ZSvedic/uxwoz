@@ -255,5 +255,8 @@ export function drawing(cache: ScreenCache, io: Pick<Io, 'fetch' | 'env'>, log: 
   /** Settles when the mockup's filing and visit have. */
   const idle = (app: string) => Promise.all([filings.get(normalizePrompt(app)), visits.get(normalizePrompt(app))])
 
-  return { file, visit, mapOf, forget, idle, screenEvents, reviseEvents }
+  /** Whether any mockup's filing or visit runs (a desk does not close then). */
+  const busy = () => filings.size > 0 || visits.size > 0 || [...filingCount.values()].some((n) => n > 0)
+
+  return { file, visit, mapOf, forget, idle, busy, screenEvents, reviseEvents }
 }
