@@ -53,8 +53,7 @@ These steps are for [Railway](https://railway.com) (Hobby plan); the root `Docke
 3. Right-click the canvas, add a **Volume**, attach it to the service, mount path `/data`. The cache
    lives there and survives deploys.
 4. **Settings**: under Networking, **Generate Domain**; set the healthcheck path to `/healthz`.
-5. **Backups**: turn on the daily schedule for the volume.
-6. Open `https://<your domain>/?owner=<that password>`. Share links then start with that address.
+5. Open `https://<your domain>/?owner=<that password>`. Share links then start with that address.
 
 To bring local mockups along, with the `railway` CLI linked to the project (`railway link`):
 
@@ -64,6 +63,17 @@ railway volume files upload temp/screen-cache.json /screen-cache.json --overwrit
 
 Then redeploy the service so it reads the file. A deploy takes the app away for a few seconds, since
 one machine holds the disk.
+
+**Backups.** Railway's scheduled volume backups need its Pro plan, so the repo has its own:
+`src/scripts/backup.sh` fetches the host's whole cache from `GET /api/backup` (owner only) into
+`backups/`, which git ignores. It reads two lines from a root `.env.local`, also ignored:
+
+```
+UXWOZ_BACKUP_URL=https://<your domain>
+UXWOZ_BACKUP_OWNER=<that password>
+```
+
+To restore one, upload it as above, or run locally on it: `UXWOZ_CACHE_FILE=../backups/<file> bun run dev`.
 
 ## Licence
 
