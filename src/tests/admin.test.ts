@@ -183,7 +183,11 @@ test('/privacy names the operator and the contact from the env, escaped, with th
   expect(res.headers.get('content-type')).toContain('text/html')
   const html = await res.text()
   expect(html).toContain('UX Woz is run by Ana &#60;Studio&#62;.')
-  expect(html).toContain('<a href="mailto:privacy@example.com">privacy@example.com</a>')
+  // The address is not in the HTML as written: backwards in two pieces, and as words for a reader with no script.
+  expect(html).not.toContain('privacy@example.com')
+  expect(html).not.toContain('mailto:')
+  expect(html).toContain('data-u="ycavirp" data-d="moc.elpmaxe"')
+  expect(html).toContain('privacy at example dot com')
   expect(html).toContain('<style>')
   expect(html).toContain('.sheet')
   expect(html).not.toContain('{{')

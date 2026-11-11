@@ -187,7 +187,9 @@ the index.
   email counts toward the day's.
 - `GET /admin` (owner: anyone else gets 403, as at `/design`; the page itself is served from a path with a
   secret made per process, which only the server's own fetch knows), `GET /privacy` (everyone): pages. The privacy page names `UXWOZ_OPERATOR` as who
-  runs the site and `UXWOZ_CONTACT` (else `UXWOZ_ADMIN_EMAIL`) as whom to write to.
+  runs the site and `UXWOZ_CONTACT` (else `UXWOZ_ADMIN_EMAIL`) as whom to write to. An email address there is
+  kept from scrapers: the HTML holds it backwards in two pieces and as words (*name at site dot com*),
+  and a script builds the link in the browser.
 - `GET /api/config` gains `public: true`, `starters: Starter[]` (both only in public mode, the owner's
   too) and, for the public, one model.
 - `GET /api/backup` in public mode is a zip, `uxwoz-backup.zip`: `screen-cache.json` (the owner's), `uxwoz.db`

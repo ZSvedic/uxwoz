@@ -129,7 +129,14 @@ export function adminRoutes(store: People, extras: AdminExtras) {
     const style = ['tokens.css', 'base.css', 'admin.css']
       .map((f) => readFileSync(join(import.meta.dir, 'design', f), 'utf8'))
       .join('\n').replace(/@font-face\s*{[^}]*}/g, '')
-    const write = contact.includes('@') ? `<a href="mailto:${esc(contact)}">${esc(contact)}</a>` : contact ? esc(contact) : 'the address on this site'
+    // An address is kept from scrapers: the page's HTML holds it backwards in two pieces, with the words
+    // "name at site dot com" as text, and a script puts the working link together in the browser.
+    const back = (s: string) => [...s].reverse().join('')
+    const at = contact.lastIndexOf('@')
+    const write = at > 0
+      ? `<span class="mail" data-u="${esc(back(contact.slice(0, at)))}" data-d="${esc(back(contact.slice(at + 1)))}">${esc(contact.slice(0, at))} at ${esc(contact.slice(at + 1).replaceAll('.', ' dot '))}</span>`
+        + `<script>for (const m of document.querySelectorAll('.mail')) { const r = (s) => [...s].reverse().join(''), a = document.createElement('a'); a.textContent = r(m.dataset.u) + String.fromCharCode(64) + r(m.dataset.d); a.href = 'mai' + 'lto:' + a.textContent; m.replaceWith(a) }</script>`
+      : contact ? esc(contact) : 'the address on this site'
     privacy = readFileSync(join(import.meta.dir, 'privacy.html'), 'utf8')
       .replace('<!--style-->', `<style>${style}</style>`)
       .replaceAll('{{operator}}', esc(operator))
