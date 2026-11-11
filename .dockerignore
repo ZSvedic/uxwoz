@@ -1,7 +1,8 @@
-# The image needs src/ only: no keys, no cache, no tests.
+# The image needs src/ and the starters' recordings only: no keys, no cache, no tests.
 *
 !Dockerfile
 !src
+!recordings
 src/node_modules
 src/tests
 src/scripts

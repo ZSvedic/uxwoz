@@ -58,7 +58,7 @@ export function createServer(opts: ServerOptions = {}) {
   const log = opts.log ?? ((m: string) => console.warn(m))
   const random = opts.random ?? Math.random
   const fileWaitMs = opts.fileWaitMs ?? 5000
-  const io = { fetch: opts.fetch, env: opts.env }
+  const io = { fetch: opts.fetch, env: opts.env, record: opts.record, spent: opts.spent }
   // Every route takes the cache and its work from the request's desk, never from here.
   const all = desks(opts.cache ?? new ScreenCache(), {
     dir: opts.usersDir ?? process.env.UXWOZ_USERS_DIR ?? null,

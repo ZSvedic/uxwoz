@@ -36,8 +36,12 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
   models.ts      the 3 screen models and Terra (background, filing), call settings, prices
   prompt.ts      system prompt (the canvas manual verbatim + how to reply) and the user messages: the paper
                  (titles, lines, boxes), then Draw, Edit or File (a copy of spec/prompt-screen.md; a test keeps them equal)
-  providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol, Terra)
+  providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol, Terra); a call's cost once
+                 however it ends (`spent`), a live call captured (`record`), a `recorded` one replayed with its timing
   generate.ts    one design: stream, 20 s deadline, cost, name and idea, refuse cut-off replies
+  starters.ts    the eight starters: id, label, kind, device, prompt (data only, also in the browser)
+  recordings.ts  server only: recordings/<id>.json read, the design for a screen's nth draw, Home's filing by side,
+                 promptHash and startersCurrent, what a recording lacks
   filing.ts      filing: number a screen's parts, ask Terra (also for the fixer), parse its lines, apply them to
                  the boxes with refusals
   fixer.ts       the fixer's visit: the paper and the screens new since the last one, parse its lines, apply them
@@ -106,6 +110,9 @@ src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loa
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
 src/tests/fixtures/demo-cache.json   the demo mockup (a habit tracker); made by scripts/make-demo-cache.ts
 src/scripts/make-demo-cache.ts   writes the demo mockup through ScreenCache, the same on every run
+src/scripts/record-starters.ts   `bun run starters:record [id…]`: live calls through createServer on temporary
+                             caches, writes recordings/<id>.json
+recordings/                  the starters' recordings (spec/public.md, Recordings); copied into the image
 src/scripts/demo.ts          `bun run demo`: the app on a temporary copy of the demo mockup, no keys, prints the URLs
 src/scripts/backup.sh        run by hand or weekly by launchd: the host's cache from GET /api/backup into backups/ (git-ignored)
 src/scripts/voice-check.ts   run by hand: a macOS voice says an Edit to a separate Chrome; PASS if the Edit was sent
@@ -113,7 +120,7 @@ src/scripts/voice-check.ts   run by hand: a macOS voice says an Edit to a separa
 
 ## Do not read (large or generated)
 
-`cassettes/*.json`, `src/packages/web/themes/pico.css`, `src/bun.lock`, `temp/`, and
+`cassettes/*.json`, `recordings/*.json`, `src/packages/web/themes/pico.css`, `src/bun.lock`, `temp/`, and
 `process/journal/` beyond its latest file. Search them with grep if you must.
 
 ## Layout rules
@@ -170,7 +177,7 @@ same time only in different parts.
 
 | Part | Files | Tests | Spec |
 |---|---|---|---|
-| Engine | core: `models`, `prompt`, `providers`, `generate` | `generate-screen`, `cut-off` | `prompt-screen.md`, `ui-generation.md` |
+| Engine | core: `models`, `prompt`, `providers`, `generate`, `starters`, `recordings` | `generate-screen`, `cut-off`, `recordings` | `prompt-screen.md`, `ui-generation.md` |
 | Cache | core: `cache`, `cache-boxes`, `keys`, `tree` | `cache`, `boxes`, `tree`, `demo-cache` | contract: Types |
 | Server | web: `server`, `drawing`, `desks`, `export`, `people`, `mail`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks`, `people`, `mail` | contract: HTTP API, `public.md` |
 | Canvas | web: `app`, `state`, `screens`, `nav`, `canvas`, `toolbar`, `net`; core: `frame` | `ropes`, `frame` | behavior: Toolbar to Rail, Navigation |
