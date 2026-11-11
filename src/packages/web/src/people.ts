@@ -256,6 +256,8 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
       return { code }
     },
     checkCode,
+    /** True when this address made its accounts for today: sign-in refuses every email then, so it never tells which have one. */
+    accountsFull(address: string) { return addr(address).accounts >= caps().addressAccounts },
     /** Sign in by code, with a new session. A new email takes over the visitor (or makes a person) and its
      * top-up waits; an existing account comes back with `merged`, the visitor's id, whose rows are gone: the
      * caller moves that cache file in. `code` for a wrong code, `address` when the address made its accounts. */
