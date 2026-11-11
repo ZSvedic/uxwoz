@@ -5,6 +5,7 @@
 | What the user sees, what the system does | [spec/behavior.md](spec/behavior.md) |
 | How a screen is generated: HTML + Pico format, rendering, models | [spec/ui-generation.md](spec/ui-generation.md) |
 | Packages, HTTP API, frame messages, types, env vars, tests | [spec/code-contract.md](spec/code-contract.md) |
+| The public: people, the meter, sign-up, the admin's routes, recordings | [spec/public.md](spec/public.md) |
 | The LLM prompt | [spec/prompt-screen.md](spec/prompt-screen.md) |
 | How to run, test, re-record | [README.md](README.md) |
 | How to write any markdown you add | [process/writing-style.md](process/writing-style.md) |

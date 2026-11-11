@@ -520,6 +520,66 @@ browser and says what they think. Nothing is real-time and nobody signs in: a li
   `/?owner=<secret>` once (it keeps a cookie); others see *This UX Woz is private.* Share links work
   for everyone. Unset, the app is as before.
 
+## The public
+
+With `UXWOZ_PUBLIC` set, anyone may open the app. A stranger lands in it with no marketing page before
+it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: [public.md](public.md).
+
+- **Starters** take the place of Templates in the generate panel, for everyone: eight cards, each with
+  its name and kind (*Plant care · Phone app*), the first one *How UX Woz works*. Picking one opens its
+  mockup and replays a recording: the two designs draw at the speed they were first made, and no model
+  is called. In a starter, Home and every screen Home links to are recorded, four designs each, so
+  picks, clicks and Regenerate are free there. A first-time visitor sees the starters above the prompt
+  box under *Pick one and watch it drawn*, and the prompt box under *or describe your own*; a visitor
+  who has mockups sees the prompt box first, as today. The public has no Model picker.
+- **Hints** teach by the moment: one line, in the hint's place, that stays until the visitor does the
+  thing, each shown once per browser and never to a visitor who already did it.
+  1. Two designs are ready for the first time: *Pick the one you like.*
+  2. After the first pick: *Click anything in it.*
+  3. After the second pick: *Change it in words: press Edit.*
+  4. After the first Edit: *Changed your mind? Undo brings the old one back.*
+  5. After the first Undo: *That is the whole app. Now describe your own.* A press on it opens the
+     generate panel.
+  Each step done plays the spark and sound a pick already has. Nothing blocks and nothing needs closing.
+- **Live designs.** A visitor's own prompt, an Edit, a box's Edit, Visit now, and a click on a screen
+  with no recording call the models, and count against the visitor's free screens. The first time, the
+  hint says *From here your designs are made live.*
+- **The account button** is the toolbar's last item. A visitor's shows the free screens left
+  (*14 free*) once they made a live design; a registered user's shows the first letter of their email.
+  Its menu: *About 14 free screens left*; **Register** (a visitor) or the email; **Ask for more**
+  (registered, none left); **Sign out**; **Delete my account…**, which asks for the email typed once
+  more and then removes the mockups, the links and the account at once; **Privacy**.
+- **The account card** opens over the dimmed canvas, like the generate panel, when a live design is
+  refused for lack of free screens, or from **Register**. Esc or a press outside closes it.
+  - A visitor: *You have used your free screens. Register to get about 21 more.* An email field,
+    **Send the code**, and *No password: we email you a six-digit code.* with a link to Privacy.
+  - Then *We sent a code to ana@example.com.*, a field for it, **Verify** and *Send a new one*. A wrong
+    code says *That code is not right.*
+  - Verified, a new account: *Thanks. Your 21 free screens arrive within 12 hours, and we will email
+    you. Your mockups stay open until then: look, click, export.* The email, when it comes, says *Your
+    free screens are ready* with a link to the app.
+  - Verified, an account that exists: the card closes and the mockups made as a visitor are in Recent.
+  - A registered user with none left: *You have used your free screens.* A field *What are you
+    building?*, **Ask for more**, then *Asked. The answer comes by email.*
+- **Paused.** When the owner switched the public to starters only, or the day's or the month's cap is
+  reached, a live design answers with the red pill: *Live designs are paused for now. The starters
+  still work.*
+- **What needs an account**: Share (View and Comment links) and Export project. A visitor who presses
+  either gets the account card with *Register to share a mockup* or *Register to export it*. Edit links
+  are the owner's only. Export the boxes, voice and the boxes work for everyone.
+- **The admin's page** (`/admin`, the owner): today's and the month's public spend beside their caps,
+  and the switch **Open / Starters only**; the caps and allowances, each editable; the steps by day for
+  30 days (arrived, picked a starter, picked a design, typed an own prompt, hit the limit, asked for a
+  code, verified); **Waiting** (verified users whose free screens have not arrived, each with **Approve
+  now**); **Requests** (who, their note, what they spent, an amount, **Approve** and **Refuse**; the
+  user gets the answer by email); **People** (email or *visitor*, since, last seen, spent of allowance,
+  mockups; **Give more**, **Block**, **Delete**); *Your address as the server sees it*; and whether the
+  starters were recorded with today's prompt.
+- **Privacy** (`/privacy`, everyone): a short page on what is stored (the email, prompts and mockups, a
+  scrambled network address for one day, counts of steps), who else handles it (the host, the mail
+  service, the model providers), how long (a visitor's mockups 30 days after the last visit, an
+  account's until it is deleted), and whom to write to.
+
 ## Colours
 
 Black and white is the mockup, and blue is a control in a mockup that opens another screen, in
