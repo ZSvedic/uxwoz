@@ -93,7 +93,6 @@ src/packages/web/src/
                  og.png (the share preview)
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
-src/scripts/fixer-reply.ts   run by hand: Terra's raw reply to a visit of a cache file
 src/scripts/voice-check.ts   run by hand: a macOS voice says an Edit to a separate Chrome; PASS if the Edit was sent
 ```
 
@@ -128,8 +127,7 @@ at the running app. Bun's `--hot` dev server cannot pick up a newly added fronte
   `tests/design.test.ts` checks it. To find the file for a look change: a colour is in `tokens.css`, a
   shape in the part's file, a rule two parts share in `base.css`, movement in `motion.css`.
 - **No design tweak without a request.** Change colours, spacing, fonts, motion or sounds only when the
-  user asked for that change. A bug fix keeps the look as it is. The design variants the user chooses
-  from are in `process/design/`.
+  user asked for that change. A bug fix keeps the look as it is.
 
 ## Before a change
 
