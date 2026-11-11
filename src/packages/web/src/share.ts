@@ -12,8 +12,8 @@ export const TRIP_KEEP = 50
 export const FEEDBACK_CHARS = 1000
 export const EDIT_CAP = 20
 const ROLES = ['view', 'comment', 'edit'] as const
-/** The routes an edit link may not use: the share links themselves, resolving feedback, deleting the whole mockup, the owner's warm-up, the backup. */
-const OWNER_ONLY = new Set(['/api/share', '/api/shares', '/api/unshare', '/api/feedback', '/api/delete-app', '/api/warmup', '/api/backup'])
+/** The routes an edit link may not use: the share links themselves, resolving feedback, deleting the whole mockup, the owner's warm-up, the backup, the admin's. */
+const OWNER_ONLY = new Set(['/api/share', '/api/shares', '/api/unshare', '/api/feedback', '/api/delete-app', '/api/warmup', '/api/backup', '/api/admin'])
 /** The routes that call a model when an edit link uses them (a new screen only when it is not in the cache). */
 const PAID = new Set(['/api/screen', '/api/revise', '/api/pick'])
 
@@ -245,8 +245,12 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
       if (secret === owner) return new Response(null, { status: 302, headers: { Location: '/', 'Set-Cookie': `uxwoz_owner=${owner}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${https ? '; Secure' : ''}` } })
       return isOwner(req) || pub ? page(server, '/_app') : closed()
     }
-    // The design sheet is the owner's too: its page moves to /_design, as the app's is at /_app.
-    if (owner && out['/design']) { out['/_design'] = out['/design']; out['/design'] = (req: Request, server: { port?: number }) => isOwner(req) ? page(server, '/_design') : closed() }
+    // The design sheet and the admin's page are the owner's too: each page moves to /_<name>, as the app's is at /_app.
+    for (const p of ['/design', '/admin']) {
+      if (!owner || !out[p]) continue
+      out[`/_${p.slice(1)}`] = out[p]
+      out[p] = (req: Request, server: { port?: number }) => isOwner(req) ? page(server, `/_${p.slice(1)}`) : closed()
+    }
     return out as Bun.Serve.Routes<unknown, R>
   }
 

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Pull the hosted app's screen cache into backups/ at the repo root (git-ignored).
+# Pull the hosted app's backup into backups/ at the repo root (git-ignored): the screen cache as JSON, or in public
+# mode (UXWOZ_PUBLIC=1) a zip of the screen cache, the people's database and every person's cache file.
 # Run by hand from anywhere: src/scripts/backup.sh. On the owner's Mac a launchd job runs it on Mondays at 10:00
 # (~/Library/LaunchAgents/com.uxwoz.backup.plist; its output goes to backups/backup.log).
 # It reads two lines from the repo root's .env.local (git-ignored, read by nothing else):
@@ -17,16 +18,22 @@ owner="${UXWOZ_BACKUP_OWNER:-$(line UXWOZ_BACKUP_OWNER)}"
 [ -n "$url" ] && [ -n "$owner" ] || { echo "backup: put UXWOZ_BACKUP_URL and UXWOZ_BACKUP_OWNER in $conf" >&2; exit 1; }
 
 mkdir -p "$root/backups"
-out="$root/backups/screen-cache-$(date +%Y-%m-%d-%H%M).json"
-trap 'rm -f "$out.part"' EXIT
+base="$root/backups/screen-cache-$(date +%Y-%m-%d-%H%M)"
+part="$base.part"
+trap 'rm -f "$part"' EXIT
 # The password goes in a header read from stdin, so it never shows in the process list or the address.
 # curl's config file treats \ and " as special inside quotes: escape them.
 esc=${owner//\\/\\\\}; esc=${esc//\"/\\\"}
-code=$(printf 'header = "Cookie: uxwoz_owner=%s"\n' "$esc" | curl -sS -m 120 -K - -o "$out.part" -w '%{http_code}' "${url%/}/api/backup") || code=000
-if [ "$code" != 200 ] || [ "$(head -c 1 "$out.part")" != "{" ] || [ "$(tail -c 1 "$out.part")" != "}" ]; then
-  rm -f "$out.part"
+code=$(printf 'header = "Cookie: uxwoz_owner=%s"\n' "$esc" | curl -sS -m 300 -K - -o "$part" -w '%{http_code}' "${url%/}/api/backup") || code=000
+# Whole: a JSON file starts with { and ends with }; a zip starts with PK and ends with its directory's last record.
+out=""
+if [ "$code" = 200 ] && [ "$(head -c 1 "$part")" = "{" ] && [ "$(tail -c 1 "$part")" = "}" ]; then out="$base.json"
+elif [ "$code" = 200 ] && [ "$(head -c 2 "$part")" = "PK" ] && [ "$(tail -c 22 "$part" | head -c 4 | od -An -tx1 | tr -d ' \n')" = "504b0506" ]; then out="$base.zip"
+fi
+if [ -z "$out" ]; then
+  rm -f "$part"
   echo "$(date '+%Y-%m-%d %H:%M') backup FAILED: HTTP $code from ${url%/}/api/backup" >&2
   exit 1
 fi
-mv "$out.part" "$out"
+mv "$part" "$out"
 echo "$(date '+%Y-%m-%d %H:%M') backup saved: $out ($(wc -c < "$out" | tr -d ' ') bytes)"

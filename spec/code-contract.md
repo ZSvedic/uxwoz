@@ -142,7 +142,8 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
   now (every mockup, the boxes, the shares, feedback and trips), as `application/json` with
   `Content-Disposition: attachment; filename="screen-cache.json"` and `Cache-Control: no-store`; it
   changes nothing. The owner's only (see Sharing): never through a share link of any role. A file
-  saved from it loads as `UXWOZ_CACHE_FILE`.
+  saved from it loads as `UXWOZ_CACHE_FILE`. In public mode it is a zip instead (see
+  [public.md](public.md#routes)).
 - `POST /api/delete {key}`: delete a screen. Screens the first screen reached before and no longer
   reaches (through the clicks that made screens and the buttons in each screen's newest version) go
   too; a screen whose first click came from a screen that is gone takes the screen that reaches it
@@ -190,12 +191,12 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
   `/api/revise`, `/api/undo`, `/api/box` and `/api/delete`, each for its own mockup only: the mockup
   is a GET's `?app=`, or a POST body's `app` or the first part of its `key`; a POST whose `app` or
   `key` is not a string, or whose `?app=` names another mockup than its body, is 403. It may not use
-  `/api/share`, `/api/shares`, `/api/unshare`, `/api/feedback`, `/api/delete-app`, `/api/warmup`, `/api/backup`, or `/api/delete` of
+  `/api/share`, `/api/shares`, `/api/unshare`, `/api/feedback`, `/api/delete-app`, `/api/warmup`, `/api/backup`, `/api/admin`, or `/api/delete` of
   its first screen (all 403). Its budget (`cap`) counts each call that makes a model work: a new
   screen that is not a cache hit, a pick (its filing), `/api/revise`, and `/api/box` with `edit` or
   `visit`. A unit is taken before the call and given back when the call is refused; past the cap,
   429 *This link's budget is used up.*
-- **The owner**: with `UXWOZ_OWNER` set, `/`, `/design` and every `/api` route but `/api/s/*` need the cookie
+- **The owner**: with `UXWOZ_OWNER` set, `/`, `/design`, `/admin` (public mode) and every `/api` route but `/api/s/*` need the cookie
   `uxwoz_owner=<secret>` (401 on the API, a one-line 403 page on `/` and `/design`; `/og.png` and share links
   answer everyone); `/?owner=<secret>` sets it
   (`HttpOnly; SameSite=Lax`, and `Secure` when the public origin is https) and redirects to `/`. The server fetches the
@@ -303,6 +304,7 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 | `UXWOZ_CACHE_FILE` | screen cache `{version: 5, entries, boxes, states, shared}`, default `temp/screen-cache.json` |
 | `UXWOZ_USERS_DIR` | people's caches, `<id>.json` each (see Desks), default `users/` beside the cache file |
 | `UXWOZ_OWNER` | the owner's secret: when set, only a browser with its cookie uses the app (see Sharing) |
+| `UXWOZ_PUBLIC`, `UXWOZ_URL`, … | the public app: see [public.md](public.md#mail) |
 | `UXWOZ_RECORD` | `1` makes tests call the live APIs and rewrite `cassettes/` |
 
 ## Tests

@@ -137,15 +137,21 @@ test('a wrong code five times kills it; the right one after says no too', async 
 
 test('sign-in checks the email and never says whether it has an account', async () => {
   for (const b of [{ email: 'nope' }, { email: '' }, {}, { email: ['a@b.co'] }, 'not json', null]) expect((await post('/api/signin', b)).status).toBe(400)
-  // Three accounts from one address today; the fourth email, new or known, gets the same 429.
+  // Three accounts from one address today; asking for a code is the same 204 for a known email and a new one,
+  // so existing users are never locked out; the fourth new account is refused at verify.
   for (const e of ['a1@example.com', 'a2@example.com', 'a3@example.com']) expect((await signIn(e, null)).status).toBe(200)
-  for (const e of ['a1@example.com', 'a4@example.com']) {
-    const r = await post('/api/signin', { email: e })
-    expect(r.status).toBe(429)
-    expect(await r.json()).toEqual({ error: 'Sign-ups are full for today.' })
-  }
-  // From another address, the known one signs in.
-  expect((await signIn('a1@example.com', null, '192.0.2.9')).status).toBe(200)
+  expect((await signIn('a1@example.com', null)).status).toBe(200)
+  const r = await signIn('a4@example.com', null)
+  expect(r.status).toBe(429)
+  expect(await r.json()).toEqual({ error: 'Sign-ups are full for today.' })
+  // A second code for one email within a minute is refused.
+  expect((await post('/api/signin', { email: 'a5@example.com' })).status).toBe(204)
+  const again = await post('/api/signin', { email: 'a5@example.com' })
+  expect(again.status).toBe(429)
+  expect((await again.json() as any).error).toContain('wait a minute')
+  // From another address, the new one signs up.
+  clock.t += 60_000
+  expect((await signIn('a4@example.com', null, '192.0.2.9')).status).toBe(200)
 })
 
 test('codes asked together cannot make a fourth account: 429 at verify', async () => {

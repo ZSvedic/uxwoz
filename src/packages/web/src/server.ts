@@ -4,8 +4,10 @@
 import { dirname, join, resolve } from 'node:path'
 import {
   BOX_TITLES, DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, ScreenCache, canonicalAction, isComponent, isDevice, isModelId, normalizePrompt,
-  screenKey, screenRef, STARTERS, VISIT_EVERY, warmUp, type BoxName, type Io,
+  screenKey, screenRef, STARTERS, VISIT_EVERY, startersCurrent, warmUp, zip, type BoxName, type Io,
 } from '@uxwoz/core'
+import { accountRoutes, startTopups } from './account.ts'
+import { adminRoutes } from './admin.ts'
 import { desks } from './desks.ts'
 import { drawing, ndjson } from './drawing.ts'
 import { exportRoute } from './export.ts'
@@ -13,7 +15,7 @@ import index from './index.html'
 import player from './player.html'
 import sheet from './design/sheet.html'
 import { people, type People } from './people.ts'
-import { PUBLIC_MODEL, gate, publicMode } from './public.ts'
+import { PUBLIC_MODEL, clearCookie, gate, publicMode, setCookie, tokenOf } from './public.ts'
 import { hostOf, sharing } from './share.ts'
 
 const THEMES_DIR = resolve(import.meta.dir, '../themes')
@@ -46,6 +48,11 @@ interface ServerOptions extends Io {
   addressHeader?: string
 }
 
+/** The app's address in emails: UXWOZ_URL, else the public app's. */
+export const APP_URL = 'https://app.uxwoz.com/'
+/** How often idle visitors are looked for (spec/public.md, What a role may do). */
+export const IDLE_SWEEP_MS = 24 * 3600_000
+
 const json = (data: unknown, status = 200) => Response.json(data, { status })
 const fail = (error: string, status = 400) => json({ error }, status)
 
@@ -68,7 +75,8 @@ export function createServer(opts: ServerOptions = {}) {
   const log = opts.log ?? ((m: string) => console.warn(m))
   const random = opts.random ?? Math.random
   const fileWaitMs = opts.fileWaitMs ?? 5000
-  const io = { fetch: opts.fetch, env: opts.env, record: opts.record, spent: opts.spent }
+  const io = { fetch: opts.fetch, env: opts.env, record: opts.record, spent: opts.spent, sleep: opts.sleep }
+  const env = () => opts.env ?? process.env
   const owner = opts.owner ?? process.env.UXWOZ_OWNER
   // Public mode: a person's request passes the gate onto their own desk, and their calls are charged to them.
   const store = publicMode(opts.public ?? process.env.UXWOZ_PUBLIC === '1', owner) ? (opts.people ?? people(process.env.UXWOZ_DB ?? ':memory:')) : null
@@ -100,6 +108,58 @@ export function createServer(opts: ServerOptions = {}) {
   }
 
   const { guard } = sharing(all, api, { app: index, player }, owner, pub)
+
+  // Public mode: the account's and the admin's routes, the top-ups each minute and the idle visitors each day.
+  const appUrl = () => env().UXWOZ_URL?.trim() || APP_URL
+  const mailIo: Io = { fetch: opts.fetch, env: opts.env, log }
+  /** A person's cache file and desk go; the store's rows are the caller's. */
+  const deleteFile = (id: string) => all.remove(id)
+  /** A visitor's mockups into the account they signed in to; the share links they bring are the account's in the index. */
+  const move = (from: string, to: string) => {
+    const cache = all.desk(to)?.cache
+    for (const app of all.move(from, to)) for (const t of cache ? tokensOf(cache, app) : []) pub!.shared(t, to)
+  }
+  const personOf = (req: Request) => { const w = pub!.who(req); return w.role === 'visitor' || w.role === 'user' ? store!.person(w.person.id) : null }
+  const withCookie = (res: Response, token: string | null, req: Request) => {
+    const headers = new Headers(res.headers)
+    headers.append('Set-Cookie', token ? setCookie(token, req) : clearCookie(req))
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+  }
+  /** Each POST of the account's routes refuses a foreign request first, as every other POST does. */
+  const accounts = store ? Object.fromEntries(Object.entries(accountRoutes(store, {
+    who: personOf, token: tokenOf, address: (req) => pub!.address(req), cookie: withCookie, move, deleteFile, io: mailIo, appUrl,
+  })).map(([path, r]) => [path, { POST: (req: Request) => refuseForeign(req) ?? r.POST(req) }])) : {}
+  const admin = store ? adminRoutes(store, {
+    mockups: (id) => all.peek(id)?.apps().length ?? 0, address: (req) => pub!.address(req), startersCurrent: () => startersCurrent(),
+    deleteFile, io: mailIo, appUrl,
+  }) : null
+  const adminApi = admin ? { '/api/admin': { GET: admin['/api/admin'].GET, POST: (req: Request) => refuseForeign(req) ?? admin['/api/admin'].POST(req) } } : {}
+  /** The public's own pages and routes: `/admin` and `/api/admin` get the owner's gate in share.ts, `/privacy` is open. */
+  const publicRoutes: Record<string, any> = admin ? { '/admin': admin['/admin'], '/privacy': admin['/privacy'], ...accounts, ...adminApi } : {}
+  const topups = store ? startTopups(store, { io: mailIo, appUrl }) : null
+  /** Visitors idle for 30 days lose their file, then their rows. */
+  const sweepIdle = async () => {
+    if (!store) return []
+    const gone = store.idleVisitors()
+    for (const id of gone) { await deleteFile(id); store.deletePerson(id) }
+    if (gone.length) log(`idle visitors deleted: ${gone.length}`)
+    return gone
+  }
+  const idleTimer = store ? setInterval(() => void sweepIdle().catch((e) => log(`idle sweep: ${e.message}`)), IDLE_SWEEP_MS) : null
+  idleTimer?.unref()
+
+  /** The owner's backup: the cache file, or in public mode a zip of it, the database and every person's file. */
+  const backup = (req: Request) => {
+    const cache = at(req).cache
+    const headers = (type: string, name: string) => ({ 'Content-Type': type, 'Content-Disposition': `attachment; filename="${name}"`, 'Cache-Control': 'no-store' })
+    if (!store) return new Response(cache.serialize(), { headers: headers('application/json', 'screen-cache.json') })
+    const files = [
+      { name: 'screen-cache.json', data: cache.serialize() },
+      { name: 'uxwoz.db', data: new Uint8Array(store.db.serialize()) },
+      ...all.people().map((id) => ({ name: `users/${id}.json`, data: all.peek(id)!.serialize() })),
+    ]
+    return new Response(zip(files), { headers: headers('application/zip', 'uxwoz-backup.zip') })
+  }
   server = Bun.serve({
     port: opts.port ?? Number(process.env.PORT ?? 3000),
     // Only this machine: the API spends the owner's model credits.
@@ -112,6 +172,7 @@ export function createServer(opts: ServerOptions = {}) {
     routes: guard({
       '/': index,
       '/design': sheet,
+      ...publicRoutes,
       // For the host's health check: open with the owner's gate on, touches nothing.
       '/healthz': () => new Response('ok', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }),
       '/og.png': () => new Response(Bun.file(join(import.meta.dir, 'design/brand/og.png')), { headers: { 'Content-Type': 'image/png' } }),
@@ -217,10 +278,8 @@ export function createServer(opts: ServerOptions = {}) {
       },
       '/api/apps': (req) => json({ apps: at(req).cache.apps() }),
       '/api/export': exportRoute((req) => at(req).cache),
-      // The whole cache file, as it would be saved now: the owner's only (see share.ts).
-      '/api/backup': {
-        GET: (req) => new Response(at(req).cache.serialize(), { headers: { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="screen-cache.json"', 'Cache-Control': 'no-store' } }),
-      },
+      // The whole cache file as it would be saved now, or the public's zip: the owner's only (see share.ts).
+      '/api/backup': { GET: backup },
       // Returns the whole mockup: a delete can give other screens new parents.
       '/api/delete': {
         POST: api(async (b, req) => {
@@ -257,7 +316,13 @@ export function createServer(opts: ServerOptions = {}) {
     }),
     fetch: () => new Response('Not found', { status: 404 }),
   })
-  return Object.assign(server, { desks: all, people: store })
+  const stop = server.stop.bind(server)
+  return Object.assign(server, {
+    desks: all, people: store,
+    /** One run of the once-a-minute top-ups and of the daily idle sweep, for tests. */
+    tick: { topups: () => topups?.tick() ?? Promise.resolve(), idle: sweepIdle },
+    stop: (closeActive?: boolean) => { topups?.(); if (idleTimer) clearInterval(idleTimer); return stop(closeActive) },
+  })
 }
 
 if (import.meta.main) {

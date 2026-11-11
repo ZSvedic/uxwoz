@@ -3,7 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { CAPS, CODE_MS, network, people, screensOf, type People, type Person } from '../packages/web/src/people.ts'
+import { CAPS, CODE_AGAIN_MS, CODE_MS, CODES_PER_ADDRESS, network, people, screensOf, type People, type Person } from '../packages/web/src/people.ts'
 
 const HAIKU = 'claude-haiku-5.5'
 const IP = '203.0.113.7'
@@ -244,10 +244,10 @@ describe('sign-in codes', () => {
   })
 
   test('a code works once; a new one replaces the old', () => {
-    const { s } = store()
+    const { s, later } = store()
     const a = s.makeCode('ana@example.com', null, IP) as { code: string }
-    let b = s.makeCode('ana@example.com', null, IP) as { code: string }
-    while (b.code === a.code) b = s.makeCode('ana@example.com', null, IP) as { code: string }
+    let b: { code: string }
+    do { later(CODE_AGAIN_MS); b = s.makeCode('ana@example.com', null, IP) as { code: string } } while (b.code === a.code)
     expect(s.checkCode('ana@example.com', a.code)).toBe(false)
     expect(s.checkCode('ana@example.com', b.code)).toBe(true)
     expect(s.checkCode('ana@example.com', b.code)).toBe(false)
@@ -264,14 +264,15 @@ describe('sign-in codes', () => {
     expect(s.checkCode('ana@example.com', b.code)).toBe(false)
   })
 
-  test('a bad email; the mail quota; 3 new accounts a day per address', async () => {
+  test('a bad email; the mail quota; 3 new accounts a day per address, refused at verify only', async () => {
     const { s, at } = store()
     expect(s.makeCode('ana', null, IP)).toBe('email')
     expect(s.makeCode('ana@example', null, IP)).toBe('email')
     for (const n of [1, 2, 3]) await signUp(s, `u${n}@example.com`, null)
-    expect(s.makeCode('u4@example.com', null, IP)).toBe('address')
+    // Asking for a code never depends on the address's accounts: the fourth new one is refused at verify.
+    const four = s.makeCode('u4@example.com', null, IP) as { code: string }
+    expect(s.verify('u4@example.com', four.code, null, IP)).toBe('address')
     expect(s.makeCode('u1@example.com', null, IP)).toHaveProperty('code')
-    expect(s.makeCode('u4@example.com', null, '198.51.100.1')).toHaveProperty('code')
     at('2026-11-12T00:00:00Z')
     expect(s.makeCode('u4@example.com', null, IP)).toHaveProperty('code')
     for (let i = 0; i < CAPS.mailPerDay - 1; i++) s.mailed()
@@ -281,6 +282,22 @@ describe('sign-in codes', () => {
     expect(s.makeCode('u5@example.com', null, IP)).toBe('mail')
     at('2026-11-13T00:00:00Z')
     expect(s.mailToday()).toBe(0)
+  })
+
+  test('a network asks for 10 codes a day; an email for one a minute', () => {
+    const { s, later, at } = store()
+    expect(s.makeCode('a@example.com', null, IP)).toHaveProperty('code')
+    expect(s.makeCode('A@example.com ', null, IP)).toBe('soon')
+    expect(s.makeCode('a@example.com', null, '198.51.100.1')).toBe('soon')
+    later(CODE_AGAIN_MS - 1)
+    expect(s.makeCode('a@example.com', null, IP)).toBe('soon')
+    later(1)
+    expect(s.makeCode('a@example.com', null, IP)).toHaveProperty('code')
+    for (let n = 3; n <= CODES_PER_ADDRESS; n++) expect(s.makeCode(`n${n}@example.com`, null, IP)).toHaveProperty('code')
+    expect(s.makeCode('late@example.com', null, IP)).toBe('codes')
+    expect(s.makeCode('late@example.com', null, '198.51.100.1')).toHaveProperty('code')
+    at('2026-11-12T00:00:00Z')
+    expect(s.makeCode('late2@example.com', null, IP)).toHaveProperty('code')
   })
 
   test('codes asked before the cap cannot make a fourth account at verify', () => {

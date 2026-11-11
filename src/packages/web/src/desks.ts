@@ -2,6 +2,7 @@
 // its own person's desk and has no way to name another's. `owner` is the cache createServer gets; any
 // other person's opens from `<dir>/<id>.json` when their request comes and closes after 10 idle minutes.
 
+import { existsSync, readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { ScreenCache, type Share } from '@uxwoz/core'
 import type { drawing } from './drawing.ts'
@@ -81,6 +82,38 @@ export function desks(owner: ScreenCache, opts: DeskOptions) {
   }
   setInterval(sweep, Math.min(60_000, idleMs)).unref()
 
-  return { owner: own, desk, whose, of, bind, sweep, open: () => [...open.keys()] }
+  const fileOf = (id: string) => (opts.dir && PERSON_ID.test(id) ? join(opts.dir, `${id}.json`) : null)
+  /** A person's desk closed for good and their file removed: work still running on it saves nothing. */
+  function remove(id: string) {
+    if (!PERSON_ID.test(id)) return
+    const d = open.get(id)
+    open.delete(id)
+    // The cache's file is private to core: null it, so a filing or a visit that ends later writes nowhere.
+    if (d) Reflect.set(d.cache, 'file', null)
+    const f = fileOf(id)
+    if (f) rmSync(f, { force: true })
+  }
+  /** A visitor's mockups into an account's cache (the prompts the account has stay its own); the visitor's desk and file go. The prompts moved. */
+  function move(from: string, to: string): string[] {
+    const src = desk(from), dst = desk(to)
+    if (!src || !dst || src === dst) return []
+    const taken = dst.cache.takeIn(src.cache)
+    remove(from)
+    return taken
+  }
+  /** A person's cache to read, never to change: the open desk's, else their file as it is (empty when none). */
+  function peek(id: string): ScreenCache | null {
+    if (id === 'owner') return owner
+    if (!PERSON_ID.test(id)) return null
+    return open.get(id)?.cache ?? new ScreenCache(fileOf(id))
+  }
+  /** Every person with a cache: the open desks and the files in the folder. */
+  function people(): string[] {
+    const ids = new Set(open.keys())
+    if (opts.dir && existsSync(opts.dir)) for (const f of readdirSync(opts.dir)) { const id = f.replace(/\.json$/, ''); if (f.endsWith('.json') && PERSON_ID.test(id)) ids.add(id) }
+    return [...ids]
+  }
+
+  return { owner: own, desk, whose, of, bind, sweep, remove, move, peek, people, open: () => [...open.keys()] }
 }
 export type Desks = ReturnType<typeof desks>

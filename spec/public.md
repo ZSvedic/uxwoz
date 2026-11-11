@@ -33,7 +33,7 @@ the address, the cookie, and the gate below; `createServer` takes `public`, `own
 - Cookie `uxwoz_who=<token>` (32 hex; `HttpOnly; SameSite=Lax; Max-Age` a year; `Secure` on https) → the
   person whose session it is. The database keeps a SHA-256 of the token, never the token.
 - No cookie, or one that is no session → `new`: may load the page, `/api/config`, `/api/me`,
-  `/api/step`; `/api/apps` answers `{apps: []}` and `/api/warmup` 204 with no call; any other route is
+  `/api/step`, `/api/signin`, `/api/verify` and `/api/signout` (a second browser signs in with no person); `/api/apps` answers `{apps: []}` and `/api/warmup` 204 with no call; any other route is
   401 `{error, reason: "new"}`. The first `POST /api/screen` (from this app's page: a cross-site one is
   refused first) makes a person (a visitor) and sets the cookie, whatever it answers.
 - An edit link (`x-uxwoz-share`) works as before: the owner's mockup, the owner's models, its cap.
@@ -112,7 +112,8 @@ for a visitor, plain 403 otherwise):
 | `/api/export` | no | yes |
 | `/api/backup`, `/design`, `/admin`, `/api/admin` | no | no |
 
-A visitor's cache file is deleted after 30 days with no request. A cache file that passed 5 MB takes no
+A visitor's cache file and rows are deleted after 30 days with no request, by a check once a day (the first a
+day after the server starts). A cache file that passed 5 MB takes no
 new screen and no revise (413 *This account is full: delete a mockup first.*); a cache hit still opens.
 
 A person's share links are in the `shares` index: added by `/api/share`, dropped by `/api/unshare`, by
@@ -132,9 +133,11 @@ the index.
   a day per address, and an `arrived` before the person exists counts for the day only.
 - `POST /api/signin {email}` → 204, and a code is sent: six digits, good for 15 minutes, dead after 5
   wrong tries; a new one replaces the old. 400 for a bad email, 429 *Sign-ups are full for today.*
-  when the day's 100 emails or the address's 3 accounts are used (for every email alike, so the answer
-  never tells whether an email has an account; the accounts are checked again at verify, so codes
-  asked together cannot make a fourth), 503 *Sign-up is not set up yet.* in production with no mail
+  when the day's 100 emails are used or the network asked for its 10 codes today, 429 *A code is on its
+  way: wait a minute before asking again.* when this email asked less than a minute ago (both counted in
+  the store). Asking never depends on the address's accounts nor on whether the email has one, so a
+  network that made its 3 accounts still lets its users sign in; the fourth new account is refused at
+  verify only. 503 *Sign-up is not set up yet.* in production with no mail
   key, 503 when the email did not go. The code is never logged in production.
 - `POST /api/verify {email, code}` → `{me}` and a new session cookie. A new email takes over the
   visitor's person (the mockups stay where they are) and sets `topupDue` 12 hours ahead. An email with
@@ -157,16 +160,19 @@ the index.
   `answer` amount of 0 or less), an unknown person or request 404, a top-up that no longer waits or an
   answered request 409. `topup` emails *Your free screens are ready*, `answer` the answer; each sent
   email counts toward the day's.
-- `GET /admin` (owner), `GET /privacy` (everyone): pages. The privacy page names `UXWOZ_OPERATOR` as who
+- `GET /admin` (owner: anyone else gets 403, as at `/design`), `GET /privacy` (everyone): pages. The privacy page names `UXWOZ_OPERATOR` as who
   runs the site and `UXWOZ_CONTACT` (else `UXWOZ_ADMIN_EMAIL`) as whom to write to.
 - `GET /api/config` gains `public: true`, `starters: Starter[]` (both only in public mode, the owner's
   too) and, for the public, one model.
-- `GET /api/backup` in public mode is a zip: `screen-cache.json`, `uxwoz.db`, `users/<id>.json`.
+- `GET /api/backup` in public mode is a zip, `uxwoz-backup.zip`: `screen-cache.json` (the owner's), `uxwoz.db`
+  (a snapshot of the database) and `users/<id>.json` for every person with a cache, open or on disk.
+  `src/scripts/backup.sh` keeps either kind.
 
 A check once a minute hands out the top-ups that are due and emails each user *Your free screens are
 ready* (not when the day's emails are used up). Approving in the admin's page does the same at once.
 The same check tells the owner of sign-ups that started waiting since its last such email, one email an
-hour at most. These routes and the check are `web/src/account.ts`.
+hour at most. These routes and the check are `web/src/account.ts`. The links in every email start with
+`UXWOZ_URL` (default `https://app.uxwoz.com/`).
 
 ## Mail
 
@@ -182,6 +188,7 @@ hour at most. These routes and the check are `web/src/account.ts`.
 | `UXWOZ_ADDRESS_HEADER` | the header with the visitor's address, default `x-real-ip` |
 | `RESEND_API_KEY`, `UXWOZ_MAIL_FROM`, `UXWOZ_ADMIN_EMAIL` | mail: the key, the sender (default `UX Woz <hello@mail.uxwoz.com>`), the owner's address |
 | `UXWOZ_OPERATOR`, `UXWOZ_CONTACT` | the privacy page: who runs the site, whom to write to |
+| `UXWOZ_URL` | the app's address in emails, default `https://app.uxwoz.com/` |
 
 ## Recordings
 
