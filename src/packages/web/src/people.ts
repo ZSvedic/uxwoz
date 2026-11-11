@@ -23,6 +23,8 @@ export const CAPS: Caps = {
 /** What a call whose cost never arrived is charged; what one picked screen costs, for "screens left". */
 export const UNKNOWN_USD = 0.002
 export const SCREEN_USD = 0.007
+/** What a live call holds from its start until its cost arrives. */
+export const RESERVE_USD = 0.004
 /** A code's life and its wrong tries; how many `arrived` an address counts a day; idle days before a visitor goes; the default answer. */
 export const CODE_MS = 15 * 60_000
 export const CODE_TRIES = 5
@@ -101,6 +103,22 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
   // A database from before the codes count gets the column.
   if (!(db.query('PRAGMA table_info(addresses)').all() as { name: string }[]).some((c) => c.name === 'codes')) db.exec('ALTER TABLE addresses ADD COLUMN codes INTEGER NOT NULL DEFAULT 0')
   const busy = new Set<string>()
+  /** What the running live calls hold, in micros: per person, per visitor's address (its hash), for the whole public. */
+  const held = { people: new Map<string, number>(), addresses: new Map<string, number>(), all: 0 }
+  /** Nothing left (`spent` at the cap), or what runs could pass it: a call may start while anything is left, so the
+   * most a cap is passed by is one reservation's worth beyond the calls' real costs. */
+  const over = (spent: number, reserved: number, cap: number) => spent >= cap || spent + reserved > cap
+  /** mayCall's checks, and a visitor's address hash for the reservation. */
+  function check(person: Person, address: string): { reason: Reason | null; hash: string | null } {
+    const p = byId(person.id)
+    if (!p || p.blocked) return { reason: 'blocked', hash: null }
+    const c = caps()
+    if (mode() === 'starters' || over(spentSince(dayStart()), held.all, micros(c.dayUsd)) || over(spentSince(monthStart()), held.all, micros(c.monthUsd))) return { reason: 'paused', hash: null }
+    if (over(micros(p.spent), held.people.get(p.id) ?? 0, micros(p.allowance))) return { reason: 'allowance', hash: null }
+    if (p.email !== null) return { reason: null, hash: null }
+    const a = addr(address)
+    return over(a.usd, held.addresses.get(a.hash) ?? 0, micros(c.addressUsd)) ? { reason: 'address', hash: null } : { reason: null, hash: a.hash }
+  }
 
   const get = (key: string) => (db.query('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | null)?.value
   const put = (key: string, value: string) => db.query('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(key, value)
@@ -212,15 +230,30 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
     signOut(token: string) { db.query('DELETE FROM sessions WHERE hash = ?').run(sha(token)) },
 
     // ── The meter ──
-    /** Null when a paid request may run. Checked in this order: what no one but the owner can fix comes first. */
-    mayCall(person: Person, address: string): Reason | null {
-      const p = byId(person.id)
-      if (!p || p.blocked) return 'blocked'
-      const c = caps()
-      if (mode() === 'starters' || spentSince(dayStart()) >= micros(c.dayUsd) || spentSince(monthStart()) >= micros(c.monthUsd)) return 'paused'
-      if (micros(p.spent) >= micros(p.allowance)) return 'allowance'
-      if (p.email === null && addr(address).usd >= micros(c.addressUsd)) return 'address'
-      return null
+    /** Null when a paid request may run. Checked in this order: what no one but the owner can fix comes first.
+     * The calls running count with what they hold (see `reserve`). */
+    mayCall(person: Person, address: string): Reason | null { return check(person, address).reason },
+    /**
+     * A live call about to be sent: it holds RESERVE_USD of the person's allowance, of a visitor's address and of the
+     * public's day and month until `release` (when its cost arrives and is charged). The reason it may not, by the
+     * same checks as `mayCall`.
+     */
+    reserve(person: Person, address: string): (() => void) | Reason {
+      const { reason, hash } = check(person, address)
+      if (reason) return reason
+      const m = micros(RESERVE_USD), id = person.id
+      const add = (map: Map<string, number>, k: string, by: number) => { const v = (map.get(k) ?? 0) + by; if (v > 0) map.set(k, v); else map.delete(k) }
+      add(held.people, id, m)
+      if (hash) add(held.addresses, hash, m)
+      held.all += m
+      let done = false
+      return () => {
+        if (done) return
+        done = true
+        add(held.people, id, -m)
+        if (hash) add(held.addresses, hash, -m)
+        held.all -= m
+      }
     },
     /** True when a paid request would get `paused`. */
     paused() {

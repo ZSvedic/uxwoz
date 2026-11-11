@@ -15,14 +15,17 @@ export interface Io {
   log?: (msg: string) => void
   /** Called with each live call that reached its final event, as it was said. */
   record?: (r: Recorded, call: { model: ModelId; user: string }) => void
-  /** Called once per live call when it ends, however it ends; `usd` is null when the cost never arrived. Never for a replay. */
+  /** Called once per live call that was sent, when it ends, however it ends; `usd` is null when the cost never arrived.
+   * Never for a replay, nor for a call that failed before it was sent (no key) or that `allow` refused. */
   spent?: (usd: number | null, model: ModelId) => void
+  /** Called right before a live call is sent, never for a replay; if it throws, the call ends with that error. */
+  allow?: () => void
   /** The clock a replay waits on: real time unless a test speeds it up. */
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>
 }
 
 /** The parts of an Io a call passes on. */
-export const ioOf = (o: Io): Io => ({ fetch: o.fetch, env: o.env, log: o.log, record: o.record, spent: o.spent, sleep: o.sleep })
+export const ioOf = (o: Io): Io => ({ fetch: o.fetch, env: o.env, log: o.log, record: o.record, spent: o.spent, allow: o.allow, sleep: o.sleep })
 
 export interface FinalEvent {
   type: 'final'
@@ -72,7 +75,9 @@ function key(env: Env, name: string): string {
   return v
 }
 
-async function post(f: Fetch, url: string, body: unknown, headers: Record<string, string>, signal?: AbortSignal) {
+/** `send` runs right before the fetch: the call's `allow`, then it counts as sent. */
+async function post(f: Fetch, url: string, body: unknown, headers: Record<string, string>, send: () => void, signal?: AbortSignal) {
+  send()
   const res = await f(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
@@ -86,7 +91,7 @@ async function post(f: Fetch, url: string, body: unknown, headers: Record<string
   return res.body
 }
 
-async function* streamOpenRouter(cfg: ModelConfig, o: StreamOptions, f: Fetch, env: Env) {
+async function* streamOpenRouter(cfg: ModelConfig, o: StreamOptions, f: Fetch, env: Env, send: () => void) {
   const body = {
     model: cfg.model,
     stream: true,
@@ -103,7 +108,7 @@ async function* streamOpenRouter(cfg: ModelConfig, o: StreamOptions, f: Fetch, e
     Authorization: `Bearer ${key(env, 'OPENROUTER_API_KEY')}`,
     'HTTP-Referer': 'http://localhost/uxwoz',
     'X-Title': 'uxwoz',
-  }, o.signal)
+  }, send, o.signal)
   const final = noFinal()
   for await (const data of sseData(stream)) {
     if (data === '[DONE]') break
@@ -121,7 +126,7 @@ async function* streamOpenRouter(cfg: ModelConfig, o: StreamOptions, f: Fetch, e
   yield final
 }
 
-async function* streamOpenAI(cfg: ModelConfig, o: StreamOptions, f: Fetch, env: Env) {
+async function* streamOpenAI(cfg: ModelConfig, o: StreamOptions, f: Fetch, env: Env, send: () => void) {
   const body = {
     model: cfg.model,
     stream: true,
@@ -134,7 +139,7 @@ async function* streamOpenAI(cfg: ModelConfig, o: StreamOptions, f: Fetch, env: 
   }
   const stream = await post(f, 'https://api.openai.com/v1/responses', body, {
     Authorization: `Bearer ${key(env, 'OPENAI_API_KEY')}`,
-  }, o.signal)
+  }, send, o.signal)
   const final = noFinal()
   for await (const data of sseData(stream)) {
     if (data === '[DONE]') break
@@ -165,11 +170,13 @@ export function streamModel(o: StreamOptions): AsyncGenerator<StreamEvent> {
   const cfg = MODELS[o.model]
   const f = o.fetch ?? fetch
   const env = o.env ?? process.env
-  return metered(cfg.provider === 'openrouter' ? streamOpenRouter(cfg, o, f, env) : streamOpenAI(cfg, o, f, env), o)
+  const state = { sent: false }
+  const send = () => { o.allow?.(); state.sent = true }
+  return metered(cfg.provider === 'openrouter' ? streamOpenRouter(cfg, o, f, env, send) : streamOpenAI(cfg, o, f, env, send), o, state)
 }
 
-/** A live call: its cost to `spent` once however it ends, and the whole call to `record` when it reached its end. */
-async function* metered(events: AsyncGenerator<StreamEvent>, o: StreamOptions): AsyncGenerator<StreamEvent> {
+/** A live call: its cost to `spent` once however it ends, if it was sent; the whole call to `record` when it reached its end. */
+async function* metered(events: AsyncGenerator<StreamEvent>, o: StreamOptions, state: { sent: boolean }): AsyncGenerator<StreamEvent> {
   const t0 = performance.now(), said: [number, string][] = []
   let ended = false
   try {
@@ -183,7 +190,7 @@ async function* metered(events: AsyncGenerator<StreamEvent>, o: StreamOptions): 
       yield ev
     }
   } finally {
-    if (!ended) o.spent?.(null, o.model)
+    if (!ended && state.sent) o.spent?.(null, o.model)
   }
 }
 

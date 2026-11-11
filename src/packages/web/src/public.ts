@@ -91,8 +91,14 @@ export function gate(o: GateOptions) {
   const lastAddress = new Map<string, string>()
 
   const isOwner = (req: Request) => cookies(req).get('uxwoz_owner') === o.owner
-  /** The request's address: the configured header's first value, else the socket's. */
-  const address = (req: Request) => req.headers.get(header)?.split(',')[0]?.trim() || o.socket(req) || 'unknown'
+  /** The request's address: the configured header's value, else the socket's. Of X-Forwarded-For the last value is
+   * the one our proxy added; the ones before it are the client's own claim. */
+  const address = (req: Request) => {
+    const values = (req.headers.get(header) ?? '').split(',').map((v) => v.trim()).filter(Boolean)
+    return (header === 'x-forwarded-for' ? values.at(-1) : values[0]) || o.socket(req) || 'unknown'
+  }
+  /** When the public's last warm-up was let through: one slot for the whole public, claimed before the call. */
+  let warmClaim = 0
 
   /** Who sent the request; a person is looked up once per request (and marked seen). */
   function who(req: Request): Who {
@@ -112,15 +118,30 @@ export function gate(o: GateOptions) {
   const deskOf = (req: Request) => { const w = who(req); return w.role === 'owner' ? 'owner' : w.role === 'new' ? '' : w.person.id }
   const isPublic = (req: Request) => who(req).role !== 'owner'
 
-  /** A person's Io: each call's cost charged to them, at their last address. */
-  const io = <T extends Io>(id: string, base: T): T => ({
-    ...base,
-    spent: (usd: number | null, model: ModelId) => {
-      const p = store.person(id)
-      if (p) store.charge(p, usd, model, lastAddress.get(id) ?? 'unknown')
-      base.spent?.(usd, model)
-    },
-  })
+  /**
+   * A person's Io: each live call is checked when it is about to be sent (`allow` reserves its hold or throws the
+   * reason's words), whatever route or race started it; its cost, when it arrives, frees the hold and is charged to
+   * them at their last address.
+   */
+  const io = <T extends Io>(id: string, base: T): T => {
+    const holds: (() => void)[] = []
+    return {
+      ...base,
+      allow: () => {
+        const p = store.person(id)
+        const r = p ? store.reserve(p, lastAddress.get(id) ?? 'unknown') : 'blocked'
+        if (typeof r === 'string') throw new Error(REASONS[r])
+        holds.push(r)
+        base.allow?.()
+      },
+      spent: (usd: number | null, model: ModelId) => {
+        holds.shift()?.()
+        const p = store.person(id)
+        if (p) store.charge(p, usd, model, lastAddress.get(id) ?? 'unknown')
+        base.spent?.(usd, model)
+      },
+    }
+  }
   /** Whether a person's background work (filing, a visit) may start: a paid request would pass. */
   const may = (id: string) => () => { const p = store.person(id); return !!p && store.mayCall(p, lastAddress.get(id) ?? 'unknown') === null }
 
@@ -155,6 +176,9 @@ export function gate(o: GateOptions) {
     const post = req.method === 'POST'
     if (w.role === 'new') {
       if (path === '/api/apps') return json({ apps: [] })
+      // Opening a mockup reads its map before the first screen makes the person: an empty mockup, as for an unknown prompt.
+      if (path === '/api/map' && !post) { all.bind(req, all.nobody); return run(req) }
+      if (path === '/api/shares' && !post) return json({ shares: [], feedback: [], trips: [] })
       if (path === '/api/warmup') return new Response(null, { status: 204 })
       if (path !== '/api/screen' || !post) return fail('Start with a starter or a prompt of your own.', 401, { reason: 'new' })
       const foreign = o.refuse(req)
@@ -181,7 +205,7 @@ export function gate(o: GateOptions) {
     // A pick calls no model itself: its filing and visit start only while `may` says so.
     const warm = path === '/api/warmup'
     const paid = warm || (path !== '/api/pick' && paidOf(b, desk.cache) && !desk.draw.replayed(path, b))
-    if (warm && Date.now() - (store.lastCall(PUBLIC_MODEL) ?? 0) < WARM_MS) return answer(new Response(null, { status: 204 }))
+    if (warm && Date.now() - Math.max(store.lastCall(PUBLIC_MODEL) ?? 0, warmClaim) < WARM_MS) return answer(new Response(null, { status: 204 }))
     if (paid && (path === '/api/screen' || path === '/api/revise') && Buffer.byteLength(desk.cache.serialize()) > FILE_CAP)
       return answer(fail('This account is full: delete a mockup first.', 413))
     let release: (() => void) | null = null
@@ -191,6 +215,8 @@ export function gate(o: GateOptions) {
         if (reason === 'allowance') step(id, 'limit', req)
         return answer(fail(REASONS[reason], 402, { reason }))
       }
+      // Claimed with no wait since the check, so warm-ups sent together make one call.
+      if (warm) warmClaim = Date.now()
       // A stream holds until it ends; a warm-up and a box's Edit or visit return at once and run in the background.
       if (path === '/api/screen' || path === '/api/revise') {
         release = store.hold(id)

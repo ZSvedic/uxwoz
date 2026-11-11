@@ -36,8 +36,8 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
   models.ts      the 3 screen models and Terra (background, filing), call settings, prices
   prompt.ts      system prompt (the canvas manual verbatim + how to reply) and the user messages: the paper
                  (titles, lines, boxes), then Draw, Edit or File (a copy of spec/prompt-screen.md; a test keeps them equal)
-  providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol, Terra); a call's cost once
-                 however it ends (`spent`), a live call captured (`record`), a `recorded` one replayed with its timing
+  providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol, Terra); a live call checked right
+                 before it is sent (`allow`), its cost once however it ends (`spent`), a live call captured (`record`), a `recorded` one replayed with its timing
   generate.ts    one design: stream, 20 s deadline, cost, name and idea, refuse cut-off replies
   starters.ts    the eight starters: id, label, kind, device, prompt (data only, also in the browser)
   recordings.ts  server only: recordings/<id>.json read, the design for a screen's nth draw, Home's filing by side,
@@ -52,7 +52,7 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
                  shortest-path levels, the titles and lines of the paper
   cache.ts       screen cache, the screens (ScreenCacheBase): entry and version types, find by name, proposals
                  (the open A OR B) and pick, versions and undo, parents, delete with pruning, apps, sharing data,
-                 takeIn (another cache's mockups, at a sign-in), the JSON file (load, format, save)
+                 takeIn (another cache's mockups, at a sign-in), the JSON file (load, format, save, detach)
   cache-boxes.ts screen cache, the boxes (ScreenCache extends the base): components as entries, rules, tables,
                  limits, IDs, a box's states, Past and Undo, the fixer's notes and their Undo, markSeen, the paper
   frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll, vh fix, picking and locating
@@ -99,7 +99,7 @@ src/packages/web/src/
   boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes and their rails, editing and adding in
                  place, Export
   people.ts      the public's people and money over bun:sqlite (spec/public.md): visitors, sessions, the meter
-                 (mayCall, hold, charge), sign-in codes and verify, top-ups, quota requests, steps, caps, share
+                 (mayCall, reserve: $0.004 held per running call, hold, charge), sign-in codes and verify, top-ups, quota requests, steps, caps, share
                  tokens, the admin's summary, deletes, the day's address HMAC; no routes
   mail.ts        mail through Resend (logs with no key off production) and the texts of the emails
   admin.ts       adminRoutes(store, extras): GET and POST /api/admin (the ops, their checks, their emails), /admin,

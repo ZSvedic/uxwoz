@@ -31,6 +31,9 @@ export function desks(owner: ScreenCache, opts: DeskOptions) {
   const idleMs = opts.idleMs ?? IDLE_MS
   const own: Desk = { id: 'owner', cache: owner, draw: opts.draw(owner, 'owner'), used: 0 }
   const open = new Map<string, Desk>()
+  /** The desk of someone with no person yet: an empty cache in memory that nothing writes to (GET /api/map only). */
+  const nobodyCache = new ScreenCache()
+  const nobody: Desk = { id: 'nobody', cache: nobodyCache, draw: opts.draw(nobodyCache, 'nobody'), used: 0 }
 
   /** A person's desk, opened when it is not; null for an id that is neither `owner` nor a person's. */
   function desk(id: string): Desk | null {
@@ -88,8 +91,8 @@ export function desks(owner: ScreenCache, opts: DeskOptions) {
     if (!PERSON_ID.test(id)) return
     const d = open.get(id)
     open.delete(id)
-    // The cache's file is private to core: null it, so a filing or a visit that ends later writes nowhere.
-    if (d) Reflect.set(d.cache, 'file', null)
+    // A filing or a visit that ends later writes nowhere.
+    d?.cache.detach()
     const f = fileOf(id)
     if (f) rmSync(f, { force: true })
   }
@@ -114,6 +117,6 @@ export function desks(owner: ScreenCache, opts: DeskOptions) {
     return [...ids]
   }
 
-  return { owner: own, desk, whose, of, bind, sweep, remove, move, peek, people, open: () => [...open.keys()] }
+  return { owner: own, nobody, desk, whose, of, bind, sweep, remove, move, peek, people, open: () => [...open.keys()] }
 }
 export type Desks = ReturnType<typeof desks>

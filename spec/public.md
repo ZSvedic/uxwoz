@@ -33,7 +33,9 @@ the address, the cookie, and the gate below; `createServer` takes `public`, `own
 - Cookie `uxwoz_who=<token>` (32 hex; `HttpOnly; SameSite=Lax; Max-Age` a year; `Secure` on https) → the
   person whose session it is. The database keeps a SHA-256 of the token, never the token.
 - No cookie, or one that is no session → `new`: may load the page, `/api/config`, `/api/me`,
-  `/api/step`, `/api/signin`, `/api/verify` and `/api/signout` (a second browser signs in with no person); `/api/apps` answers `{apps: []}` and `/api/warmup` 204 with no call; any other route is
+  `/api/step`, `/api/signin`, `/api/verify` and `/api/signout` (a second browser signs in with no person); `GET /api/map`
+  answers an empty mockup (the page reads the map before it draws the first screen) and `GET /api/shares`
+  `{shares: [], feedback: [], trips: []}`, neither making a person; `/api/apps` answers `{apps: []}` and `/api/warmup` 204 with no call; any other route is
   401 `{error, reason: "new"}`. The first `POST /api/screen` (from this app's page: a cross-site one is
   refused first) makes a person (a visitor) and sets the cookie, whatever it answers.
 - An edit link (`x-uxwoz-share`) works as before: the owner's mockup, the owner's models, its cap.
@@ -61,12 +63,22 @@ store's methods take and give USD. Times are milliseconds since 1970, days and m
 
 ## The meter
 
-- `Io.spent?: (usd: number | null, model: ModelId) => void` (core, `providers.ts`): `streamModel` calls
-  it once per call when the call ends, however it ends. `null` means the cost never arrived; the
-  server charges $0.002 for it. A replayed recording never calls it.
-- For a person, the server passes an `Io` whose `spent` adds a `calls` row, adds to the person's
-  `spent`, and to the day's address row when the person is a visitor. A call in the background is
-  charged to the address of the person's last request.
+- `Io.allow?: () => void` (core, `providers.ts`): `streamModel` calls it right before a live call is
+  sent, never for a replay. If it throws, the call ends with that error and costs nothing.
+- `Io.spent?: (usd: number | null, model: ModelId) => void`: `streamModel` calls it once per call that
+  was sent, when the call ends, however it ends. `null` means the cost never arrived; the server
+  charges $0.002 for it. A replay, a call `allow` refused and a call that failed before it was sent (no
+  key) never call it.
+- **Every live call is checked when it starts**, whatever route, race or background work started it:
+  streams, filing, visits, their redraws and warm-ups alike. A person's `Io` has an `allow` that
+  reserves $0.004 for the call (`reserve` in `people.ts`, held in memory) or throws the reason's words
+  below; its `spent` frees the reservation, adds a `calls` row, adds to the person's `spent`, and to the
+  day's address row when the person is a visitor. A call in the background is charged to the address of
+  the person's last request.
+- A reservation holds against the person's allowance, a visitor's address and the public's day and
+  month. A check counts what is spent plus what the running calls hold: a call may start while
+  something is left and the reservations do not pass the cap. So with $0.004 left an A OR B gets both
+  designs, and spend passes a cap by at most one reservation beyond the calls' real costs.
 - **Paid** requests are the ones an edit link's cap counts (`costs` in `share.ts`) and `/api/warmup`,
   except `/api/pick`: a pick is never refused (the two designs are paid for already), and its filing
   and visit start only while the person may make a paid request (`may` in `drawing.ts`). A request a
@@ -75,7 +87,7 @@ store's methods take and give USD. Times are milliseconds since 1970, days and m
 
 | `reason` | When | `error` |
 |---|---|---|
-| `allowance` | the person's `spent` is at or over their `allowance` | *Your free screens are used up.* |
+| `allowance` | the person's `spent` is at or over their `allowance`, or with the running calls' reservations over it | *Your free screens are used up.* |
 | `address` | a visitor, and visitors from this address spent $0.30 today | *This network has used today's free screens. Register to carry on.* |
 | `paused` | the mode is `starters`, or the public spent $3 today or $20 this month | *Live designs are paused for now. The starters still work.* |
 | `blocked` | the owner blocked the person | *This account is closed.* |
@@ -87,17 +99,20 @@ help. The 21st new visitor from an address in a day gets 402 `address` at their 
 - A person runs one paid request at a time (409 *One at a time: wait for this one.*): a new screen or
   a revise holds until its stream ends or the browser leaves. A warm-up, a box's Edit and Visit now
   answer at once and are not held. Background work (filing, a visit) starts only while a paid request
-  of the person would pass (no 402 reason). Two people can still pass a
-  shared cap (the address's, the day's) at once: each running call finishes, and the next is refused.
+  of the person would pass (no 402 reason), and each of its calls is checked again as it starts. Two
+  people share a cap (the address's, the day's) through the reservations, as one person's calls do.
 - The public's model is Claude Haiku: `/api/config` lists only it (and makes it `defaultModel`), and
   another `model` on any route is 403 *Only Claude Haiku is open to the public.*
-- `/api/warmup` from the public calls the model only if no Haiku call ran in the last 4 minutes (it
-  answers 204 without a call then, before the meter is asked).
+- `/api/warmup` from the public calls the model only if no Haiku call ran and no warm-up was let
+  through in the last 4 minutes (it answers 204 without a call then, before the meter is asked). The
+  warm-up claims that slot, one for the whole public, before it calls, so warm-ups sent together make
+  one call.
 - Defaults, each changeable on the admin's page: visitor allowance $0.10, top-up $0.15 after 12 hours,
   $0.30 a day per address for visitors, 20 new visitors and 3 new accounts a day per address, $3 a day
   and $20 a month for the public as a whole, 100 emails a day (Resend's free plan).
 - **The address** is the header named by `UXWOZ_ADDRESS_HEADER` (default `x-real-ip`), else the
-  socket's. An IPv6 address counts by its /64. It is stored only as an HMAC under a salt made new each
+  socket's. Of a list the first value counts, except for `x-forwarded-for`, whose last value counts:
+  the one the proxy added (the ones before it are the client's own claim). An IPv6 address counts by its /64. It is stored only as an HMAC under a salt made new each
   UTC day.
 
 ## What a role may do
