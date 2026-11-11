@@ -82,6 +82,11 @@ All three were measured on 2026-10-22/23 with the lite benchmark, a Python tool 
 - **Haiku** is the default: nearly Sol's correctness at 1/140 of the price, billed cost reported by
   OpenRouter. Pin the provider: `provider: {order: ["anthropic"], allow_fallbacks: false,
   require_parameters: true}`. Calling Anthropic directly (`ANTHROPIC_API_KEY`) is untested.
+  The system prompt goes as one text part marked `cache_control: {type: "ephemeral"}`: Claude caches
+  nothing without the mark. Measured on 2026-11-11: 3,227 of a design's 3,379 input tokens are then read
+  from the cache (5 minutes, renewed by each read), and a design costs about $0.0003 instead of $0.0007.
+  The first call after a quiet 5 minutes pays 1.25 times for writing it, and two calls sent together on
+  a cold cache both pay that, which is what the warm-up call is for.
 - **Luna fast** is the fastest. Luna rejects `ultrafast`. With reasoning `none` it sometimes writes
   its planning notes as plain text into the reply; in HTML they show as stray text, in a pure
   script they break it. Its cost is an estimate (2x the $0.10 / $0.50 standard price, unconfirmed).

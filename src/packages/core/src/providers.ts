@@ -97,7 +97,9 @@ async function* streamOpenRouter(cfg: ModelConfig, o: StreamOptions, f: Fetch, e
     stream: true,
     max_tokens: o.maxTokens ?? 8000,
     messages: [
-      { role: 'system', content: o.system },
+      // The system prompt is the same for every call, so it is marked for the provider's prompt cache (5 minutes,
+      // renewed by each read): Claude caches nothing without a mark. The user message differs per call and stays unmarked.
+      { role: 'system', content: [{ type: 'text', text: o.system, cache_control: { type: 'ephemeral' } }] },
       { role: 'user', content: o.user },
     ],
     reasoning: cfg.reasoning,
