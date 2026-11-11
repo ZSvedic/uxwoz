@@ -19,7 +19,7 @@ function make(env: Record<string, string> = { RESEND_API_KEY: 're_test' }, extra
     return new Response('{"id":"x"}')
   }
   routes = adminRoutes(store, {
-    mockups: (id) => (id.startsWith('0') ? 0 : 2),
+    mockups: () => 2,
     address: () => ADDR,
     startersCurrent: () => true,
     deleteFile: (id) => { deleted.push(id) },

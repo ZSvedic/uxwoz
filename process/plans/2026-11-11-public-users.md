@@ -4,7 +4,8 @@ This plan owns the decisions and the build order for letting strangers use https
 starters, a metered allowance, sign-up by email, quota requests, the admin's page and onboarding. It
 changes nothing for the owner, whose gate, file and share links stay as they are.
 
-Status: waiting for the owner's go-ahead. Nothing is built. The owner's three answers are at the end.
+Status: built and merged on 2026-11-11, not pushed; see `process/journal/2026-11-11-public.md`. Where the
+build chose differently (reservations per call, limits per email), `spec/public.md` is right.
 
 ## A visitor's first ten minutes
 
