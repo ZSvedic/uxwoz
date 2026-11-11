@@ -10,6 +10,7 @@ import { coach, post, showError, themeCss } from './net.ts'
 import { currentAt, renderNav, trailStep, walkTrail } from './nav.ts'
 import { draw, labelOf } from './screens.ts'
 import { initVoice } from './voice-ui.ts'
+import { needsAccount, renderAccountMenu } from './account-ui.ts'
 import { $, deviceSelect, enterSubmits, generate, modelSelect, promptInput, state, store } from './state.ts'
 
 // ---- Wiring
@@ -127,7 +128,7 @@ function open(app: string) {
 
 // ---- The toolbar: project menu, Nav, zoom
 
-const MENUS: [string, string][] = [['projectButton', 'projectMenu'], ['navButton', 'navMenu'], ['themeButton', 'themeMenu'], ['zoomValue', 'zoomMenu'], ['boxesButton', 'boxNav']]
+const MENUS: [string, string][] = [['projectButton', 'projectMenu'], ['navButton', 'navMenu'], ['themeButton', 'themeMenu'], ['zoomValue', 'zoomMenu'], ['boxesButton', 'boxNav'], ['accountButton', 'accountMenu']]
 
 export function closeMenus() {
   for (const [, m] of MENUS) $(m).hidden = true
@@ -140,6 +141,7 @@ for (const [b, m] of MENUS) $(b).addEventListener('click', () => {
   renderToolbar()
   if (m === 'navMenu') renderNav()
   if (m === 'projectMenu') renderRecentMenu()
+  if (m === 'accountMenu') renderAccountMenu()
   if (m === 'themeMenu') $(m).replaceChildren(...state.themes.map((t) => {
     const b = item(t.label, t.id === state.theme ? '✓' : '', () => setTheme(t.id))
     b.classList.toggle('current', t.id === state.theme)
@@ -218,7 +220,7 @@ export const warmUp = (model: string) => post('/api/warmup', { model }).catch(()
 modelSelect.addEventListener('change', () => warmUp(modelSelect.value))
 
 /** Export project: the whole mockup as a zip for a coding or design agent, downloaded from the server. */
-const exportProject = item('⇩ Export project…', 'zip', () => { if (state.app) location.href = `/api/export?app=${encodeURIComponent(state.app)}` })
+const exportProject = item('⇩ Export project…', 'zip', () => { if (state.app && !needsAccount('export')) location.href = `/api/export?app=${encodeURIComponent(state.app)}` })
 exportProject.id = 'exportProject'
 exportProject.title = 'Download the prompt, the boxes and every screen as a zip, to hand to a coding or design agent'
 $('exportBoxes').after(exportProject)
