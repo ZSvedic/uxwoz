@@ -33,6 +33,13 @@ function capped<T>(list: T[], same: (x: T) => boolean = () => true) {
 /** Feedback kinds kept apart, so one kind cannot push out another: comments, thumbs, answers (Done, and the old dead controls). */
 const groupOf = (kind: Feedback['kind']) => (kind === 'dead' ? 'done' : kind)
 const titleOf = (e: CacheEntry) => e.versions.at(-1)?.name || e.name || HOME_NAME
+/** A request's host as the browser sent it: the Host header (a proxy keeps it), else the URL's. */
+export const hostOf = (req: Request) => req.headers.get('host') ?? new URL(req.url).host
+/** A request's public origin behind a proxy that ends HTTPS: the forwarded scheme (its first value), else the URL's; the Host header. */
+export function publicOrigin(req: Request) {
+  const proto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() || new URL(req.url).protocol.slice(0, -1)
+  return `${proto}://${hostOf(req)}`
+}
 
 /** The player's mockup: the picked screens' newest versions, their tree parents and the components; nothing else. */
 export function playerMap(cache: ScreenCache, root: string) {
@@ -49,7 +56,7 @@ export function playerMap(cache: ScreenCache, root: string) {
 }
 
 export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; player: Route }, owner = process.env.UXWOZ_OWNER) {
-  const linkOf = (req: Request, s: Share) => ({ ...s, url: `${new URL(req.url).origin}/s/${s.token}` })
+  const linkOf = (req: Request, s: Share) => ({ ...s, url: `${publicOrigin(req)}/s/${s.token}` })
   const found = (req: Request & { params?: Record<string, string> }) => cache.share(req.params?.token ?? '')
   const isOwner = (req: Request) => !owner || req.headers.get('cookie')?.split(/;\s*/).includes(`uxwoz_owner=${owner}`)
   /** Proxy one of our own pages (the app or the player), so a link keeps its own address; from this server itself, never from the request's Host. */
@@ -80,7 +87,7 @@ export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; playe
       if (!f) return new Response('This link does not work any more.', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
       if (f.share.role === 'edit') return page(server, '/_app')
       // Crawlers ignore a relative og:image: give it this link's own origin, as linkOf does.
-      const origin = new URL(req.url).origin
+      const origin = publicOrigin(req)
       return page(server, '/_player').then(async (r) => new Response((await r.text()).replace('content="/og.png"', `content="${origin}/og.png"`), { status: r.status, headers: { 'Content-Type': r.headers.get('content-type') ?? 'text/html;charset=utf-8' } }))
     },
     '/api/s/:token/map': (req: Request & { params: Record<string, string> }) => {
@@ -220,7 +227,7 @@ export function sharing(cache: ScreenCache, api: Api, pages: { app: Route; playe
     }
     if (owner) out['/'] = (req: Request, server: { port?: number }) => {
       const secret = new URL(req.url).searchParams.get('owner')
-      const https = new URL(req.url).protocol === 'https:' || req.headers.get('x-forwarded-proto') === 'https'
+      const https = publicOrigin(req).startsWith('https:')
       if (secret === owner) return new Response(null, { status: 302, headers: { Location: '/', 'Set-Cookie': `uxwoz_owner=${owner}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${https ? '; Secure' : ''}` } })
       return isOwner(req) ? page(server, '/_app') : closed()
     }

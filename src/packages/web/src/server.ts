@@ -11,7 +11,7 @@ import { exportRoute } from './export.ts'
 import index from './index.html'
 import player from './player.html'
 import sheet from './design/sheet.html'
-import { sharing } from './share.ts'
+import { hostOf, sharing } from './share.ts'
 
 const THEMES_DIR = resolve(import.meta.dir, '../themes')
 /** Theme ids and labels; the first is the default. `clean` is Pico alone, `mockup` is Pico plus mockup.css. */
@@ -32,11 +32,12 @@ interface ServerOptions extends Io {
 const json = (data: unknown, status = 200) => Response.json(data, { status })
 const fail = (error: string, status = 400) => json({ error }, status)
 
-/** Every POST costs money or changes the cache, so only this app's page may send it: JSON only (no preflight is answered), no cross-site Origin. */
+/** Every POST costs money or changes the cache, so only this app's page may send it: JSON only (no preflight is answered), no cross-site Origin.
+ * The Origin's host is compared with the Host header, scheme left out: behind a proxy that ends HTTPS the page is https, the request http. */
 function refuseForeign(req: Request): Response | null {
   if (!req.headers.get('content-type')?.startsWith('application/json')) return fail('send application/json', 415)
   const origin = req.headers.get('origin')
-  if (origin && origin !== new URL(req.url).origin) return fail('cross-origin request refused', 403)
+  if (origin && URL.parse(origin)?.host !== hostOf(req)) return fail('cross-origin request refused', 403)
   if (req.headers.get('sec-fetch-site') === 'cross-site') return fail('cross-site request refused', 403)
   return null
 }
@@ -74,6 +75,8 @@ export function createServer(opts: ServerOptions = {}) {
     routes: guard({
       '/': index,
       '/design': sheet,
+      // For the host's health check: open with the owner's gate on, touches nothing.
+      '/healthz': () => new Response('ok', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }),
       '/og.png': () => new Response(Bun.file(join(import.meta.dir, 'design/brand/og.png')), { headers: { 'Content-Type': 'image/png' } }),
       '/themes/:name': (req) => {
         const name = req.params.name.replace(/\.css$/, '')
