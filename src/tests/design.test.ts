@@ -39,9 +39,9 @@ describe('design/', () => {
     expect(missing).toEqual([])
   })
 
-  test('index.css imports every other CSS file in design/ but the player\'s', () => {
+  test('index.css imports every other CSS file in design/ but the player\'s and the admin\'s', () => {
     const imported = [...css['index.css']!.matchAll(/@import\s+["']\.\/([\w-]+\.css)["']/g)].map((m) => m[1]).sort()
-    expect(imported).toEqual(cssFiles.filter((f) => f !== 'index.css' && f !== 'player.css'))
+    expect(imported).toEqual(cssFiles.filter((f) => !['index.css', 'player.css', 'admin.css'].includes(f)))
   })
 
   test('player.html has no <style>, and every id player.ts looks up is in it', () => {

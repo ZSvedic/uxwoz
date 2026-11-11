@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>UX Woz admin</title>
+<link rel="icon" type="image/svg+xml" href="./design/brand/favicon.svg">
+<link rel="stylesheet" href="./design/tokens.css">
+<link rel="stylesheet" href="./design/base.css">
+<link rel="stylesheet" href="./design/admin.css">
+</head>
+<body>
+<main class="sheet">
+  <h1>UX Woz admin</h1>
+  <p class="err" id="err" role="alert" hidden></p>
+  <section>
+    <h2>Spend</h2>
+    <p id="spend">Loading…</p>
+    <p class="row">Live designs: <button id="modeOpen">Open</button><button id="modeStarters">Starters only</button></p>
+  </section>
+  <section>
+    <h2>Caps and allowances</h2>
+    <form id="caps"><table><tbody id="capRows"></tbody></table><p><button type="submit" class="primary">Save the caps</button></p></form>
+  </section>
+  <section>
+    <h2>Steps by day</h2>
+    <div class="scroll"><table><thead id="stepHead"></thead><tbody id="stepRows"></tbody></table></div>
+  </section>
+  <section>
+    <h2>Waiting</h2>
+    <div class="scroll"><table><tbody id="waiting"></tbody></table></div>
+  </section>
+  <section>
+    <h2>Requests</h2>
+    <div class="scroll"><table><tbody id="requests"></tbody></table></div>
+  </section>
+  <section>
+    <h2>People</h2>
+    <div class="scroll"><table><tbody id="people"></tbody></table></div>
+  </section>
+  <section>
+    <p class="muted" id="address"></p>
+    <p class="muted" id="starters"></p>
+    <p class="muted" id="mail"></p>
+  </section>
+</main>
+<script type="module" src="./admin-page.ts"></script>
+</body>
+</html>

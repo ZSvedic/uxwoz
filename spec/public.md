@@ -127,8 +127,14 @@ new screen (413 *This account is full: delete a mockup first.*).
   people: {id, email, created, seen, allowance, spent, mockups, blocked, topupDue}[], requests[],
   address, mailToday, startersCurrent}`. `address` is the caller's as the server sees it.
 - `POST /api/admin {op, …}` (owner): `mode`, `caps`, `give {id, usd}`, `block {id, blocked}`,
-  `delete {id}`, `topup {id}` (now), `answer {request, approved, usd?}`.
-- `GET /admin` (owner), `GET /privacy` (everyone): pages.
+  `delete {id}`, `topup {id}` (now), `answer {request, approved, usd?}`. It answers the same body as
+  `GET /api/admin`, with `mailed: false` when the op's email did not go. A bad input is 400 (an unknown
+  op or cap, a cap below 0 or over its ceiling, an amount over $100, `give` of 0 or below −$100, an
+  `answer` amount of 0 or less), an unknown person or request 404, a top-up that no longer waits or an
+  answered request 409. `topup` emails *Your free screens are ready*, `answer` the answer; each sent
+  email counts toward the day's.
+- `GET /admin` (owner), `GET /privacy` (everyone): pages. The privacy page names `UXWOZ_OPERATOR` as who
+  runs the site and `UXWOZ_CONTACT` (else `UXWOZ_ADMIN_EMAIL`) as whom to write to.
 - `GET /api/config` gains `public: true`, `starters: Starter[]` and, for the public, one model.
 - `GET /api/backup` in public mode is a zip: `screen-cache.json`, `uxwoz.db`, `users/<id>.json`.
 
@@ -148,6 +154,7 @@ ready*. Approving in the admin's page does the same at once.
 | `UXWOZ_DB`, `UXWOZ_USERS_DIR` | the database file and the folder of people's cache files |
 | `UXWOZ_ADDRESS_HEADER` | the header with the visitor's address, default `x-real-ip` |
 | `RESEND_API_KEY`, `UXWOZ_MAIL_FROM`, `UXWOZ_ADMIN_EMAIL` | mail: the key, the sender (default `UX Woz <hello@mail.uxwoz.com>`), the owner's address |
+| `UXWOZ_OPERATOR`, `UXWOZ_CONTACT` | the privacy page: who runs the site, whom to write to |
 
 ## Recordings
 
