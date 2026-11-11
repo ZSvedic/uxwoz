@@ -167,6 +167,10 @@ export function createServer(opts: ServerOptions = {}) {
       },
       '/api/apps': () => json({ apps: cache.apps() }),
       '/api/export': exportRoute(cache),
+      // The whole cache file, as it would be saved now: the owner's only (see share.ts).
+      '/api/backup': {
+        GET: () => new Response(cache.serialize(), { headers: { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="screen-cache.json"', 'Cache-Control': 'no-store' } }),
+      },
       // Returns the whole mockup: a delete can give other screens new parents.
       '/api/delete': {
         POST: api(async (b) => {

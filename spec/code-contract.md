@@ -128,6 +128,11 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
   (newest version, components pasted, Pico and `mockup.css` inlined, vh as pixels of the device's
   height, centred on a grey page, our link script in place of the frame's); see
   [behavior.md](behavior.md#export). 404 for a mockup with no picked first screen.
+- `GET /api/backup`: the whole screen cache, the same bytes `save()` would write to the cache file
+  now (every mockup, the boxes, the shares, feedback and trips), as `application/json` with
+  `Content-Disposition: attachment; filename="screen-cache.json"` and `Cache-Control: no-store`; it
+  changes nothing. The owner's only (see Sharing): never through a share link of any role. A file
+  saved from it loads as `UXWOZ_CACHE_FILE`.
 - `POST /api/delete {key}`: delete a screen. Screens the first screen reached before and no longer
   reaches (through the clicks that made screens and the buttons in each screen's newest version) go
   too; a screen whose first click came from a screen that is gone takes the screen that reaches it
@@ -175,7 +180,7 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
   `/api/revise`, `/api/undo`, `/api/box` and `/api/delete`, each for its own mockup only: the mockup
   is a GET's `?app=`, or a POST body's `app` or the first part of its `key`; a POST whose `app` or
   `key` is not a string, or whose `?app=` names another mockup than its body, is 403. It may not use
-  `/api/share`, `/api/shares`, `/api/unshare`, `/api/feedback`, `/api/delete-app`, `/api/warmup`, or `/api/delete` of
+  `/api/share`, `/api/shares`, `/api/unshare`, `/api/feedback`, `/api/delete-app`, `/api/warmup`, `/api/backup`, or `/api/delete` of
   its first screen (all 403). Its budget (`cap`) counts each call that makes a model work: a new
   screen that is not a cache hit, a pick (its filing), `/api/revise`, and `/api/box` with `edit` or
   `visit`. A unit is taken before the call and given back when the call is refused; past the cap,

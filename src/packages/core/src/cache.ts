@@ -318,12 +318,17 @@ export abstract class ScreenCacheBase {
     return [...this.entries.values()].filter((e) => normalizePrompt(e.app) === root)
   }
 
+  /** The cache file's text, as `save()` writes it (also `GET /api/backup`). */
+  serialize(): string {
+    return JSON.stringify({ version: FORMAT, entries: [...this.entries.values()], boxes: Object.fromEntries(this.boxes), states: Object.fromEntries(this.states), shared: Object.fromEntries(this.shared) }, null, 1)
+  }
+
   save() {
     if (!this.file) return
     mkdirSync(dirname(this.file), { recursive: true })
     // Write a temp file, then rename, so a crash never leaves half a cache file.
     const tmp = `${this.file}.tmp`
-    writeFileSync(tmp, JSON.stringify({ version: FORMAT, entries: [...this.entries.values()], boxes: Object.fromEntries(this.boxes), states: Object.fromEntries(this.states), shared: Object.fromEntries(this.shared) }, null, 1))
+    writeFileSync(tmp, this.serialize())
     renameSync(tmp, this.file)
   }
 }
