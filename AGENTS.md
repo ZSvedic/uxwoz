@@ -99,6 +99,7 @@ src/tests/                   bun tests; cassette.ts replays cassettes/, no-netwo
 src/tests/fixtures/demo-cache.json   the demo mockup (a habit tracker); made by scripts/make-demo-cache.ts
 src/scripts/make-demo-cache.ts   writes the demo mockup through ScreenCache, the same on every run
 src/scripts/demo.ts          `bun run demo`: the app on a temporary copy of the demo mockup, no keys, prints the URLs
+src/scripts/backup.sh        run by hand or weekly by launchd: the host's cache from GET /api/backup into backups/ (git-ignored)
 src/scripts/voice-check.ts   run by hand: a macOS voice says an Edit to a separate Chrome; PASS if the Edit was sent
 ```
 
