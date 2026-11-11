@@ -19,7 +19,8 @@ const STEP_LABELS: [string, string][] = [['arrived', 'Arrived'], ['starter', 'Pi
   ['own', 'Own prompt'], ['limit', 'Hit the limit'], ['asked', 'Asked for a code'], ['verified', 'Verified']]
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
-const money = (usd: number) => `$${usd.toFixed(2)}`
+/** Dollars; an amount under ten cents keeps its tenths of a cent, since a design costs about $0.001. */
+const money = (usd: number) => `$${usd.toFixed(usd !== 0 && Math.abs(usd) < 0.1 ? 3 : 2)}`
 const when = (ms: number | null) => (ms ? new Date(ms).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '')
 
 type Child = Node | string

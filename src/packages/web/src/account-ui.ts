@@ -116,6 +116,13 @@ export function initAccount(d: AccountDeps, cfg: { public?: boolean }) {
   deps = d
   isPublic = !!cfg.public
   if (!isPublic) return
+  // The first step of the count, once per browser.
+  try {
+    if (!localStorage.getItem('uxwoz:arrived')) {
+      localStorage.setItem('uxwoz:arrived', '1')
+      fetch('/api/step', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ step: 'arrived' }) }).catch(() => {})
+    }
+  } catch { /* no storage: not counted */ }
   try {
     const k = JSON.parse(sessionStorage.getItem(KEPT) ?? 'null')
     if (typeof k?.email === 'string') Object.assign(card, { email: k.email, step: k.code ? 'code' : 'email' })
