@@ -109,7 +109,8 @@
     <div id="sharePane" class="pane share-pane" hidden></div>
   </aside>
   <form id="generate" class="generate">
-    <h2>What should we mock up?</h2>
+    <h2 id="genTitle">What should we mock up?</h2>
+    <h3 id="ownTitle" hidden>or describe your own</h3>
     <textarea id="prompt" name="prompt" rows="2" maxlength="2000" required
       placeholder="Describe a product, e.g. a coffee shop ordering app"></textarea>
     <div class="gen-row">
@@ -117,16 +118,9 @@
       <label>Device <select id="device" title="What the mockup's screens are designed for"></select></label>
     </div>
     <button type="submit" class="primary go">Generate</button>
-    <div class="gen-list">
-      <h3>Templates</h3>
-      <div class="chips">
-        <button type="button" class="example">A coffee shop ordering app</button>
-        <button type="button" class="example">A mortgage calculator with a yearly balance chart</button>
-        <button type="button" class="example">A todo list with filters</button>
-        <button type="button" class="example" data-prompt="cute android app for controling Schrodinger 3000, which is an automatic cat litter box (cleans the sand automatically), has automatic water dispenser, dry food dispenser, and wet food dispenser, and a camera to track your cat!!">Schrodinger 3000 cat app</button>
-        <button type="button" class="example" data-prompt="A food delivery app: browse restaurants, a restaurant's menu, cart, checkout and live order tracking">Food delivery app</button>
-        <button type="button" class="example" data-prompt="A habit tracker: today's habits, a habit's detail with a streak calendar, add a habit, weekly stats and settings">Habit tracker</button>
-      </div>
+    <div class="gen-list" id="startersBox">
+      <h3 id="startersTitle">Starters</h3>
+      <div id="starters" class="starters"></div>
     </div>
     <div class="gen-list" id="recentBox" hidden>
       <h3>Recent mockups</h3>

@@ -96,6 +96,13 @@ export function pickFx(key: string, index: number): { wait: Promise<void>; done:
   return { wait: ms ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve(), done }
 }
 
+/** A hint's step done (onboarding.ts): the pick's sparks out of the hint and its chime (`sound` false when a pick plays its own). */
+export function stepFx(hint: Element, sound = true) {
+  if (!DOM) return
+  burst(hint, 12, WON)
+  if (sound) play('chime')
+}
+
 /** The speaker in the bar shows the setting. */
 function showSound() {
   const b = document.getElementById('sound'); if (!b) return

@@ -9,6 +9,8 @@
 /* Errors (until closed) and hints show in a pill at the bottom of the canvas. */
 .error-pill, .hint-pill { position: absolute; z-index: 12; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 6px 14px;
   border: 1px solid var(--border); border-radius: 18px; background: var(--surface); color: var(--muted); box-shadow: var(--shadow); font-size: 13px; }
+.hint-pill { --z: 1; }
+.hint-pill.press { cursor: pointer; }
 .error-pill { max-width: calc(100% - 32px); display: flex; gap: 8px; align-items: center; padding-right: 8px; border-color: var(--err); color: var(--err); }
 .error-pill button { padding: 0 6px; border: 0; background: none; color: inherit; }
 

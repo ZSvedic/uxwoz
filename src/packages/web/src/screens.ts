@@ -8,7 +8,7 @@ import { renderSide } from './boxes.ts'
 import type { CardView, ScreenView } from './canvas.ts'
 import { canvas, closeMockup, side } from './app.ts'
 import { boxOp, renderDrawer } from './drawer.ts'
-import { mapOf, post, showError, hint, stream, streamInto, themeCss, type StreamRenderer } from './net.ts'
+import { coach, mapOf, post, showError, hint, stream, streamInto, themeCss, type StreamRenderer } from './net.ts'
 import { pickFx } from './design/fx.ts'
 import { applyMap, filed, saveCurrent, setCurrent } from './nav.ts'
 import { loadRecent, renderToolbar } from './toolbar.ts'
@@ -129,8 +129,11 @@ export async function openScreen(action: string | null, from: string | null, lab
       if (!s) return
       s.stream?.cancel()
       s.stream = null
-      if (ev.type === 'version') s.version = ev.version
-      else { s.error = ev.message; state.failed.set(`${m!.key}#${ev.variant}`, ev.message) }
+      if (ev.type === 'version') {
+        s.version = ev.version
+        if (ev.version.costUsd !== 0) coach.did('live') // a replayed design costs 0
+        if (m!.sides.every((x) => x.version)) coach.did('ready')
+      } else { s.error = ev.message; state.failed.set(`${m!.key}#${ev.variant}`, ev.message) }
       draw()
     } else if (ev.type === 'done') {
       keep(ev.entry)
@@ -162,6 +165,7 @@ async function refit(key: string, fitted: number | null, choice = true) {
 
 /** Fit a finished A OR B by width now, then snugly once both have their size. */
 export function fitChoice(key: string) {
+  coach.did('ready')
   canvas.fit(key, { top: true })
   refit(key, performance.now())
 }
@@ -215,6 +219,7 @@ export async function pick(key: string, index: number) {
     keep(entry)
     Object.assign(state, { filing, visiting: visiting || state.visiting })
     if (filing || visiting) filed()
+    coach.did('pick')
     canvas.rename(`${key}#${index}`, key)
     state.current = key
     saveCurrent()
@@ -253,6 +258,7 @@ function target(app: string, from: string, prompt: string): { to: string; prompt
 export function onAction(from: string, action: string, label: string) {
   const app = state.app
   if (!app) return
+  coach.did('click')
   const { to, prompt } = target(app, from, action)
   setCurrent(from)
   if (to === from) return void (screenRef(action) || isBack(action) || hint('This control leads nowhere yet: the fixer redraws it.'))
@@ -271,6 +277,7 @@ export async function revise(key: string, change: string | null) {
   if (!e?.versions.length) return
   if (state.busy) return hint()
   state.revising = { key, change }
+  if (change) coach.did('editSent')
   let frame: StreamRenderer | null = null
   await stream('/api/revise', { key, change, model: modelSelect.value, device: deviceSelect.value }, change ? 'make the change' : 'make a new design', (ev, css) => {
     if (ev.type === 'chunk') (frame ??= streamInto(key, css, isComponent(e))).push(ev.text)
@@ -279,7 +286,8 @@ export async function revise(key: string, change: string | null) {
       keep(ev.entry)
       if (ev.filing) { state.filing = true; filed() }
       state.revising = null
-      if (change) changeInput.value = ''
+      if (change) { changeInput.value = ''; coach.did('edited') }
+      if (ev.entry.versions.at(-1)?.costUsd !== 0) coach.did('live')
       // The new version may be taller or narrower: keep it in view once it has its size.
       canvas.sized(key).then(() => canvas.reveal(key))
     }
@@ -295,6 +303,7 @@ export async function undo(key: string) {
   const res = await post('/api/undo', { key }).catch(() => null)
   if (!res?.ok) return showError('Nothing to undo')
   keep((await res.json()).entry)
+  coach.did('undo')
   draw()
 }
 

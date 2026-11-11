@@ -77,8 +77,11 @@ src/packages/web/src/
                  Undo, delete
   nav.ts         browser: the current screen, ← → trail, the map after filing, Nav
   drawer.ts      browser: box changes and rail tools, the drawer (Edit, Info, and Comments for a screen) for a screen or a box
-  toolbar.ts     browser: generate panel and pickers, toolbar menus (Theme too), Recent, zoom and its keys
-  net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill and the hint
+  toolbar.ts     browser: generate panel (the starters, above the prompt box for a first-time visitor) and
+                 pickers, toolbar menus (Theme too), Recent, zoom and its keys
+  net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill, the brief hint
+                 and the lasting one (`coach`)
+  onboarding.ts  the public's hints: which is due from what the visitor did, kept in local storage (no DOM, tested)
   voice.ts       browser: voice input's state machine (wake phrase as Chrome hears it, what was heard, countdown,
                  stop, cancel; no DOM, tested) and speech recognition that restarts itself and says why it stops
   voice-ui.ts    browser: the microphone button, the label with what was heard, the words in the drawer's Edit
@@ -184,7 +187,7 @@ same time only in different parts.
 | Engine | core: `models`, `prompt`, `providers`, `generate`, `starters`, `recordings` | `generate-screen`, `cut-off`, `recordings` | `prompt-screen.md`, `ui-generation.md` |
 | Cache | core: `cache`, `cache-boxes`, `keys`, `tree` | `cache`, `boxes`, `tree`, `demo-cache` | contract: Types |
 | Server | web: `server`, `drawing`, `desks`, `export`, `people`, `mail`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks`, `people`, `mail` | contract: HTTP API, `public.md` |
-| Canvas | web: `app`, `state`, `screens`, `nav`, `canvas`, `toolbar`, `net`; core: `frame` | `ropes`, `frame` | behavior: Toolbar to Rail, Navigation |
+| Canvas | web: `app`, `state`, `screens`, `nav`, `canvas`, `toolbar`, `net`, `onboarding`; core: `frame` | `ropes`, `frame`, `onboarding` | behavior: Toolbar to Rail, Navigation |
 | Boxes and drawer | web: `boxes`, `drawer`, `voice`, `voice-ui` | `boxes`, `voice` | behavior: Drawer, Voice, Boxes |
 | Sharing | web: `share`, `sharing`, `comments`, `pins`, `player.*` | `share`, `comments`, `pins` | behavior: Sharing |
 | Design | web: `design/` | `design`, `fx` | **Design** above |
