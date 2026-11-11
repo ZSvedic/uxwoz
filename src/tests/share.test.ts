@@ -161,6 +161,24 @@ describe('sharing', () => {
     expect((await fetch(url(`/s/${token}`))).status).toBe(200)
   })
 
+  test('behind a proxy that ends HTTPS: POSTs from the page pass, a foreign Origin is refused, links are https, /healthz is open', async () => {
+    const { cache } = mockup()
+    process.env.UXWOZ_OWNER = 'sesame'
+    start(cache)
+    const cookie = 'uxwoz_owner=sesame'
+    const proxy = { Host: 'uxwoz.example', 'X-Forwarded-Proto': 'https', cookie }
+    const health = await fetch(url('/healthz'), { headers: { Host: 'uxwoz.example' } })
+    expect([health.status, await health.text()]).toEqual([200, 'ok'])
+    const made = await post('/api/share', { app: APP, role: 'view' }, { ...proxy, Origin: 'https://uxwoz.example' })
+    expect(made.status).toBe(200)
+    const view = await made.json()
+    expect(view.url).toBe(`https://uxwoz.example/s/${view.token}`)
+    expect((await post('/api/share', { app: APP, role: 'view' }, { ...proxy, Origin: 'https://evil.example' })).status).toBe(403)
+    expect((await post('/api/share', { app: APP, role: 'view' }, { ...proxy, Origin: 'null' })).status).toBe(403)
+    const page = await (await fetch(url(`/s/${view.token}`), { headers: proxy })).text()
+    expect(page).toContain('<meta property="og:image" content="https://uxwoz.example/og.png">')
+  })
+
   test('without UXWOZ_OWNER, everything works as before', async () => {
     start(mockup().cache)
     expect((await fetch(url('/'))).status).toBe(200)

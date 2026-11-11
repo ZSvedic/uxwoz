@@ -40,7 +40,12 @@ There are no runtime dependencies; `@types/bun` and `typescript` are dev-only.
 
 The server listens on 127.0.0.1 by default (`UXWOZ_HOST`). Every POST must be `application/json` (else 415) and must not
 come from another origin (`Origin` or `Sec-Fetch-Site: cross-site`, else 403), so no other web page
-can spend model credits.
+can spend model credits. The `Origin`'s host is compared with the request's `Host` header, scheme left out,
+so a proxy that ends HTTPS and forwards plain HTTP still passes; a request with no `Origin` passes.
+A link the server builds (a share's `url`, the player's `og:image`) uses the request's public origin: the
+scheme from `X-Forwarded-Proto` (its first value) when present, else the request's own, and the `Host` header.
+
+- `GET /healthz` → 200 `ok` (text) for the host's health check: open with `UXWOZ_OWNER` set, touches nothing.
 
 - `GET /api/config`: models (id, label, costEstimated), themes (`mockup`, `clean`), devices (id,
   label, width), and the default model, theme and device; `warning` when the cache file is from a
@@ -178,7 +183,7 @@ can spend model credits.
 - **The owner**: with `UXWOZ_OWNER` set, `/`, `/design` and every `/api` route but `/api/s/*` need the cookie
   `uxwoz_owner=<secret>` (401 on the API, a one-line 403 page on `/` and `/design`; `/og.png` and share links
   answer everyone); `/?owner=<secret>` sets it
-  (`HttpOnly; SameSite=Lax`, and `Secure` over https) and redirects to `/`. The server fetches the
+  (`HttpOnly; SameSite=Lax`, and `Secure` when the public origin is https) and redirects to `/`. The server fetches the
   pages it proxies from itself (`127.0.0.1` and its port), never from the request's Host.
 - `GET /design`: the design sheet, built from the app's own CSS and classes on static markup: the logo, every
   colour token by day and night, type, controls, surfaces, motion, and a ▶ per sound.
