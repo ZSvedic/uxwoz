@@ -7,6 +7,7 @@ import { draw, page } from './screens.ts'
 import { openGenerate } from './toolbar.ts'
 import { Coach, type Hint } from './onboarding.ts'
 import { stepFx } from './design/fx.ts'
+import { loadMe, refused } from './account-ui.ts'
 import { $, state, store } from './state.ts'
 
 async function fetchText(url: string): Promise<string> {
@@ -85,9 +86,13 @@ export const coach = new Coach({
 })
 $('hint').addEventListener('click', () => { if (!hintTimer && coach.press()) openGenerate() })
 
+/** A refusal the account card or the red pill already answered (account-ui.ts): no "Could not" pill on top. */
+class Answered extends Error {}
+
 async function* readEvents(res: Response): AsyncGenerator<ScreenEvent> {
   if (!res.ok || !res.body) {
     const b = await res.json().catch(() => ({}))
+    if (refused(res.status, b)) throw new Answered()
     throw new Error(b.error ?? `HTTP ${res.status}`)
   }
   const decoder = new TextDecoder()
@@ -129,10 +134,11 @@ export async function stream(url: string, body: object, what: string, on: (ev: S
     if (!finished && !ctrl.signal.aborted) throw new Error('the stream ended early')
   } catch (err) {
     failed = !ctrl.signal.aborted
-    if (failed) showError(`Could not ${what}: ${err instanceof Error ? err.message : err}`)
+    if (failed && !(err instanceof Answered)) showError(`Could not ${what}: ${err instanceof Error ? err.message : err}`)
   } finally {
     after(failed)
     if (state.busy === ctrl) state.busy = null
+    loadMe() // the free screens left, after a live design or a refusal
     draw().catch((e) => showError(String(e)))
   }
 }

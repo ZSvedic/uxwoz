@@ -10,7 +10,7 @@
 .gen-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
 .generate .go { padding: 10px; border-radius: 99px; font-size: 17px; font-weight: 600; box-shadow: var(--pick-shadow); }
 .generate .go:focus-visible { box-shadow: 0 0 0 2px var(--focus-in), var(--pick-shadow); }
-.workspace:has(> .generate.open:not([hidden]))::after { content: ''; position: absolute; inset: 0; z-index: 14; background: var(--dim); }
+.workspace:has(> :is(.generate.open, .account-card):not([hidden]))::after { content: ''; position: absolute; inset: 0; z-index: 14; background: var(--dim); }
 .gen-row label { display: flex; gap: 6px; align-items: center; color: var(--muted); }
 .starters { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
 .starter { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; text-align: left; border-radius: 12px; }
@@ -20,3 +20,14 @@
 .recent { display: flex; flex-direction: column; gap: 2px; max-height: 15em; overflow: auto; }
 .recent button { text-align: left; padding: 4px 8px; display: flex; gap: 8px; }
 .recent button small { color: var(--muted); white-space: nowrap; }
+/* The account card (account-ui.ts): the generate panel's card, narrower, over the dim and over the panel itself. */
+.workspace:has(> .generate.account-card:not([hidden]))::after { z-index: 16; }
+.generate.account-card { z-index: 17; top: 16vh; width: min(460px, calc(100% - 32px)); gap: 10px; }
+.account-card p { margin: 0; }
+.account-card .lead { font-size: 16px; }
+.account-card input { width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 10px; background: var(--field); font-size: 15px; }
+.account-card label, .account-card small, .account-card .again { color: var(--muted); }
+.account-card .again { align-self: flex-start; padding: 0; border: 0; background: none; text-decoration: underline; }
+.account-card .err { color: var(--err); }
+.account-card a { color: inherit; }
+.menu h3.plain { text-transform: none; font-size: 13px; font-weight: 400; color: var(--text); }

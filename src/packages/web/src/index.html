@@ -78,6 +78,10 @@
     <button data-zoom="screen" class="wide-only" title="Fit screen (⇧2)"><svg class="icon" viewBox="0 0 16 16"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg></button>
     <i class="sep"></i>
     <button id="sound" class="sound off" title="Sounds" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></button>
+    <span class="pop" id="accountPop" hidden>
+      <button id="accountButton" class="menu-button" aria-haspopup="menu" title="Your account"><span id="accountName"></span><span id="accountLetter" class="dot" hidden></span><svg id="accountIcon" class="icon" viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.8"/><path d="M2.5 14c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5"/></svg></button>
+      <div id="accountMenu" class="menu" role="menu" hidden></div>
+    </span>
   </div>
   </nav>
 </header>
@@ -126,6 +130,15 @@
       <h3>Recent mockups</h3>
       <div id="recent" class="recent"></div>
     </div>
+  </form>
+  <form id="account" class="generate account-card" hidden>
+    <p id="accountLead" class="lead"></p>
+    <label for="accountField" id="accountLabel" hidden></label>
+    <input id="accountField" required>
+    <button id="accountSend" type="submit" class="primary go"></button>
+    <p id="accountError" class="err" role="alert" hidden></p>
+    <button id="accountAgain" type="button" class="again" hidden>Send a new one</button>
+    <small id="accountNote"><span id="accountNoteText"></span> <a href="/privacy" target="_blank">Privacy</a></small>
   </form>
 </div>
 <script type="module" src="./app.ts"></script>

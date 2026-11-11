@@ -548,14 +548,19 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
   with no recording call the models, and count against the visitor's free screens. The first time a
   screen's design is made by a model (it cost more than 0), the hint says *From here your designs are
   made live.*, ahead of the chain, until the visitor's next pick, click, Edit, Undo or a press on it.
-- **The account button** is the toolbar's last item. A visitor's shows the free screens left
-  (*14 free*) once they made a live design; a registered user's shows the first letter of their email.
-  Its menu: *About 14 free screens left*; **Register** (a visitor) or the email; **Ask for more**
-  (registered, none left); **Sign out**; **Delete my account…**, which asks for the email typed once
-  more and then removes the mockups, the links and the account at once; **Privacy**.
+- **The account button** is the toolbar's last item, for the public only (not the owner). A visitor's
+  shows the free screens left (*14 free*) once they made a live design, a person's outline before; a
+  registered user's shows the first letter of their email. Its menu: *About 14 free screens left*;
+  **Register** (a visitor) or the email; **Ask for more** (registered, none left); **Sign out** and
+  **Delete my account…** (registered), which asks for the email typed once more and then removes the
+  mockups, the links and the account at once; **Privacy**. After either the page starts again.
 - **The account card** opens over the dimmed canvas, like the generate panel, when a live design is
-  refused for lack of free screens, or from **Register**. Esc or a press outside closes it.
-  - A visitor: *You have used your free screens. Register to get about 21 more.* An email field,
+  refused for lack of free screens, or from **Register**. Esc or a press outside closes it. What was
+  typed and the step stay while it is closed; Enter sends; a refusal (*Sign-ups are full for today.*)
+  shows in the card in the server's words.
+  - A visitor: *You have used your free screens. Register to get about 21 more.* (from **Register**:
+    *Register to get about 21 more free screens.*; for the network's day: *This network has used
+    today's free screens. Register to carry on.*) An email field,
     **Send the code**, and *No password: we email you a six-digit code.* with a link to Privacy.
   - Then *We sent a code to ana@example.com.*, a field for it, **Verify** and *Send a new one*. A wrong
     code says *That code is not right.*
@@ -563,13 +568,14 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
     you. Your mockups stay open until then: look, click, export.* The email, when it comes, says *Your
     free screens are ready* with a link to the app.
   - Verified, an account that exists: the card closes and the mockups made as a visitor are in Recent.
+    An account still waiting for its free screens gets the thanks above instead.
   - A registered user with none left: *You have used your free screens.* A field *What are you
     building?*, **Ask for more**, then *Asked. The answer comes by email.*
 - **Paused.** When the owner switched the public to starters only, or the day's or the month's cap is
   reached, a live design answers with the red pill: *Live designs are paused for now. The starters
-  still work.*
+  still work.* A blocked account's says *This account is closed.*
 - **What needs an account**: Share (View and Comment links) and Export project. A visitor who presses
-  either gets the account card with *Register to share a mockup* or *Register to export it*. Edit links
+  either (or Feedback) gets the account card with *Register to share a mockup* or *Register to export it*. Edit links
   are the owner's only. Export the boxes, voice and the boxes work for everyone.
 - **The admin's page** (`/admin`, the owner): today's and the month's public spend beside their caps,
   and the switch **Open / Starters only**; the caps and allowances, each editable; the steps by day for

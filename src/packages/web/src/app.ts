@@ -14,6 +14,7 @@ import { applyMap, currentKey, resetTrail, setCurrent } from './nav.ts'
 import { all, components, dropChoice, draw, fitChoice, fitScreenSoon, onAction, openScreen, pick, stopMaking } from './screens.ts'
 import { PICKERS, closeMenus, loadRecent, openGenerate, warmUp } from './toolbar.ts'
 import { editLinkApp, loadShared, shareToken } from './sharing.ts'
+import { initAccount } from './account-ui.ts'
 import { $, deviceSelect, generate, modelSelect, promptInput, state, store } from './state.ts'
 
 export const side = createSide(boxOp, (box, tab) => { focusBox(box); openDrawer(tab) })
@@ -37,8 +38,9 @@ export async function start(app: string, make = true) {
   state.before = null
   const n = ++state.starts
   const res = await mapOf(app)
-  if (!res.ok) throw new Error(`could not load the mockup: HTTP ${res.status}`)
-  const map = await res.json() as { entries: CacheEntry[] }
+  // 401: a first-time visitor of the public app, who has no person (and so no mockups) until the first screen.
+  if (!res.ok && res.status !== 401) throw new Error(`could not load the mockup: HTTP ${res.status}`)
+  const map = res.ok ? await res.json() as { entries: CacheEntry[] } : { entries: [] }
   if (n !== state.starts) return // a newer mockup was opened meanwhile
   if (!make && !map.entries.length) { store.set('uxwoz:app', ''); return draw() }
   state.app = app
@@ -102,6 +104,7 @@ async function deleteApp(again: boolean) {
 async function init() {
   const cfg = await (await fetch('/api/config')).json()
   if (cfg.warning) showError(cfg.warning)
+  initAccount({ post, showError, loadRecent, closeMenus }, cfg)
   for (const [s, name] of PICKERS) {
     const list: { id: string; label: string }[] = cfg[`${name}s`], saved = store.get(`uxwoz:${name}`)
     for (const x of list) s.add(new Option(x.label, x.id))

@@ -9,6 +9,7 @@ import { openDrawer, renderDrawer } from './drawer.ts'
 import { hint, post, showError } from './net.ts'
 import { labelOf } from './screens.ts'
 import { closeMenus } from './toolbar.ts'
+import { needsAccount } from './account-ui.ts'
 import { $, state } from './state.ts'
 
 /** The edit link this page was opened by, if any: the app then shows its one mockup, without the project menu. */
@@ -137,6 +138,7 @@ function copy(url: string) {
 /** Share… and Feedback in the project menu open the pane. */
 for (const id of ['shareMenu', 'feedbackMenu']) $(id).addEventListener('click', () => {
   closeMenus()
+  if (needsAccount('share')) return
   openDrawer('share')
   if (id === 'feedbackMenu') requestAnimationFrame(() => $('sharePane').querySelector('h3:nth-of-type(2)')?.scrollIntoView())
 })

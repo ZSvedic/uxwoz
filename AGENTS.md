@@ -90,6 +90,9 @@ src/packages/web/src/
   net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill, the brief hint
                  and the lasting one (`coach`)
   onboarding.ts  the public's hints: which is due from what the visitor did, kept in local storage (no DOM, tested)
+  account-ui.ts  browser: the public's account button, its menu and the account card (sign in by code, Ask for
+                 more), a refused live design (402) or a thing that needs an account; what each shows from
+                 /api/me as functions with no DOM (tested); nothing of it in private mode
   voice.ts       browser: voice input's state machine (wake phrase as Chrome hears it, what was heard, countdown,
                  stop, cancel; no DOM, tested) and speech recognition that restarts itself and says why it stops
   voice-ui.ts    browser: the microphone button, the label with what was heard, the words in the drawer's Edit
@@ -197,7 +200,7 @@ same time only in different parts.
 | Engine | core: `models`, `prompt`, `providers`, `generate`, `starters`, `recordings` | `generate-screen`, `cut-off`, `recordings` | `prompt-screen.md`, `ui-generation.md` |
 | Cache | core: `cache`, `cache-boxes`, `keys`, `tree` | `cache`, `boxes`, `tree`, `demo-cache` | contract: Types |
 | Server | web: `server`, `drawing`, `desks`, `public`, `export`, `people`, `mail`, `admin`, `account`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks`, `public`, `people`, `mail`, `admin`, `account`, `replay`, `journey` | contract: HTTP API, `public.md` |
-| Canvas | web: `app`, `state`, `screens`, `nav`, `canvas`, `toolbar`, `net`, `onboarding`; core: `frame` | `ropes`, `frame`, `onboarding` | behavior: Toolbar to Rail, Navigation |
+| Canvas | web: `app`, `state`, `screens`, `nav`, `canvas`, `toolbar`, `net`, `onboarding`, `account-ui`; core: `frame` | `ropes`, `frame`, `onboarding`, `account-ui` | behavior: Toolbar to Rail, Navigation |
 | Boxes and drawer | web: `boxes`, `drawer`, `voice`, `voice-ui` | `boxes`, `voice` | behavior: Drawer, Voice, Boxes |
 | Sharing | web: `share`, `sharing`, `comments`, `pins`, `player.*` | `share`, `comments`, `pins` | behavior: Sharing |
 | Design | web: `design/` | `design`, `fx` | **Design** above |
