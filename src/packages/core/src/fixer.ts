@@ -1,8 +1,8 @@
 // The fixer's visit: the background model reads the paper, the screens new since its last visit and
 // any request of the user, and replies in plain lines; code applies them with refusals and an Undo each.
 
-import type { BoxName, Change, Rule, ScreenCache, Table, Visit } from './cache.ts'
-import { BOXES, idOf, refuseLine } from './cache.ts'
+import type { BoxName, Change, Rule, ScreenCache, Table, Visit } from './cache-boxes.ts'
+import { BOXES, idOf, refuseLine } from './cache-boxes.ts'
 import { askBackground, backgroundVersion, boxLines, numberParts, parseFiling, partOf, type FilingLine } from './filing.ts'
 import { BOX_TITLES } from './keys.ts'
 import { visitRequest } from './prompt.ts'
