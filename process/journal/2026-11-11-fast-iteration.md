@@ -114,3 +114,11 @@ Railway reads the root `Dockerfile` and needs no config file (its `railway.json`
 2026-12-01, so none was written). The README is rewritten short: how to run, where to find things, the
 six hosting steps. One more fix for a proxy: the browser's host is taken from `X-Forwarded-Host` when a
 proxy sets it, because Railway's docs promise that header and say nothing about `Host`.
+
+The repo is public at https://github.com/ZSvedic/uxwoz, with the work email replaced by the GitHub
+no-reply address in every commit (so commit IDs quoted in older journal files no longer match). It runs
+on Railway at https://uxwoz-production.up.railway.app: the service deploys `main` from GitHub, a 5 GB
+volume is mounted at `/data`, the healthcheck is `/healthz`, the port is pinned to 8080, the region is
+US East. Checked on the live host: `/healthz`, the page, a button press from the page passes and one
+from another site is refused. The three secrets were left for the owner to add, so until then it has
+no keys and no owner's gate.
