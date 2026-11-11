@@ -10,8 +10,8 @@ export const TRIP_KEEP = 50
 export const FEEDBACK_CHARS = 1000
 export const EDIT_CAP = 20
 const ROLES = ['view', 'comment', 'edit'] as const
-/** The routes an edit link may not use: the share links themselves, resolving feedback, deleting the whole mockup, the owner's warm-up. */
-const OWNER_ONLY = new Set(['/api/share', '/api/shares', '/api/unshare', '/api/feedback', '/api/delete-app', '/api/warmup'])
+/** The routes an edit link may not use: the share links themselves, resolving feedback, deleting the whole mockup, the owner's warm-up, the backup. */
+const OWNER_ONLY = new Set(['/api/share', '/api/shares', '/api/unshare', '/api/feedback', '/api/delete-app', '/api/warmup', '/api/backup'])
 /** The routes that call a model when an edit link uses them (a new screen only when it is not in the cache). */
 const PAID = new Set(['/api/screen', '/api/revise', '/api/pick'])
 

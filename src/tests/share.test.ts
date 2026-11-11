@@ -318,6 +318,51 @@ describe('sharing', () => {
     expect((await post('/api/feedback', { app: APP, id, resolved: true }, { cookie: 'uxwoz_owner=sesame' })).status).toBe(200)
   })
 
+  test('the backup is the cache file as save() writes it, for the owner only, and it loads back the same', async () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
+    const { cache, home } = mockup(file)
+    const shares = cache.ownShared(APP).shares
+    const tok = (n: number) => String(n).padStart(32, '0')
+    shares.push(...(['view', 'comment', 'edit'] as const).map((role, i) => ({ token: tok(i + 1), role, createdAt: '', used: 0, opens: 0 })))
+    process.env.UXWOZ_OWNER = 'sesame'
+    start(cache)
+    const visitor = 'abcdef0123456789'
+    await post(`/api/s/${tok(2)}/feedback`, { visitor, name: 'Ana', kind: 'comment', screen: home, text: 'Nice' })
+    await post(`/api/s/${tok(2)}/trip`, { id: '0123456789abcdef', visitor, name: 'Ana', screens: ['Home'], dead: [] })
+    const owner = { cookie: 'uxwoz_owner=sesame' }
+    // No cookie, a view, a comment and an edit link: refused, also with the owner's cookie beside a link.
+    expect((await fetch(url('/api/backup'))).status).toBe(401)
+    expect((await fetch(url('/api/backup'), { headers: { cookie: 'uxwoz_owner=wrong' } })).status).toBe(401)
+    for (const n of [1, 2, 3]) expect((await fetch(url('/api/backup'), { headers: { 'x-uxwoz-share': tok(n) } })).status).toBe(403)
+    expect((await fetch(url('/api/backup'), { headers: { 'x-uxwoz-share': tok(3), ...owner } })).status).toBe(403)
+    const res = await fetch(url('/api/backup'), { headers: owner })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('application/json')
+    expect(res.headers.get('content-disposition')).toBe('attachment; filename="screen-cache.json"')
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    const text = await res.text()
+    cache.save()
+    expect(text).toBe(readFileSync(file, 'utf8'))
+    expect(Object.values(JSON.parse(text).shared)[0]).toMatchObject({ feedback: [{ text: 'Nice' }], trips: [{ id: '0123456789abcdef' }] })
+    // Loaded as a new cache, it serves the same mockups and the same map.
+    const apps = await (await fetch(url('/api/apps'), { headers: owner })).json()
+    const map = await (await fetch(url(`/api/map?app=${encodeURIComponent(APP)}`), { headers: owner })).json()
+    const copy = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'backup.json')
+    await Bun.write(copy, text)
+    const loaded = new ScreenCache(copy)
+    expect(JSON.parse(loaded.serialize())).toEqual(JSON.parse(text))
+    server!.stop(true)
+    start(loaded)
+    expect(await (await fetch(url('/api/apps'), { headers: owner })).json()).toEqual(apps)
+    expect(await (await fetch(url(`/api/map?app=${encodeURIComponent(APP)}`), { headers: owner })).json()).toEqual(map)
+    // Without UXWOZ_OWNER it answers like any other route, but never through an edit link.
+    server!.stop(true)
+    delete process.env.UXWOZ_OWNER
+    start(loaded)
+    expect((await fetch(url('/api/backup'))).status).toBe(200)
+    expect((await fetch(url('/api/backup'), { headers: { 'x-uxwoz-share': tok(3) } })).status).toBe(403)
+  })
+
   test('feedback from before names and ids loads: Someone, kinds dead and done, each with an id that stays the same', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
     const { cache, home } = mockup(file)
