@@ -215,6 +215,13 @@ Facts that cost builders a search:
   to an edit link's own mockup, view and comment links get 403, and `/api/apps` is cut there too.
 - Components are cache entries. The player's map and the paper the models get copy named fields, so a
   new field on an entry stays private until you add it there.
+- A builder's worktree can start behind `main`: fast-forward it to `main` before reading anything.
+- Builders add their lines to the code map and leave the Parts table to the lead: every builder who
+  edited its Server row caused a merge conflict.
+- To look at the public app: `UXWOZ_PUBLIC=1 UXWOZ_OWNER=<any>` with `UXWOZ_CACHE_FILE`, `UXWOZ_DB` and
+  `UXWOZ_USERS_DIR` in a temporary folder. With no `RESEND_API_KEY` outside production the sign-in code
+  is in the server's log. The owner's cookie is per host, so be the owner on `localhost` and a visitor
+  on `127.0.0.1`.
 - A click inside a screen's frame never reaches the page around it. The frame posts messages (see
   Frame messages in the contract); of the keys, only Escape and the zoom keys are passed on.
 
