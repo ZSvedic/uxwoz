@@ -4,7 +4,10 @@ import { REBUILD_MS, extractFragment, hasVisibleText } from '@uxwoz/core/frame'
 import type { ScreenEvent } from './server.ts'
 import { canvas } from './app.ts'
 import { draw, page } from './screens.ts'
-import { $, state } from './state.ts'
+import { openGenerate } from './toolbar.ts'
+import { Coach, type Hint } from './onboarding.ts'
+import { stepFx } from './design/fx.ts'
+import { $, state, store } from './state.ts'
 
 async function fetchText(url: string): Promise<string> {
   const res = await fetch(url)
@@ -59,9 +62,28 @@ export function hint(text = 'One screen at a time: wait until this one is made.'
   const h = $('hint')
   h.textContent = text
   h.hidden = false
+  h.classList.remove('press')
   clearTimeout(hintTimer)
-  hintTimer = setTimeout(() => { h.hidden = true }, 2500)
+  hintTimer = setTimeout(() => { hintTimer = undefined; showLasting() }, 2500)
 }
+
+/** The hint that stays until the visitor does the thing (onboarding.ts); a brief hint shows over it, then gives it back. */
+let lasting: Hint | null = null
+function showLasting() {
+  if (hintTimer) return
+  const h = $('hint')
+  h.textContent = lasting?.text ?? ''
+  h.hidden = !lasting
+  h.classList.toggle('press', !!lasting?.opens || !!lasting?.live)
+}
+export const coach = new Coach({
+  load: () => store.get('uxwoz:hints'),
+  save: (json) => store.set('uxwoz:hints', json),
+  show: (h) => { lasting = h; showLasting() },
+  fx: (sound) => stepFx($('hint'), sound),
+  later: (run, ms) => setTimeout(run, ms),
+})
+$('hint').addEventListener('click', () => { if (!hintTimer && coach.press()) openGenerate() })
 
 async function* readEvents(res: Response): AsyncGenerator<ScreenEvent> {
   if (!res.ok || !res.body) {

@@ -1,11 +1,12 @@
 // The toolbar and the generate panel: menus, Recent, theme, zoom and its keys, the pickers.
 
 import { normalizePrompt } from '@uxwoz/core/keys'
+import { STARTERS } from '../../core/src/starters.ts'
 import { MAX_ZOOM } from './canvas.ts'
 import { el, type Box } from './boxes.ts'
 import { canvas, restorePickers, side, start } from './app.ts'
 import { closeDrawer, unseen } from './drawer.ts'
-import { post, showError, themeCss } from './net.ts'
+import { coach, post, showError, themeCss } from './net.ts'
 import { currentAt, renderNav, trailStep, walkTrail } from './nav.ts'
 import { draw, labelOf } from './screens.ts'
 import { initVoice } from './voice-ui.ts'
@@ -26,11 +27,28 @@ generate.addEventListener('submit', (e) => {
 })
 enterSubmits(promptInput, generate)
 
-// A template with a long prompt shows a short name and keeps the full prompt in data-prompt.
-for (const b of document.querySelectorAll<HTMLButtonElement>('.example')) {
-  const prompt = b.dataset.prompt ?? b.textContent ?? ''
-  b.title = b.dataset.prompt ?? ''
-  b.addEventListener('click', () => open(prompt))
+// The starters, in place of templates: a card opens its mockup with the starter's device, and the server replays its
+// recording. The device is for that mockup only: the saved choice stays.
+$('starters').replaceChildren(...STARTERS.map((s) => {
+  const b = el('button', 'starter')
+  b.type = 'button'
+  b.title = s.prompt
+  b.append(el('b', '', s.label), el('small', '', s.kind))
+  b.addEventListener('click', () => {
+    deviceSelect.value = s.device
+    start(s.prompt).catch((err) => showError(String(err)))
+  })
+  return b
+}))
+
+/** A first-time visitor (no mockups) sees the starters above the prompt box; anyone else the prompt box first. */
+function placeStarters(first: boolean) {
+  const box = $('startersBox')
+  if (first) $('genTitle').after(box)
+  else generate.querySelector('.go')!.after(box)
+  $('genTitle').textContent = first ? 'Pick one and watch it drawn' : 'What should we mock up?'
+  $('startersTitle').hidden = first
+  $('ownTitle').hidden = !first
 }
 
 
@@ -74,6 +92,8 @@ export async function loadRecent() {
   recentApps = (await res.json() as { apps: { app: string; screens: number }[] }).apps
   $('recent').replaceChildren(...recentApps.map((a) => item(a.app, screensNote(a.screens), () => open(a.app))))
   $('recentBox').hidden = recentApps.length === 0
+  placeStarters(recentApps.length === 0)
+  coach.begin(recentApps.length > 0)
   renderRecentMenu()
 }
 
@@ -144,6 +164,7 @@ addEventListener('keydown', (e: KeyboardEvent) => {
 })
 
 export function openGenerate() {
+  coach.did('own')
   if (state.app && generate.classList.contains('open')) return promptInput.focus() // already over a mockup: keep what was typed
   restorePickers()
   generate.classList.add('open')

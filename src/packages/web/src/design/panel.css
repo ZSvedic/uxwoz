@@ -12,9 +12,11 @@
 .generate .go:focus-visible { box-shadow: 0 0 0 2px var(--focus-in), var(--pick-shadow); }
 .workspace:has(> .generate.open:not([hidden]))::after { content: ''; position: absolute; inset: 0; z-index: 14; background: var(--dim); }
 .gen-row label { display: flex; gap: 6px; align-items: center; color: var(--muted); }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.example { padding: 3px 9px; font-size: 13px; }
-.example:hover, .recent button:hover { border-color: var(--current); }
+.starters { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.starter { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; text-align: left; border-radius: 12px; }
+.starter b { font-weight: 600; }
+.starter small { color: var(--muted); font-size: 12px; }
+.starter:hover, .recent button:hover { border-color: var(--current); }
 .recent { display: flex; flex-direction: column; gap: 2px; max-height: 15em; overflow: auto; }
 .recent button { text-align: left; padding: 4px 8px; display: flex; gap: 8px; }
 .recent button small { color: var(--muted); white-space: nowrap; }

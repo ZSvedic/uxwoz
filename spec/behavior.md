@@ -103,8 +103,8 @@ the process: no fixer's notes, no design that was not picked, no older versions.
 
 The prompt box takes a product description (up to 2,000 characters) and grows with it; Enter makes
 the mockup, Shift+Enter adds a line. Under it, the **Model** and **Device** pickers sit
-in one row, and a large **Generate** button below them. Under that come **Templates** (example
-prompts that start a mockup at once) and **Recent mockups** (every mockup in the cache, most
+in one row, and a large **Generate** button below them. Under that come the **Starters** (see The public: a
+card opens its mockup at once, on its own device) and **Recent mockups** (every mockup in the cache, most
 recently changed first, with its number of screens; the list comes from the server, so it is the
 same in every browser). The panel is the same with or without a mockup open: with none it shows on
 its own, and **+** shows it over the dimmed canvas, where Esc or a press outside closes it.
@@ -533,17 +533,21 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
   box under *Pick one and watch it drawn*, and the prompt box under *or describe your own*; a visitor
   who has mockups sees the prompt box first, as today. The public has no Model picker.
 - **Hints** teach by the moment: one line, in the hint's place, that stays until the visitor does the
-  thing, each shown once per browser and never to a visitor who already did it.
+  thing, each shown once per browser and never to a visitor who already did it. A browser that first
+  opens the app with mockups in Recent has done it all, so the owner sees none. A brief hint (*One
+  screen at a time…*) shows over it for 2.5 s and gives it back.
   1. Two designs are ready for the first time: *Pick the one you like.*
   2. After the first pick: *Click anything in it.*
-  3. After the second pick: *Change it in words: press Edit.*
-  4. After the first Edit: *Changed your mind? Undo brings the old one back.*
-  5. After the first Undo: *That is the whole app. Now describe your own.* A press on it opens the
-     generate panel.
-  Each step done plays the spark and sound a pick already has. Nothing blocks and nothing needs closing.
+  3. After the second pick: *Change it in words: press Edit.* Sending an Edit does it.
+  4. After the first Edit that made a new version: *Changed your mind? Undo brings the old one back.*
+  5. After the first Undo: *That is the whole app. Now describe your own.* A press on it, or **+**,
+     opens the generate panel.
+  Each step done plays the spark and sound a pick already has, out of the hint, then the next one
+  shows. Nothing blocks and nothing needs closing.
 - **Live designs.** A visitor's own prompt, an Edit, a box's Edit, Visit now, and a click on a screen
-  with no recording call the models, and count against the visitor's free screens. The first time, the
-  hint says *From here your designs are made live.*
+  with no recording call the models, and count against the visitor's free screens. The first time a
+  screen's design is made by a model (it cost more than 0), the hint says *From here your designs are
+  made live.*, ahead of the chain, until the visitor's next pick, click, Edit, Undo or a press on it.
 - **The account button** is the toolbar's last item. A visitor's shows the free screens left
   (*14 free*) once they made a live design; a registered user's shows the first letter of their email.
   Its menu: *About 14 free screens left*; **Register** (a visitor) or the email; **Ask for more**
