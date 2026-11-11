@@ -167,6 +167,14 @@ Recorded = {events: [ms, text][], final: FinalEvent}   // ms since the call bega
   `designs[1]`; each Regenerate takes the next (2, 3, then 0 again). The filing after Home's pick is
   `filings[side picked]`. A pick of another recorded screen files nothing. Anything else (a screen with
   no recording, an Edit, a box's Edit, Visit now) is a live, paid call.
+- This holds for everyone, the owner too. A Regenerate takes design *versions held + 1*, so after an
+  Undo the same design comes back; a screen whose newest version an Edit or the fixer made regenerates
+  live. A pick answered by a recording (Home's replayed filing, or nothing) never brings the fixer's
+  visit. Once the mockup has had a live call (here, or a screen's design that cost something, or a
+  visit), its picks file live and visits run as usual; recorded screens still draw from the recording.
+  A replayed design or filing costs 0. `drawing(…, may)` starts a live filing or visit only when `may()`
+  says so; a replay always runs. `replayed(path, body)` says whether a request to `/api/screen`,
+  `/api/revise` or `/api/pick` would be answered by a recording, with no model call.
 - `bun run starters:record [id…]` (live calls) drives the real server on a temporary cache: Home's two
   designs, two Regenerates, then each linked name from a Home version that links to it, its four
   designs the same way. `promptHash` is a hash of the system prompt; `startersCurrent` is false when a

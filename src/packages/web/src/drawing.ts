@@ -1,10 +1,11 @@
 // The work behind a screen: the filing chain per mockup and the fixer's visits, and the streaming of a
 // screen (A OR B at once, a revise) as NDJSON. server.ts's routes call what `drawing` returns.
+// In a starter's mockup a recording answers where a model would be called (spec/public.md, Recordings).
 
 import {
   DEFAULT_DEVICE, DEFAULT_MODEL, HOME_LINE, HOME_NAME, PROPOSALS, canonicalAction, drawRequest, editRequest,
-  fileDecision, generateScreen, isComponent, isModelId, normalizePrompt, visitPaper, plannedScreens, promptFromLabel, screenKey, screenRef,
-  type CacheEntry, type Device, type ScreenCache, type GenerateEvent, type Io, type ModelId, type Version, type VisitOptions,
+  fileDecision, generateScreen, recordedDesign, recordedFiling, recordedHtml, recordingFor, isComponent, isModelId, normalizePrompt, visitPaper, plannedScreens, promptFromLabel, screenKey, screenRef,
+  type CacheEntry, type Device, type ScreenCache, type GenerateEvent, type Io, type ModelId, type Recorded, type Recording, type Version, type VisitOptions,
 } from '@uxwoz/core'
 
 /** One line of a /api/screen or /api/revise NDJSON stream (spec/code-contract.md). `meta.variants`: 2, 1 for a revise, 0 for a cache hit. */
@@ -62,8 +63,52 @@ export function ndjson(events: AsyncIterable<ScreenEvent>): Response {
   return new Response(body, { headers: { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-store' } })
 }
 
-/** The chains of every mockup, and the screens drawn with them. */
-export function drawing(cache: ScreenCache, io: Pick<Io, 'fetch' | 'env'>, log: (m: string) => void, random: () => number, fileWaitMs: number) {
+/** A recorded call to replay: it cost nothing this time. */
+const free = (r: Recorded | null): Recorded | undefined => (r ? { ...r, final: { ...r.final, costUsd: 0 } } : undefined)
+
+/** The chains of every mockup, and the screens drawn with them. `may`: whether a live filing or visit may start now. */
+export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string) => void, random: () => number, fileWaitMs: number, may: () => boolean = () => true) {
+  /** Mockups that have had a live call since the server started. */
+  const lived = new Set<string>()
+  /** Mockups whose pick was just answered by a recording: the visit asked for in the same breath is refused. */
+  const quiet = new Set<string>()
+
+  /** The mockup's recording, if its prompt is a starter's. */
+  const recOf = (app: string): Recording | null => recordingFor(app)
+  /** Whether the mockup has had a live call: here, or (after a restart) a screen's design that cost something, or a visit. */
+  function live(app: string): boolean {
+    const root = normalizePrompt(app)
+    if (lived.has(root)) return true
+    const { entries, boxes } = cache.map(app)
+    return !!boxes.visits?.length || entries.some((e) => !isComponent(e) && [...e.versions, ...(e.proposals ?? [])].some((v) => v && v.costUsd !== 0))
+  }
+  const goLive = (app: string) => lived.add(normalizePrompt(app))
+
+  /** The recorded design for a new screen's side `slot`, or null when it has none. */
+  function recordedScreen(app: string, action: string | null, slot: number): Recorded | null {
+    const rec = recOf(app), ref = action && screenRef(action)
+    if (!rec || (action && !ref)) return null
+    return recordedDesign(rec, ref ? ref.name : null, slot)
+  }
+  /** The recorded design for a Regenerate of `entry` (the next after those it has), or null: an Edit, a component, or a screen whose newest version an Edit made stay live. */
+  function recordedRegenerate(entry: CacheEntry, change: string | null): Recorded | null {
+    const rec = recOf(entry.app), v = entry.versions.at(-1)
+    if (!rec || change || isComponent(entry) || !v || v.feedback || v.by) return null
+    return recordedDesign(rec, entry.name ?? null, entry.versions.length + 1)
+  }
+  /**
+   * How a pick of `key` is filed: a replay (Home's filing by its side), `nothing` (another recorded screen,
+   * before the mockup's first live call), or `live`.
+   */
+  function pickFiling(key: string, side: number | null): { replay: Recorded } | 'nothing' | 'live' {
+    const e = cache.get(key), rec = e && recOf(e.app)
+    if (!e || !rec || live(e.app) || !recordedDesign(rec, e.name ?? null, 0)) return 'live'
+    if ((e.name ?? HOME_NAME) !== HOME_NAME) return 'nothing'
+    // After the pick, the side is the recorded design the screen now shows.
+    side ??= rec.screens[HOME_NAME]!.designs.slice(0, PROPOSALS).findIndex((d) => recordedHtml(d) === e.versions[0]?.html)
+    const f = side >= 0 ? recordedFiling(rec, side) : null
+    return f ? { replay: f } : 'live'
+  }
   /** The background job running for each mockup, by root key: filings and the fixer's visits run one after another. */
   const filings = new Map<string, Promise<unknown>>()
   /** How many filings each mockup has in its chain. */
@@ -78,12 +123,23 @@ export function drawing(cache: ScreenCache, io: Pick<Io, 'fetch' | 'env'>, log: 
     return p
   }
 
+  /** File a decision in the mockup's chain (a pick's is `other`). Whether a filing started. */
   function file(key: string, decision: { other: string } | { change: string }): boolean {
     const e = cache.get(key)
     if (!e || isComponent(e)) return false
     const root = normalizePrompt(e.app), t0 = performance.now(), since = cache.now()
+    const how = 'other' in decision ? pickFiling(key, null) : 'live'
+    if (how !== 'live') {
+      quiet.add(root)
+      queueMicrotask(() => quiet.delete(root))
+      if (how === 'nothing') return false
+    } else {
+      if (!may()) return false
+      goLive(e.app)
+    }
+    const recorded = how === 'live' ? undefined : free(how.replay)
     count(root, 1)
-    chain(root, () => fileDecision({ cache, key, decision, ...io, log }))
+    chain(root, () => fileDecision({ cache, key, decision, ...io, log, recorded }))
       .then((run) => run && log(`filed ${run.screen} in ${(run.ms / 1000).toFixed(1)} s for $${run.costUsd?.toFixed(4)}: added ${run.added.join(', ') || 'nothing'}, changed ${run.changed.join(', ') || 'nothing'}, refused ${run.refused.length}`))
       .catch((err) => {
         log(`filing failed: ${message(err)}`)
@@ -108,6 +164,9 @@ export function drawing(cache: ScreenCache, io: Pick<Io, 'fetch' | 'env'>, log: 
       again.add(root)
       return null
     }
+    if (!ask && quiet.has(root)) return 'A pick answered by a recording brings no visit.'
+    if (!may()) return 'No live calls now.'
+    goLive(app)
     const since = cache.now(), t0 = performance.now(), stop = new AbortController()
     stops.set(root, stop)
     const p = chain(root, () => visitPaper({ cache, app, ask, ...io, log }, () => cache.removedSince(root, since)))
@@ -194,9 +253,12 @@ export function drawing(cache: ScreenCache, io: Pick<Io, 'fetch' | 'env'>, log: 
     const paper = cache.paper(app, device)
     // One random side asks for a clearly different design, so the side says nothing about which is which.
     const different = Math.min(PROPOSALS - 1, Math.floor(random() * PROPOSALS))
+    // A starter's recorded screen replays its first two designs, A and B; any other is drawn live.
+    const recorded = Array.from({ length: PROPOSALS }, (_, slot) => recordedScreen(app, action, slot))
+    if (recorded.some((r) => !r)) goLive(app)
     const streams = Array.from({ length: PROPOSALS }, (_, slot) => tagged(slot, generateScreen({
       user: drawRequest(paper, target, from ? { ...shown(from), label: click!.label } : null, slot === different),
-      model, device, signal, ...io,
+      model, device, signal, ...io, recorded: free(recorded[slot] ?? null),
     })))
     const parent = click && { key: click.from, label: click.label || prompt || 'home' }
     const failed: string[] = []
@@ -233,8 +295,10 @@ export function drawing(cache: ScreenCache, io: Pick<Io, 'fetch' | 'env'>, log: 
     const paper = cache.paper(app, device), parent = entry.parent && cache.get(entry.parent.key)
     const user = change ? editRequest(paper, shown(entry), change, isComponent(entry))
       : drawRequest(paper, shown(entry), parent?.versions.length ? { ...shown(parent), label: entry.parent!.label } : null)
+    const recorded = fixer ? null : recordedRegenerate(entry, change)
+    if (!recorded) goLive(app)
     try {
-      for await (const ev of generateScreen({ user, model, device, signal, ...io })) {
+      for await (const ev of generateScreen({ user, model, device, signal, ...io, recorded: free(recorded) })) {
         if (ev.type === 'chunk') { yield { type: 'chunk', variant: 0, text: ev.text }; continue }
         const version: Version = { ...ev.version, ...(change && { feedback: change }), ...(fixer && { by: 'fixer' as const }) }
         const stored = cache.group(() => cache.addVersion(key, version), group)
@@ -258,5 +322,25 @@ export function drawing(cache: ScreenCache, io: Pick<Io, 'fetch' | 'env'>, log: 
   /** Whether any mockup's filing or visit runs (a desk does not close then). */
   const busy = () => filings.size > 0 || visits.size > 0 || [...filingCount.values()].some((n) => n > 0)
 
-  return { file, visit, mapOf, forget, idle, busy, screenEvents, reviseEvents }
+  /**
+   * Whether a request to `path` with JSON body `b` would be answered by a recording, with no model call:
+   * a recorded screen's A OR B, a Regenerate of one, a pick whose filing is replayed or that files nothing.
+   */
+  function replayed(path: string, b: any): boolean {
+    if (path === '/api/screen') {
+      const app = typeof b?.app === 'string' ? b.app.trim() : ''
+      const action = canonicalAction(typeof b?.action === 'string' && b.action.trim() ? b.action.trim() : null)
+      return !!app && Array.from({ length: PROPOSALS }, (_, slot) => recordedScreen(app, action, slot)).every(Boolean)
+    }
+    const entry = cache.get(String(b?.key ?? ''))
+    if (!entry) return false
+    if (path === '/api/revise') {
+      const change = typeof b?.change === 'string' && b.change.trim() ? b.change.trim() : null
+      return !!entry.versions.length && !!recordedRegenerate(entry, change)
+    }
+    if (path === '/api/pick') return !!entry.proposals && pickFiling(entry.key, Number(b?.index)) !== 'live'
+    return false
+  }
+
+  return { file, visit, mapOf, forget, idle, busy, screenEvents, reviseEvents, replayed }
 }

@@ -69,7 +69,8 @@ src/packages/web/src/
                  /api/box (also undo, a box's Undo and Edit, Visit now), /api/warmup, /api/backup, themes; request checks; a visit every 5 picks;
                  every route takes its cache from the request's desk
   drawing.ts     the work behind the routes: filing and visits in one chain per mockup (a click waits for it), a
-                 visit's redraws as Edits; a screen's stream (A OR B at once, a revise) as NDJSON
+                 visit's redraws as Edits; a screen's stream (A OR B at once, a revise) as NDJSON; a
+                 starter's recording replayed in place of those calls, and `replayed` (would a request be)
   app.ts         browser entry: builds the canvas and the boxes, opens, closes and deletes a mockup, init
   state.ts       browser: the shared state, local storage, elements by id, Enter sends a form
   screens.ts     browser: views (a card's name) and draw, A OR B streaming, refit and pick, clicks (@names, back), Regenerate, Edit,
