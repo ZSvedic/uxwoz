@@ -33,8 +33,8 @@ function capped<T>(list: T[], same: (x: T) => boolean = () => true) {
 /** Feedback kinds kept apart, so one kind cannot push out another: comments, thumbs, answers (Done, and the old dead controls). */
 const groupOf = (kind: Feedback['kind']) => (kind === 'dead' ? 'done' : kind)
 const titleOf = (e: CacheEntry) => e.versions.at(-1)?.name || e.name || HOME_NAME
-/** A request's host as the browser sent it: the Host header (a proxy keeps it), else the URL's. */
-export const hostOf = (req: Request) => req.headers.get('host') ?? new URL(req.url).host
+/** A request's host as the browser sent it: `X-Forwarded-Host` when a proxy sets it (its first value), else the Host header, else the URL's. */
+export const hostOf = (req: Request) => req.headers.get('x-forwarded-host')?.split(',')[0]?.trim() || (req.headers.get('host') ?? new URL(req.url).host)
 /** A request's public origin behind a proxy that ends HTTPS: the forwarded scheme (its first value), else the URL's; the Host header. */
 export function publicOrigin(req: Request) {
   const proto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() || new URL(req.url).protocol.slice(0, -1)

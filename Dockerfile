@@ -1,4 +1,5 @@
 # UX Woz as one long-running Bun process. The screen cache lives on a volume mounted at /data.
+# Railway builds this file as it is and sets PORT itself; 8080 is the fallback elsewhere.
 FROM oven/bun:1.3.11-slim
 WORKDIR /app/src
 

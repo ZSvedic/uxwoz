@@ -177,6 +177,11 @@ describe('sharing', () => {
     expect((await post('/api/share', { app: APP, role: 'view' }, { ...proxy, Origin: 'null' })).status).toBe(403)
     const page = await (await fetch(url(`/s/${view.token}`), { headers: proxy })).text()
     expect(page).toContain('<meta property="og:image" content="https://uxwoz.example/og.png">')
+    // A proxy that rewrites Host says the browser's host in X-Forwarded-Host.
+    const inner = { Host: 'internal:8080', 'X-Forwarded-Host': 'uxwoz.example', 'X-Forwarded-Proto': 'https', cookie }
+    const again = await post('/api/share', { app: APP, role: 'view' }, { ...inner, Origin: 'https://uxwoz.example' })
+    expect([again.status, (await again.json()).url.startsWith('https://uxwoz.example/s/')]).toEqual([200, true])
+    expect((await post('/api/share', { app: APP, role: 'view' }, { ...inner, Origin: 'https://internal:8080' })).status).toBe(403)
   })
 
   test('without UXWOZ_OWNER, everything works as before', async () => {

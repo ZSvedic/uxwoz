@@ -106,3 +106,11 @@ script and stylesheet answered as they should.
 
 The 5-hour window went from 11% to about 42%; the week from 8% to 12%. No model credits were spent:
 every server a builder started ran without keys. No cassette changed, because no prompt byte changed.
+
+## Addendum, the same day: public, MIT, Railway
+
+You chose a public repo under the MIT licence, and Railway (Hobby) over Fly.io. `fly.toml` is gone;
+Railway reads the root `Dockerfile` and needs no config file (its `railway.json` stops being read on
+2026-12-01, so none was written). The README is rewritten short: how to run, where to find things, the
+six hosting steps. One more fix for a proxy: the browser's host is taken from `X-Forwarded-Host` when a
+proxy sets it, because Railway's docs promise that header and say nothing about `Host`.

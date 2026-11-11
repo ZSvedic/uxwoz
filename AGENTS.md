@@ -109,7 +109,7 @@ src/scripts/voice-check.ts   run by hand: a macOS voice says an Edit to a separa
 
 ## Layout rules
 
-The repo is organized by lifecycle; the tree is in [README.md](README.md#project-layout).
+The repo is organized by lifecycle; the tree is in [README.md](README.md#find-your-way).
 
 - **`src/` is the deployable unit**: `package.json` sits there, and module resolution walks up, so
   all code that imports packages (app and tests) lives under it. Its root files (`package.json`,

@@ -1,155 +1,72 @@
-## UX Woz
+# UX Woz
 
-*UX Woz* stands for *UX Wizard of Oz*, inspired by the [Wizard of Oz prototyping technique](https://en.wikipedia.org/wiki/Wizard_of_Oz_experiment), where a human secretly simulates a system's behavior. UXWoz replaces the human wizard with AI, generating interactive user interfaces on demand as users explore them.
+*UX Woz* is short for *UX Wizard of Oz*, after the
+[prototyping technique](https://en.wikipedia.org/wiki/Wizard_of_Oz_experiment) where a hidden person plays
+the system. Here a model plays it: type a product idea, click around, and each screen you reach is drawn
+on demand, two designs at a time, and kept. The result is a clickable mockup you can share for comments
+or export for a coding agent.
 
 ## Run it
 
-You need [bun](https://bun.sh) and a root `.env` with `OPENROUTER_API_KEY` (Claude Haiku, the
-default) and `OPENAI_API_KEY` (the two GPT models, and GPT-6.1 Terra, which files every decision
-into the boxes and tidies them as the fixer). All `bun` commands run from `src/`.
+You need [bun](https://bun.sh). Every `bun` command runs from `src/`.
 
-```bash
-cd src && bun install && bun run dev
+| To | Run | Needs |
+|---|---|---|
+| Look around on a made-up mockup | `bun install && bun run demo` | nothing: no keys, no model calls |
+| Make your own mockups | `bun run dev`, then http://127.0.0.1:3000 | a root `.env` with `OPENROUTER_API_KEY` and `OPENAI_API_KEY` |
+| Test and typecheck | `bun run check` | nothing: tests replay `cassettes/` offline |
+| Re-record after a prompt change | `bun run test:record` | the keys, a few cents |
+| Check voice input on a Mac | `bun scripts/voice-check.ts --voice Karen` | the app running, speakers the microphone hears |
+
+Your mockups are saved in `temp/screen-cache.json`. `PORT=3001` picks another port. Restart `bun run dev`
+after adding a frontend file: live reload cannot add one.
+
+## Find your way
+
+| You want | Read |
+|---|---|
+| To change the code, as an agent or a person | [AGENTS.md](AGENTS.md): the code map, the seven parts, the rules |
+| What the user sees and the system does | [spec/behavior.md](spec/behavior.md) |
+| The HTTP API, types, env vars, tests | [spec/code-contract.md](spec/code-contract.md) |
+| How a screen is generated, and the prompt | [spec/ui-generation.md](spec/ui-generation.md), [spec/prompt-screen.md](spec/prompt-screen.md) |
+| Where the work stands | the latest file in [process/journal/](process/journal/) |
+| Why it exists | [process/uxwoz-product-brief.md](process/uxwoz-product-brief.md) |
+
 ```
-
-Open http://127.0.0.1:3000, type a product idea (or pick a template), and click around: each new
-screen comes as two designs side by side, A OR B; click the one you like to keep it. A click on a
-blue control inside a screen makes the next screen below it. Change a screen with the buttons to
-its right: ✎ Edit, ↻ Regenerate, ↶ Undo, ⓘ Info, ✕ Delete. `PORT=3001 bun run dev` picks another port.
-
-To look around without keys or your own mockups, `bun run demo` starts the app on a temporary copy
-of a made-up mockup at http://127.0.0.1:3100 (`PORT` picks another) and prints its share links. It
-reads no `.env`, so anything that needs a model fails there.
-
-Right of the first screen, side by side, are four boxes: **Rules**, **Fixer's notes**,
-**Components** (parts that look the same on every screen that has them; screens paste them by ID)
-and **Data**. Every model call reads Components, Rules and Data. After each pick or Edit, filing
-adds what the decision settled, in the background; the screen's Info says what it filed. Edit a
-rule or a table cell by clicking it; the toolbar's Rules, Fixer, Components and Data buttons move
-the view to each box, and **Export the boxes** in the project menu writes them as markdown. Every 5
-picks the fixer visits: it merges doubles, removes what no screen needs and redraws up to 5
-screens, and Fixer's notes lists each change with an Undo. Each box has a rail like a screen's: **+ Rule**
-(in place), **▶ Visit now** or **+ Table** (in place), then **✎ Edit** (the drawer: ask the fixer for
-a change in that box, and its past changes), **↶ Undo** (the box as it was before its last change)
-and **ⓘ Info**. The Theme menu is in the toolbar.
-
-Generated screens are cached in `temp/screen-cache.json`. To make a mockup again from scratch,
-open it and choose **Start over** in the project menu (top left); **Delete** removes it. To clear the whole cache, stop the server,
-move the file aside, and start it again: a running server keeps its cache in memory and writes it
-back.
-
-If an edit to `canvas.ts` does not show up after a reload, restart `bun run dev`: the live reload
-sometimes keeps an old copy of it.
-
-If the page shows "Failed to load bundled module" after new code arrives, restart `bun run dev`:
-the live reload cannot add a new frontend file.
-
-## Test it
-
-```bash
-cd src && bun test
+spec/        what the app does
+src/         the app, a bun workspace: packages/core (engine), packages/web (server and page), tests/, scripts/
+cassettes/   recorded model replies the tests replay
+process/     product brief, writing style, journal
+temp/        local scratch, ignored by git
 ```
-
-`bun run check` runs the tests and then the typecheck.
-
-The tests replay recorded model replies from `cassettes/` and make no API calls. After changing the
-prompt or the request shape, re-record them (live calls, a few cents):
-
-```bash
-cd src && bun run test:record
-```
-
-`bun run typecheck` checks the types.
-
-## Check voice
-
-`bun test` cannot check voice input: that needs a microphone. A script checks it by hand on a Mac,
-with the app running and a mockup with a screen in it:
-
-```bash
-cd src && bun scripts/voice-check.ts --url http://localhost:3000 --say "Hey Woz, use switches." --voice Samantha
-```
-
-It makes the clip with macOS `say`, starts a separate Google Chrome with its own profile (yours is
-never touched), opens the app, turns the microphone on and plays the clip through the speakers
-(`--player`, `afplay` by default). It prints what Chrome heard, what the label showed and the Edit
-field, then `PASS: the Edit was sent: "…"` or `FAIL:` with the link that broke. It stops every POST to
-`/api/` (the Edit, a new screen, the warm-up) before it reaches the server, so a run costs nothing. It
-closes its Chrome and deletes the profile even on Ctrl-C; `--keep` keeps the clip and the profile.
-
-It needs a quiet room and speakers the microphone can hear. Chrome sends the audio to Google, as its
-voice input always does. The clip plays through the speakers because Chrome's fake microphone
-(`--use-file-for-fake-audio-capture`) does not reach speech recognition in Chrome 157.
-
-## Put it on GitHub
-
-The repo has no remote yet. Git history holds no key (checked on 2026-11-11), `.env` and `temp/` are
-ignored, and the tracked files come to about 2 MB. With the `gh` CLI signed in, from the repo root:
-
-```bash
-gh repo create uxwoz --private --source=. --remote=origin --push
-```
-
-That makes a private repo under your account, adds it as `origin` and pushes `main`. Later pushes are
-`git push`. To make it public, first choose a licence for the code (the font's OFL and Pico's MIT
-licence files are already in the tree) and decide whether `process/` and `cassettes/` go with it.
 
 ## Host it
 
-The app is one Bun process that writes one JSON file, so it needs one always-on machine with a disk:
-[Fly.io](https://fly.io) with a 1 GB volume, about $4 a month. `Dockerfile` and `fly.toml` are in the
-repo root. Hosts with no disk (Vercel, Cloudflare Workers) cannot keep the cache file.
+The app is one Bun process that writes one JSON file, so it needs one always-on machine with a disk.
+These steps are for [Railway](https://railway.com) (Hobby plan); the root `Dockerfile` is all it reads.
+
+1. **New Project**, **Deploy from GitHub repo**, pick this repo. Railway finds the `Dockerfile` and
+   builds; every push to `main` deploys again.
+2. On the service, **Variables**: add `OPENROUTER_API_KEY`, `OPENAI_API_KEY` and `UXWOZ_OWNER`, a long
+   password you make up. Only a browser that opened `/?owner=<that password>` once can use the app and
+   spend model credits.
+3. Right-click the canvas, add a **Volume**, attach it to the service, mount path `/data`. The cache
+   lives there and survives deploys.
+4. **Settings**: under Networking, **Generate Domain**; set the healthcheck path to `/healthz`.
+5. **Backups**: turn on the daily schedule for the volume.
+6. Open `https://<your domain>/?owner=<that password>`. Share links then start with that address.
+
+To bring local mockups along, with the `railway` CLI linked to the project (`railway link`):
 
 ```bash
-brew install flyctl
+railway volume files upload temp/screen-cache.json /screen-cache.json --overwrite
 ```
 
-```bash
-fly auth login
-```
+Then redeploy the service so it reads the file. A deploy takes the app away for a few seconds, since
+one machine holds the disk.
 
-```bash
-fly apps create uxwoz
-```
+## Licence
 
-If the name is taken, pick another and change `app` in `fly.toml` to match.
-
-```bash
-fly volumes create uxwoz_data --region fra --size 1
-```
-
-```bash
-fly secrets set --stage OPENROUTER_API_KEY=... OPENAI_API_KEY=... UXWOZ_OWNER=...
-```
-
-Take the two keys from `.env`. `UXWOZ_OWNER` is a long password you make up: only a browser that
-opened `/?owner=<that password>` once can use the app and spend model credits.
-
-```bash
-fly deploy --ha=false
-```
-
-Open `https://uxwoz.fly.dev/?owner=<that password>`. Share links then start with that address. To
-bring your local mockups along, copy the cache up before you make anything on the host (the upload may
-refuse to replace a file that is already there), then restart:
-
-```bash
-fly ssh sftp put temp/screen-cache.json /data/screen-cache.json
-```
-
-```bash
-fly apps restart uxwoz
-```
-
-Fly keeps a daily snapshot of the volume for five days. A deploy restarts the one machine, so the app
-is away for a few seconds. `GET /healthz` answers `ok` for the host's check.
-
-## Project layout
-
-```
-spec/        what the app does: behavior, UI generation, code contract, prompts
-src/         the app (bun workspace): packages/core (engine), packages/web (server + page), tests/, scripts/ (run by hand)
-cassettes/   recorded model replies the tests replay
-process/     product brief, writing style, journal
-temp/        local scratch, ignored by git (the screen cache lives here)
-```
+[MIT](LICENSE). Two vendored pieces keep their own: the Fredoka font
+([OFL](src/packages/web/src/design/brand/LICENSE-fredoka.md)) and Pico CSS
+([MIT](src/packages/web/themes/LICENSE-pico.md)).
