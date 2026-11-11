@@ -5,8 +5,24 @@ import { MODELS, type ModelConfig, type ModelId } from './models.ts'
 
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>
 type Env = Record<string, string | undefined>
+/** What one call said, with its timing: each text delta after `ms` since the call began, then its final event. */
+export interface Recorded { events: [ms: number, text: string][]; final: FinalEvent }
+
 /** How a call reaches the world: a fetch and an env to use instead of the real ones (tests), and a log. */
-export interface Io { fetch?: Fetch; env?: Env; log?: (msg: string) => void }
+export interface Io {
+  fetch?: Fetch
+  env?: Env
+  log?: (msg: string) => void
+  /** Called with each live call that reached its final event, as it was said. */
+  record?: (r: Recorded, call: { model: ModelId; user: string }) => void
+  /** Called once per live call when it ends, however it ends; `usd` is null when the cost never arrived. Never for a replay. */
+  spent?: (usd: number | null, model: ModelId) => void
+  /** The clock a replay waits on: real time unless a test speeds it up. */
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>
+}
+
+/** The parts of an Io a call passes on. */
+export const ioOf = (o: Io): Io => ({ fetch: o.fetch, env: o.env, log: o.log, record: o.record, spent: o.spent, sleep: o.sleep })
 
 export interface FinalEvent {
   type: 'final'
@@ -26,6 +42,8 @@ interface StreamOptions extends Io {
   user: string
   maxTokens?: number
   signal?: AbortSignal
+  /** Replay this instead of calling the model: no network, no `spent`. */
+  recorded?: Recorded
 }
 
 const noFinal = (): FinalEvent => ({ type: 'final', servedModel: null, finishReason: null, inputTokens: null, cachedInputTokens: null, outputTokens: null, costUsd: null })
@@ -143,8 +161,47 @@ function estimateCost(cfg: ModelConfig, f: FinalEvent): number | null {
 }
 
 export function streamModel(o: StreamOptions): AsyncGenerator<StreamEvent> {
+  if (o.recorded) return replay(o.recorded, o.sleep ?? sleep, o.signal)
   const cfg = MODELS[o.model]
   const f = o.fetch ?? fetch
   const env = o.env ?? process.env
-  return cfg.provider === 'openrouter' ? streamOpenRouter(cfg, o, f, env) : streamOpenAI(cfg, o, f, env)
+  return metered(cfg.provider === 'openrouter' ? streamOpenRouter(cfg, o, f, env) : streamOpenAI(cfg, o, f, env), o)
+}
+
+/** A live call: its cost to `spent` once however it ends, and the whole call to `record` when it reached its end. */
+async function* metered(events: AsyncGenerator<StreamEvent>, o: StreamOptions): AsyncGenerator<StreamEvent> {
+  const t0 = performance.now(), said: [number, string][] = []
+  let ended = false
+  try {
+    for await (const ev of events) {
+      if (ev.type === 'text') said.push([Math.round(performance.now() - t0), ev.text])
+      else {
+        ended = true
+        o.spent?.(ev.costUsd, o.model)
+        o.record?.({ events: said, final: { ...ev } }, { model: o.model, user: o.user })
+      }
+      yield ev
+    }
+  } finally {
+    if (!ended) o.spent?.(null, o.model)
+  }
+}
+
+const sleep = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve, reject) => {
+  if (signal?.aborted) return reject(signal.reason)
+  const t = setTimeout(() => { signal?.removeEventListener('abort', stop); resolve() }, ms)
+  const stop = () => { clearTimeout(t); reject(signal!.reason) }
+  signal?.addEventListener('abort', stop, { once: true })
+})
+
+/** A recorded call said again: each delta after its recorded delay, then its final event. */
+async function* replay(r: Recorded, wait: NonNullable<Io['sleep']>, signal?: AbortSignal): AsyncGenerator<StreamEvent> {
+  let at = 0
+  for (const [ms, text] of r.events) {
+    if (ms > at) await wait(ms - at, signal)
+    at = Math.max(at, ms)
+    if (signal?.aborted) throw signal.reason
+    yield { type: 'text', text }
+  }
+  yield { ...r.final }
 }

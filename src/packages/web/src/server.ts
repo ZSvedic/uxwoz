@@ -52,7 +52,7 @@ export function createServer(opts: ServerOptions = {}) {
   const log = opts.log ?? ((m: string) => console.warn(m))
   const random = opts.random ?? Math.random
   const fileWaitMs = opts.fileWaitMs ?? 5000
-  const io = { fetch: opts.fetch, env: opts.env }
+  const io = { fetch: opts.fetch, env: opts.env, record: opts.record, spent: opts.spent }
   const { file, visit, mapOf, forget, idle, screenEvents, reviseEvents } = drawing(cache, io, log, random, fileWaitMs)
 
   const pickers = (b: { model?: unknown; device?: unknown } | null) => {

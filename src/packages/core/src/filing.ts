@@ -7,7 +7,7 @@ import { LIMITS, normalizePrompt } from './keys.ts'
 import { elementEnd, type Device } from './frame.ts'
 import { FILING_MODEL, MODELS } from './models.ts'
 import { SYSTEM_PROMPT, fileRequest } from './prompt.ts'
-import { ProviderError, streamModel, type FinalEvent, type Io } from './providers.ts'
+import { ProviderError, ioOf, streamModel, type FinalEvent, type Io, type Recorded } from './providers.ts'
 import { HOME_LINE, HOME_NAME } from './tree.ts'
 
 /** Filing runs in the background, so it may take longer than a screen. */
@@ -142,6 +142,8 @@ interface FileOptions extends Io {
   cache: ScreenCache
   key: string
   decision: { other: string } | { change: string }
+  /** A recorded filing to replay in place of the model call. */
+  recorded?: Recorded
 }
 
 /** File one decision: ask the filing model, apply its lines, note the run in the boxes. Null when the screen or its mockup went meanwhile. */
@@ -163,9 +165,9 @@ export async function fileDecision(o: FileOptions): Promise<Filing | null> {
 }
 
 /** Ask the background model once, with the system prompt; its whole reply and its final event. A cut-off reply is an error. */
-export async function askBackground(user: string, o: Io, maxTokens = 4000) {
+export async function askBackground(user: string, o: Io & { recorded?: Recorded }, maxTokens = 4000) {
   let reply = '', final: FinalEvent | null = null
-  for await (const ev of streamModel({ model: FILING_MODEL, system: SYSTEM_PROMPT, user, maxTokens, signal: AbortSignal.timeout(FILING_DEADLINE_MS), fetch: o.fetch, env: o.env })) {
+  for await (const ev of streamModel({ model: FILING_MODEL, system: SYSTEM_PROMPT, user, maxTokens, signal: AbortSignal.timeout(FILING_DEADLINE_MS), ...ioOf(o), recorded: o.recorded })) {
     if (ev.type === 'text') reply += ev.text
     else final = ev
   }

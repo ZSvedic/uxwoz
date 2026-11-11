@@ -5,7 +5,7 @@ import { extractFragment, screenIdea, screenName } from './frame.ts'
 import type { Device } from './frame.ts'
 import { MODELS, type ModelId } from './models.ts'
 import { SYSTEM_PROMPT, WARMUP_REQUEST } from './prompt.ts'
-import { ProviderError, streamModel, type Io } from './providers.ts'
+import { ProviderError, ioOf, streamModel, type Io, type Recorded } from './providers.ts'
 
 /** A slower screen is useless, and keep-alive comments can stall a stream, so this is an overall deadline. */
 const DEADLINE_MS = 20_000
@@ -17,6 +17,8 @@ interface GenerateOptions extends Io {
   /** The device the request designs for, stored with the version. */
   device?: Device
   signal?: AbortSignal
+  /** A recording to replay in place of the model call. */
+  recorded?: Recorded
 }
 
 export type GenerateEvent = { type: 'chunk'; text: string } | { type: 'done'; version: Version }
@@ -30,7 +32,7 @@ export async function* generateScreen(o: GenerateOptions): AsyncGenerator<Genera
   let firstChunkMs: number | null = null
   try {
     for await (const ev of streamModel({
-      model: o.model, system: SYSTEM_PROMPT, user: o.user, signal, fetch: o.fetch, env: o.env,
+      model: o.model, system: SYSTEM_PROMPT, user: o.user, signal, ...ioOf(o), recorded: o.recorded,
     })) {
       if (ev.type === 'text') {
         firstChunkMs ??= performance.now() - t0

@@ -16,6 +16,7 @@ You need [bun](https://bun.sh). Every `bun` command runs from `src/`.
 | Make your own mockups | `bun run dev`, then http://127.0.0.1:3000 | a root `.env` with `OPENROUTER_API_KEY` and `OPENAI_API_KEY` |
 | Test and typecheck | `bun run check` | nothing: tests replay `cassettes/` offline |
 | Re-record after a prompt change | `bun run test:record` | the keys, a few cents |
+| Re-record the starters after a prompt change | `bun run starters:record` (or `… plants bill` for some) | the keys, about 2 cents a starter |
 | Check voice input on a Mac | `bun scripts/voice-check.ts --voice Karen` | the app running, speakers the microphone hears |
 
 Your mockups are saved in `temp/screen-cache.json`. `PORT=3001` picks another port. Restart `bun run dev`
@@ -36,6 +37,7 @@ after adding a frontend file: live reload cannot add one.
 spec/        what the app does
 src/         the app, a bun workspace: packages/core (engine), packages/web (server and page), tests/, scripts/
 cassettes/   recorded model replies the tests replay
+recordings/  the starters' recorded designs and filings, replayed in place of the model
 process/     product brief, writing style, journal
 temp/        local scratch, ignored by git
 ```

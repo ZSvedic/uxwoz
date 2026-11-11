@@ -10,6 +10,8 @@ COPY src/packages/web/package.json packages/web/
 RUN bun install --frozen-lockfile
 
 COPY src/packages packages
+# The starters' recordings, replayed in place of the model (core/src/recordings.ts reads /app/recordings).
+COPY recordings ../recordings
 
 ENV NODE_ENV=production \
     UXWOZ_HOST=0.0.0.0 \
