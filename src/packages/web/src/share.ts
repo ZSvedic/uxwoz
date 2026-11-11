@@ -3,6 +3,7 @@
 
 import { HOME_NAME, canonicalAction, componentsOf, isComponent, normalizePrompt, screenTree, type CacheEntry, type Feedback, type ScreenCache, type Share, type Trip } from '@uxwoz/core'
 import type { Desks } from './desks.ts'
+import type { Gate } from './public.ts'
 
 /** How many of each kind a mockup keeps (comments, thumbs, answers, trips; the oldest go), the most screens and dead clicks
  * a trip keeps, the longest text, an edit link's default cap. */
@@ -56,7 +57,8 @@ export function playerMap(cache: ScreenCache, root: string) {
   }
 }
 
-export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Route }, owner = process.env.UXWOZ_OWNER) {
+/** `pub`: the public's gate (public mode): a request without the owner's cookie goes through it onto its person's desk. */
+export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Route }, owner = process.env.UXWOZ_OWNER, pub?: Gate) {
   const linkOf = (req: Request, s: Share) => ({ ...s, url: `${publicOrigin(req)}/s/${s.token}` })
   /** A share link's desk, mockup and link, from the token in the path. */
   const found = (req: Request & { params?: Record<string, string> }) => desks.whose(req.params?.token ?? '')
@@ -151,6 +153,7 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
       const s: Share = { token: token(), role, createdAt: new Date().toISOString(), ...(cap && { cap }), used: 0, opens: 0 }
       cache.ownShared(app).shares.push(s)
       cache.save()
+      pub?.shared(s.token, desks.of(req)!.id)
       return json(linkOf(req, s))
     }) },
     '/api/shares': (req: Request) => {
@@ -172,6 +175,7 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
       const list = cache.ownShared(f.root).shares
       list.splice(list.indexOf(f.share), 1)
       cache.save()
+      pub?.unshared([f.share.token])
       return json({ ok: true })
     }) },
   }
@@ -205,6 +209,7 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
    */
   const wrap = (path: string, run: (req: Request) => Response | Promise<Response>) => async (req: Request) => {
     const t = req.headers.get('x-uxwoz-share')
+    if (!t && pub && !pub.isOwner(req)) return pub.route(path, req, run, (b, cache) => costs(path, b, cache))
     if (!t) return !isOwner(req) ? fail('This UX Woz is private.', 401) : desks.of(req) ? run(req) : fail('Who sent this is not known.', 400)
     const f = desks.whose(t)
     if (!f || f.share.role !== 'edit') return fail('This link does not work any more.', 403)
@@ -238,7 +243,7 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
       const secret = new URL(req.url).searchParams.get('owner')
       const https = publicOrigin(req).startsWith('https:')
       if (secret === owner) return new Response(null, { status: 302, headers: { Location: '/', 'Set-Cookie': `uxwoz_owner=${owner}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${https ? '; Secure' : ''}` } })
-      return isOwner(req) ? page(server, '/_app') : closed()
+      return isOwner(req) || pub ? page(server, '/_app') : closed()
     }
     // The design sheet is the owner's too: its page moves to /_design, as the app's is at /_app.
     if (owner && out['/design']) { out['/_design'] = out['/design']; out['/design'] = (req: Request, server: { port?: number }) => isOwner(req) ? page(server, '/_design') : closed() }

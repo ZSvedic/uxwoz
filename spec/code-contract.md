@@ -52,7 +52,8 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
   `usersDir`, else `UXWOZ_USERS_DIR`, else `users/` beside the cache file (`server.ts` run directly;
   no dir keeps it in memory), and closes after 10 idle minutes, saved first, never while its filing or
   a visit runs. A share token (`/s/:token`, `/api/s/*`, `x-uxwoz-share`) finds its desk with
-  `whose(token)`: the owner's and the open ones are searched, and an edit link works on its desk.
+  `whose(token)`: the owner's and the open ones are searched (in public mode the owner's, then the
+  person the share index names, opened if closed: spec/public.md), and an edit link works on its desk.
 
 - `GET /healthz` → 200 `ok` (text) for the host's health check: open with `UXWOZ_OWNER` set, touches nothing.
 

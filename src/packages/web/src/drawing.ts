@@ -63,7 +63,7 @@ export function ndjson(events: AsyncIterable<ScreenEvent>): Response {
 }
 
 /** The chains of every mockup, and the screens drawn with them. */
-export function drawing(cache: ScreenCache, io: Pick<Io, 'fetch' | 'env'>, log: (m: string) => void, random: () => number, fileWaitMs: number) {
+export function drawing(cache: ScreenCache, io: Pick<Io, 'fetch' | 'env'>, log: (m: string) => void, random: () => number, fileWaitMs: number, may: () => boolean = () => true) {
   /** The background job running for each mockup, by root key: filings and the fixer's visits run one after another. */
   const filings = new Map<string, Promise<unknown>>()
   /** How many filings each mockup has in its chain. */
@@ -258,5 +258,8 @@ export function drawing(cache: ScreenCache, io: Pick<Io, 'fetch' | 'env'>, log: 
   /** Whether any mockup's filing or visit runs (a desk does not close then). */
   const busy = () => filings.size > 0 || visits.size > 0 || [...filingCount.values()].some((n) => n > 0)
 
-  return { file, visit, mapOf, forget, idle, busy, screenEvents, reviseEvents }
+  /** Whether a recording answers this request, so it is free. A stub until the replay is wired. */
+  const replayed = (_path: string, _b: any): boolean => false
+
+  return { file, visit, mapOf, forget, idle, busy, screenEvents, reviseEvents, replayed }
 }

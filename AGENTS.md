@@ -62,11 +62,17 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
 src/packages/web/src/
   desks.ts       a desk per person: their ScreenCache and its drawing; owner's is createServer's cache, others
                  open <dir>/<id>.json on demand and close after 10 idle minutes; whose(token) finds a share's desk
+                 (through the store's share index in public mode, opening a closed desk)
+  public.ts      public mode (UXWOZ_PUBLIC needs UXWOZ_OWNER), the uxwoz_who cookie, the address, who(req); the
+                 gate a person's /api request passes onto their own desk: role table, Haiku only, 402 by the
+                 meter, 409 one at a time, 413 at 5 MB, the warm-up rule, the steps counted; a person's metered
+                 Io and `may`; /api/me and the arrived step
   export.ts      GET /api/export: a mockup as a zip for a coding or design agent (handoff, README with the tree,
                  the boxes, one page per drawn screen whose links work from disk)
   server.ts      Bun.serve: /api/config, /api/screen (NDJSON, A OR B at once), /api/pick, /api/revise, /api/undo,
                  /api/map (wait=1 for filing and a visit), /api/apps, /api/delete, /api/delete-app,
-                 /api/box (also undo, a box's Undo and Edit, Visit now), /api/warmup, /api/backup, themes; request checks; a visit every 5 picks;
+                 /api/box (also undo, a box's Undo and Edit, Visit now), /api/warmup, /api/backup, /api/me, /api/step,
+                 themes; request checks; a visit every 5 picks;
                  every route takes its cache from the request's desk
   drawing.ts     the work behind the routes: filing and visits in one chain per mockup (a click waits for it), a
                  visit's redraws as Edits; a screen's stream (A OR B at once, a revise) as NDJSON
@@ -179,7 +185,7 @@ same time only in different parts.
 |---|---|---|---|
 | Engine | core: `models`, `prompt`, `providers`, `generate`, `starters`, `recordings` | `generate-screen`, `cut-off`, `recordings` | `prompt-screen.md`, `ui-generation.md` |
 | Cache | core: `cache`, `cache-boxes`, `keys`, `tree` | `cache`, `boxes`, `tree`, `demo-cache` | contract: Types |
-| Server | web: `server`, `drawing`, `desks`, `export`, `people`, `mail`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks`, `people`, `mail` | contract: HTTP API, `public.md` |
+| Server | web: `server`, `drawing`, `desks`, `public`, `export`, `people`, `mail`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks`, `public`, `people`, `mail` | contract: HTTP API, `public.md` |
 | Canvas | web: `app`, `state`, `screens`, `nav`, `canvas`, `toolbar`, `net`; core: `frame` | `ropes`, `frame` | behavior: Toolbar to Rail, Navigation |
 | Boxes and drawer | web: `boxes`, `drawer`, `voice`, `voice-ui` | `boxes`, `voice` | behavior: Drawer, Voice, Boxes |
 | Sharing | web: `share`, `sharing`, `comments`, `pins`, `player.*` | `share`, `comments`, `pins` | behavior: Sharing |
