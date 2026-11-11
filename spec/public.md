@@ -38,18 +38,19 @@ registered, an allowance and what they spent, both in USD. A visitor is a person
 ## Stored
 
 `bun:sqlite` in one file (`UXWOZ_DB`, default `uxwoz.db` beside the cache file; `:memory:` in tests),
-behind `web/src/people.ts`. No other file reads it.
+behind `web/src/people.ts`. No other file reads it. Money is integer micro-dollars in the tables; the
+store's methods take and give USD. Times are milliseconds since 1970, days and months are UTC.
 
 | Table | Holds |
 |---|---|
-| `people` | id, email (unique or null), created, seen, allowance, spent, blocked, topupDue (when a waiting top-up arrives), steps done |
+| `people` | id, email (unique or null), created, seen (each request), allowance, spent, blocked, topupDue (when a waiting top-up arrives), steps done |
 | `sessions` | token hash, person, created |
 | `codes` | email, code hash, the person who asked, expires, wrong tries |
-| `calls` | one row per model call: at, person, usd, model |
-| `addresses` | per day and hashed address: usd spent by visitors, visitors made, accounts made |
+| `calls` | one row per model call: at, person, usd, model. A deleted person's rows stay, with no person, so the day's and the month's sums hold |
+| `addresses` | per day and hashed address: usd spent by visitors, visitors made, accounts made, `arrived` counted. A new salt deletes the days before |
 | `requests` | a quota request: person, note, at, answer (`approved`, `refused` or null), answeredAt, usd |
 | `steps` | per day and step: how many people |
-| `settings` | the mode (`open` or `starters`), the caps, the day's salt |
+| `settings` | the mode (`open` or `starters`), the caps, the day's salt, the day's count of emails sent |
 | `shares` | share token → person |
 
 ## The meter
@@ -70,13 +71,18 @@ behind `web/src/people.ts`. No other file reads it.
 | `paused` | the mode is `starters`, or the public spent $3 today or $20 this month | *Live designs are paused for now. The starters still work.* |
 | `blocked` | the owner blocked the person | *This account is closed.* |
 
+The store checks in the order `blocked`, `paused`, `allowance`, `address`: a reason the person cannot fix
+comes before one that registering fixes, so a refused person is never sent to a sign-up that would not
+help. The 21st new visitor from an address in a day gets 402 `address` at their first `POST /api/screen`.
+
 - A person runs one paid request at a time (409 *One at a time: wait for this one.*). Background work
-  (filing, a visit) starts only while the person's balance is above zero.
+  (filing, a visit) starts only while the person's balance is above zero. Two people can still pass a
+  shared cap (the address's, the day's) at once: each running call finishes, and the next is refused.
 - The public's model is Claude Haiku: `/api/config` lists only it, and another `model` is 403.
 - `/api/warmup` from the public calls the model only if no Haiku call ran in the last 4 minutes.
 - Defaults, each changeable on the admin's page: visitor allowance $0.10, top-up $0.15 after 12 hours,
   $0.30 a day per address for visitors, 20 new visitors and 3 new accounts a day per address, $3 a day
-  and $20 a month for the public as a whole.
+  and $20 a month for the public as a whole, 100 emails a day (Resend's free plan).
 - **The address** is the header named by `UXWOZ_ADDRESS_HEADER` (default `x-real-ip`), else the
   socket's. An IPv6 address counts by its /64. It is stored only as an HMAC under a salt made new each
   UTC day.
@@ -106,14 +112,16 @@ new screen (413 *This account is full: delete a mockup first.*).
   times a day per address.
 - `POST /api/signin {email}` → 204, and a code is sent: six digits, good for 15 minutes, dead after 5
   wrong tries; a new one replaces the old. 400 for a bad email, 429 *Sign-ups are full for today.*
-  when the mail quota or the address's 3 accounts are used, 503 *Sign-up is not set up yet.* in
+  when the day's 100 emails or the address's 3 accounts are used (the accounts are checked again at
+  verify, so codes asked together cannot make a fourth), 503 *Sign-up is not set up yet.* in
   production with no mail key.
 - `POST /api/verify {email, code}` → `{me}` and a new session cookie. A new email takes over the
   visitor's person (the mockups stay where they are) and sets `topupDue` 12 hours ahead. An email with
   an account signs in to it: the visitor's mockups move in, except those whose prompt the account
   already has, and the visitor's person is deleted. 400 *That code is not right.*
 - `POST /api/signout` → 204, the session is deleted and the cookie cleared.
-- `POST /api/delete-account {email}` → 204: the cache file, every row and share link of the person go.
+- `POST /api/delete-account {email}` → 204: the cache file, every row and share link of the person go
+  (their `calls` stay with no person).
 - `POST /api/ask {note}` (registered, 1 to 500 characters) → 204. One open request per person (409).
 - `GET /api/admin` (owner) → `{spent: {today, month}, caps, mode, steps: {day, …counts}[] (30 days),
   people: {id, email, created, seen, allowance, spent, mockups, blocked, topupDue}[], requests[],
