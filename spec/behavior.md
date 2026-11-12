@@ -533,7 +533,9 @@ With `UXWOZ_PUBLIC` set, anyone may open the app. A stranger lands in it with no
 it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: [public.md](public.md).
 
 - **Starters** take the place of Templates in the generate panel, for everyone: eight cards, each with
-  its name and kind (*Plant care · Phone app*), the first one *How UX Woz works*. Picking one opens its
+  its name and kind (*Plant care · Phone app*), the first one *How UX Woz works*: eight lessons, among
+  them why the sketch has no colour (Theme), where Share and Export are, and why data differs at first
+  (Data, the fixer, Edit). Picking one opens its
   mockup and replays a recording: the two designs draw at the speed they were first made, and no model
   is called. In a starter, Home and every screen Home links to are recorded, four designs each, so
   picks, clicks and Regenerate are free there. A first-time visitor sees the starters above the prompt

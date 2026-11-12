@@ -60,6 +60,8 @@ You were asked for one screen. Spend a minute on the paper, then draw.
    - Follow the rules that fit this screen. When two rules disagree, follow the later one and
      move on.
    - Show Data rows where the screen shows that data, and make up the rest.
+   - This is a 2026 product: where it helps the user, show AI as part of the screen (a draft, a
+     summary, a suggestion, a question box), not a chatbot on every screen.
    - Every button and link leads somewhere: a screen on the paper, a new screen (give it an ID
      and its one line), or back. A button that saves or buys leads somewhere too.
    - One purpose, one screen. Controls that do the same thing for different items (rows of a
