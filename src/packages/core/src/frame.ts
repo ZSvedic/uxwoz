@@ -66,6 +66,17 @@ export function scrollsFirst(chain: Scrollable[], dx: number, dy: number): boole
   return false
 }
 
+/**
+ * Who takes a one-finger drag that has moved (fx, fy) since it started: null while it is still a tap (under 6 px);
+ * 'screen' when a part under the finger can scroll that way (the content follows the finger, so it scrolls the other
+ * way: `takes`, the wheel rule, asked with that scroll); else 'canvas'. Copied into the frame as source, so it uses
+ * nothing from outside.
+ */
+export function dragOwner(fx: number, fy: number, takes: (dx: number, dy: number) => boolean): 'screen' | 'canvas' | null {
+  if (Math.hypot(fx, fy) < 6) return null
+  return takes(-fx, -fy) ? 'screen' : 'canvas'
+}
+
 // Our script, before the model's markup: clicks on data-action controls become messages to the app,
 // and the frame never navigates. While the screen streams (`final` false), controls do nothing.
 const bootstrap = (final: boolean, vh: number) => `(() => {
@@ -201,6 +212,26 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     e.preventDefault()
     parent.postMessage({ uxwoz: 'wheel', dx: e.deltaX, dy: e.deltaY }, '*')
   }, { passive: false })
+  // Touch: one finger on a part that can scroll that way scrolls it, else the drag pans the canvas; two fingers zoom it.
+  // A tap stays a click. Points go out in the frame's pixels; \`start\` begins a gesture (or a new count of fingers).
+  const dragOwner = ${dragOwner}
+  let drag = null
+  const at = (ts) => { const a = ts[0], b = ts[1] || a; return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2, d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) } }
+  const begin = (e) => {
+    const n = e.touches.length, p = n && at(e.touches)
+    drag = n ? { x: p.x, y: p.y, by: n > 1 ? 'pinch' : null, t: drag ? drag.t : e.target, start: true } : null
+  }
+  for (const n of ['touchstart', 'touchend', 'touchcancel']) addEventListener(n, begin, { passive: true })
+  addEventListener('touchmove', (e) => {
+    if (!drag || drag.by === 'screen') return
+    const p = at(e.touches)
+    if (!drag.by) drag.by = dragOwner(p.x - drag.x, p.y - drag.y, (dx, dy) => scrollsFirst(chain(drag.t), dx, dy))
+    if (!drag.by || drag.by === 'screen') return
+    e.preventDefault()
+    parent.postMessage({ uxwoz: drag.by === 'pinch' ? 'pinch' : 'pan', x: p.x, y: p.y, d: p.d, start: drag.start }, '*')
+    drag.start = false
+  }, { passive: false })
+  addEventListener('gesturestart', (e) => e.preventDefault()) // Safari's own pinch would zoom the page
 })()`
 
 // Controls that open another screen are blue in every theme, the rest a neutral ink, so Pico's own

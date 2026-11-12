@@ -166,13 +166,22 @@ hidden when the user branches.
 - **Opening a mockup** fits its current screen, and fits it again once the screen has its real
   size. **Fit screen** keeps a tall screen readable and shows its top, like the A OR B fit: at
   least 75%, unless its width needs less.
-- **The window**: when it changes size (or moves to another display), the canvas fits again as on
-  opening: an open A OR B, else the current screen or box. On a phone, a keyboard that opens while
-  typing moves nothing.
+- **The window**: when its width or height really changes (or it moves to another display), the
+  canvas fits again the first of these that was in view before, any of it: the open A OR B, the
+  current box, the current screen, as on opening. With none of them in view, the view stays. On a
+  phone, a keyboard that opens while typing, in the app or in a screen, moves nothing.
 - **Pan and zoom**: scroll, or drag the empty canvas, to pan. Pinch or Ctrl/Cmd + scroll zooms
   around the pointer, also over a screen, from 10% to 200%. The zoom menu, **+**, **−** and the keys
-  keep the current screen (or box) in view: centred when it fits, else its top left corner; with no
-  screen yet, the middle of the view stays. The stars zoom with the canvas.
+  zoom around the middle of the view when a screen or a box is there, so whatever the user reads
+  stays put; over the empty sky the view lands on the open A OR B, else the current box or screen:
+  centred when it fits, else its top left corner. With no screen yet, the middle stays. The stars
+  zoom with the canvas.
+- **Touch**: one finger pans the canvas, also when it starts on a screen; a part of the screen that
+  scrolls that way takes the drag first, as with the wheel. A tap still clicks. Two fingers pinch to
+  zoom, on a screen or off it.
+- **A narrow window** (720 px or less, a phone): the current screen fits the window's width, with a
+  thin margin, and its rail is a row under it (see Rail). Nothing makes the page wider than the
+  window.
 - **The current screen stays in view**: when it grows or moves (Regenerate, an Edit, a new A OR B,
   the drawer opening), a current screen that was in view and no longer is comes back on that side:
   centred when it fits, else its start. One the user scrolled away from stays where it is.
@@ -191,6 +200,8 @@ says nothing about which is which. Both appear out of a blur, the second a beat 
   scrolled, zoomed, used a fit or chosen a screen in Nav meanwhile; a very tall pair keeps a readable
   zoom and shows its top. After the pick, the zoom and scroll come back, and the picked screen
   scrolls into view. A new mockup's first screen has no view to come back to: it is fitted instead.
+- **On a narrow window** A sits above B, each as wide as the window allows, with the OR between
+  them; the ideas get four lines, so they show whole. A tap on a side picks it.
 - **The idea** sits above each side in larger type: one sentence the model writes about the design
   (*One big clean button on top*).
 - **Locked previews**: both stream in live, and their scripts run once finished, so charts draw.
@@ -228,6 +239,10 @@ use them:
   button in another screen also reaches stays, under that screen. Deleting the first screen deletes
   the mockup.
 
+On a narrow window the current screen's rail is a row of the same buttons under the screen; while
+the screen is in view and its bottom is not, the row stays at the bottom of the window, in reach of
+the thumb. The other screens' rails do not show.
+
 Using a rail button makes its screen current. While a screen is being made or changed, the rail's
 buttons wait (Info still works).
 
@@ -235,12 +250,14 @@ buttons wait (Info still works).
 
 A 360 px card docked at the right edge, level, rounded, with a double gold line inside its edge,
 for the current screen or box (see Boxes for a box's). It swings in over 0.45 s and closes at once.
-The canvas gets narrower and scrolls so the screen stays fully visible beside it. Esc or ✕ closes
+The canvas gets narrower and scrolls so the screen stays fully visible beside it. On a narrow
+window the drawer lies over the canvas, inside the window. Esc or ✕ closes
 it. It has two tabs, and a third for a screen of a mockup with share links (**Comments**, see Sharing):
 
 - **Edit**: *What should change?* Type it and click **Make the change** (or press Enter): the
   model gets this screen and the request, and returns the same screen with only that change, as a
-  new version in place. **Past changes** lists the versions, newest first: *Edit: show one level
+  new version in place. On a narrow window, where the drawer covers the screen, it closes when the
+  change is sent, so the screen and its note (*Making the change…*) show. **Past changes** lists the versions, newest first: *Edit: show one level
   indicator, not four*, *Fixer: paste tab-bar*, *Regenerated*, *The design you picked*, the one
   showing marked.
 - **Info**: name, idea, the click that opened it, what made the version showing (the pick, an Edit

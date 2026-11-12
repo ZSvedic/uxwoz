@@ -29,6 +29,15 @@ const ENTRY_X = 110
 /** Label height above a screen and above a side, in pixels on screen. */
 const LABEL_H = 62
 const IDEA_H = 76
+/** On a narrow window a side's idea has a line more: its card is as wide as the window, its words whole. */
+const IDEA_PHONE = 104
+let ideaH = IDEA_H
+/** A narrow window (a phone): A OR B one above the other, the current screen as wide as the window, its rail a row under it. */
+export const PHONE = '(max-width: 720px)'
+const isPhone = () => typeof matchMedia === 'function' && matchMedia(PHONE).matches
+/** On a narrow window: the room for the OR between the sides, in pixels on screen; the rail's row, in canvas pixels. */
+const OR_H = 130
+const RAIL_ROW = 60
 /** Below this zoom a screen shows only its name (.surface.far). */
 const FAR = 0.5
 const NAME_H = 26
@@ -36,7 +45,7 @@ const labelH = (z: number) => (z < FAR ? NAME_H : LABEL_H)
 /** The ivory frame drawn round a screen, in canvas pixels: the head stands above it. */
 const FRAME = 8
 /** The room above a screen (a side's idea or a name), in canvas pixels. */
-export const headH = (choice: boolean, z: number) => (choice ? IDEA_H : labelH(z)) / z + FRAME
+export const headH = (choice: boolean, z: number) => (choice ? ideaH : labelH(z)) / z + FRAME
 const SVG_NS = 'http://www.w3.org/2000/svg'
 const MIN_ZOOM = 0.1
 export const MAX_ZOOM = 2
@@ -56,6 +65,40 @@ export function landing(b: Box, z: number, w: number, h: number, m = EDGE): { le
  *  start when it is longer than the view, or it covers the view. */
 export const seenOn = (lo: number, hi: number, at: number, size: number) =>
   (lo >= at - 1 && (hi <= at + size + 1 || (hi - lo > size && lo < at + size))) || (lo <= at + 1 && hi >= at + size - 1)
+
+/** Where the sides of an A OR B sit, from the top left of its place, and where the OR goes: side by side with `orW`
+ *  between them, or on a narrow window one above the other, with the OR (`orH`) and the lower side's idea (`head`) between. */
+export function sidesOf(parts: { w: number; h: number }[], narrow: boolean, orW: number, orH: number, head: number) {
+  if (!narrow) {
+    const at = parts.map((_, i) => ({ x: parts.slice(0, i).reduce((t, p) => t + p.w + orW, 0), y: 0 }))
+    const h = Math.max(...parts.map((p) => p.h))
+    return { w: parts.reduce((t, p) => t + p.w, 0) + orW * (parts.length - 1), h, at, or: { x: parts[0]!.w, y: 0, w: orW, h: Math.min(h, 700) } }
+  }
+  const at = parts.map((_, i) => ({ x: 0, y: parts.slice(0, i).reduce((t, p) => t + p.h + orH + head, 0) }))
+  const w = Math.max(...parts.map((p) => p.w))
+  return { w, h: at.at(-1)!.y + parts.at(-1)!.h, at, or: { x: 0, y: parts[0]!.h, w, h: orH } }
+}
+
+/** The zoom that fits a box on a stage. A narrow window keeps a thin margin and fits a screen by its width alone. */
+export function fitOf(stageW: number, stageH: number, box: { w: number; h: number }, narrow: boolean, screen: boolean,
+  o: { max?: number; top?: boolean; snug?: boolean } = {}): number {
+  const m = narrow ? 8 : 48
+  return fitZoom((stageW - 2 * m) / box.w, (stageH - 2 * m) / box.h, narrow && screen ? { max: o.max, top: true } : o)
+}
+
+/** Whether a point (canvas pixels) lies on one of the boxes. */
+export const hit = (boxes: Box[], x: number, y: number) => boxes.some((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h)
+
+/** The first of the targets whose box shows, any of it, in a view (pixels on screen) at zoom z. */
+export function firstSeen<T>(targets: [T, Box | undefined][], z: number, v: { left: number; top: number; w: number; h: number }): T | undefined {
+  return targets.find(([, b]) => b && b.x * z < v.left + v.w && (b.x + b.w) * z > v.left && b.y * z < v.top + v.h && (b.y + b.h) * z > v.top)?.[0]
+}
+
+/** One step of a touch gesture a frame handed on: the point on the window and the fingers' spread, before and now. A
+ *  pan scrolls the canvas by the finger's way back (the content follows the finger); a pinch zooms by how the spread grew. */
+export function touchStep(last: { x: number; y: number; d: number }, now: { x: number; y: number; d: number }, pinch: boolean) {
+  return pinch ? { zoom: last.d > 0 && now.d > 0 ? now.d / last.d : 1, dx: 0, dy: 0 } : { zoom: 1, dx: last.x - now.x, dy: last.y - now.y }
+}
 
 /** The zoom of a fit: the width's and the height's, at most `max`. `top`: the width alone. `snug`: the height too, but at
  *  least 60% of the width's fit and at least READABLE (or the width's fit when that is less). */
@@ -111,6 +154,8 @@ interface CanvasHandlers {
 }
 
 export interface Box { x: number; y: number; w: number; h: number }
+/** A screen by its key, or a box by its element. */
+type Target = string | HTMLElement
 
 /** The comments' pins (comments.ts): told when a screen's frame is rebuilt, when a picked one has its size, and its answers to `locate`. */
 export const pinHook = { rebuilt: (_key: string) => {}, size: (_key: string) => {}, located: (_key: string, _d: any) => {} }
@@ -188,15 +233,22 @@ export class Canvas {
     this.surface.style.setProperty('--z', '1')
     addEventListener('message', (e) => this.onFrameMessage(e))
     new ResizeObserver(() => this.queue()).observe(stage)
-    stage.addEventListener('scroll', () => { this.seen = this.currentSeen() }, { passive: true })
-    // The window changed size (or moved to another display): fit again, as on opening. A keyboard that opens on a
-    // phone changes only the height while a field has the focus: that is no reason to move.
-    let w0 = innerWidth, timer: ReturnType<typeof setTimeout> | undefined
-    const resized = () => { clearTimeout(timer); timer = setTimeout(() => this.refit(), 150) }
+    stage.addEventListener('scroll', () => this.measure(), { passive: true })
+    // The window really changed size (or moved to another display): fit again what was in view before (see `refit`).
+    // A keyboard that opens on a phone changes only the height while a field, in the app or in a screen, has the focus:
+    // that is no reason to move.
+    let w0 = innerWidth, h0 = innerHeight, timer: ReturnType<typeof setTimeout> | undefined, was: Target | undefined
+    const resized = () => {
+      if (timer === undefined) was = this.inView // what showed before this burst of resizes
+      clearTimeout(timer)
+      timer = setTimeout(() => { timer = undefined; this.refit(was) }, 150)
+    }
     addEventListener('resize', () => {
-      const typing = document.activeElement?.matches('input, textarea, select, [contenteditable]')
-      if (innerWidth !== w0 || !typing) resized()
+      const typing = document.activeElement?.matches('input, textarea, select, [contenteditable], iframe')
+      const across = innerWidth !== w0, down = innerHeight !== h0
       w0 = innerWidth
+      h0 = innerHeight
+      if (across || (down && !typing)) resized()
     })
     const watchDpr = () => matchMedia(`(resolution: ${devicePixelRatio}dppx)`).addEventListener('change', () => { resized(); watchDpr() }, { once: true })
     watchDpr()
@@ -215,29 +267,54 @@ export class Canvas {
       const g = e as Event & { scale: number; clientX: number; clientY: number }
       this.setZoom(z0 * g.scale, g.clientX, g.clientY)
     })
-    // Dragging the empty canvas pans it.
+    // Two fingers on the canvas outside a screen zoom around their middle (a screen hands its touches on, see the frame).
+    let spread: { d: number; z: number } | null = null
+    const apart = (t: TouchList) => Math.hypot(t[0]!.clientX - t[1]!.clientX, t[0]!.clientY - t[1]!.clientY)
+    stage.addEventListener('touchstart', (e) => { spread = e.touches.length === 2 ? { d: apart(e.touches), z: this.z } : null }, { passive: true })
+    stage.addEventListener('touchmove', (e) => {
+      if (!spread || e.touches.length !== 2 || !spread.d) return
+      e.preventDefault()
+      const t = e.touches
+      this.setZoom(spread.z * apart(t) / spread.d, (t[0]!.clientX + t[1]!.clientX) / 2, (t[0]!.clientY + t[1]!.clientY) / 2)
+    }, { passive: false })
+    // Dragging the empty canvas pans it; a finger pans it as the browser scrolls.
     stage.addEventListener('pointerdown', (e) => {
       this.moved = performance.now()
-      if (e.button !== 0 || (e.target !== stage && e.target !== this.surface && e.target !== this.lines)) return
+      if (e.button !== 0 || e.pointerType === 'touch' || (e.target !== stage && e.target !== this.surface && e.target !== this.lines)) return
       const x0 = e.clientX, y0 = e.clientY, l0 = stage.scrollLeft, t0 = stage.scrollTop
       stage.setPointerCapture(e.pointerId)
       stage.classList.add('panning')
       const move = (m: PointerEvent) => stage.scrollTo(l0 - (m.clientX - x0), t0 - (m.clientY - y0))
-      const up = () => { stage.classList.remove('panning'); stage.removeEventListener('pointermove', move); stage.removeEventListener('pointerup', up) }
+      const up = () => {
+        stage.classList.remove('panning')
+        for (const [n, f] of [['pointermove', move], ['pointerup', up], ['pointercancel', up]] as const) stage.removeEventListener(n, f as EventListener)
+      }
       stage.addEventListener('pointermove', move)
       stage.addEventListener('pointerup', up)
+      stage.addEventListener('pointercancel', up)
     })
   }
 
   /** When the user last scrolled, dragged or zoomed the canvas (performance.now()); fits do not count. */
   moved = 0
-  /** Whether the current screen or box was in view after the last layout, fit or scroll (see `keepSeen`). */
+  /** Whether the current screen or box (`seenOf`) was in view after the last layout, fit or scroll (see `keepSeen`). */
   private seen = false
+  private seenOf: Target | undefined
+  /** After the last layout, fit or scroll, the first of the open A OR B, the current box and the current screen that showed. */
+  private inView: Target | undefined
+  /** A narrow window, as of the last layout. */
+  private narrow = false
 
   /** The current box's element, else the current screen's key. */
-  private currentTarget(): string | HTMLElement | undefined {
+  private currentTarget(): Target | undefined {
     return this.side.querySelector<HTMLElement>('.box.current') ?? this.screens.find((s) => s.current)?.key
   }
+
+  /** The room kept at the stage's edge when the view moves to a screen: thin on a narrow window, where a screen fills it. */
+  private edge = () => (this.narrow ? 8 : EDGE)
+
+  /** The open A OR B's key. */
+  private choice = () => this.screens.find((s) => s.cards[0]?.side)?.key
 
   private currentSeen(): boolean {
     const t = this.currentTarget(), b = t && this.box(t)
@@ -246,44 +323,59 @@ export class Canvas {
     return seenOn(b.x * z, (b.x + b.w) * z, st.scrollLeft, st.clientWidth) && seenOn(b.y * z, (b.y + b.h) * z, st.scrollTop, st.clientHeight)
   }
 
-  /** After a layout: a current screen or box that was in view and no longer is (it grew, the stage got narrower) comes
-   *  back on the axis it left: centred when it fits, else its start. */
+  /** What is in view now: the current target's `seen`, and `inView` for a resize. */
+  private measure() {
+    this.seenOf = this.currentTarget()
+    this.seen = this.currentSeen()
+    const st = this.stage, cur = this.screens.find((s) => s.current)?.key, box = this.side.querySelector<HTMLElement>('.box.current') ?? undefined
+    const targets: [Target | undefined, Box | undefined][] = [[this.choice(), undefined], [box, undefined], [cur, undefined]]
+    for (const t of targets) t[1] = t[0] ? this.box(t[0]) : undefined
+    this.inView = firstSeen(targets, this.z, { left: st.scrollLeft, top: st.scrollTop, w: st.clientWidth, h: st.clientHeight })
+  }
+
+  /** After a layout: the current screen or box that was in view and no longer is (it grew, the stage got narrower) comes
+   *  back on the axis it left: centred when it fits, else its start. One that just became current was measured for no one. */
   private keepSeen() {
     const t = this.currentTarget(), b = t && this.box(t)
-    if (b && this.seen && !this.currentSeen()) {
-      const st = this.stage, z = this.z, to = landing(b, z, st.clientWidth, st.clientHeight)
+    if (b && t === this.seenOf && this.seen && !this.currentSeen()) {
+      const st = this.stage, z = this.z, to = landing(b, z, st.clientWidth, st.clientHeight, this.edge())
       st.scrollTo({
         left: seenOn(b.x * z, (b.x + b.w) * z, st.scrollLeft, st.clientWidth) ? st.scrollLeft : to.left,
         top: seenOn(b.y * z, (b.y + b.h) * z, st.scrollTop, st.clientHeight) ? st.scrollTop : to.top,
       })
     }
-    this.seen = this.currentSeen()
+    this.measure()
   }
 
-  /** Fit again after the window changed size, as on opening: an open A OR B, else the current box or screen, else the tree. */
-  refit() {
-    const choice = this.screens.find((s) => s.cards[0]?.side)?.key, t = choice ?? this.currentTarget()
-    if (t instanceof HTMLElement) this.fit(t, { top: true })
-    else if (t) this.fit(t, { snug: true })
-    else this.fit()
+  /** Fit again after the window changed size: what was in view before (the open A OR B, the current box, the current
+   *  screen, the first that showed) as on opening; with none of them in view, the view stays. */
+  private refit(t: Target | undefined) {
+    if (t instanceof HTMLElement) { if (t.isConnected) this.fit(t, { top: true }) }
+    else if (t && this.screens.some((s) => s.key === t)) this.fit(t, t === this.choice() ? { top: true } : { snug: true })
   }
 
   /**
    * Zoom to `z`. Around a point (x, y), a pinch's, that point stays in place. Without one (the menu, + and −, the keys),
-   * the current screen or box stays in view: centred when it fits, else its top left corner; with none, the middle stays.
+   * around the middle of the view when a screen or a box is there; over the empty sky, the view lands on the open A OR B,
+   * else the current box or screen: centred when it fits, else its top left corner. With none, the middle stays.
    */
   setZoom(z: number, x?: number, y?: number) {
     this.moved = performance.now()
     z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z * 100) / 100))
     if (z === this.z) return
     const st = this.stage, r = st.getBoundingClientRect()
-    const cur = x == null ? this.currentTarget() : undefined
+    const mid = () => {
+      const px = (st.scrollLeft + st.clientWidth / 2) / this.z, py = (st.scrollTop + st.clientHeight / 2) / this.z
+      const all = [...this.boxes.keys()].map((k) => this.box(k)!).concat(this.side.hidden ? [] : [this.box(this.side)!])
+      return hit(all, px, py)
+    }
+    const cur = x == null && !mid() ? this.choice() ?? this.currentTarget() : undefined
     if (cur && this.box(cur)) {
       this.applyZoom(z)
-      const to = landing(this.box(cur)!, z, st.clientWidth, st.clientHeight)
+      const to = landing(this.box(cur)!, z, st.clientWidth, st.clientHeight, this.edge())
       st.scrollLeft = to.left
       st.scrollTop = to.top
-      this.seen = this.currentSeen()
+      this.measure()
       return
     }
     const ax = x == null ? st.clientWidth / 2 : x - r.left, ay = y == null ? st.clientHeight / 2 : y - r.top
@@ -343,24 +435,28 @@ export class Canvas {
     if (!b) return undefined
     const choice = !!this.screens.find((s) => s.key === key)?.cards[0]?.side
     const above = headH(choice, this.z)
-    return { x: b.x, y: b.y - above, w: b.w + (choice ? 0 : RAIL_W), h: b.h + above }
+    // On a narrow window the rail is a row under the screen, in its place already.
+    return { x: b.x, y: b.y - above, w: b.w + (choice || this.narrow ? 0 : RAIL_W), h: b.h + above }
   }
 
-  /** Zoom and scroll so a screen (or the tree) fills the stage, at most `max`. `top`: fit the width, show the top. `snug`: the height too, at least 60% of the width's fit. */
+  /** Zoom and scroll so a screen (or the tree) fills the stage, at most `max`. `top`: fit the width, show the top. `snug`:
+   *  the height too, at least 60% of the width's fit. On a narrow window a screen or an A OR B fits by its width. */
   fit(key?: string | HTMLElement, { max = 1, top = false, snug = false } = {}) {
-    const st = this.stage, m = 48
-    if (this.queued) this.layout() // sizes that arrived since the last frame count
+    const st = this.stage
+    if (this.queued) this.layout(false) // sizes that arrived since the last frame count
+    const screen = typeof key === 'string'
+    if (this.narrow && screen) top = true
     // Names keep their size on screen, so the box changes with the zoom; a few rounds settle it.
     for (let i = 0; i < 4; i++) {
       const box = this.box(key)
       if (!box) return
-      const next = fitZoom((st.clientWidth - 2 * m) / box.w, (st.clientHeight - 2 * m) / box.h, { max, top, snug })
+      const next = fitOf(st.clientWidth, st.clientHeight, box, this.narrow, screen, { max, top, snug })
       if (next === this.z) break
       this.applyZoom(next)
     }
     const box = this.box(key)
     if (box) this.center(top ? { ...box, h: Infinity } : box)
-    this.seen = this.currentSeen()
+    this.measure()
   }
 
   /** Resolves once every card of a screen has its final screen and its size (or after 4 s). */
@@ -394,10 +490,13 @@ export class Canvas {
 
   /** Scroll a screen or a box into view if any of it is out of view (its top first, if it is taller than the stage). */
   reveal(key: string | HTMLElement, smooth = true) {
-    if (this.queued) this.layout()
+    // The layout waiting for the next frame runs now, but leaves the scrolling to this one: the least needed, gliding.
+    if (this.queued) this.layout(false)
     const b = this.box(key)
     if (!b) return
-    const st = this.stage, z = this.z, m = 24
+    const st = this.stage, z = this.z, m = this.edge()
+    // On a narrow window a screen wider than the window fits its width instead.
+    if (this.narrow && typeof key === 'string' && b.w * z > st.clientWidth + 1) return this.fit(key)
     // Per axis: stay when it is in view, else show its start (when it does not fit) or its middle.
     const axis = (lo: number, hi: number, at: number, size: number) => (lo >= at + m && hi <= at + size - m ? at : hi - lo > size - 2 * m ? lo - m : (lo + hi) / 2 - size / 2)
     const left = axis(b.x * z, (b.x + b.w) * z, st.scrollLeft, st.clientWidth), top = axis(b.y * z, (b.y + b.h) * z, st.scrollTop, st.clientHeight)
@@ -494,20 +593,22 @@ export class Canvas {
     requestAnimationFrame(() => { this.queued = false; this.layout() })
   }
 
-  /** Place the tree and the boxes, size the canvas, draw the lines. */
-  private layout() {
-    const z = this.z
+  /** Place the tree and the boxes, size the canvas, draw the lines; `keep`: then keep the current screen in view. */
+  private layout(keep = true) {
+    const z = this.z, narrow = this.narrow = isPhone()
+    ideaH = narrow ? IDEA_PHONE : IDEA_H
     // At a low zoom, the OR needs more of the canvas than its fixed room gives.
     const orW = Math.max(OR_W, OR_MIN / z)
     const screens = this.screens.filter((s) => !s.component)
     // The Components box is as wide as a screen of the mockup and its rail; the boxes' rails go in the gaps.
     const devW = Math.max(DEVICES[DEFAULT_DEVICE].width, ...this.screens.filter((s) => s.component || !s.parent).map((s) => s.cards[0]?.width ?? 0))
     this.components.parentElement!.style.width = `${devW + 50 + RAIL_W}px`
-    const sizes = new Map<string, { w: number; h: number; parts: { id: string; w: number; h: number }[] }>()
+    const sizes = new Map<string, ReturnType<typeof sidesOf> & { parts: { id: string; w: number; h: number }[] }>()
     for (const s of screens) {
-      const parts = s.cards.map((v) => ({ id: v.id, w: this.cards.get(v.id)!.width, h: v.error ? FAILED_H : this.cards.get(v.id)!.height }))
-      const w = parts.reduce((t, p) => t + p.w, 0) + orW * (parts.length - 1)
-      sizes.set(s.key, { w, h: Math.max(...parts.map((p) => p.h)), parts })
+      // A picked screen on a narrow window has its rail's row under it.
+      const row = narrow && s.cards.length === 1 ? RAIL_ROW : 0
+      const parts = s.cards.map((v) => ({ id: v.id, w: this.cards.get(v.id)!.width, h: (v.error ? FAILED_H : this.cards.get(v.id)!.height) + row }))
+      sizes.set(s.key, { ...sidesOf(parts, narrow, orW, OR_H / z, headH(true, z)), parts })
     }
     // The tree from the parents; a screen whose parent is not here starts a tree of its own, to the right.
     const keys = new Set(screens.map((s) => s.key))
@@ -574,25 +675,21 @@ export class Canvas {
     for (const s of screens) {
       const b = this.boxes.get(s.key)
       if (!b) continue
-      let cx = b.x
-      for (const p of sizes.get(s.key)!.parts) {
+      const { parts, at, or } = sizes.get(s.key)!
+      parts.forEach((p, i) => {
         const c = this.cards.get(p.id)!
-        Object.assign(c.el.style, { left: `${cx}px`, top: `${b.y}px`, width: `${p.w}px`, height: `${p.h}px` })
+        Object.assign(c.el.style, { left: `${b.x + at[i]!.x}px`, top: `${b.y + at[i]!.y}px`, width: `${p.w}px`, height: `${p.h}px` })
         c.screen.style.width = `${p.w}px`
-        cx += p.w + orW
-      }
+      })
       const o = this.ors.get(s.key)
-      if (o) {
-        const first = sizes.get(s.key)!.parts[0]!
-        Object.assign(o.style, { left: `${b.x + first.w}px`, top: `${b.y}px`, width: `${orW}px`, height: `${Math.min(b.h, 700)}px` })
-      }
+      if (o) Object.assign(o.style, { left: `${b.x + or.x}px`, top: `${b.y + or.y}px`, width: `${or.w}px`, height: `${or.h}px` })
     }
     // The canvas reaches past the tree, and at least fills the stage, so any screen can be centred.
     const w = Math.max(maxX + PAD, this.stage.clientWidth / z), h = Math.max(y + PAD, this.stage.clientHeight / z)
     this.surface.style.width = `${w}px`
     this.surface.style.height = `${h}px`
     this.drawLines(kids)
-    this.keepSeen()
+    if (keep) this.keepSeen()
     // Show "more" by each idea cut off at two lines; the room it has changes with the zoom.
     requestAnimationFrame(() => { for (const c of this.cards.values()) c.more.hidden = !!c.view?.side || (c.more.textContent !== 'less' && c.idea.scrollHeight <= c.idea.clientHeight + 1) })
   }
@@ -629,6 +726,9 @@ export class Canvas {
     return c
   }
 
+  /** The last point (and spread) of a touch gesture a frame handed on, on the window. */
+  private touch: { x: number; y: number; d: number } | null = null
+
   /** Screens report their size, clicks and scroll gestures (see the frame script). */
   private onFrameMessage(e: MessageEvent) {
     const d = e.data
@@ -657,6 +757,18 @@ export class Canvas {
       // Coordinates inside the frame, in its own pixels; the frame is shown at the canvas's zoom.
       const r = c.frame.getBoundingClientRect(), k = r.width / (c.frame.offsetWidth || 1)
       this.zoomBy(Number(d.dy) || 0, r.left + (Number(d.x) || 0) * k, r.top + (Number(d.y) || 0) * k)
+    } else if (d.uxwoz === 'pan' || d.uxwoz === 'pinch') {
+      // A finger dragging, or two pinching, over the screen: points in the frame's pixels, put on the window as the
+      // frame is now, so the canvas moving under the finger does not count as the finger moving.
+      const r = c.frame.getBoundingClientRect(), k = r.width / (c.frame.offsetWidth || 1)
+      const now = { x: r.left + (Number(d.x) || 0) * k, y: r.top + (Number(d.y) || 0) * k, d: (Number(d.d) || 0) * k }
+      const last = d.start ? null : this.touch
+      this.touch = now
+      this.moved = performance.now()
+      if (!last) return
+      const s = touchStep(last, now, d.uxwoz === 'pinch')
+      if (s.zoom !== 1) this.setZoom(this.z * s.zoom, now.x, now.y)
+      else this.stage.scrollBy(s.dx, s.dy)
     } else if (d.uxwoz === 'wheel') {
       // Nothing under the pointer in the screen could scroll that way: the gesture scrolls the canvas.
       this.moved = performance.now()

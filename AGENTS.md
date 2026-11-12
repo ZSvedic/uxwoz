@@ -55,7 +55,7 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
                  takeIn (another cache's mockups, at a sign-in), the JSON file (load, format, save, detach)
   cache-boxes.ts screen cache, the boxes (ScreenCache extends the base): components as entries, rules, tables,
                  limits, IDs, a box's states, Past and Undo, the fixer's notes and their Undo, markSeen, the paper
-  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll and `scrollsFirst`, vh fix, picking and locating
+  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll and `scrollsFirst`, touch and `dragOwner`, vh fix, picking and locating
                  a part for a comment); devices and their size;
                  name, idea; paste by ID and the current link
   zip.ts         a zip of stored entries (CRC-32, central directory), for Export project
@@ -102,7 +102,8 @@ src/packages/web/src/
                  field, Sending in 3… and Cancel
   canvas.ts      browser: the boxes right of Home, the tree layout (packed rows, ropes that bend in the gap), cards and frames, A OR B sides,
                  rails at the canvas's scale, pan and zoom, fits (and again on a window resize), frames scaled
-                 not zoomed, where a zoom lands (`landing`), the current screen kept in view
+                 not zoomed, where a zoom lands (`landing`), the current screen kept in view; a narrow window
+                 (`PHONE`: A OR B stacked by `sidesOf`, width fits by `fitOf`, the rail a row), touch pan and pinch
   boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes and their rails, editing and adding in
                  place, Export
   people.ts      the public's people and money over bun:sqlite (spec/public.md): visitors, sessions, the meter

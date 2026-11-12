@@ -6,6 +6,7 @@ import { isComponent } from '@uxwoz/core/tree'
 import type { Boxes } from '@uxwoz/core'
 import { boxesMarkdown, countLabel, countOf, el, markBox, visitToUndo, type Box, type BoxOp } from './boxes.ts'
 import { canvas, side } from './app.ts'
+import { PHONE } from './canvas.ts'
 import { coach, fmtS, fmtUsd, post, showError } from './net.ts'
 import { loadMe, refused } from './account-ui.ts'
 import { applyMap, currentAt, setCurrent } from './nav.ts'
@@ -87,7 +88,8 @@ export function openDrawer(tab: NonNullable<typeof state.drawer>) {
   state.drawer = tab
   if (tab === 'share' || tab === 'comments' || (tab === 'info' && !state.box)) loadShared()
   renderDrawer()
-  if (tab === 'edit') changeInput.focus()
+  // The drawer swings in from off the window: a focus that scrolled to the field would carry the page along.
+  if (tab === 'edit') changeInput.focus({ preventScroll: true })
   // The canvas got narrower: keep the current box or screen in view beside the drawer.
   requestAnimationFrame(() => { const at = currentAt(); if (at) canvas.reveal(at) })
 }
@@ -192,7 +194,11 @@ $('editPane').addEventListener('submit', (ev) => {
   if (!change) return changeInput.focus()
   // Enter sends the form even while its button waits.
   if (state.box) { if (!state.visiting) boxOp({ op: 'edit', box: state.box, text: change }).then((ok) => { if (ok) changeInput.value = '' }) }
-  else if (state.current) revise(state.current, change)
+  else if (state.current) {
+    revise(state.current, change)
+    // On a phone the drawer covers the screen: it closes, so the screen and its note (Making the change…) show.
+    if (matchMedia(PHONE).matches) closeDrawer()
+  }
 })
 enterSubmits(changeInput, $('editPane') as HTMLFormElement)
 for (const b of drawer.querySelectorAll<HTMLButtonElement>('[data-tab]')) b.addEventListener('click', () => openDrawer(b.dataset.tab as 'edit' | 'info' | 'comments'))
