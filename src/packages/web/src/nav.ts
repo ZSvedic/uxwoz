@@ -134,9 +134,10 @@ export function renderNav() {
 
 // ---- The address: `/m/<mockup>/<screen>` (an edit link keeps its own)
 
-/** The screen the address names; `hold` counts mockups being opened, whose draws are half done. */
+/** The screen the address names; `hold` counts mockups being opened, whose draws are half done, and the page's
+ * own opening (from 1, until init has opened what the address names: that never adds a step). */
 let shown = new Shown()
-export const address = { hold: 0 }
+export const address = { hold: 1 }
 
 /** The address names this screen (Back or Forward went there, or it was opened by its address). */
 export const showsAt = (key: string) => shown.went(key, state.current, state.entries)
