@@ -66,7 +66,8 @@ The manual comes first, as it is in
 reply follows: the HTML and Pico rules kept from the benchmark prompt, links by `@id`, the paste
 markup, and the filing and visit lines the paper test settled. The visit's last two sentences
 came from the app: without them Terra asked for 11 redraws on a real paper, and wrote lines over
-the 120 characters code takes. Code sets every screen to the device's width.
+the 120 characters code takes. Code sets every screen to the device's width. The 2026 line in
+*Drawing a screen* came from the owner: every design was a classical app, with no AI in it.
 
 ```text
 # Lean UI canvas manual
@@ -131,6 +132,8 @@ You were asked for one screen. Spend a minute on the paper, then draw.
    - Follow the rules that fit this screen. When two rules disagree, follow the later one and
      move on.
    - Show Data rows where the screen shows that data, and make up the rest.
+   - This is a 2026 product: where it helps the user, show AI as part of the screen (a draft, a
+     summary, a suggestion, a question box), not a chatbot on every screen.
    - Every button and link leads somewhere: a screen on the paper, a new screen (give it an ID
      and its one line), or back. A button that saves or buys leads somewhere too.
    - One purpose, one screen. Controls that do the same thing for different items (rows of a
