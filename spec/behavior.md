@@ -535,7 +535,11 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
 - **Hints** teach by the moment: one line, in the hint's place, that stays until the visitor does the
   thing, each shown once per browser and never to a visitor who already did it. A browser that first
   opens the app with mockups in Recent has done it all, so the owner sees none. A brief hint (*One
-  screen at a time…*) shows over it for 2.5 s and gives it back.
+  screen at a time…*) shows over it for 2.5 s and gives it back. A hint never goes stale: it also
+  leaves when the visitor opens another mockup or screen, a box, a drawer (but Edit for *press Edit*),
+  a card or the generate panel, and a reload shows none; a hint still due shows again at the
+  visitor's next step. None shows with no mockup open, and the red pill takes its place while it
+  shows.
   1. Two designs are ready for the first time: *Pick the one you like.*
   2. After the first pick: *Click anything in it.*
   3. After the second pick: *Change it in words: press Edit.* Sending an Edit does it.
@@ -546,29 +550,37 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
   shows. Nothing blocks and nothing needs closing.
 - **Live designs.** A visitor's own prompt, an Edit, a box's Edit, Visit now, and a click on a screen
   with no recording call the models, and count against the visitor's free screens. The first time a
-  screen's design is made by a model (it cost more than 0), the hint says *From here your designs are
-  made live.*, ahead of the chain, until the visitor's next pick, click, Edit, Undo or a press on it.
+  screen's design is made by a model (it cost more than 0), the hint says *This design was drawn fresh
+  for you, so it used one of your free screens.*, ahead of the chain, until the visitor's next pick,
+  click, Edit, Undo or a press on it. A Regenerate on a screen whose newest version was an Edit says
+  briefly *A fresh design. Undo brings your edit back.*
 - **The account button** is the toolbar's last item, for the public only (not the owner). A visitor's
   shows the free screens left (*14 free*) once they made a live design, a person's outline before; a
-  registered user's shows the first letter of their email. Its menu: *About 14 free screens left*;
-  **Register** (a visitor) or the email; **Ask for more** (registered, none left); **Sign out** and
-  **Delete my account…** (registered), which asks for the email typed once more and then removes the
-  mockups, the links and the account at once; **Privacy**. After either the page starts again.
+  registered user's shows the first letter of their email. Its menu: *About 14 free screens left*
+  (*No free screens left* at none); **Register** (a visitor) or the email; **Ask for more**
+  (registered, none left); **Sign out** and **Delete my account…** (registered); **Privacy**. The count
+  is read again after every live call ends, after a refusal, and when the tab gets focus, so a gift
+  from the owner shows without a reload. **Delete my account…** opens the account card: *Delete your
+  account? Its mockups and its links go at once, for good. Type your email once more.*, the email
+  field, **Delete** and **Cancel**; Delete removes the mockups, the links and the account at once, and
+  every `uxwoz:` key this browser kept. After Sign out or Delete the page starts again.
 - **The account card** opens over the dimmed canvas, like the generate panel, when a live design is
-  refused for lack of free screens, or from **Register**. Esc or a press outside closes it. What was
+  refused for lack of free screens, or from **Register**. When the free screens run out during an
+  A OR B, the side that was refused shows the server's words and under them **Register** (a visitor)
+  or **Ask for more** (registered), which opens the card. Esc or a press outside closes it. What was
   typed and the step stay while it is closed; Enter sends; a refusal (*Sign-ups are full for today.*)
   shows in the card in the server's words.
   - A visitor: *You have used your free screens. Register to get about 21 more.* (from **Register**:
     *Register to get about 21 more free screens.*; for the network's day: *This network has used
-    today's free screens. Register to carry on.*) An email field,
+    today's free screens. Register to carry on.*; for the guests' day: *Today's free screens for
+    guests are used up. Register to carry on.*) The number is what a new account adds, as `/api/me`
+    says (`more`). An email field,
     **Send the code**, and *No password: we email you a six-digit code.* with a link to Privacy.
   - Then *We sent a code to ana@example.com.*, a field for it, **Verify** and *Send a new one*. A wrong
     code says *That code is not right.*
-  - Verified, a new account: *Thanks. Your 21 free screens arrive within 12 hours, and we will email
-    you. Your mockups stay open until then: look, click, export.* The email, when it comes, says *Your
-    free screens are ready* with a link to the app.
+  - Verified, a new account: its free screens are there at once, and the card says *Thanks. You have
+    about 21 more free screens.*
   - Verified, an account that exists: the card closes and the mockups made as a visitor are in Recent.
-    An account still waiting for its free screens gets the thanks above instead.
   - A registered user with none left: *You have used your free screens.* A field *What are you
     building?*, **Ask for more**, then *Asked. The answer comes by email.*
 - **Paused.** When the owner switched the public to starters only, or the day's or the month's cap is

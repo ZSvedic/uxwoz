@@ -10,31 +10,37 @@ export interface Me {
   left?: number
   allowance?: number
   screensLeft?: number
-  topupDue?: number
+  /** A visitor's: about how many free screens a new account adds. */
+  more?: number
   request?: { at: number; answer?: string }
   paused?: boolean
   may?: { share: boolean; exportZip: boolean }
 }
-/** Why the card opened: a live design refused (`allowance`, `address`), Register, Share or Export, Ask for more. */
-export type Why = 'allowance' | 'address' | 'register' | 'share' | 'export' | 'ask'
-/** Where the sign-in is: the email, the code sent, verified into a new account; or a request for more sent. */
-export type CardStep = 'email' | 'code' | 'thanks' | 'asked'
+/** Why the card opened: a live design refused (`allowance`, `address`, `guests`), Register, Share or Export, Ask for more. */
+export type Why = 'allowance' | 'address' | 'guests' | 'register' | 'share' | 'export' | 'ask'
+/**
+ * Where the sign-in is: the email, the code sent, verified into a new account; or a request for more sent; or
+ * Delete my account, asking for the email once more.
+ */
+export type CardStep = 'email' | 'code' | 'thanks' | 'asked' | 'delete'
 
-/** What the top-up gives ($0.15 at about $0.007 a screen). */
+/** What a new account adds when /api/me does not say. */
 export const MORE = 21
-const LEADS: Record<Why, string> = {
-  allowance: `You have used your free screens. Register to get about ${MORE} more.`,
-  address: 'This network has used today\'s free screens. Register to carry on.',
-  register: `Register to get about ${MORE} more free screens.`,
-  share: 'Register to share a mockup.',
-  export: 'Register to export it.',
-  ask: `Register to get about ${MORE} more free screens.`,
+const LEADS: Record<Why, (more: number) => string> = {
+  allowance: (n) => `You have used your free screens. Register to get about ${n} more.`,
+  address: () => 'This network has used today\'s free screens. Register to carry on.',
+  guests: () => 'Today\'s free screens for guests are used up. Register to carry on.',
+  register: (n) => `Register to get about ${n} more free screens.`,
+  share: () => 'Register to share a mockup.',
+  export: () => 'Register to export it.',
+  ask: (n) => `Register to get about ${n} more free screens.`,
 }
+const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`
 
 export interface CardView {
   lead: string
   /** The one field, if any, with its label (shown above it) and what it holds. */
-  field: { kind: 'email' | 'code' | 'note'; label?: string; placeholder: string } | null
+  field: { kind: 'email' | 'code' | 'note' | 'confirm'; label?: string; placeholder: string } | null
   /** The primary button. */
   send: string | null
   /** The line under it; `privacy` links to /privacy. */
@@ -42,19 +48,22 @@ export interface CardView {
   privacy: boolean
   /** *Send a new one*, under the code. */
   again: boolean
+  /** **Cancel**, under Delete. */
+  cancel: boolean
 }
 
-const view = (lead: string, rest: Partial<CardView> = {}): CardView => ({ lead, field: null, send: null, note: null, privacy: false, again: false, ...rest })
+const view = (lead: string, rest: Partial<CardView> = {}): CardView => ({ lead, field: null, send: null, note: null, privacy: false, again: false, cancel: false, ...rest })
 
 /** What the card shows for `me`, given why it opened and where the sign-in is. */
 export function cardOf(me: Me, why: Why, step: CardStep, email: string): CardView {
-  if (step === 'thanks') return view(`Thanks. Your ${MORE} free screens arrive within 12 hours, and we will email you. Your mockups stay open until then: look, click, export.`)
+  if (step === 'delete') return view('Delete your account? Its mockups and its links go at once, for good. Type your email once more.', { field: { kind: 'confirm', placeholder: 'Your email' }, send: 'Delete', cancel: true })
+  if (step === 'thanks') return view(`Thanks. You have about ${plural(me.screensLeft ?? 0, 'more free screen')}.`)
   if (me.role === 'user') {
     if (step === 'asked' || (me.request && !me.request.answer)) return view('Asked. The answer comes by email.')
     return view('You have used your free screens.', { field: { kind: 'note', label: 'What are you building?', placeholder: 'e.g. a booking app for my dog walking business' }, send: 'Ask for more' })
   }
   if (step === 'code') return view(`We sent a code to ${email}.`, { field: { kind: 'code', placeholder: 'Six digits' }, send: 'Verify', again: true })
-  return view(LEADS[why], { field: { kind: 'email', placeholder: 'you@example.com' }, send: 'Send the code', note: 'No password: we email you a six-digit code.', privacy: true })
+  return view(LEADS[why](me.more ?? MORE), { field: { kind: 'email', placeholder: 'you@example.com' }, send: 'Send the code', note: 'No password: we email you a six-digit code.', privacy: true })
 }
 
 /** The account button shows at all: the public app, for anyone but the owner. */
@@ -73,7 +82,7 @@ export type Row = { kind: 'text' | 'email' | 'register' | 'ask' | 'signout' | 'd
 export function menuOf(me: Me): Row[] {
   const n = me.screensLeft ?? 0, user = me.role === 'user'
   return [
-    { kind: 'text', text: `About ${n} free screen${n === 1 ? '' : 's'} left` },
+    { kind: 'text', text: n > 0 ? `About ${plural(n, 'free screen')} left` : 'No free screens left' },
     user ? { kind: 'email', text: me.email ?? '' } : { kind: 'register', text: 'Register' },
     ...user && n === 0 && !(me.request && !me.request.answer) ? [{ kind: 'ask', text: 'Ask for more' } as Row] : [],
     ...user ? [{ kind: 'signout', text: 'Sign out' }, { kind: 'delete', text: 'Delete my account…' }] as Row[] : [],
@@ -84,10 +93,26 @@ export function menuOf(me: Me): Row[] {
 /** What a refused request leads to: the card (and why), the red pill with the server's words, or nothing of ours. */
 export function refusalOf(status: number, body: { error?: string; reason?: string } | null): { card: Why } | { pill: string } | null {
   const r = body?.reason
-  if (status === 402 && (r === 'allowance' || r === 'address')) return { card: r }
+  if (status === 402 && (r === 'allowance' || r === 'address' || r === 'guests')) return { card: r }
   if (status === 402 && (r === 'paused' || r === 'blocked')) return { pill: body!.error ?? 'Live designs are paused for now. The starters still work.' }
   if (status === 403 && r === 'register') return { card: 'register' }
   return null
+}
+
+/**
+ * A side of an A OR B the meter refused (its message speaks of free screens): the button under the words, Register
+ * for a visitor or Ask for more for a registered user, and why the card opens.
+ */
+export function sideOf(message: string, me: Me | null): { text: string; why: Why } | null {
+  if (!me || me.role === 'owner' || !/free screens/i.test(message)) return null
+  if (me.role === 'user') return { text: 'Ask for more', why: 'ask' }
+  return { text: 'Register', why: /guests/i.test(message) ? 'guests' : /network/i.test(message) ? 'address' : 'allowance' }
+}
+
+/** Every key of ours (`uxwoz:`) in a storage, removed. */
+export function forget(s: Pick<Storage, 'length' | 'key' | 'removeItem'>) {
+  const ours = Array.from({ length: s.length }, (_, i) => s.key(i)).filter((k): k is string => !!k?.startsWith('uxwoz:'))
+  for (const k of ours) s.removeItem(k)
 }
 
 // ---- The page
@@ -103,7 +128,7 @@ let deps: AccountDeps | null = null
 let isPublic = false
 let me: Me | null = null
 /** The card's own state, kept while it is closed: why it opened, the step, what was typed, the last error. */
-const card = { why: 'register' as Why, step: 'email' as CardStep, email: '', code: '', note: '', error: '' }
+const card = { why: 'register' as Why, step: 'email' as CardStep, email: '', code: '', note: '', confirm: '', error: '' }
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 /** The email and a code on its way also outlive a reload of this tab. */
 const KEPT = 'uxwoz:signin'
@@ -131,7 +156,9 @@ export function initAccount(d: AccountDeps, cfg: { public?: boolean }) {
   const form = $<HTMLFormElement>('account')
   form.addEventListener('submit', (e) => { e.preventDefault(); send() })
   $('accountField').addEventListener('input', (e) => { const v = (e.target as HTMLInputElement).value; if (fieldKind()) card[fieldKind()!] = v })
-  $('accountAgain').addEventListener('click', () => signIn())
+  $('accountAgain').addEventListener('click', () => { if (card.step === 'delete') { card.step = 'email'; closeCard() } else signIn() })
+  // The free screens left, read again when the tab comes back (the owner may have given more).
+  addEventListener('focus', () => loadMe())
   addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape') closeCard() })
   document.addEventListener('pointerdown', (e) => {
     const t = e.target as Node
@@ -170,10 +197,7 @@ export function renderAccountMenu() {
     privacy: () => open('/privacy', '_blank'),
     ask: () => openCard('ask'),
     signout: () => leave('/api/signout', {}),
-    delete: () => {
-      const typed = prompt('Delete your account? Its mockups and its links go at once, for good. Type your email once more:')
-      if (typed?.trim()) leave('/api/delete-account', { email: typed.trim() })
-    },
+    delete: () => { card.confirm = ''; openCard('ask', 'delete') },
   }
   $('accountMenu').replaceChildren(...menuOf(me).map((r) => {
     if (r.kind === 'text' || r.kind === 'email') return Object.assign(document.createElement('h3'), { textContent: r.text, className: r.kind === 'email' ? 'plain' : '' })
@@ -183,12 +207,28 @@ export function renderAccountMenu() {
   }))
 }
 
-/** Sign out or delete the account: then the page starts again with no mockup open. */
+/** Sign out: then the page starts again with no mockup open. */
 async function leave(url: string, body: object) {
   const res = await deps!.post(url, body).catch(() => null)
   if (!res?.ok) return deps!.showError((await res?.json().catch(() => null))?.error ?? 'No answer: try again.')
   try { localStorage.setItem('uxwoz:app', ''); sessionStorage.removeItem(KEPT) } catch { /* private mode */ }
   location.reload()
+}
+
+/** The account card's Delete: the account goes, and with it everything this browser kept of ours. */
+function deleteAccount() {
+  if (!card.confirm.trim()) return $('accountField').focus()
+  return call('/api/delete-account', { email: card.confirm.trim() }, () => {
+    $('account').hidden = true // so nothing is kept again before the reload
+    try { forget(localStorage); forget(sessionStorage) } catch { /* private mode */ }
+    location.reload()
+  })
+}
+
+/** The button under a side the meter refused (`sideOf`), if any. */
+export function sideAct(message: string): { text: string; run: () => void } | undefined {
+  const s = isPublic ? sideOf(message, me) : null
+  return s ? { text: s.text, run: () => openCard(s.why) } : undefined
 }
 
 /** A thing that needs an account: true (and the card opens) when this person may not do it yet. */
@@ -213,15 +253,19 @@ export function refused(status: number, body: { error?: string; reason?: string 
   return true
 }
 
-export function openCard(why: Why) {
-  if (card.step === 'thanks' || card.step === 'asked') card.step = 'email'
+export function openCard(why: Why, step?: CardStep) {
+  if (step) card.step = step
+  else if (card.step === 'thanks' || card.step === 'asked' || card.step === 'delete') card.step = 'email'
   card.why = why
   card.error = ''
   $('account').hidden = false
   renderCard()
 }
 
-export const closeCard = () => { $('account').hidden = true }
+export const closeCard = () => {
+  $('account').hidden = true
+  if (card.step === 'delete') card.step = 'email'
+}
 
 const fieldKind = () => (me ? cardOf(me, card.why, card.step, card.email).field?.kind ?? null : null)
 
@@ -235,8 +279,8 @@ function renderCard() {
   label.textContent = v.field?.label ?? ''
   if (v.field) {
     const k = v.field.kind
-    Object.assign(f, { type: k === 'email' ? 'email' : 'text', placeholder: v.field.placeholder, value: card[k], maxLength: k === 'code' ? 6 : k === 'note' ? 500 : 200 })
-    f.inputMode = k === 'code' ? 'numeric' : k === 'email' ? 'email' : 'text'
+    Object.assign(f, { type: k === 'email' || k === 'confirm' ? 'email' : 'text', placeholder: v.field.placeholder, value: card[k], maxLength: k === 'code' ? 6 : k === 'note' ? 500 : 200 })
+    f.inputMode = k === 'code' ? 'numeric' : k === 'email' || k === 'confirm' ? 'email' : 'text'
     f.autocomplete = k === 'email' ? 'email' : k === 'code' ? 'one-time-code' : 'off'
   }
   const s = $<HTMLButtonElement>('accountSend')
@@ -244,7 +288,8 @@ function renderCard() {
   s.textContent = v.send ?? ''
   $('accountNote').hidden = !v.note
   $('accountNoteText').textContent = v.note ?? ''
-  $('accountAgain').hidden = !v.again
+  $('accountAgain').hidden = !v.again && !v.cancel
+  $('accountAgain').textContent = v.cancel ? 'Cancel' : 'Send a new one'
   $('accountError').textContent = card.error
   $('accountError').hidden = !card.error
   if (v.field) f.focus()
@@ -257,6 +302,7 @@ function send() {
   if (k === 'email') return signIn()
   if (k === 'code') return verify()
   if (k === 'note') return ask()
+  if (k === 'confirm') return deleteAccount()
 }
 
 /** The server's words for a refusal, else its status. */
@@ -281,10 +327,10 @@ function signIn() {
 function verify() {
   if (!card.code.trim()) return $('accountField').focus()
   return call('/api/verify', { email: card.email.trim(), code: card.code.trim() }, async (res) => {
-    const m = (await res.json()).me as Me
+    const m = (await res.json()).me as Me, before = me?.screensLeft ?? 0
     card.code = ''
-    // A new account waits for its top-up; an account that existed takes the visitor's mockups at once.
-    card.step = m.topupDue ? 'thanks' : 'email'
+    // A new account has its free screens at once and says so; an account that existed takes the visitor's mockups.
+    card.step = (m.screensLeft ?? 0) > before ? 'thanks' : 'email'
     keep()
     setMe(m)
     if (card.step === 'email') closeCard()

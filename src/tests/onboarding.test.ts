@@ -1,7 +1,7 @@
 // The public's hints (spec/behavior.md, The public): which one is due, kept in this browser, the spark on a step done.
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
-import { Coach, HINTS, LIVE, due, fresh, record, veteran, type Hint, type Step } from '../packages/web/src/onboarding.ts'
+import { Coach, HINTS, LIVE, due, fresh, left, record, veteran, type Hint, type Step, type Where } from '../packages/web/src/onboarding.ts'
 
 const walk = (...steps: Step[]) => steps.reduce(record, fresh())
 const text = (p: ReturnType<typeof fresh>) => due(p)?.text ?? null
@@ -63,15 +63,32 @@ describe('Coach', () => {
     expect(b.shown).toEqual([null, null, null])
   })
 
-  test('kept in storage: a reload shows the hint still due, and a second begin changes nothing', () => {
+  test('kept in storage: a reload shows no hint, the one still due comes back at the next step', () => {
     const a = coach()
     a.c.begin(false)
     a.c.did('ready')
     const b = coach(a.saved())
     b.c.begin(true)
-    expect(b.shown).toEqual(['Pick the one you like.'])
+    expect(b.shown).toEqual([null])
+    expect(b.c.p?.ready).toBe(true)
+    b.c.did('ready')
+    expect(b.shown.at(-1)).toBe('Pick the one you like.')
+    b.c.begin(true) // Recent loaded again: the hint on show stays
+    expect(b.shown.at(-1)).toBe('Pick the one you like.')
     expect(coach('{broken').c.p).toBeNull()
   })
+
+  test('going elsewhere takes the hint away, still due, until the next step', () => {
+    const a = coach()
+    a.c.begin(false)
+    a.c.did('ready')
+    a.c.away()
+    expect(a.shown.at(-1)).toBeNull()
+    expect(due(a.c.p!)?.text).toBe('Pick the one you like.')
+    a.c.did('ready')
+    expect(a.shown.at(-1)).toBe('Pick the one you like.')
+  })
+
 
   test('a step done plays the spark (a pick plays its own sound), then the next hint shows', () => {
     const a = coach()
@@ -104,5 +121,31 @@ describe('Coach', () => {
   test('the spec says each hint word for word', () => {
     const spec = readFileSync(new URL('../../spec/behavior.md', import.meta.url), 'utf8').replace(/\s+/g, ' ')
     for (const h of HINTS) expect([h.text, spec.includes(`*${h.text}*`)]).toEqual([h.text, true])
+  })
+})
+
+describe('a hint on show goes stale', () => {
+  const at: Where = { app: 'a', current: 'k', box: null, drawer: null, card: false }
+  const pick: Hint = { text: 'Pick the one you like.' }, edit = HINTS.find((h) => h.drawer)!
+  test('when the visitor opens another mockup, screen, box, drawer, or a card', () => {
+    expect(left(pick, at, { ...at })).toBe(false)
+    expect(left(pick, at, { ...at, app: 'b' })).toBe(true)
+    expect(left(pick, at, { ...at, current: 'k2' })).toBe(true)
+    expect(left(pick, at, { ...at, box: 'rules' })).toBe(true)
+    expect(left(pick, at, { ...at, drawer: 'info' })).toBe(true)
+    expect(left(pick, at, { ...at, card: true })).toBe(true)
+  })
+  test('closing a drawer, a box or a card is no move', () => {
+    expect(left(pick, { ...at, drawer: 'edit' }, at)).toBe(false)
+    expect(left(pick, { ...at, box: 'rules' }, at)).toBe(false)
+    expect(left(pick, { ...at, card: true }, at)).toBe(false)
+  })
+  test('but not when they open the drawer the hint asks for', () => {
+    expect(edit.text).toBe('Change it in words: press Edit.')
+    expect(left(edit, at, { ...at, drawer: 'edit' })).toBe(false)
+    expect(left(edit, at, { ...at, drawer: 'info' })).toBe(true)
+  })
+  test('the live hint says it in plain words', () => {
+    expect(LIVE.text).toBe('This design was drawn fresh for you, so it used one of your free screens.')
   })
 })
