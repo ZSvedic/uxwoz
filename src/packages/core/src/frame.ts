@@ -43,6 +43,29 @@ export const DEFAULT_DEVICE: Device = 'phone'
 export const LEGACY_WIDTH = 800
 export const isDevice = (v: unknown): v is Device => typeof v === 'string' && Object.hasOwn(DEVICES, v)
 
+/** An element on the way up from the pointer, as the wheel rule needs it. */
+export interface Scrollable {
+  overflowX: string; overflowY: string; scrollLeft: number; scrollTop: number
+  scrollWidth: number; scrollHeight: number; clientWidth: number; clientHeight: number
+}
+
+/**
+ * Whether a scroll gesture (dx, dy) belongs to a part of the screen: one of `chain` (the elements from the pointer up)
+ * scrolls on the gesture's main axis and has room left that way. Else the canvas moves. Copied into the frame as source,
+ * so it uses nothing from outside.
+ */
+export function scrollsFirst(chain: Scrollable[], dx: number, dy: number): boolean {
+  const across = Math.abs(dx) > Math.abs(dy), d = across ? dx : dy
+  if (!d) return false
+  for (const e of chain) {
+    const flow = across ? e.overflowX : e.overflowY
+    if (flow !== 'auto' && flow !== 'scroll') continue
+    const at = across ? e.scrollLeft : e.scrollTop, room = (across ? e.scrollWidth - e.clientWidth : e.scrollHeight - e.clientHeight) - 1
+    if (room > 0 && (d < 0 ? at > 0 : at < room)) return true
+  }
+  return false
+}
+
 // Our script, before the model's markup: clicks on data-action controls become messages to the app,
 // and the frame never navigates. While the screen streams (`final` false), controls do nothing.
 const bootstrap = (final: boolean, vh: number) => `(() => {
@@ -161,10 +184,22 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     if (h + 'x' + w !== last) { last = h + 'x' + w; parent.postMessage({ uxwoz: 'size', height: h, width: w }, '*') }
   }
   addEventListener('load', () => { report(); new ResizeObserver(report).observe(document.body) })
+  // A part under the pointer that can scroll that way (a card rail) takes the gesture; else it scrolls the canvas.
+  const scrollsFirst = ${scrollsFirst}
+  const chain = (t) => {
+    const out = []
+    for (let el = t instanceof Element ? t : null; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+      const s = getComputedStyle(el)
+      out.push({ overflowX: s.overflowX, overflowY: s.overflowY, scrollLeft: el.scrollLeft, scrollTop: el.scrollTop,
+        scrollWidth: el.scrollWidth, scrollHeight: el.scrollHeight, clientWidth: el.clientWidth, clientHeight: el.clientHeight })
+    }
+    return out
+  }
   addEventListener('wheel', (e) => {
-    e.preventDefault() // a pinch arrives as Ctrl+wheel
-    if (e.ctrlKey || e.metaKey) parent.postMessage({ uxwoz: 'zoom', dy: e.deltaY, x: e.clientX, y: e.clientY }, '*')
-    else parent.postMessage({ uxwoz: 'wheel', dx: e.deltaX, dy: e.deltaY }, '*')
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); parent.postMessage({ uxwoz: 'zoom', dy: e.deltaY, x: e.clientX, y: e.clientY }, '*'); return } // a pinch arrives as Ctrl+wheel
+    if (scrollsFirst(chain(e.target), e.deltaX, e.deltaY)) return
+    e.preventDefault()
+    parent.postMessage({ uxwoz: 'wheel', dx: e.deltaX, dy: e.deltaY }, '*')
   }, { passive: false })
 })()`
 

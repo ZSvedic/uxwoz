@@ -1,6 +1,42 @@
 // The rope between a screen and its parent: down to the bottom of the parent's row, then one S-curve in the gap.
 import { describe, expect, test } from 'bun:test'
-import { curve, headH, rope } from '../packages/web/src/canvas.ts'
+import { READABLE, curve, fitZoom, headH, landing, rope, seenOn } from '../packages/web/src/canvas.ts'
+
+describe('where the view lands', () => {
+  const phone = { x: 600, y: 600, w: 450, h: 930 }
+
+  test('after a zoom, a screen that fits is centred; a taller one shows its top, a wider one its left edge', () => {
+    // At 50% on a 1280 × 900 stage the phone fits: its middle is the stage's middle.
+    const a = landing(phone, 0.5, 1280, 900)
+    expect(a.left + 640).toBeCloseTo((600 + 225) * 0.5)
+    expect(a.top + 450).toBeCloseTo((600 + 465) * 0.5)
+    // At 100% it is taller than the stage: its top shows, 24 px down; across it still fits, so it is centred.
+    const b = landing(phone, 1, 1280, 900)
+    expect(b.top).toBe(600 - 24)
+    expect(b.left).toBe(825 - 640)
+    // At 200% on a narrow stage its left edge shows, never cut off.
+    expect(landing(phone, 2, 700, 900).left).toBe(1200 - 24)
+  })
+
+  test('a screen is seen when all of it shows, or its start when it is longer, or it covers the view', () => {
+    expect(seenOn(100, 500, 0, 1000)).toBe(true)
+    expect(seenOn(100, 1500, 0, 1000)).toBe(true) // its start shows, it is longer than the view
+    expect(seenOn(-200, 1500, 0, 1000)).toBe(true) // it covers the view
+    expect(seenOn(700, 1100, 0, 1000)).toBe(false) // it fits, but its end is cut off
+    expect(seenOn(-200, 300, 0, 1000)).toBe(false) // its start is cut off
+    expect(seenOn(1200, 2600, 0, 1000)).toBe(false) // out of view
+  })
+
+  test('a snug fit keeps a tall screen readable unless its width needs less', () => {
+    // A pair on a small window: the height alone gives 42%, the width allows 77%.
+    expect(fitZoom(0.77, 0.42, { snug: true })).toBe(READABLE)
+    // A narrow window: the width's fit is the floor.
+    expect(fitZoom(0.5, 0.3, { snug: true })).toBe(0.5)
+    // A phone screen on a laptop still fits at 100%, as before.
+    expect(fitZoom(2.7, 0.6, { snug: true })).toBe(1)
+    expect(fitZoom(0.77, 0.42)).toBe(0.42)
+  })
+})
 
 /** Points along a path of the form curve() writes: M, V, then at most one C and a last V. */
 function sample(d: string): { x: number; y: number }[] {
