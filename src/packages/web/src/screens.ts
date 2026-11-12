@@ -8,7 +8,8 @@ import { renderSide } from './boxes.ts'
 import type { CardView, ScreenView } from './canvas.ts'
 import { canvas, closeMockup, side } from './app.ts'
 import { boxOp, renderDrawer } from './drawer.ts'
-import { coach, mapOf, post, showError, hint, stream, streamInto, themeCss, type StreamRenderer } from './net.ts'
+import { checkHint, coach, mapOf, post, showError, hint, stream, streamInto, themeCss, type StreamRenderer } from './net.ts'
+import { loadMe, sideAct } from './account-ui.ts'
 import { pickFx } from './design/fx.ts'
 import { applyMap, filed, saveCurrent, setCurrent } from './nav.ts'
 import { loadRecent, renderToolbar } from './toolbar.ts'
@@ -51,7 +52,7 @@ function sideCard(key: string, index: number, side: Side | null, stored: Version
   const idea = version ? ideaOf(version) : side && state.filing ? 'Waiting for filing, then drawing…' : ''
   return {
     id, width: widthOf(version?.device ?? device), device: version?.device ?? device, name: '', idea,
-    side: { index, pickable: !!version }, error, streaming: !version && !error,
+    side: { index, pickable: !!version }, error, act: error ? sideAct(error) : undefined, streaming: !version && !error,
   }
 }
 
@@ -89,6 +90,7 @@ export async function draw() {
   generate.hidden = !!state.app && !generate.classList.contains('open')
   renderDrawer()
   renderToolbar()
+  checkHint()
   const theme = state.theme
   const css = await themeCss(theme)
   if (theme !== state.theme) return // a newer draw shows the newer theme
@@ -218,7 +220,7 @@ export async function pick(key: string, index: number) {
     const { entry, filing, visiting } = await res.json() as { entry: CacheEntry; filing: boolean; visiting: boolean }
     keep(entry)
     Object.assign(state, { filing, visiting: visiting || state.visiting })
-    if (filing || visiting) filed()
+    if (filing || visiting) filed().then(loadMe) // filing and a visit are live calls too
     coach.did('pick')
     canvas.rename(`${key}#${index}`, key)
     state.current = key
@@ -278,16 +280,19 @@ export async function revise(key: string, change: string | null) {
   if (state.busy) return hint()
   state.revising = { key, change }
   if (change) coach.did('editSent')
+  const edited = !change && !!e.versions.at(-1)!.feedback && e.versions.at(-1)!.by !== 'fixer'
   let frame: StreamRenderer | null = null
   await stream('/api/revise', { key, change, model: modelSelect.value, device: deviceSelect.value }, change ? 'make the change' : 'make a new design', (ev, css) => {
     if (ev.type === 'chunk') (frame ??= streamInto(key, css, isComponent(e))).push(ev.text)
     else if (ev.type === 'done') {
       frame?.cancel()
       keep(ev.entry)
-      if (ev.filing) { state.filing = true; filed() }
+      if (ev.filing) { state.filing = true; filed().then(loadMe) }
       state.revising = null
       if (change) { changeInput.value = ''; coach.did('edited') }
       if (ev.entry.versions.at(-1)?.costUsd !== 0) coach.did('live')
+      // A Regenerate over an Edit: say the edit is not lost.
+      if (edited) hint('A fresh design. Undo brings your edit back.')
       // The new version may be taller or narrower: keep it in view once it has its size.
       canvas.sized(key).then(() => canvas.reveal(key))
     }

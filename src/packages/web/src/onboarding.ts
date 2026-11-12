@@ -11,13 +11,20 @@ export interface Progress {
 }
 /** Two designs ready, a pick, a click in a screen, an Edit sent and one made, an Undo, the generate panel opened, a design made live. */
 export type Step = 'ready' | 'pick' | 'click' | 'editSent' | 'edited' | 'undo' | 'own' | 'live'
-export interface Hint { text: string; /** A press on it opens the generate panel. */ opens?: true; live?: true }
+export interface Hint {
+  text: string
+  /** A press on it opens the generate panel. */
+  opens?: true
+  live?: true
+  /** The drawer tab that following it opens, so opening that one does not take it away. */
+  drawer?: string
+}
 
-export const LIVE: Hint = { text: 'From here your designs are made live.', live: true }
+export const LIVE: Hint = { text: 'This design was drawn fresh for you, so it used one of your free screens.', live: true }
 const CHAIN: [Hint, (p: Progress) => boolean][] = [
   [{ text: 'Pick the one you like.' }, (p) => !!p.ready && p.picks < 1],
   [{ text: 'Click anything in it.' }, (p) => p.picks >= 1 && !p.click],
-  [{ text: 'Change it in words: press Edit.' }, (p) => p.picks >= 2 && !p.editSent],
+  [{ text: 'Change it in words: press Edit.', drawer: 'edit' }, (p) => p.picks >= 2 && !p.editSent],
   [{ text: 'Changed your mind? Undo brings the old one back.' }, (p) => !!p.edited && !p.undo],
   [{ text: 'That is the whole app. Now describe your own.', opens: true }, (p) => !!p.undo && !p.own],
 ]
@@ -45,6 +52,19 @@ export function due(p: Progress): Hint | null {
   return CHAIN.find(([, when]) => when(p))?.[0] ?? null
 }
 
+/** Where the visitor is, as far as a hint on show cares: the mockup, the screen or box, the drawer, a card or panel. */
+export interface Where { app: string | null; current: string | null; box: string | null; drawer: string | null; card: boolean }
+
+/**
+ * The visitor went somewhere else since `h` showed at `then`: another mockup or screen, or they opened a box, a
+ * drawer (other than the one the hint asks for), a card or a panel. Closing one is no move.
+ */
+export function left(h: Hint, then: Where, now: Where): boolean {
+  const opened = (a: string | null, b: string | null) => b !== null && b !== a
+  return then.app !== now.app || then.current !== now.current || opened(then.box, now.box)
+    || (opened(then.drawer, now.drawer) && now.drawer !== h.drawer) || (now.card && !then.card)
+}
+
 export interface CoachDeps {
   load(): string | null
   save(json: string): void
@@ -64,10 +84,21 @@ export class Coach {
     this.p = p && typeof p.picks === 'number' ? p : null
   }
 
-  /** The first time this browser is seen: with mockups in Recent it is no first-time visitor. */
+  /**
+   * The first time this browser is seen: with mockups in Recent it is no first-time visitor. A page load shows no
+   * hint: one still due shows again at the visitor's next step. Recent loads again often: only the first counts.
+   */
   begin(hasMockups: boolean) {
+    if (this.begun) return
+    this.begun = true
     if (!this.p) { this.p = hasMockups ? veteran() : fresh(); this.deps.save(JSON.stringify(this.p)) }
-    this.deps.show(due(this.p))
+    this.deps.show(null)
+  }
+  private begun = false
+
+  /** The visitor went elsewhere (`left`): the hint on show goes, kept due, until their next step. */
+  away() {
+    this.deps.show(null)
   }
 
   /** The visitor did `step`: keep it, play the spark if that finished the hint on show, then show what is due. */

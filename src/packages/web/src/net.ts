@@ -5,10 +5,10 @@ import type { ScreenEvent } from './server.ts'
 import { canvas } from './app.ts'
 import { draw, page } from './screens.ts'
 import { openGenerate } from './toolbar.ts'
-import { Coach, type Hint } from './onboarding.ts'
+import { Coach, left, type Hint, type Where } from './onboarding.ts'
 import { stepFx } from './design/fx.ts'
-import { loadMe, refused } from './account-ui.ts'
-import { $, state, store } from './state.ts'
+import { loadMe, refused, sideAct } from './account-ui.ts'
+import { $, generate, state, store } from './state.ts'
 
 async function fetchText(url: string): Promise<string> {
   const res = await fetch(url)
@@ -49,10 +49,11 @@ export type StreamRenderer = ReturnType<typeof streamInto>
 export const fmtS = (ms: number) => `${(ms / 1000).toFixed(ms < 1000 ? 2 : 1)} s`
 export const fmtUsd = (v: number) => `$${v < 0.01 ? v.toFixed(4) : v.toFixed(3)}`
 
-/** A red pill at the bottom of the canvas, until closed or replaced. */
+/** A red pill at the bottom of the canvas, until closed or replaced; it takes the hint's place while it shows. */
 export function showError(msg: string | null) {
   $('errorText').textContent = msg ?? ''
   $('error').hidden = !msg
+  showLasting()
 }
 
 $('errorClose').addEventListener('click', () => showError(null))
@@ -62,25 +63,40 @@ let hintTimer: ReturnType<typeof setTimeout> | undefined
 export function hint(text = 'One screen at a time: wait until this one is made.') {
   const h = $('hint')
   h.textContent = text
-  h.hidden = false
+  h.hidden = !$('error').hidden
   h.classList.remove('press')
   clearTimeout(hintTimer)
   hintTimer = setTimeout(() => { hintTimer = undefined; showLasting() }, 2500)
 }
 
-/** The hint that stays until the visitor does the thing (onboarding.ts); a brief hint shows over it, then gives it back. */
-let lasting: Hint | null = null
+/**
+ * The hint that stays until the visitor does the thing (onboarding.ts), with where the visitor was when it showed;
+ * a brief hint shows over it, then gives it back. None with no mockup open, nor under the red pill.
+ */
+let lasting: { hint: Hint; at: Where } | null = null
+const where = (): Where => ({
+  app: state.app, current: state.current, box: state.box, drawer: state.drawer,
+  card: generate.classList.contains('open') || !$('account').hidden,
+})
 function showLasting() {
   if (hintTimer) return
-  const h = $('hint')
-  h.textContent = lasting?.text ?? ''
-  h.hidden = !lasting
-  h.classList.toggle('press', !!lasting?.opens || !!lasting?.live)
+  const h = $('hint'), on = lasting && state.app && $('error').hidden ? lasting.hint : null
+  h.textContent = on?.text ?? ''
+  h.hidden = !on
+  h.classList.toggle('press', !!on?.opens || !!on?.live)
 }
+/** The visitor went elsewhere since the hint showed: it goes (draw() and every click or key ask). */
+export function checkHint() {
+  if (lasting && left(lasting.hint, lasting.at, where())) coach.away()
+  else showLasting()
+}
+const soon = () => setTimeout(checkHint)
+addEventListener('click', soon, true)
+addEventListener('keydown', soon, true)
 export const coach = new Coach({
   load: () => store.get('uxwoz:hints'),
   save: (json) => store.set('uxwoz:hints', json),
-  show: (h) => { lasting = h; showLasting() },
+  show: (h) => { lasting = h && { hint: h, at: where() }; showLasting() },
   fx: (sound) => stepFx($('hint'), sound),
   later: (run, ms) => setTimeout(run, ms),
 })
@@ -134,7 +150,11 @@ export async function stream(url: string, body: object, what: string, on: (ev: S
     if (!finished && !ctrl.signal.aborted) throw new Error('the stream ended early')
   } catch (err) {
     failed = !ctrl.signal.aborted
-    if (failed && !(err instanceof Answered)) showError(`Could not ${what}: ${err instanceof Error ? err.message : err}`)
+    const msg = err instanceof Error ? err.message : String(err)
+    // Both sides refused by the meter: the account card, as for a refusal at the door.
+    const act = failed && !(err instanceof Answered) ? sideAct(msg) : undefined
+    if (act) act.run()
+    else if (failed && !(err instanceof Answered)) showError(`Could not ${what}: ${msg}`)
   } finally {
     after(failed)
     if (state.busy === ctrl) state.busy = null

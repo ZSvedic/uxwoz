@@ -89,9 +89,11 @@ src/packages/web/src/
                  pickers, toolbar menus (Theme too), Recent, zoom and its keys
   net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill, the brief hint
                  and the lasting one (`coach`)
-  onboarding.ts  the public's hints: which is due from what the visitor did, kept in local storage (no DOM, tested)
+  onboarding.ts  the public's hints: which is due from what the visitor did, kept in local storage, and when one on
+                 show goes stale (`left`) (no DOM, tested)
   account-ui.ts  browser: the public's account button, its menu and the account card (sign in by code, Ask for
-                 more), a refused live design (402) or a thing that needs an account; what each shows from
+                 more, Delete my account), a refused live design (402, or a refused side of an A OR B) or a thing
+                 that needs an account; what each shows from
                  /api/me as functions with no DOM (tested); nothing of it in private mode
   voice.ts       browser: voice input's state machine (wake phrase as Chrome hears it, what was heard, countdown,
                  stop, cancel; no DOM, tested) and speech recognition that restarts itself and says why it stops

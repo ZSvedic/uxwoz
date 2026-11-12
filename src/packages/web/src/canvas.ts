@@ -54,6 +54,8 @@ export interface CardView {
   side?: { index: number; pickable: boolean }
   /** Why a side failed; shown instead of the screen. */
   error?: string
+  /** A button under those words (Register, Ask for more). */
+  act?: { text: string; run: () => void }
   streaming: boolean
   /** A component: as tall as its content. */
   fit?: boolean
@@ -337,7 +339,13 @@ export class Canvas {
         c.note.hidden = !c.note.textContent
         // While a screen is being changed, the note takes the idea's line, so the names keep their room.
         c.idea.parentElement!.hidden = !c.note.hidden
-        c.error.textContent = v.error ?? ''
+        c.error.replaceChildren(v.error ?? '')
+        if (v.error && v.act) {
+          const b = el('button', 'primary', v.act.text) as HTMLButtonElement
+          b.type = 'button'
+          b.addEventListener('click', v.act.run)
+          c.error.append(el('p', '', b))
+        }
         c.error.hidden = !v.error
         c.screen.hidden = !!v.error
         c.shield.title = v.side ? (v.side.pickable ? 'Pick this design' : 'Wait until it is finished') : ''
