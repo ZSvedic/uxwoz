@@ -1,6 +1,6 @@
 // The rope between a screen and its parent: down to the bottom of the parent's row, then one S-curve in the gap.
 import { describe, expect, test } from 'bun:test'
-import { READABLE, curve, fitZoom, headH, landing, rope, seenOn } from '../packages/web/src/canvas.ts'
+import { READABLE, curve, firstSeen, fitOf, fitZoom, headH, hit, landing, peekZoom, rope, seenOn, sidesOf, touchStep } from '../packages/web/src/canvas.ts'
 
 describe('where the view lands', () => {
   const phone = { x: 600, y: 600, w: 450, h: 930 }
@@ -35,6 +35,65 @@ describe('where the view lands', () => {
     // A phone screen on a laptop still fits at 100%, as before.
     expect(fitZoom(2.7, 0.6, { snug: true })).toBe(1)
     expect(fitZoom(0.77, 0.42)).toBe(0.42)
+  })
+})
+
+describe('on a phone', () => {
+  const phone = { w: 390, h: 900 }
+
+  test('an A OR B stands one above the other, each as wide as the window allows, the OR between', () => {
+    const wide = sidesOf([phone, phone], false, 160, 130, 90)
+    expect(wide.at).toEqual([{ x: 0, y: 0 }, { x: 550, y: 0 }])
+    expect(wide.w).toBe(940)
+    const narrow = sidesOf([phone, phone], true, 160, 130, 90)
+    expect(narrow.at).toEqual([{ x: 0, y: 0 }, { x: 0, y: 900 + 130 + 90 }])
+    expect(narrow.w).toBe(390)
+    expect(narrow.or).toEqual({ x: 0, y: 900, w: 390, h: 130 })
+    // A 375 px window: the pair fits at 92% (was about 30% side by side), the height ignored.
+    const z = fitOf(375, 700, { w: narrow.w, h: narrow.h + 100 }, true, true, { top: true })
+    expect(z).toBe(0.92)
+    expect(fitOf(375, 700, { w: wide.w, h: wide.h }, false, true, { top: true })).toBeLessThan(0.3)
+  })
+
+  test('a stacked A OR B opens zoomed so the top of B shows under A, never below 70%, never wider than the window', () => {
+    // A tall window: A, the OR and 80 px of B fit at the width's zoom.
+    expect(peekZoom(1400, 800, 0.92)).toBe(0.92)
+    // A shorter one: the zoom by height, so B's top is at the bottom of the window.
+    const z = peekZoom(1100, 800, 0.92)
+    expect(z).toBeLessThan(0.92)
+    expect(z).toBeGreaterThan(0.7)
+    expect(z * 816 + 2 * 136 + 130 + 80).toBeLessThanOrEqual(1100)
+    // A phone: the height would need 33%, so it stays readable at 70%.
+    expect(peekZoom(688, 791, 0.92)).toBe(0.7)
+  })
+
+  test('a picked screen fits the window by its width, with its rail under it, never cut off at the right', () => {
+    const z = fitOf(375, 700, { w: 390, h: 1000 }, true, true, { snug: true })
+    expect(390 * z).toBeLessThanOrEqual(375)
+    expect(z).toBeGreaterThan(0.9)
+    // A wide window is as before: the snug fit keeps its height rule.
+    expect(fitOf(1280, 900, { w: 450, h: 1000 }, false, true, { snug: true })).toBe(fitZoom((1280 - 96) / 450, (900 - 96) / 1000, { snug: true }))
+  })
+
+  test('a finger moves the canvas by its own way, back; two fingers zoom by their spread', () => {
+    expect(touchStep({ x: 100, y: 300, d: 0 }, { x: 110, y: 250, d: 0 }, false)).toEqual({ zoom: 1, dx: -10, dy: 50 })
+    expect(touchStep({ x: 0, y: 0, d: 100 }, { x: 0, y: 0, d: 150 }, true).zoom).toBe(1.5)
+  })
+})
+
+describe('what the view keeps', () => {
+  test('a zoom without a pointer stays put over a screen or a box, and lands only from the empty sky', () => {
+    const boxes = [{ x: 600, y: 600, w: 450, h: 930 }]
+    expect(hit(boxes, 800, 1400)).toBe(true)
+    expect(hit(boxes, 1200, 1400)).toBe(false)
+  })
+
+  test('a resize fits again the first target that showed, any of it, else nothing', () => {
+    const view = { left: 0, top: 0, w: 1000, h: 800 }
+    const off = { x: 3000, y: 0, w: 400, h: 400 }, on = { x: 900, y: 700, w: 400, h: 400 }
+    expect(firstSeen([['choice', undefined], ['box', off], ['screen', on]], 1, view)).toBe('screen')
+    expect(firstSeen([['choice', on], ['screen', on]], 1, view)).toBe('choice')
+    expect(firstSeen([['screen', off]], 1, view)).toBeUndefined()
   })
 })
 

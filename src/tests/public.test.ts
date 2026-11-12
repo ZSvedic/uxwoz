@@ -101,6 +101,40 @@ describe('public mode', () => {
     expect(evil.cookie).toBe('')
   })
 
+  test('a side refused at the limit is drawn alone when asked again: the side that worked is not paid twice', async () => {
+    start()
+    store.setCaps({ visitor: 0.003 }) // one call's hold is $0.004: the first side passes, the second is refused
+    const ana = browser()
+    const first = await ana.post('/api/screen', { app: 'App one' })
+    const evs = await lines(first)
+    const failed = evs.filter((e) => e.type === 'failed')
+    expect(failed.map((e) => e.message)).toEqual(['Your free screens are used up.'])
+    expect(calls.haiku).toBe(1)
+    const key = evs[0].key as string, refused = failed[0].variant as number, kept = 1 - refused
+    const sides = async () => ((await (await ana.get('/api/map?app=App%20one')).json()).entries as any[]).find((e) => e.key === key).proposals
+    const a = (await sides())[kept]
+    expect(a).not.toBeNull()
+    expect((await sides())[refused]).toBeNull()
+    // Not asked again: the free cache hit it always was, at the limit too, the side there and the missing one as they were.
+    const hit = await lines(await ana.post('/api/screen', { app: 'App one' }))
+    expect(hit.map((e) => e.type)).toEqual(['meta', 'done'])
+    expect(hit[0].cached).toBe(true)
+    expect(calls.haiku).toBe(1)
+    // Asked again at the limit: refused at the door, as any paid request.
+    expect((await ana.post('/api/screen', { app: 'App one', again: true })).status).toBe(402)
+    expect(calls.haiku).toBe(1)
+    store.give(personOf(ana).id, 1)
+    const again = await lines(await ana.post('/api/screen', { app: 'App one', again: true }))
+    expect(calls.haiku).toBe(2)
+    expect(again.filter((e) => e.type === 'version').map((e) => e.variant).sort()).toEqual([0, 1])
+    expect(again.at(-1).type).toBe('done')
+    expect((await sides())[kept]).toEqual(a)
+    expect((await sides())[refused]).not.toBeNull()
+    // Both sides there: a cache hit, free, asked again or not.
+    await lines(await ana.post('/api/screen', { app: 'App one', again: true }))
+    expect(calls.haiku).toBe(2)
+  })
+
   test('the meter runs to zero, then each 402 reason in its order', async () => {
     start()
     store.setCaps({ visitor: 0.03 })
@@ -287,6 +321,21 @@ describe('public mode', () => {
     expect((await browser().get('/api/apps', { 'x-uxwoz-share': link.token })).status).toBe(200)
   })
 
+  test('a mockup\'s address is the page for everyone; only the person whose mockup it is finds its ID', async () => {
+    start()
+    const ana = browser('10.0.0.1'), bo = browser('10.0.0.2')
+    const made = await screen(ana, 'A dog walking app')
+    expect((await ana.post('/api/pick', { key: made.key, index: 0 })).status).toBe(200)
+    const [mine] = (await (await ana.get('/api/apps')).json()).apps
+    expect(mine.id).toMatch(/^[a-z0-9]{6}$/)
+    const map = await (await ana.get(`/api/map?app=${encodeURIComponent(mine.app)}`)).json()
+    const sid = map.entries[0].sid
+    for (const b of [ana, bo]) expect((await b.get(`/m/${mine.id}/${sid}`)).status).toBe(200)
+    expect((await bo.get(`/m/${mine.id}`)).status).toBe(200)
+    // Bo has no mockups, so the page finds nothing for that ID and opens the start page.
+    expect(await (await bo.get('/api/apps')).json()).toEqual({ apps: [] })
+  })
+
   test('the page is open to everyone; the design sheet is the owner\'s', async () => {
     start()
     expect((await fetch(url('/'))).status).toBe(200)
@@ -299,6 +348,9 @@ describe('private mode', () => {
   test('nothing of the public: /api/me is the owner, no cookie, every model', async () => {
     server = createServer({ port: 0, cache: new ScreenCache(), fetch: fakeFetch, env, log: () => {}, fileWaitMs: 0, public: false, owner: '' })
     expect(await (await fetch(url('/api/me'))).json()).toEqual({ role: 'owner' })
+    // With no owner's secret a mockup's address is the app's page, as `/` is.
+    expect((await fetch(url('/m/k3f9x2/a7'))).status).toBe(200)
+    expect((await fetch(url('/m/k3f9x2/a7/more'))).status).toBe(404)
     expect((await fetch(url('/api/step'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"step":"arrived"}' })).status).toBe(204)
     const cfg = await (await fetch(url('/api/config'))).json()
     expect(cfg.public).toBeUndefined()

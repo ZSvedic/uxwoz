@@ -2,8 +2,7 @@
    or without a mockup open. Opened over a mockup (.open), it dims the canvas and the drawer, not the bar. */
 .generate { position: absolute; z-index: 15; left: 50%; top: 12vh; transform: translateX(-50%); width: min(680px, calc(100% - 32px));
   display: flex; flex-direction: column; gap: 12px; padding: 20px; background: var(--surface); border: 2px solid var(--current);
-  border-radius: 20px; box-shadow: var(--panel-glow); max-height: calc(100% - 24px); overflow: auto; }
-.generate h2 { margin: 0; font-size: 21px; font-weight: 600; }
+  border-radius: 20px; box-shadow: var(--panel-glow); max-height: calc(100% - 12vh - 12px); overflow: auto; }.generate h2 { margin: 0; font-size: 21px; font-weight: 600; }
 .generate h3 { margin: 0 0 6px; }
 #prompt { width: 100%; resize: none; padding: 10px 12px; border: 2px solid var(--border); border-radius: 10px; background: var(--field);
   font-size: 15px; field-sizing: content; min-height: 3.2em; max-height: 14em; }
@@ -22,12 +21,14 @@
 .recent button small { color: var(--muted); white-space: nowrap; }
 /* The account card (account-ui.ts): the generate panel's card, narrower, over the dim and over the panel itself. */
 .workspace:has(> .generate.account-card:not([hidden]))::after { z-index: 16; }
-.generate.account-card { z-index: 17; top: 16vh; width: min(460px, calc(100% - 32px)); gap: 10px; }
-.account-card p { margin: 0; }
+.generate.account-card { z-index: 17; top: 16vh; max-height: calc(100% - 16vh - 12px); width: min(460px, calc(100% - 32px)); gap: 10px; }
+.generate p { margin: 0; }
 .account-card .lead { font-size: 16px; }
 .account-card input { width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 10px; background: var(--field); font-size: 15px; }
 .account-card label, .account-card small, .account-card .again { color: var(--muted); }
 .account-card .again { align-self: flex-start; padding: 0; border: 0; background: none; text-decoration: underline; }
 .account-card .err { color: var(--err); }
 .account-card a { color: inherit; }
-.menu h3.plain { text-transform: none; font-size: 13px; font-weight: 400; color: var(--text); }
+.menu h3.plain { text-transform: none; font-size: 13px; font-weight: 400; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The panel and the card end above the bar and scroll inside; on a phone they start near the top, so Generate shows. */
+@media (max-width: 720px) { .generate.generate { top: 12px; max-height: calc(100% - 24px); } }

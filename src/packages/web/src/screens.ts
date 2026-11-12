@@ -9,11 +9,11 @@ import type { CardView, ScreenView } from './canvas.ts'
 import { canvas, closeMockup, side } from './app.ts'
 import { boxOp, renderDrawer } from './drawer.ts'
 import { checkHint, coach, mapOf, post, showError, hint, stream, streamInto, themeCss, type StreamRenderer } from './net.ts'
-import { loadMe, sideAct } from './account-ui.ts'
+import { sideAct } from './account-ui.ts'
 import { pickFx } from './design/fx.ts'
-import { applyMap, filed, saveCurrent, setCurrent } from './nav.ts'
-import { loadRecent, renderToolbar } from './toolbar.ts'
-import { changeInput, deviceSelect, generate, modelSelect, state, type Making, type Side } from './state.ts'
+import { applyMap, filed, saveCurrent, setCurrent, syncAddress } from './nav.ts'
+import { loadRecent, openGenerate, renderToolbar } from './toolbar.ts'
+import { changeInput, deviceSelect, generate, modelSelect, promptInput, state, type Making, type Side } from './state.ts'
 
 // ---- Views
 
@@ -52,7 +52,8 @@ function sideCard(key: string, index: number, side: Side | null, stored: Version
   const idea = version ? ideaOf(version) : side && state.filing ? 'Waiting for filing, then drawing…' : ''
   return {
     id, width: widthOf(version?.device ?? device), device: version?.device ?? device, name: '', idea,
-    side: { index, pickable: !!version }, error, act: error ? sideAct(error) : undefined, streaming: !version && !error,
+    side: { index, pickable: !!version }, error, act: error ? sideAct(error) ?? (stored === null && !side ? { text: 'Try again', run: () => redraw(key) } : undefined) : undefined,
+    streaming: !version && !error,
   }
 }
 
@@ -83,6 +84,7 @@ export function views(): ScreenView[] {
 
 /** Draw every screen and put each stored design in its frame. Streaming frames are left to their streams. */
 export async function draw() {
+  syncAddress()
   state.tree = screenTree(all())
   side.el.hidden = !state.app || !state.entries.size || !state.boxes
   if (state.boxes) renderSide(side, { boxes: state.boxes, components: components(), past: state.past, visiting: state.visiting, current: state.box }, boxOp)
@@ -107,12 +109,14 @@ export async function draw() {
 // ---- Screens
 
 /** Open a screen from the cache, else as A OR B: remember the view, fit both, stream them. */
-export async function openScreen(action: string | null, from: string | null, label: string | null) {
+export async function openScreen(action: string | null, from: string | null, label: string | null, again = false) {
   const device = deviceSelect.value as Device
   /** When the A OR B was fitted; refitted once both finish unless the canvas moved since. */
   let fitted: number | null = null
   let m: Making | null = null
-  await stream('/api/screen', { app: state.app!, action, model: modelSelect.value, device, from, label }, 'make this screen', async (ev, css) => {
+  const app = state.app
+  refused = null
+  await stream('/api/screen', { app: state.app!, action, model: modelSelect.value, device, from, label, ...(again && { again }) }, 'make this screen', async (ev, css) => {
     if (ev.type === 'meta' && !ev.cached) {
       m = { key: ev.key, parent: from, device, sides: [] }
       m.sides = Array.from({ length: ev.variants }, (_, i) => ({
@@ -135,7 +139,13 @@ export async function openScreen(action: string | null, from: string | null, lab
         s.version = ev.version
         if (ev.version.costUsd !== 0) coach.did('live') // a replayed design costs 0
         if (m!.sides.every((x) => x.version)) coach.did('ready')
-      } else { s.error = ev.message; state.failed.set(`${m!.key}#${ev.variant}`, ev.message) }
+      } else {
+        s.error = ev.message
+        state.failed.set(`${m!.key}#${ev.variant}`, ev.message)
+        // A side the meter refused: drawn alone after a sign-up.
+        const key = m!.key
+        if (sideAct(ev.message)) refused = { app, run: () => redraw(key) }
+      }
       draw()
     } else if (ev.type === 'done') {
       keep(ev.entry)
@@ -152,9 +162,46 @@ export async function openScreen(action: string | null, from: string | null, lab
         }
       }
     }
-  }, (failed) => {
+  }, (failed, answered) => {
     if (failed) { stopMaking(); back() }
+    // A new mockup's first screen the account card answered: sent again after a sign-up (`again`).
+    if (failed && answered) {
+      // Refused whole (a first screen, a click into a new screen): sent again after a sign-up.
+      refused = { app, run: () => openScreen(action, from, label, again) }
+      if (action == null && !state.entries.size) refusedFirst = state.app
+    }
   })
+}
+
+/** The mockup whose first screen was refused for lack of free screens, until a sign-up or the card is closed. */
+let refusedFirst: string | null = null
+/** The last request the meter refused, in its mockup, until the next request: sent again after a sign-up. */
+let refused: { app: string | null; run: () => unknown } | null = null
+
+/** After a sign-up: the last refused request is sent again (a first screen, a click, a missing side, an Edit). */
+export async function again() {
+  const r = refused
+  refused = refusedFirst = null
+  if (r && r.app === state.app && state.app) await r.run()
+}
+
+/** An open A OR B's missing side, drawn again (asked `again`: a paid request); the side there comes back as it is. */
+export async function redraw(key: string) {
+  const e = state.entries.get(key)
+  if (!e || e.versions.length) return
+  if (state.busy) return hint()
+  e.proposals?.forEach((_, i) => state.failed.delete(`${key}#${i}`))
+  await openScreen(e.name && e.action != null ? `@${e.name}` : null, e.parent?.key ?? null, e.parent?.label ?? null, true)
+}
+
+/** The account card closed with no sign-up: a refused first screen's prompt goes back into the generate panel. */
+export function cardClosed() {
+  const app = refusedFirst
+  refusedFirst = null
+  if (!app || app !== state.app || state.entries.size) return
+  closeMockup()
+  openGenerate()
+  promptInput.value = app
 }
 
 /** Once a screen (or an A OR B) has its size, fit it snugly, unless the view moved since `fitted` or the A OR B was picked. */
@@ -166,8 +213,8 @@ async function refit(key: string, fitted: number | null, choice = true) {
 }
 
 /** Fit a finished A OR B by width now, then snugly once both have their size. */
-export function fitChoice(key: string) {
-  coach.did('ready')
+export function fitChoice(key: string, step = true) {
+  if (step) coach.did('ready')
   canvas.fit(key, { top: true })
   refit(key, performance.now())
 }
@@ -220,11 +267,11 @@ export async function pick(key: string, index: number) {
     const { entry, filing, visiting } = await res.json() as { entry: CacheEntry; filing: boolean; visiting: boolean }
     keep(entry)
     Object.assign(state, { filing, visiting: visiting || state.visiting })
-    if (filing || visiting) filed().then(loadMe) // filing and a visit are live calls too
-    coach.did('pick')
+    if (filing || visiting) filed()
     canvas.rename(`${key}#${index}`, key)
     state.current = key
     saveCurrent()
+    coach.did('pick')
     await draw()
     if (state.before) { back(); canvas.reveal(key, false) } else fitScreenSoon(key)
   } finally {
@@ -279,6 +326,8 @@ export async function revise(key: string, change: string | null) {
   if (!e?.versions.length) return
   if (state.busy) return hint()
   state.revising = { key, change }
+  refused = null
+  const app = state.app
   if (change) coach.did('editSent')
   const edited = !change && !!e.versions.at(-1)!.feedback && e.versions.at(-1)!.by !== 'fixer'
   let frame: StreamRenderer | null = null
@@ -287,7 +336,7 @@ export async function revise(key: string, change: string | null) {
     else if (ev.type === 'done') {
       frame?.cancel()
       keep(ev.entry)
-      if (ev.filing) { state.filing = true; filed().then(loadMe) }
+      if (ev.filing) { state.filing = true; filed() }
       state.revising = null
       if (change) { changeInput.value = ''; coach.did('edited') }
       if (ev.entry.versions.at(-1)?.costUsd !== 0) coach.did('live')
@@ -296,8 +345,9 @@ export async function revise(key: string, change: string | null) {
       // The new version may be taller or narrower: keep it in view once it has its size.
       canvas.sized(key).then(() => canvas.reveal(key))
     }
-  }, () => {
+  }, (failed, answered) => {
     frame?.cancel()
+    if (failed && answered) refused = { app, run: () => revise(key, change) }
     // After a failure, draw() puts the screen as it was back into its frame.
     if (state.revising?.key === key) state.revising = null
   })

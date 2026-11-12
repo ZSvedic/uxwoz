@@ -82,7 +82,8 @@ test('a visitor registers and the top-up comes with the code: no wait, no mail b
   expect(store.person(v.person.id)!.allowance).toBe(0.1)
   const r = await post('/api/verify', { email: 'ana@example.com', code: codeOf('ana@example.com') }, v.token)
   expect(r.status).toBe(200)
-  const { me } = await r.json() as any
+  const { me, created } = await r.json() as any
+  expect(created).toBe(true)
   // $0.15 at $0.004 a screen: 37 screens at once.
   expect(me).toEqual({ role: 'user', email: 'ana@example.com', left: 0.15, allowance: 0.25, screensLeft: 37, paused: false, may: { share: true, exportZip: true } })
   const t = cookieOf(r)
@@ -92,7 +93,9 @@ test('a visitor registers and the top-up comes with the code: no wait, no mail b
   expect(store.person(v.person.id)!.steps).toEqual(['asked', 'verified'])
   // Signing in again gives nothing more, and the owner is told nothing.
   clock.t += 60_000
-  expect((await signIn('ana@example.com', null)).status).toBe(200)
+  const again = await signIn('ana@example.com', null)
+  expect(again.status).toBe(200)
+  expect((await again.json() as any).created).toBeUndefined()
   expect(store.person(v.person.id)!.allowance).toBe(0.25)
   await asks.tick()
   expect(mails.filter((m) => m.to[0] === ADMIN)).toEqual([])

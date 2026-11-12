@@ -198,10 +198,14 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
     return { root, b }
   }
 
-  /** Whether a request makes a model work: a new screen (not a cache hit), an Edit or a Regenerate, a pick (its filing), an Edit of a box or a visit. */
+  /** Whether a request makes a model work: a new screen (not a cache hit, unless an open A OR B is asked to draw its missing side again), an Edit or a Regenerate, a pick (its filing), an Edit of a box or a visit. */
   function costs(path: string, b: any, cache: ScreenCache): boolean {
     if (path === '/api/box') return b?.op === 'edit' || b?.op === 'visit'
-    if (path === '/api/screen') return !cache.find(String(b?.app ?? ''), canonicalAction(typeof b?.action === 'string' ? b.action : null))
+    if (path === '/api/screen') {
+      // A cache hit is free, but an open A OR B asked `again` draws its missing side.
+      const hit = cache.find(String(b?.app ?? ''), canonicalAction(typeof b?.action === 'string' ? b.action : null))
+      return !hit || (b?.again === true && !hit.versions.length && !!hit.proposals?.some((p) => !p))
+    }
     return PAID.has(path)
   }
 
@@ -234,17 +238,18 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
   }
 
   const closed = () => new Response(pub ? 'Only the owner can open this.' : 'This UX Woz is private.', { status: 403, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
-  /** Every /api route but the visitors' goes through `wrap`; with UXWOZ_OWNER set, `/` and `/design` ask for the owner's cookie. */
+  /** Every /api route but the visitors' goes through `wrap`; with UXWOZ_OWNER set, `/`, `/m/…` and `/design` ask for the owner's cookie. */
   function guard<R extends string>(all: Bun.Serve.Routes<unknown, R>): Bun.Serve.Routes<unknown, R> {
     const out: Record<string, Route> = { ...all, ...routes }
     for (const [path, r] of Object.entries(out)) {
       if (!path.startsWith('/api/') || path.startsWith('/api/s/')) continue
       out[path] = typeof r === 'function' ? wrap(path, r) : Object.fromEntries(Object.entries(r).map(([m, f]) => [m, wrap(path, f as any)]))
     }
-    if (owner) out['/'] = (req: Request, server: { port?: number }) => {
-      const secret = new URL(req.url).searchParams.get('owner')
+    // The app's page at `/` and at a mockup's address (`/m/…`): the secret's redirect keeps the path.
+    if (owner) for (const p of Object.keys(out).filter((p) => p === '/' || p.startsWith('/m/'))) out[p] = (req: Request, server: { port?: number }) => {
+      const u = new URL(req.url), secret = u.searchParams.get('owner')
       const https = publicOrigin(req).startsWith('https:')
-      if (secret === owner) return new Response(null, { status: 302, headers: { Location: '/', 'Set-Cookie': `uxwoz_owner=${owner}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${https ? '; Secure' : ''}` } })
+      if (secret === owner) return new Response(null, { status: 302, headers: { Location: u.pathname, 'Set-Cookie': `uxwoz_owner=${owner}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${https ? '; Secure' : ''}` } })
       return isOwner(req) || pub ? page(server, '/_app') : closed()
     }
     // The design sheet and the admin's page are the owner's too. Each page moves to a path with a secret made for this

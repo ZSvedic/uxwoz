@@ -2,7 +2,7 @@
 .workspace { flex: 1; min-height: 0; display: flex; position: relative; }
 .canvas-area { flex: 1; min-width: 0; min-height: 0; position: relative; display: flex; }
 .stage { flex: 1; min-width: 0; min-height: 0; position: relative; overflow: auto; outline: none;
-  background: transparent; mask-image: linear-gradient(to top, transparent, black 16px); }
+  background: transparent; mask-image: linear-gradient(to top, transparent, black 16px); touch-action: pan-x pan-y; }
 .stage.panning { cursor: grabbing; }
 .stage.panning iframe { pointer-events: none; }
 
@@ -53,14 +53,15 @@
 /* A side of an A OR B: its idea above in larger type, and a shield over the frame that takes the click. */
 .card.side .head > * { white-space: normal; }
 .card.side .idea { color: var(--sky-text); font-size: calc(16px / var(--z)); font-weight: 600; -webkit-line-clamp: 3; }
-.card .shield { display: none; }
-.card.side .shield { display: flex; position: absolute; inset: 0; cursor: progress; align-items: flex-start; justify-content: center;
-  padding-top: calc(160px / var(--z)); }
-.card.side.pickable .shield { cursor: pointer; }
-/* Pick this design: the ember pill. */
-.pick-hint { opacity: 0; padding: calc(5px / var(--z)) calc(18px / var(--z)); border-radius: 99px;
+.card .shield, .card:not(.side) .pick-hint { display: none; }
+.card.side .shield { display: block; position: absolute; inset: 0; cursor: progress; }
+.card.side.pickable :is(.shield, .head) { cursor: pointer; }
+/* Pick this design: the ember pill under a side's idea, above the design: on the side under the pointer, or on every
+   side where nothing hovers. */
+.pick-hint { align-self: flex-start; margin-top: calc(4px / var(--z)); opacity: 0; padding: calc(5px / var(--z)) calc(18px / var(--z)); border-radius: 99px;
   background: var(--pick); color: var(--on-pick); font-weight: 600; font-size: calc(14px / var(--z)); box-shadow: var(--pick-shadow); }
 .card.side.pickable:hover .pick-hint { opacity: 1; }
+@media (hover: none) { .card.side.pickable .pick-hint { opacity: 1; } }
 .error-box { height: 100%; padding: calc(16px / var(--z)); border: calc(1px / var(--z)) dashed var(--err); border-radius: 10px;
   color: var(--err); font-size: calc(13px / var(--z)); overflow: auto; background: var(--surface); }
 /* The OR: a gold coin, and under it the ✕ that drops both designs as a round parchment button. */
@@ -81,3 +82,12 @@
 .rail .tool:focus-visible { box-shadow: 0 0 0 2px var(--focus-in), var(--lift); }
 .rail .tool:disabled { color: var(--disabled); }
 .rail .tool:hover:not(:disabled) { color: var(--text); border-color: var(--current); }
+/* A narrow window: nothing widens the page; the current screen's rail is a row under it that stays in the window
+   while the screen shows (the others' take no taps); a side's idea has a fourth line. */
+@media (max-width: 720px) {
+  .workspace { overflow: clip; }
+  .error-pill, .hint-pill { bottom: 82px; } /* above the rail's row */
+  .surface > .card .rail { position: sticky; top: auto; bottom: calc(24px / var(--z)); flex-direction: row; justify-content: center; padding: 10px 0 0; }
+  .surface > .card:not(.current) .rail { visibility: hidden; }
+  .card.side .idea { -webkit-line-clamp: 4; }
+}

@@ -60,11 +60,15 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
 - `GET /api/config`: models (id, label, costEstimated), themes (`mockup`, `clean`), devices (id,
   label, width), and the default model, theme and device; `warning` when the cache file is from a
   newer app (it is left alone and nothing is saved).
-- `POST /api/screen {app, action?, model?, device?, from?, label?}`: a new screen, as an NDJSON
+- `POST /api/screen {app, action?, model?, device?, from?, label?, again?}`: a new screen, as an NDJSON
   stream. `action` is `@name: prompt`, `@name` alone (a screen the mockup has or plans; one with no
   plan is made from the name and `label`); anything else but `home` is 400. A screen with that name
   is a cache hit. A cache hit sends `meta` (cached true, variants 0) and `done` only; a screen whose A OR B
-  is still open comes back with its `proposals`, at no cost. Otherwise two designs stream at once:
+  is still open comes back with its `proposals`, at no cost, a missing side (refused or failed)
+  missing still. Asked `again: true` (after a sign-up, or a failed side's **Try again**), an open A OR B
+  with a side missing streams like a new screen (`meta.variants` 2), sends the side there as `version`
+  at once, and draws only the missing side, a paid request like any other (gated, one at a time; a
+  recording still answers a starter's). Otherwise two designs stream at once:
   `meta.variants` is 2 and each `chunk` names its side (`variant` 0 or 1). One random side is asked
   for a clearly different design. Each side that finishes is stored at once as that side's
   proposal and sent as `version`; one that fails sends `failed` with its message. The first side to
@@ -129,8 +133,11 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
   visit, redraws included, have finished (at most a minute). Levels, the
   tree and planned screens are not stored: `screenTree` and `plannedScreens` in `core/src/tree.ts`
   work them out (server and browser).
-- `GET /api/apps`: `{apps: {app, screens, updatedAt}[]}`, every mockup once as first typed,
-  most recently changed first, for the Recent mockups lists.
+- `GET /api/apps`: `{apps: {app, id, screens, updatedAt}[]}`, every mockup once as first typed,
+  most recently changed first, for the Recent mockups lists; `id` is the mockup's ID in its address,
+  which the page looks up there.
+- `GET /m/:mockup` and `GET /m/:mockup/:screen`: the app's page, as `/` serves it (the same gate); the
+  page reads the IDs from its address (`web/src/address.ts`).
 - `GET /api/export?app=…`: the mockup as a zip (`application/zip`, stored entries, written by
   `core/src/zip.ts`), `Content-Disposition: attachment; filename="<slug>.zip"`, the slug being the
   prompt's letters, digits and dashes (40 at most). It holds one folder, `<slug>/`, with `HANDOFF.md`,
@@ -196,10 +203,10 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
   screen that is not a cache hit, a pick (its filing), `/api/revise`, and `/api/box` with `edit` or
   `visit`. A unit is taken before the call and given back when the call is refused; past the cap,
   429 *This link's budget is used up.*
-- **The owner**: with `UXWOZ_OWNER` set, `/`, `/design`, `/admin` (public mode) and every `/api` route but `/api/s/*` need the cookie
+- **The owner**: with `UXWOZ_OWNER` set, `/`, `/m/…`, `/design`, `/admin` (public mode) and every `/api` route but `/api/s/*` need the cookie
   `uxwoz_owner=<secret>` (401 on the API, a one-line 403 page on `/` and `/design`; `/og.png` and share links
   answer everyone); `/?owner=<secret>` sets it
-  (`HttpOnly; SameSite=Lax`, and `Secure` when the public origin is https) and redirects to `/`. The server fetches the
+  (`HttpOnly; SameSite=Lax`, and `Secure` when the public origin is https) and redirects to the same path without it. The server fetches the
   pages it proxies from itself (`127.0.0.1` and its port), never from the request's Host.
 - `GET /design`: the design sheet, built from the app's own CSS and classes on static markup: the logo, every
   colour token by day and night, type, controls, surfaces, motion, and a ▶ per sound.
@@ -222,6 +229,11 @@ only from a card's own frame.
 { uxwoz: 'wheel', dx, dy }           // scroll over the screen: dy and dx scroll the canvas
 { uxwoz: 'zoom', dy, x, y }          // Ctrl/Cmd + scroll or a pinch over the screen, at (x, y) in
                                      // the frame: zooms the canvas around that point
+{ uxwoz: 'pan', x, y, d, start }     // a finger dragging over the screen that no part of it takes: its
+                                     // point in the frame; the canvas follows it from the last point
+                                     // (`start` begins a gesture); `d` is unused
+{ uxwoz: 'pinch', x, y, d, start }   // two fingers over the screen: their middle and their spread `d`;
+                                     // the canvas zooms by how the spread grew, around the middle
 { uxwoz: 'part', text, tag, nth, x, y, w, h } // the part clicked after the page sent { uxwoz: 'name-part' }:
                                      // its words (60 characters), tag, place among the parts with the same
                                      // tag and words, and its rectangle in the frame's own pixels; while
@@ -243,6 +255,9 @@ does nothing until asked.
 CacheEntry { key; app; action: string | null; name?: string; parent: { key; label } | null;
              versions: Version[]; proposals?: (Version | null)[]; filed?: { at; screen; ms; costUsd; added; changed; refused; error? } }
              // filed: the screen's last filing, shown in its Info
+             // mid (the first screen only): the mockup's ID in its address, 6 of [a-z0-9], unique in the cache;
+             // sid: the entry's ID in the address, 2-4 of [a-z0-9], unique in its mockup. Made from a hash
+             // (the prompt and its first design's time; the key) where missing or taken twice, at load and save.
              // name never changes: "home" for the first screen, else the one in the link that
              // opened it ("@sleep-report: …"); unique in the mockup; links use it as "@sleep-report".
              // action is the screen's prompt (without "@name: "). parent is the screen and

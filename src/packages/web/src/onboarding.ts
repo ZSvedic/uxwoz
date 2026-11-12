@@ -16,17 +16,22 @@ export interface Hint {
   /** A press on it opens the generate panel. */
   opens?: true
   live?: true
-  /** The drawer tab that following it opens, so opening that one does not take it away. */
+  /** The drawer tab that following it opens: opening that one does it (`ends`), and does not take it away. */
   drawer?: string
+  ends?: Step
+  /** Shows only while a drawn screen is current and no A OR B is open: there is something to change. */
+  onScreen?: true
+  /** The step that brings it: it shows at that step only, so it never comes back over something else. */
+  after: Step
 }
 
-export const LIVE: Hint = { text: 'This design was drawn fresh for you, so it used one of your free screens.', live: true }
+export const LIVE: Hint = { text: 'This design was drawn fresh for you, so it used one of your free screens.', live: true, after: 'live' }
 const CHAIN: [Hint, (p: Progress) => boolean][] = [
-  [{ text: 'Pick the one you like.' }, (p) => !!p.ready && p.picks < 1],
-  [{ text: 'Click anything in it.' }, (p) => p.picks >= 1 && !p.click],
-  [{ text: 'Change it in words: press Edit.', drawer: 'edit' }, (p) => p.picks >= 2 && !p.editSent],
-  [{ text: 'Changed your mind? Undo brings the old one back.' }, (p) => !!p.edited && !p.undo],
-  [{ text: 'That is the whole app. Now describe your own.', opens: true }, (p) => !!p.undo && !p.own],
+  [{ text: 'Pick the one you like.', after: 'ready' }, (p) => !!p.ready && p.picks < 1],
+  [{ text: 'Click anything in it.', after: 'pick' }, (p) => p.picks >= 1 && !p.click],
+  [{ text: 'Change it in words: press Edit.', drawer: 'edit', ends: 'editSent', onScreen: true, after: 'pick' }, (p) => p.picks >= 2 && !p.editSent],
+  [{ text: 'Changed your mind? Undo brings the old one back.', after: 'edited' }, (p) => !!p.edited && !p.undo],
+  [{ text: 'That is the whole app. Now describe your own.', opens: true, after: 'undo' }, (p) => !!p.undo && !p.own],
 ]
 export const HINTS = [...CHAIN.map(([h]) => h), LIVE]
 
@@ -53,7 +58,17 @@ export function due(p: Progress): Hint | null {
 }
 
 /** Where the visitor is, as far as a hint on show cares: the mockup, the screen or box, the drawer, a card or panel. */
-export interface Where { app: string | null; current: string | null; box: string | null; drawer: string | null; card: boolean }
+export interface Where {
+  app: string | null; current: string | null; box: string | null; drawer: string | null; card: boolean
+  /** A drawn screen is current (not a box); an A OR B is open somewhere in the mockup. */
+  drawn: boolean; choice: boolean
+}
+
+/** Whether `h` may show where the visitor is now. */
+export const fits = (h: Hint, w: Where) => !h.onScreen || (w.drawn && !w.choice)
+
+/** The step done by opening the drawer the hint asks for, if the visitor is there now. */
+export const doneBy = (h: Hint, w: Where): Step | null => (h.drawer && h.ends && w.drawer === h.drawer ? h.ends : null)
 
 /**
  * The visitor went somewhere else since `h` showed at `then`: another mockup or screen, or they opened a box, a
@@ -63,6 +78,19 @@ export function left(h: Hint, then: Where, now: Where): boolean {
   const opened = (a: string | null, b: string | null) => b !== null && b !== a
   return then.app !== now.app || then.current !== now.current || opened(then.box, now.box)
     || (opened(then.drawer, now.drawer) && now.drawer !== h.drawer) || (now.card && !then.card)
+}
+
+/**
+ * The hint on show and where it showed. Where is taken once the step that showed it has finished (`settle`, a tick
+ * later): a pick shows its hint before the picked screen is current, and that screen is where the hint belongs.
+ */
+export class OnShow {
+  hint: Hint | null = null
+  private at: Where | null = null
+  show(h: Hint | null) { this.hint = h; this.at = null }
+  settle(w: Where) { if (this.hint && !this.at) this.at = w }
+  /** The visitor went elsewhere since it settled (`left`); never before. */
+  stale(w: Where) { return !!this.hint && !!this.at && left(this.hint, this.at, w) }
 }
 
 export interface CoachDeps {
@@ -86,37 +114,44 @@ export class Coach {
 
   /**
    * The first time this browser is seen: with mockups in Recent it is no first-time visitor. A page load shows no
-   * hint: one still due shows again at the visitor's next step. Recent loads again often: only the first counts.
+   * hint: one still due shows again only at the step that brings it. Recent loads again often: only the first counts.
    */
   begin(hasMockups: boolean) {
     if (this.begun) return
     this.begun = true
     if (!this.p) { this.p = hasMockups ? veteran() : fresh(); this.deps.save(JSON.stringify(this.p)) }
-    this.deps.show(null)
+    this.show(null)
   }
   private begun = false
+  /** The hint on show, if any. */
+  private on: Hint | null = null
+  private show(h: Hint | null) { this.on = h; this.deps.show(h) }
 
-  /** The visitor went elsewhere (`left`): the hint on show goes, kept due, until their next step. */
+  /** The visitor went elsewhere (`left`): the hint on show goes, kept due, until the step that brings it. */
   away() {
-    this.deps.show(null)
+    this.show(null)
   }
 
-  /** The visitor did `step`: keep it, play the spark if that finished the hint on show, then show what is due. */
+  /**
+   * The visitor did `step`: keep it, play the spark if that finished the hint on show, then show what is due, if this
+   * step brings it or it is already on show; a hint due but brought by another step stays away (it belongs elsewhere).
+   */
   did(step: Step) {
-    const before = this.p ? due(this.p) : null
+    const before = this.on
     const p = this.p = record(this.p ?? fresh(), step)
     this.deps.save(JSON.stringify(p))
-    const now = due(p)
+    const due_ = due(p), now = due_ && (due_ === before || due_.after === step) ? due_ : null
     if (before && now !== before && !before.live) {
       this.deps.fx(step !== 'pick')
-      this.deps.later(() => { if (this.p === p) this.deps.show(now) }, 900)
-    } else this.deps.show(now)
+      this.on = null
+      this.deps.later(() => { if (this.p === p) this.show(now) }, 900)
+    } else this.show(now)
   }
 
   /** A press on the hint: the live one goes; the last of the chain says to open the generate panel (true). */
   press(): boolean {
     const h = this.p && due(this.p)
-    if (h?.live) { this.p = { ...this.p!, live: 'done' }; this.deps.save(JSON.stringify(this.p)); this.deps.show(due(this.p)) }
+    if (h?.live) { this.p = { ...this.p!, live: 'done' }; this.deps.save(JSON.stringify(this.p)); this.show(null) }
     return !!h?.opens
   }
 }

@@ -5,7 +5,7 @@ import type { ScreenEvent } from './server.ts'
 import { canvas } from './app.ts'
 import { draw, page } from './screens.ts'
 import { openGenerate } from './toolbar.ts'
-import { Coach, left, type Hint, type Where } from './onboarding.ts'
+import { Coach, OnShow, doneBy, fits, type Where } from './onboarding.ts'
 import { stepFx } from './design/fx.ts'
 import { loadMe, refused, sideAct } from './account-ui.ts'
 import { $, generate, state, store } from './state.ts'
@@ -73,21 +73,27 @@ export function hint(text = 'One screen at a time: wait until this one is made.'
  * The hint that stays until the visitor does the thing (onboarding.ts), with where the visitor was when it showed;
  * a brief hint shows over it, then gives it back. None with no mockup open, nor under the red pill.
  */
-let lasting: { hint: Hint; at: Where } | null = null
+const lasting = new OnShow()
 const where = (): Where => ({
   app: state.app, current: state.current, box: state.box, drawer: state.drawer,
   card: generate.classList.contains('open') || !$('account').hidden,
+  drawn: !state.box && !!state.current && !!state.entries.get(state.current)?.versions.length,
+  choice: !!state.making || [...state.entries.values()].some((e) => !e.versions.length),
 })
 function showLasting() {
   if (hintTimer) return
-  const h = $('hint'), on = lasting && state.app && $('error').hidden ? lasting.hint : null
-  h.textContent = on?.text ?? ''
+  const h = $('hint'), on = state.app && $('error').hidden && lasting.hint && fits(lasting.hint, where()) ? lasting.hint : null
+  // On a narrow window A sits above B, and B starts below the window: the first hint says so.
+  const below = on?.after === 'ready' && matchMedia('(max-width: 720px)').matches ? ' The second is below.' : ''
+  h.textContent = on ? on.text + below : ''
   h.hidden = !on
   h.classList.toggle('press', !!on?.opens || !!on?.live)
 }
 /** The visitor went elsewhere since the hint showed: it goes (draw() and every click or key ask). */
 export function checkHint() {
-  if (lasting && left(lasting.hint, lasting.at, where())) coach.away()
+  const w = where(), step = lasting.hint && doneBy(lasting.hint, w)
+  if (step) coach.did(step) // following the hint (opening Edit) is doing it
+  else if (lasting.stale(w)) coach.away()
   else showLasting()
 }
 const soon = () => setTimeout(checkHint)
@@ -96,7 +102,11 @@ addEventListener('keydown', soon, true)
 export const coach = new Coach({
   load: () => store.get('uxwoz:hints'),
   save: (json) => store.set('uxwoz:hints', json),
-  show: (h) => { lasting = h && { hint: h, at: where() }; showLasting() },
+  show: (h) => {
+    lasting.show(h)
+    setTimeout(() => lasting.settle(where())) // once the step that showed it has run to its end
+    showLasting()
+  },
   fx: (sound) => stepFx($('hint'), sound),
   later: (run, ms) => setTimeout(run, ms),
 })
@@ -132,13 +142,13 @@ export const post = (url: string, body: object, signal?: AbortSignal) =>
  * Stream a screen request as the one busy job: each event to `on` (with the theme's CSS), an error or
  * a stream that ends early to the red pill as "Could not `what`", then `after(failed)`.
  */
-export async function stream(url: string, body: object, what: string, on: (ev: ScreenEvent, css: string) => unknown, after: (failed: boolean) => void) {
+export async function stream(url: string, body: object, what: string, on: (ev: ScreenEvent, css: string) => unknown, after: (failed: boolean, answered: boolean) => void) {
   showError(null)
   state.busy?.abort()
   const ctrl = new AbortController()
   state.busy = ctrl
   draw() // rails and the drawer wait while busy
-  let failed = false
+  let failed = false, answered = false
   try {
     const css = await themeCss(state.theme)
     let finished = false
@@ -153,10 +163,11 @@ export async function stream(url: string, body: object, what: string, on: (ev: S
     const msg = err instanceof Error ? err.message : String(err)
     // Both sides refused by the meter: the account card, as for a refusal at the door.
     const act = failed && !(err instanceof Answered) ? sideAct(msg) : undefined
+    answered = failed && (err instanceof Answered || !!act)
     if (act) act.run()
-    else if (failed && !(err instanceof Answered)) showError(`Could not ${what}: ${msg}`)
+    else if (failed && !answered) showError(`Could not ${what}: ${msg}`)
   } finally {
-    after(failed)
+    after(failed, answered)
     if (state.busy === ctrl) state.busy = null
     loadMe() // the free screens left, after a live design or a refusal
     draw().catch((e) => showError(String(e)))

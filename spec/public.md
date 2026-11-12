@@ -15,7 +15,7 @@ GET /api/me → {role: "visitor", left: 0.0984, allowance: 0.1, screensLeft: 24,
 …
 POST /api/screen → 402 {error: "Your free screens are used up.", reason: "allowance"}
 POST /api/signin {email} → 204, a six-digit code by email
-POST /api/verify {email, code} → {me}; the $0.15 top-up is in the allowance at once
+POST /api/verify {email, code} → {me, created?}; the $0.15 top-up is in the allowance at once
 ```
 
 ## Modes
@@ -164,7 +164,8 @@ the index.
   network that made its 3 accounts still lets its users sign in; the fourth new account is refused at
   verify only. 503 *Sign-up is not set up yet.* in production with no mail
   key, 503 when the email did not go. The code is never logged in production.
-- `POST /api/verify {email, code}` → `{me}` and a new session cookie. A new email takes over the
+- `POST /api/verify {email, code}` → `{me}` and a new session cookie, with `created: true` when the code made a
+  new account (the card thanks it; for an account that existed it closes). A new email takes over the
   visitor's person (the mockups stay where they are) and adds the top-up (`topup`, $0.15) to its
   allowance at once; with no visitor it makes a person with the visitor's allowance and the top-up. An email with
   an account signs in to it: the visitor's mockups move in, except those whose prompt the account

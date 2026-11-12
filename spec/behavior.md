@@ -44,17 +44,27 @@ one, and the other is gone. After that, the user changes a screen by asking for 
 ## Toolbar
 
 One wooden bar, about 58 px tall, at the bottom centre of the window. The logo (the hat and *UX Woz*)
-is its first item. A thin vertical line stands between the others: the mockup menu | ← Nav → | **+** |
-Rules | Fixer | Components | Data | Theme | zoom | the speaker | the microphone (in a browser with
-speech input).
+is its first item, **+** right after it. A thin vertical line stands between the others: **+** | the
+mockup menu | ← Nav → | Rules | Fixer | Components | Data | Theme | zoom | the speaker | the
+microphone (in a browser with speech input) | the account (the public's).
 **+** opens the generate panel (New mockup). The four menus (mockup, Nav, Theme, zoom) look alike,
 have the same chevron, and open upward, never taller than the window above the bar. The bar never
-scrolls sideways and nothing in it runs past its edge: short of room, the mockup's name gets shorter
-first, then the screen's, then the theme's. Under 900 px the logo is the hat alone. Under 720 px the
-bar has two rows (the hat, the mockup menu, ← Nav → and **+** above, the rest below, with no lines)
-and menus span the window.
+scrolls sideways and nothing in it runs past its edge: the screen's name, which a
+person steers by, always keeps its level and about ten letters (*L2 History*). Room then goes to the mockup's name up
+to about twelve letters, then to the theme's name whole, and what is left to the mockup's name.
+Short of room it is taken back in reverse: the mockup's name past twelve letters, then the theme's
+name down to a few letters (*Mo…*), then the mockup's name down to about three; then the wordmark (the logo is the hat alone), the zoom's − + and
+Fit screen, and the lines between the box buttons go; else the four box buttons fold into **Boxes
+▾** with those back; else all of it. So a window 980 px wide keeps the four box buttons in the row.
+Under 720 px (a phone) the bar has two fixed rows with no lines: the hat, **+**, the mockup menu
+and, at the right end, ← Nav → above; Boxes, Theme (it takes what is left), zoom, the speaker, the
+microphone and the account below. Boxes keeps its place before a mockup is open and room for a
+two-digit sum, and the account room for its count, so no button moves when a mockup opens or a
+count shows. Every button is inside the window and at least 36 px high, and menus span the
+window. Where the device cannot hover, menus leave out their keys (⌘+, ⇧1).
 
-- **Project menu**: a button with the mockup's prompt, cut short (at 12 characters under 900 px).
+- **Project menu**: a button with the mockup's prompt, cut short to the room it has. With no mockup
+  open and none in Recent it reads *New mockup* with no chevron and opens nothing.
   Its menu has **Recent mockups** (the last ten, the open one
   ticked; choosing one opens it), and, with a mockup open, **⇩ Export the boxes** (a markdown file
   of Components, Rules and Data), **⇩ Export project…** (a zip, see Export below), **↺ Start over** (deletes every screen and the boxes, and makes
@@ -67,27 +77,30 @@ and menus span the window.
 - **← and →** (either side of Nav): back to the screen looked at before, and forward again, like a
   browser: every screen that becomes current is a step, and reaching a screen any other way drops
   the steps ahead. Screens deleted since are skipped. ⌘[ and ⌘] do the same (also while a screen
-  has the focus), and so do the mouse's back and forward buttons.
+  has the focus), and so do the mouse's back and forward buttons. A step along them is a step of the
+  browser's Back too (see The address).
 - **Rules, Fixer, Components, Data**: each moves the view to its box (Fixer to Fixer's
   notes). A number beside it counts the entries filing or the fixer added or changed (for Fixer,
   the fixer's visits) since the user last looked; three seconds after a look, they count as seen
-  and lose their *new* mark. The box becomes current. In a window 1,200 px wide or less, the four
-  fold into one **Boxes ▾** menu above its button: each item keeps its number, and the button shows
-  their sum.
+  and lose their *new* mark. The box becomes current. When the row cannot hold them (see above),
+  the four fold into one **Boxes ▾** menu above its button: each item keeps its number, and the
+  button shows their sum.
 - **Theme** (left of the zoom): a menu of the themes, the one showing ticked; see Pickers.
 - **Zoom**: **−**, the zoom level, **+** and **Fit screen**, the first and last drawn as icons
   at the size of the text (Fit screen's is four corners pointing out). The level opens a menu: Zoom
   in ⌘+, Zoom out ⌘−, 50%, 100% ⌘0, 200%, Fit all ⇧1, Fit screen ⇧2, Fit screen width ⇧3. The keys
-  work anywhere outside a text field (Ctrl in place of ⌘ off a Mac). Under 900 px wide only the
-  level stays, and the logo is the hat alone. The keys also work while a screen has the focus.
+  work anywhere outside a text field (Ctrl in place of ⌘ off a Mac). When the bar is short of room
+  only the level stays (see above). The keys also work while a screen has the focus.
 
 Menus close on Esc, on a press outside them, or on a click into a screen.
 
 ### Export
 
 Once a mockup is final, **Export project…** downloads it as one zip (*nicesnore-a-snore-app-with-recording-as.zip*)
-for a coding agent or a design agent to build the real front end from. It holds the product, not
-the process: no fixer's notes, no design that was not picked, no older versions.
+for a coding agent or a design agent to build the real front end from; once it is saved, a brief
+hint names the file (*Saved nicesnore-….zip to your downloads.*), and a failure shows in the red
+pill. It holds the product, not the process: no fixer's notes, no design that was not picked, no
+older versions.
 
 - `HANDOFF.md`: one page for the agent: what the folder is, that the rules bind, that the data is
   sample data to seed with, that the screens' structure and navigation are the spec and the sketch
@@ -106,7 +119,11 @@ the mockup, Shift+Enter adds a line. Under it, the **Model** and **Device** pick
 in one row, and a large **Generate** button below them. Under that come the **Starters** (see The public: a
 card opens its mockup at once, on its own device) and **Recent mockups** (every mockup in the cache, most
 recently changed first, with its number of screens; the list comes from the server, so it is the
-same in every browser). The panel is the same with or without a mockup open: with none it shows on
+same in every browser). For a first-time visitor (no mockups) the heading is *Turn one sentence into a
+clickable mockup*, with *Pick an example and watch it drawn, or describe your own.* under it, and the
+starters come first (see The public); anyone else sees *What should we mock up?*. The panel is the
+same with or without a mockup open, and it never reaches under the bar: it ends above it and
+scrolls inside when it must; on a phone it starts near the top, so Generate shows. With none it shows on
 its own, and **+** shows it over the dimmed canvas, where Esc or a press outside closes it.
 A prompt seen before opens its mockup from the cache, at no cost, with the current screen it had
 last time in this browser. A reload opens the mockup that
@@ -153,13 +170,24 @@ hidden when the user branches.
 - **Opening a mockup** fits its current screen, and fits it again once the screen has its real
   size. **Fit screen** keeps a tall screen readable and shows its top, like the A OR B fit: at
   least 75%, unless its width needs less.
-- **The window**: when it changes size (or moves to another display), the canvas fits again as on
-  opening: an open A OR B, else the current screen or box. On a phone, a keyboard that opens while
-  typing moves nothing.
+- **The window**: when its width or height really changes (or it moves to another display), the
+  canvas does the last fit again (Fit all, Fit screen, Fit screen width, or the fit on opening),
+  unless the user zoomed or panned by hand since. Then it fits again the first of these that was
+  in view before, any of it: the open A OR B, the current box, the current screen, as on opening.
+  With none of them in view, the view stays. On a
+  phone, a keyboard that opens while typing, in the app or in a screen, moves nothing.
 - **Pan and zoom**: scroll, or drag the empty canvas, to pan. Pinch or Ctrl/Cmd + scroll zooms
   around the pointer, also over a screen, from 10% to 200%. The zoom menu, **+**, **−** and the keys
-  keep the current screen (or box) in view: centred when it fits, else its top left corner; with no
-  screen yet, the middle of the view stays. The stars zoom with the canvas.
+  zoom around the middle of the view when a screen or a box is there, so whatever the user reads
+  stays put; over the empty sky the view lands on the open A OR B, else the current box or screen:
+  centred when it fits, else its top left corner. With no screen yet, the middle stays. The stars
+  zoom with the canvas.
+- **Touch**: one finger pans the canvas, also when it starts on a screen; a part of the screen that
+  scrolls that way takes the drag first, as with the wheel. A tap still clicks. Two fingers pinch to
+  zoom, on a screen or off it.
+- **A narrow window** (720 px or less, a phone): the current screen fits the window's width, with a
+  thin margin, and its rail is a row under it (see Rail). Nothing makes the page wider than the
+  window.
 - **The current screen stays in view**: when it grows or moves (Regenerate, an Edit, a new A OR B,
   the drawer opening), a current screen that was in view and no longer is comes back on that side:
   centred when it fits, else its start. One the user scrolled away from stays where it is.
@@ -178,11 +206,17 @@ says nothing about which is which. Both appear out of a blur, the second a beat 
   scrolled, zoomed, used a fit or chosen a screen in Nav meanwhile; a very tall pair keeps a readable
   zoom and shows its top. After the pick, the zoom and scroll come back, and the picked screen
   scrolls into view. A new mockup's first screen has no view to come back to: it is fitted instead.
+- **On a narrow window** A sits above B, each as wide as the window allows, with the OR between
+  them; the ideas get four lines, so they show whole. A tap on a side picks it. It opens zoomed so
+  that all of A, the OR and the top of B show, as long as that keeps 70% or more; else at 70%, its
+  top first.
 - **The idea** sits above each side in larger type: one sentence the model writes about the design
   (*One big clean button on top*).
 - **Locked previews**: both stream in live, and their scripts run once finished, so charts draw.
   Nothing inside them can be clicked. A side can be picked once it has finished: hovering it
-  lifts it with a gold glow, rings it in gold and shows **Pick this design**.
+  lifts it with a gold glow, rings it in gold and shows **Pick this design** on that side, under its
+  idea and above the design, never over it. Where the device cannot hover (a phone), every side
+  that can be picked shows it. A click on it picks too.
 - **Picking**: a click anywhere on a finished side keeps it as the screen's first version and
   deletes the other. If the other is still streaming, it stops at once and nothing of it is kept.
   Both sides and the ✕ are locked, and for 0.8 s the picked one rises and the other dissolves;
@@ -214,6 +248,10 @@ use them:
   button in another screen also reaches stays, under that screen. Deleting the first screen deletes
   the mockup.
 
+On a narrow window the current screen's rail is a row of the same buttons under the screen; while
+the screen is in view and its bottom is not, the row stays at the bottom of the window, in reach of
+the thumb. The other screens' rails do not show.
+
 Using a rail button makes its screen current. While a screen is being made or changed, the rail's
 buttons wait (Info still works).
 
@@ -221,12 +259,14 @@ buttons wait (Info still works).
 
 A 360 px card docked at the right edge, level, rounded, with a double gold line inside its edge,
 for the current screen or box (see Boxes for a box's). It swings in over 0.45 s and closes at once.
-The canvas gets narrower and scrolls so the screen stays fully visible beside it. Esc or ✕ closes
+The canvas gets narrower and scrolls so the screen stays fully visible beside it. On a narrow
+window the drawer lies over the canvas, inside the window. Esc or ✕ closes
 it. It has two tabs, and a third for a screen of a mockup with share links (**Comments**, see Sharing):
 
 - **Edit**: *What should change?* Type it and click **Make the change** (or press Enter): the
   model gets this screen and the request, and returns the same screen with only that change, as a
-  new version in place. **Past changes** lists the versions, newest first: *Edit: show one level
+  new version in place. On a narrow window, where the drawer covers the screen, it closes when the
+  change is sent, so the screen and its note (*Making the change…*) show. **Past changes** lists the versions, newest first: *Edit: show one level
   indicator, not four*, *Fixer: paste tab-bar*, *Regenerated*, *The design you picked*, the one
   showing marked.
 - **Info**: name, idea, the click that opened it, what made the version showing (the pick, an Edit
@@ -415,6 +455,34 @@ control leads nowhere yet*, and the fixer redraws it. Other controls (filters, i
 - One screen is made at a time: while one is being made or changed, a click that would open
   another does nothing, and a note says so for a moment at the bottom of the canvas.
 
+### The address
+
+The address bar shows the open mockup and screen by short IDs, never the prompt's words:
+`/m/<mockup>/<screen>` (`/m/k3f9x2/a7`). A mockup's ID is 6 letters and digits, a screen's (a
+component's too) 2 to 4, unique within its mockup; both are kept in the cache file, so they stay the
+same after a reload and a restart, and an old cache gets them when it is loaded. With no mockup open
+the address is `/`, which shows what it always did.
+
+- **Opening, reloading or pasting** an address opens that mockup at that screen; `/m/<mockup>` alone
+  opens it at its first screen. An address naming a drawn screen shows that screen, even while an A OR
+  B waits elsewhere in the mockup. A screen deleted since opens the mockup at its first screen, whose
+  address replaces it, with the brief hint *That screen is not here.*
+- **What the address names**: whatever came into view last, a screen made current or an A OR B that
+  opened, so while an A OR B is open the address is its screen's; a pick keeps it. A new screen's
+  address comes once its first design is stored; a screen that merely redraws (an Edit, a Regenerate)
+  keeps its address. While a new mockup's first screen is made the address is `/` (a reload there
+  opens the last mockup, as before), and the mockup's own address is written when its ID arrives;
+  Start over puts `/` in place of the old address, so the dead one is not left in the history.
+- **Back and Forward** of the browser walk the screens that came into view, each one a step, and from a
+  mockup back to the start page. Every change of the screen shown is a step, whether by a click in a
+  screen, Nav, ← →, the tree or opening a mockup; a reload and Back and Forward themselves change the
+  address in place, so Back always returns to the screen shown before.
+- **Not here**: an address of a mockup this person does not have (deleted, or another person's) opens
+  the start page at `/` with the brief hint *That mockup is not here.* Sign out and Delete my account
+  start again at `/`.
+- **Not a share link**: an address works only for the person whose mockup it is, through the same gate
+  as `/`. An edit link keeps its own address (`/s/<token>`): its page writes none and follows none.
+
 ## Streaming and timing
 
 While the model writes, a screen is rebuilt at most every 300 ms. Controls do nothing until the
@@ -550,19 +618,24 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
   mockup and replays a recording: the two designs draw at the speed they were first made, and no model
   is called. In a starter, Home and every screen Home links to are recorded, four designs each, so
   picks, clicks and Regenerate are free there. A first-time visitor sees the starters above the prompt
-  box under *Pick one and watch it drawn*, and the prompt box under *or describe your own*; a visitor
+  box under the heading *Turn one sentence into a clickable mockup* and the line *Pick an example and
+  watch it drawn, or describe your own.*, and the prompt box under *or describe your own*; a visitor
   who has mockups sees the prompt box first, as today. The public has no Model picker.
 - **Hints** teach by the moment: one line, in the hint's place, that stays until the visitor does the
   thing, each shown once per browser and never to a visitor who already did it. A browser that first
   opens the app with mockups in Recent has done it all, so the owner sees none. A brief hint (*One
   screen at a time…*) shows over it for 2.5 s and gives it back. A hint never goes stale: it also
   leaves when the visitor opens another mockup or screen, a box, a drawer (but Edit for *press Edit*),
-  a card or the generate panel, and a reload shows none; a hint still due shows again at the
-  visitor's next step. None shows with no mockup open, and the red pill takes its place while it
+  a card or the generate panel; a reload, or opening a mockup with its A OR B open, shows none. A
+  hint shows only at the step that brings it (each below), so one that left never comes back over
+  something else; the same step later brings it again. A hint belongs to where its step left the
+  visitor: *press Edit* stays on the screen just picked until Edit is pressed. None shows with no mockup open, and the red pill takes its place while it
   shows.
-  1. Two designs are ready for the first time: *Pick the one you like.*
+  1. Two designs are ready for the first time: *Pick the one you like.* On a narrow window, where B starts below the
+     window, it adds *The second is below.*
   2. After the first pick: *Click anything in it.*
-  3. After the second pick: *Change it in words: press Edit.* Sending an Edit does it.
+  3. After the second pick: *Change it in words: press Edit.*, only while a drawn screen is current
+     and no A OR B is open. Opening Edit does it.
   4. After the first Edit that made a new version: *Changed your mind? Undo brings the old one back.*
   5. After the first Undo: *That is the whole app. Now describe your own.* A press on it, or **+**,
      opens the generate panel.
@@ -577,17 +650,25 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
 - **The account button** is the toolbar's last item, for the public only (not the owner). A visitor's
   shows the free screens left (*25 free*) once they made a live design, a person's outline before; a
   registered user's shows the first letter of their email. Its menu: *About 25 free screens left*
-  (*No free screens left* at none); **Register** (a visitor) or the email; **Ask for more**
+  (*No free screens left* at none); **Register** (a visitor) or the email (on one line, cut short
+  at the menu's edge, never broken inside a word); **Ask for more**
   (registered, none left); **Sign out** and **Delete my account…** (registered); **Privacy**. The count
-  is read again after every live call ends, after a refusal, and when the tab gets focus, so a gift
-  from the owner shows without a reload. **Delete my account…** opens the account card: *Delete your
+  is read again after every live call ends (for a pick, a box's Edit and Visit now, when their filing
+  or visit ends), after a refusal, and when the tab gets focus, so a gift from the owner shows
+  without a reload. **Delete my account…** opens the account card: *Delete your
   account? Its mockups and its links go at once, for good. Type your email once more.*, the email
   field, **Delete** and **Cancel**; Delete removes the mockups, the links and the account at once, and
-  every `uxwoz:` key this browser kept. After Sign out or Delete the page starts again.
+  every `uxwoz:` key this browser kept but the one that counted its arrival. After Sign out or Delete the page starts again;
+  after Delete the start page says briefly *Your account is deleted.*
 - **The account card** opens over the dimmed canvas, like the generate panel, when a live design is
   refused for lack of free screens, or from **Register**. When the free screens run out during an
   A OR B, the side that was refused shows the server's words and under them **Register** (a visitor)
-  or **Ask for more** (registered), which opens the card. Esc or a press outside closes it. What was
+  or **Ask for more** (registered), which opens the card. After a sign-up the last request refused for
+  lack of free screens is sent again: a first screen, a click into a new screen, an Edit, or the
+  refused side alone (the side that worked stays as it was). If the person closes the card instead
+  of a refused first screen, the generate panel opens with their prompt still in it. A side that failed for another reason (the 20 s deadline, a cut-off reply) shows **Try
+  again**, which draws that side alone; merely opening the screen again never draws it, so a click
+  costs nothing. Esc or a press outside closes it. What was
   typed and the step stay while it is closed; Enter sends; a refusal (*Sign-ups are full for today.*)
   shows in the card in the server's words.
   - A visitor: *You have used your free screens. Register to get about 37 more.* (from **Register**:
@@ -598,8 +679,9 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
     **Send the code**, and *No password: we email you a six-digit code.* with a link to Privacy.
   - Then *We sent a code to ana@example.com.*, a field for it, **Verify** and *Send a new one*. A wrong
     code says *That code is not right.*
-  - Verified, a new account: its free screens are there at once, and the card says *Thanks. You have
-    about 37 more free screens.*
+  - Verified, a new account (`/api/verify` says `created`): its free screens are there at once, and the
+    card says *Thanks. You have about 37 more free screens.*, the number it promised; it leaves by
+    itself after 3 s, or at a press outside.
   - Verified, an account that exists: the card closes and the mockups made as a visitor are in Recent.
   - A registered user with none left: *You have used your free screens.* A field *What are you
     building?*, **Ask for more**, then *Asked. The answer comes by email.*

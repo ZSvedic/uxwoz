@@ -14,6 +14,8 @@
   <nav class="bar" aria-label="Commands">
   <div class="tb-left">
     <div class="logo"><img src="./design/brand/logo.svg" alt="" width="36" height="36"><b>UX <span>Woz</span></b></div>
+    <button id="menuNew" class="deck" title="New mockup" aria-label="New mockup">+</button>
+    <i class="sep new-sep"></i>
     <span class="pop">
     <button id="projectButton" class="menu-button" aria-haspopup="menu" title="Mockup: recent, start over, delete">
       <span id="projectName">New mockup</span> <span class="caret"></span></button>
@@ -36,8 +38,6 @@
     <button id="trailForward" class="trail" title="Forward again (⌘])" hidden>→</button>
     <div id="navMenu" class="menu nav-menu" role="menu" hidden></div>
     </span>
-    <i class="sep new-sep"></i>
-    <button id="menuNew" class="deck" title="New mockup" aria-label="New mockup">+</button>
   </div>
   <div class="tb-mid">
     <i class="sep box-sep"></i>
@@ -114,6 +114,7 @@
   </aside>
   <form id="generate" class="generate">
     <h2 id="genTitle">What should we mock up?</h2>
+    <p id="genLead" class="lead" hidden>Pick an example and watch it drawn, or describe your own.</p>
     <h3 id="ownTitle" hidden>or describe your own</h3>
     <textarea id="prompt" name="prompt" rows="2" maxlength="2000" required
       placeholder="Describe a product, e.g. a coffee shop ordering app"></textarea>

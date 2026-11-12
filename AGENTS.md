@@ -52,10 +52,11 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
                  shortest-path levels, the titles and lines of the paper
   cache.ts       screen cache, the screens (ScreenCacheBase): entry and version types, find by name, proposals
                  (the open A OR B) and pick, versions and undo, parents, delete with pruning, apps, sharing data,
-                 takeIn (another cache's mockups, at a sign-in), the JSON file (load, format, save, detach)
+                 takeIn (another cache's mockups, at a sign-in), the JSON file (load, format, save, detach),
+                 the address IDs (a mockup's `mid`, an entry's `sid`, stamped at load and save)
   cache-boxes.ts screen cache, the boxes (ScreenCache extends the base): components as entries, rules, tables,
                  limits, IDs, a box's states, Past and Undo, the fixer's notes and their Undo, markSeen, the paper
-  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll and `scrollsFirst`, vh fix, picking and locating
+  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll and `scrollsFirst`, touch and `dragOwner`, vh fix, picking and locating
                  a part for a comment); devices and their size;
                  name, idea; paste by ID and the current link
   zip.ts         a zip of stored entries (CRC-32, central directory), for Export project
@@ -70,7 +71,7 @@ src/packages/web/src/
                  Io and `may`; /api/me and the arrived step
   export.ts      GET /api/export: a mockup as a zip for a coding or design agent (handoff, README with the tree,
                  the boxes, one page per drawn screen whose links work from disk)
-  server.ts      Bun.serve: /api/config, /api/screen (NDJSON, A OR B at once), /api/pick, /api/revise, /api/undo,
+  server.ts      Bun.serve: / and /m/… (the page), /api/config, /api/screen (NDJSON, A OR B at once), /api/pick, /api/revise, /api/undo,
                  /api/map (wait=1 for filing and a visit), /api/apps, /api/delete, /api/delete-app,
                  /api/box (also undo, a box's Undo and Edit, Visit now), /api/warmup, /api/backup, /api/me, /api/step,
                  themes; request checks; a visit every 5 picks;
@@ -83,10 +84,14 @@ src/packages/web/src/
   state.ts       browser: the shared state, local storage, elements by id, Enter sends a form
   screens.ts     browser: views (a card's name) and draw, A OR B streaming, refit and pick, clicks (@names, back), Regenerate, Edit,
                  Undo, delete
-  nav.ts         browser: the current screen, ← → trail, the map after filing, Nav
+  nav.ts         browser: the current screen, ← → trail, the address kept in step and followed (Back and Forward,
+                 a pasted one, *That mockup is not here.*), the map after filing, Nav
+  address.ts     browser: the address `/m/<mockup>/<screen>` read and written, which screen it names, push or
+                 replace (no DOM, tested)
   drawer.ts      browser: box changes and rail tools, the drawer (Edit, Info, and Comments for a screen) for a screen or a box
   toolbar.ts     browser: generate panel (the starters, above the prompt box for a first-time visitor) and
-                 pickers, toolbar menus (Theme too), Recent, zoom and its keys
+                 pickers, toolbar menus (Theme too), Recent, zoom and its keys; the bar's fit (`fitBar`: tight,
+                 then fold the boxes, by measuring), Export project with its hint
   net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill, the brief hint
                  and the lasting one (`coach`)
   onboarding.ts  the public's hints: which is due from what the visitor did, kept in local storage, and when one on
@@ -101,7 +106,8 @@ src/packages/web/src/
                  field, Sending in 3… and Cancel
   canvas.ts      browser: the boxes right of Home, the tree layout (packed rows, ropes that bend in the gap), cards and frames, A OR B sides,
                  rails at the canvas's scale, pan and zoom, fits (and again on a window resize), frames scaled
-                 not zoomed, where a zoom lands (`landing`), the current screen kept in view
+                 not zoomed, where a zoom lands (`landing`), the current screen kept in view; a narrow window
+                 (`PHONE`: A OR B stacked by `sidesOf`, width fits by `fitOf`, the rail a row), touch pan and pinch
   boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes and their rails, editing and adding in
                  place, Export
   people.ts      the public's people and money over bun:sqlite (spec/public.md): visitors, sessions, the meter

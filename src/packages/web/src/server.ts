@@ -173,6 +173,9 @@ export function createServer(opts: ServerOptions = {}) {
     development: process.env.NODE_ENV !== 'production',
     routes: guard({
       '/': index,
+      // A mockup's address, and a screen's in it: the same page as `/`, through the same gate (share.ts).
+      '/m/:mockup': index,
+      '/m/:mockup/:screen': index,
       '/design': sheet,
       ...publicRoutes,
       // For the host's health check: open with the owner's gate on, touches nothing.
@@ -210,7 +213,7 @@ export function createServer(opts: ServerOptions = {}) {
           const p = pickers(b)
           if (p instanceof Response) return p
           const click = typeof b?.from === 'string' && b.from ? { from: b.from.slice(0, 3000), label: String(b?.label ?? '').slice(0, 200) } : null
-          return ndjson(at(req).screenEvents(app, action, p.model, p.device, click, req.signal))
+          return ndjson(at(req).screenEvents(app, action, p.model, p.device, click, req.signal, b?.again === true))
         }),
       },
       '/api/pick': {
