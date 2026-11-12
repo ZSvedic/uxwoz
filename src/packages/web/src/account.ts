@@ -113,6 +113,8 @@ export function accountRoutes(store: People, extras: AccountExtras) {
         const email = b?.email, code = b?.code
         if (typeof email !== 'string' || !validEmail(email) || typeof code !== 'string' || !/^\s*\d{6}\s*$/.test(code)) return fail(400, 'That code is not right.')
         const address = extras.address(req)
+        // Whether this code makes a new account: the card thanks a new one and closes for one that existed.
+        const existed = !!store.byEmail(email)
         const done = store.verify(email, code.trim(), extras.who(req)?.id ?? null, address)
         if (done === 'code') return fail(400, 'That code is not right.')
         if (done === 'address') return fail(429, FULL)
@@ -120,7 +122,7 @@ export function accountRoutes(store: People, extras: AccountExtras) {
         if (done === 'blocked') return fail(403, closed())
         if (done.merged) await extras.move(done.merged, done.person.id)
         store.step(done.person.id, 'verified', address)
-        return extras.cookie(json({ me: me(store.person(done.person.id) ?? done.person) }), done.token, req)
+        return extras.cookie(json({ me: me(store.person(done.person.id) ?? done.person), ...(existed ? {} : { created: true }) }), done.token, req)
       },
     },
     '/api/signout': {

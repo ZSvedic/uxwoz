@@ -65,6 +65,19 @@ export function left(h: Hint, then: Where, now: Where): boolean {
     || (opened(then.drawer, now.drawer) && now.drawer !== h.drawer) || (now.card && !then.card)
 }
 
+/**
+ * The hint on show and where it showed. Where is taken once the step that showed it has finished (`settle`, a tick
+ * later): a pick shows its hint before the picked screen is current, and that screen is where the hint belongs.
+ */
+export class OnShow {
+  hint: Hint | null = null
+  private at: Where | null = null
+  show(h: Hint | null) { this.hint = h; this.at = null }
+  settle(w: Where) { if (this.hint && !this.at) this.at = w }
+  /** The visitor went elsewhere since it settled (`left`); never before. */
+  stale(w: Where) { return !!this.hint && !!this.at && left(this.hint, this.at, w) }
+}
+
 export interface CoachDeps {
   load(): string | null
   save(json: string): void

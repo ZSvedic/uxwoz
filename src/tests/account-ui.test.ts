@@ -51,9 +51,9 @@ describe('the account card', () => {
     expect([c.field?.kind, c.send, c.again, c.privacy]).toEqual(['code', 'Verify', true, false])
   })
 
-  test('verified into a new account: thanks with the screens it has now, nothing to fill in, no word of waiting', () => {
-    const c = cardOf({ ...user, screensLeft: 30 }, 'allowance', 'thanks', 'ana@example.com')
-    expect(c.lead).toBe('Thanks. You have about 30 more free screens.')
+  test('verified into a new account: thanks with the screens the card promised, nothing to fill in, no word of waiting', () => {
+    const c = cardOf({ ...user, screensLeft: 52 }, 'allowance', 'thanks', 'ana@example.com', 37)
+    expect(c.lead).toBe('Thanks. You have about 37 more free screens.')
     expect([c.field, c.send]).toEqual([null, null])
   })
 
@@ -103,10 +103,10 @@ describe('a refused request', () => {
 })
 
 describe('after Delete my account', () => {
-  test('every uxwoz: key is gone from a storage, the others stay', () => {
-    const m = new Map([['uxwoz:app', 'x'], ['uxwoz:hints', '{}'], ['other', '1'], ['uxwoz:current:a', 'k']])
+  test('every uxwoz: key is gone from a storage but arrived (counted once per browser); the others stay', () => {
+    const m = new Map([['uxwoz:app', 'x'], ['uxwoz:hints', '{}'], ['other', '1'], ['uxwoz:arrived', '1'], ['uxwoz:current:a', 'k']])
     const s = { get length() { return m.size }, key: (i: number) => [...m.keys()][i] ?? null, removeItem: (k: string) => void m.delete(k) }
     forget(s)
-    expect([...m.keys()]).toEqual(['other'])
+    expect([...m.keys()]).toEqual(['other', 'uxwoz:arrived'])
   })
 })

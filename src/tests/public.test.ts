@@ -101,6 +101,35 @@ describe('public mode', () => {
     expect(evil.cookie).toBe('')
   })
 
+  test('a side refused at the limit is drawn alone once there is more: the side that worked is not paid twice', async () => {
+    start()
+    store.setCaps({ visitor: 0.003 }) // one call's hold is $0.004: the first side passes, the second is refused
+    const ana = browser()
+    const first = await ana.post('/api/screen', { app: 'App one' })
+    const evs = await lines(first)
+    const failed = evs.filter((e) => e.type === 'failed')
+    expect(failed.map((e) => e.message)).toEqual(['Your free screens are used up.'])
+    expect(calls.haiku).toBe(1)
+    const key = evs[0].key as string, refused = failed[0].variant as number, kept = 1 - refused
+    const sides = async () => ((await (await ana.get('/api/map?app=App%20one')).json()).entries as any[]).find((e) => e.key === key).proposals
+    const a = (await sides())[kept]
+    expect(a).not.toBeNull()
+    expect((await sides())[refused]).toBeNull()
+    // Still at the limit: refused at the door, as any paid request.
+    expect((await ana.post('/api/screen', { app: 'App one' })).status).toBe(402)
+    expect(calls.haiku).toBe(1)
+    store.give(personOf(ana).id, 1)
+    const again = await lines(await ana.post('/api/screen', { app: 'App one' }))
+    expect(calls.haiku).toBe(2)
+    expect(again.filter((e) => e.type === 'version').map((e) => e.variant).sort()).toEqual([0, 1])
+    expect(again.at(-1).type).toBe('done')
+    expect((await sides())[kept]).toEqual(a)
+    expect((await sides())[refused]).not.toBeNull()
+    // Both sides there: a cache hit, free.
+    await lines(await ana.post('/api/screen', { app: 'App one' }))
+    expect(calls.haiku).toBe(2)
+  })
+
   test('the meter runs to zero, then each 402 reason in its order', async () => {
     start()
     store.setCaps({ visitor: 0.03 })
