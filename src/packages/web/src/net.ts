@@ -83,7 +83,9 @@ const where = (): Where => ({
 function showLasting() {
   if (hintTimer) return
   const h = $('hint'), on = state.app && $('error').hidden && lasting.hint && fits(lasting.hint, where()) ? lasting.hint : null
-  h.textContent = on?.text ?? ''
+  // On a narrow window A sits above B, and B starts below the window: the first hint says so.
+  const below = on?.after === 'ready' && matchMedia('(max-width: 720px)').matches ? ' The second is below.' : ''
+  h.textContent = on ? on.text + below : ''
   h.hidden = !on
   h.classList.toggle('press', !!on?.opens || !!on?.live)
 }

@@ -631,7 +631,8 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
   something else; the same step later brings it again. A hint belongs to where its step left the
   visitor: *press Edit* stays on the screen just picked until Edit is pressed. None shows with no mockup open, and the red pill takes its place while it
   shows.
-  1. Two designs are ready for the first time: *Pick the one you like.*
+  1. Two designs are ready for the first time: *Pick the one you like.* On a narrow window, where B starts below the
+     window, it adds *The second is below.*
   2. After the first pick: *Click anything in it.*
   3. After the second pick: *Change it in words: press Edit.*, only while a drawn screen is current
      and no A OR B is open. Opening Edit does it.
