@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { ALTERNATIVE_REQUEST, ScreenCache, drawRequest, editRequest, isBack, nameFrom, normalizePrompt, paperText, screenIdea, screenKey, screenTree, type Paper, type Version } from '@uxwoz/core'
+import { AI_LINE, ALTERNATIVE_REQUEST, ScreenCache, drawRequest, editRequest, isBack, nameFrom, normalizePrompt, paperText, screenIdea, screenKey, screenTree, type Paper, type Version } from '@uxwoz/core'
 
 const ver = (html: string, createdAt = '2026-10-23T00:00:00Z'): Version => ({
   html, model: 'claude-haiku-5.5', servedModel: null, createdAt,
@@ -81,8 +81,8 @@ describe('screen cache', () => {
     const p: Paper = { app: 'Coffee app', titles: [], lines: [], components: [], rules: [], data: [] }
     const from = { id: 'home', line: 'the first screen', html: '<h1>Menu</h1>', label: 'Cart' }
     const msg = drawRequest(p, { id: 'cart', line: 'the cart' }, from, true)
-    expect(msg).toEndWith(`The screen the click came from, home (the first screen):\n<h1>Menu</h1>\n\nDraw this screen: cart: the cart\nThe click came from "Cart" on home.\n\n${ALTERNATIVE_REQUEST}`)
-    expect(drawRequest(p, { id: 'home', line: 'the first screen' }, null)).toEndWith('(none)\n\nDraw this screen: home: the first screen')
+    expect(msg).toEndWith(`The screen the click came from, home (the first screen):\n<h1>Menu</h1>\n\n${AI_LINE}\n\nDraw this screen: cart: the cart\nThe click came from "Cart" on home.\n\n${ALTERNATIVE_REQUEST}`)
+    expect(drawRequest(p, { id: 'home', line: 'the first screen' }, null)).toEndWith(`(none)\n\n${AI_LINE}\n\nDraw this screen: home: the first screen`)
   })
 
   test('an Edit sends the screen or component as it is now and the change, last', () => {
@@ -90,6 +90,7 @@ describe('screen cache', () => {
     expect(editRequest(p, { id: 'home', line: 'the first screen', html: '<h1>Menu</h1>' }, 'Add prices'))
       .toMatch(/The screen as it is now, home \(the first screen\):\n<h1>Menu<\/h1>\n\nReply with the HTML of this screen again with one change;.* The change: Add prices$/)
     expect(editRequest(p, { id: 'tab-bar', line: 'every screen', html: '<nav></nav>' }, 'Bigger', true)).toContain('The component as it is now, tab-bar')
+    expect(editRequest(p, { id: 'home', line: 'the first screen', html: '<h1>Menu</h1>' }, 'Add prices')).not.toContain(AI_LINE)
   })
 
   test('only the action back goes back; a label never decides where a click goes', () => {

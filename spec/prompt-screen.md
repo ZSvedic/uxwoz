@@ -33,13 +33,18 @@ Last night | 4.2
 The screen the click came from, home (the first screen):
 <title>Home</title> ...
 
+This is a 2026 product: where it helps the user, show AI as part of the screen (a draft, a summary, a suggestion, a question box), not a chatbot on every screen.
+
 Draw this screen: history: every night with its snore score, newest first
 The click came from "History" on home.
 ```
 
 The jobs, each after the paper:
 
-- **Draw**: as above. The first screen has no screen it came from. One side of an A OR B (a random
+- **Draw**: as above. The first screen has no screen it came from. The 2026 line, from the owner
+  (every design was a classical app, with no AI in it), sits in Draw only, after the paper and
+  before *Draw this screen*: in the system prompt Haiku ignored it (0 of 6 designs showed AI), here
+  it followed it (6 of 6). Edit and File do not carry it. One side of an A OR B (a random
   one) adds: *Design this as a clearly different alternative to the obvious layout: arrange this
   screen's content another way, not just the wording.* Regenerate sends the screen's first request,
   without that line.
@@ -66,8 +71,7 @@ The manual comes first, as it is in
 reply follows: the HTML and Pico rules kept from the benchmark prompt, links by `@id`, the paste
 markup, and the filing and visit lines the paper test settled. The visit's last two sentences
 came from the app: without them Terra asked for 11 redraws on a real paper, and wrote lines over
-the 120 characters code takes. Code sets every screen to the device's width. The 2026 line in
-*Drawing a screen* came from the owner: every design was a classical app, with no AI in it.
+the 120 characters code takes. Code sets every screen to the device's width.
 
 ```text
 # Lean UI canvas manual
@@ -132,8 +136,6 @@ You were asked for one screen. Spend a minute on the paper, then draw.
    - Follow the rules that fit this screen. When two rules disagree, follow the later one and
      move on.
    - Show Data rows where the screen shows that data, and make up the rest.
-   - This is a 2026 product: where it helps the user, show AI as part of the screen (a draft, a
-     summary, a suggestion, a question box), not a chatbot on every screen.
    - Every button and link leads somewhere: a screen on the paper, a new screen (give it an ID
      and its one line), or back. A button that saves or buys leads somewhere too.
    - One purpose, one screen. Controls that do the same thing for different items (rows of a
