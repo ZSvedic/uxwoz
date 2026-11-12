@@ -169,8 +169,10 @@ hidden when the user branches.
   size. **Fit screen** keeps a tall screen readable and shows its top, like the A OR B fit: at
   least 75%, unless its width needs less.
 - **The window**: when its width or height really changes (or it moves to another display), the
-  canvas fits again the first of these that was in view before, any of it: the open A OR B, the
-  current box, the current screen, as on opening. With none of them in view, the view stays. On a
+  canvas does the last fit again (Fit all, Fit screen, Fit screen width, or the fit on opening),
+  unless the user zoomed or panned by hand since. Then it fits again the first of these that was
+  in view before, any of it: the open A OR B, the current box, the current screen, as on opening.
+  With none of them in view, the view stays. On a
   phone, a keyboard that opens while typing, in the app or in a screen, moves nothing.
 - **Pan and zoom**: scroll, or drag the empty canvas, to pan. Pinch or Ctrl/Cmd + scroll zooms
   around the pointer, also over a screen, from 10% to 200%. The zoom menu, **+**, **−** and the keys
@@ -203,13 +205,16 @@ says nothing about which is which. Both appear out of a blur, the second a beat 
   zoom and shows its top. After the pick, the zoom and scroll come back, and the picked screen
   scrolls into view. A new mockup's first screen has no view to come back to: it is fitted instead.
 - **On a narrow window** A sits above B, each as wide as the window allows, with the OR between
-  them; the ideas get four lines, so they show whole. A tap on a side picks it.
+  them; the ideas get four lines, so they show whole. A tap on a side picks it. It opens zoomed so
+  that all of A, the OR and the top of B show, as long as that keeps 70% or more; else at 70%, its
+  top first.
 - **The idea** sits above each side in larger type: one sentence the model writes about the design
   (*One big clean button on top*).
 - **Locked previews**: both stream in live, and their scripts run once finished, so charts draw.
   Nothing inside them can be clicked. A side can be picked once it has finished: hovering it
-  lifts it with a gold glow, rings it in gold and shows **Pick this design**. Where the device
-  cannot hover (a phone), every side that can be picked shows **Pick this design** without it.
+  lifts it with a gold glow, rings it in gold and shows **Pick this design** on that side, under its
+  idea and above the design, never over it. Where the device cannot hover (a phone), every side
+  that can be picked shows it. A click on it picks too.
 - **Picking**: a click anywhere on a finished side keeps it as the screen's first version and
   deletes the other. If the other is still streaming, it stops at once and nothing of it is kept.
   Both sides and the ✕ are locked, and for 0.8 s the picked one rises and the other dissolves;
