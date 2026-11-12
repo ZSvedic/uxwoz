@@ -2,11 +2,11 @@
 
 Four Opus critics walked the local public app as people (the owner, a developer, a designer, a phone
 visitor). The owner made a list of his own without seeing theirs. Both lists were built the same day:
-37 commits on `main`, 377 tests pass, nothing pushed.
+41 commits on `main`, 377 tests pass.
 
 ## Your checklist
 
-1. **Choose the AI line's wording.** It is the one open decision; see *The AI line* below.
+1. **Judge the starters' AI.** The calmer wording shipped; see *The AI line* below.
 2. **Look at the toolbar at 980 px.** The boxes are back in the row, and names get short to make room.
 3. **Try a real phone.** One-finger drag, pinch and the Edit field were checked in emulation only.
 4. **Set the caps for launch day on `/admin`.** $3 a day is about 350 engaged visitors.
@@ -42,14 +42,15 @@ trackpad, a resized window), what the app looked like yesterday, and whether a t
 ## The AI line
 
 The owner asked for designs that show AI. His sentence did nothing in the system prompt (0 of 140
-designs). In each Draw message the same words work every time, and too well: six of seven starters
-put AI on nearly every screen, some twice, some as a box stuck on *Loading…*. That version waits on
-branch `worktree-agent-a344744bd00e531d9` (7e243f7), unmerged. `main` has the sentence in the system
-prompt, where it changes nothing.
+designs). In each Draw message the same words worked every time, and too well: six of seven starters
+put AI on nearly every screen, some twice, some as a box stuck on *Loading…*. That version was never
+merged.
 
-A small test (16 app designs) found a calmer wording: the owner's sentence plus *At most one AI thing
-on a screen, its finished result written out, never a loading state.* It gave AI on 10 of 16 screens
-and never two. Taking it means recording the cassettes and starters again, about $0.27.
+What shipped, with the owner's yes: his sentence plus *At most one AI thing on a screen, its finished
+result written out, never a loading state.*, in every Draw message. Recorded again, the seven app
+starters show AI in 94 of 160 designs, never twice on one screen, with one empty heading and no
+*Loading…*. The guide has none. Clinic's Home now ends with *Summary: Dr. Okafor runs 25 minutes
+behind since 09:15.*
 
 ## How it was built
 
@@ -59,7 +60,8 @@ reported green; the worst was a click that made the canvas jump under the pointe
 the phone visitor and the designer found about twenty more things; eleven are fixed, the rest are
 below.
 
-Model money: $0.09 for both test rounds and the lead's walks, $0.62 for recordings and wording tests.
+Model money: $0.09 for both test rounds and the lead's walks, $0.87 for three recordings and the
+wording tests.
 
 ## Not verified
 
