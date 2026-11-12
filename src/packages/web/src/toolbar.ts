@@ -216,10 +216,11 @@ export function renderToolbar() {
 /**
  * Short of room, the bar gives way in steps, each tried in turn until the bar is one row and the mockup's name shows
  * whole or at least three letters' width. The screen's name always keeps its level and about ten letters (bar.css).
- * The mockup's name gives way first, then the theme's (slim), then the wordmark and the zoom icons (tight), then the
- * boxes fold into the Boxes menu with them back, then all. A phone (two rows by design) is always tight and folded.
+ * The mockup's name gives its room past twelve letters first (flex), then the theme's (slim), then the mockup's below
+ * twelve (short); then the wordmark and the zoom icons go (tight), then the boxes fold into the Boxes menu with them
+ * back, then all. A phone (two rows by design) is always tight, folded and short.
  */
-const STEPS = [[], ['tight'], ['fold'], ['tight', 'fold']].flatMap((s) => [s, [...s, 'slim']])
+const STEPS = [[], ['tight'], ['fold'], ['tight', 'fold']].flatMap((s) => [s, [...s, 'slim'], [...s, 'slim', 'short']])
 const phone = matchMedia('(max-width: 720px)')
 function fitBar() {
   const bar = $('toolbar'), name = $('projectName')
@@ -227,8 +228,8 @@ function fitBar() {
     const tops = [...bar.querySelectorAll<HTMLElement>('.bar > * > *')].filter((e) => e.offsetParent).map((e) => e.getBoundingClientRect().top)
     return Math.max(...tops) - Math.min(...tops) < 20 && name.clientWidth >= Math.min(name.scrollWidth, 3 * parseFloat(getComputedStyle(name).fontSize))
   }
-  for (const step of phone.matches ? [['tight', 'fold']] : STEPS) {
-    bar.classList.remove('tight', 'fold', 'slim')
+  for (const step of phone.matches ? [['tight', 'fold', 'short']] : STEPS) {
+    bar.classList.remove('tight', 'fold', 'slim', 'short')
     bar.classList.add(...step)
     if (phone.matches || fits()) return
   }
