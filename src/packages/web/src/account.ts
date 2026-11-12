@@ -167,20 +167,17 @@ export function accountRoutes(store: People, extras: AccountExtras) {
 export function startAsks(store: People, extras: Pick<AccountExtras, 'io' | 'appUrl' | 'now'>, everyMs = ASKS_EVERY_MS) {
   const now = extras.now ?? Date.now
   const app = () => extras.appUrl?.() ?? APP_URL
-  const told = new Set<number>()
-  let last = -Infinity
   let running: Promise<void> | null = null
 
+  // When the last mail went and what it told of live in the store, so a restart does not mail them again.
   async function run() {
     const owner = (extras.io.env ?? process.env).UXWOZ_ADMIN_EMAIL?.trim()
     const open = store.openRequests()
-    for (const id of told) if (!open.some((r) => r.id === id)) told.delete(id)
+    const { at: last, ids } = store.asksMailed()
+    const told = new Set(ids)
     if (!owner || !open.some((r) => !told.has(r.id)) || now() - last < ASKS_MAIL_MS || store.mailToday() >= store.settings().caps.mailPerDay) return
     const asking = open.map((r) => { const p = store.person(r.person); return { email: r.email, note: r.note, spent: p?.spent ?? 0, allowance: p?.allowance ?? 0 } })
-    if (await mailer(store, extras.io, requestMail(owner, asking, new URL('/admin', app()).href))) {
-      last = now()
-      for (const r of open) told.add(r.id)
-    }
+    if (await mailer(store, extras.io, requestMail(owner, asking, new URL('/admin', app()).href))) store.setAsksMailed(now(), open.map((r) => r.id))
   }
   /** One run; a run still going is waited for, never doubled. */
   const tick = () => (running ??= run().catch((e) => (extras.io.log ?? console.log)(`asks: ${(e as Error).message}`)).finally(() => { running = null }))

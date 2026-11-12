@@ -58,7 +58,7 @@ store's methods take and give USD. Times are milliseconds since 1970, days and m
 | `addresses` | per day and hashed address: usd spent by visitors, visitors made, accounts made, `arrived` counted. A new salt deletes the days before |
 | `requests` | a quota request: person, note, at, answer (`approved`, `refused` or null), answeredAt, usd |
 | `steps` | per day and step: how many people |
-| `settings` | the mode (`open` or `starters`), the caps, the day's salt, the day's count of emails sent |
+| `settings` | the mode (`open` or `starters`), the caps, the day's salt, the day's count of emails sent, when the owner's last mail of requests went and which it told of |
 | `shares` | share token → person |
 | `emails` | per UTC day and hashed email: codes asked, wrong tries, when it last asked. Kept apart from `codes`, whatever the mails did; the days before go |
 | `blocked` | hashed emails the owner blocked; it outlives the person |
@@ -204,7 +204,8 @@ the index.
 
 The owner hears of quota requests in one email an hour at most, listing every open request: a request
 sends it at once when none went in the last hour, and a check once a minute (`startAsks`) sends it when
-the hour is up and a request is new since the last one (not when the day's emails are used up). A
+the hour is up and a request is new since the last one (not when the day's emails are used up). When that mail went and which
+requests it told of are kept in `settings`, so a restart does not send it again. A
 database from when the top-up waited 12 hours gives each waiting top-up when the server starts. These
 routes and the check are `web/src/account.ts`. The links in every email start with
 `UXWOZ_URL` (default `https://app.uxwoz.com/`).

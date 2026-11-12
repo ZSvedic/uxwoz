@@ -403,6 +403,12 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
     openRequests(): Request[] {
       return db.query('SELECT r.*, p.email FROM requests r LEFT JOIN people p ON p.id = r.person WHERE r.answer IS NULL ORDER BY r.id').all().map(requestOf)
     },
+    /** When the owner's last mail of requests went and which requests it told of; kept across restarts. */
+    asksMailed(): { at: number; ids: number[] } {
+      const v = JSON.parse(get('asks') ?? '{}') as { at?: number; ids?: number[] }
+      return { at: typeof v.at === 'number' ? v.at : -Infinity, ids: Array.isArray(v.ids) ? v.ids : [] }
+    },
+    setAsksMailed(at: number, ids: number[]) { put('asks', JSON.stringify({ at, ids })) },
     /** A person's latest request, for /api/me. */
     lastRequest(id: string): Request | null {
       const r = db.query('SELECT r.*, p.email FROM requests r LEFT JOIN people p ON p.id = r.person WHERE r.person = ? ORDER BY r.id DESC LIMIT 1').get(id)

@@ -1,6 +1,9 @@
 // The account's routes and the once-a-minute check over a store in memory: a fake fetch for mail, an injected
 // clock, caches in memory for the mockups a sign-in moves.
 import { beforeEach, expect, test } from 'bun:test'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { ScreenCache, type Fetch, type Version } from '@uxwoz/core'
 import { accountRoutes, startAsks, ASKS_MAIL_MS, type AccountExtras } from '../packages/web/src/account.ts'
 import { RESEND_URL } from '../packages/web/src/mail.ts'
@@ -257,6 +260,35 @@ test('the owner gets one mail of requests an hour at most, listing the open ones
   clock.t += 3 * ASKS_MAIL_MS
   await asks.tick()
   expect(owner()).toHaveLength(2)
+})
+
+test('one mail an hour holds across a restart; a request made after it is told of when the hour is up', async () => {
+  const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-asks-')), 'people.db')
+  store = people(file, { now: () => new Date(clock.t) })
+  make()
+  const owner = () => mails.filter((m) => m.to[0] === ADMIN)
+  const t1 = cookieOf(await signIn('m1@example.com', null))
+  expect((await post('/api/ask', { note: 'Before the restart' }, t1)).status).toBe(204)
+  expect(owner()).toHaveLength(1)
+  // A redeploy five minutes later: a new store over the same file, a new check.
+  clock.t += 5 * 60_000
+  store.close()
+  store = people(file, { now: () => new Date(clock.t) })
+  make()
+  await asks.tick()
+  expect(owner()).toHaveLength(1)
+  const t2 = cookieOf(await signIn('m2@example.com', null, '192.0.2.50'))
+  expect((await post('/api/ask', { note: 'After the restart' }, t2)).status).toBe(204)
+  expect(owner()).toHaveLength(1)
+  clock.t += ASKS_MAIL_MS - 5 * 60_000 - 1
+  await asks.tick()
+  expect(owner()).toHaveLength(1)
+  clock.t += 1
+  await asks.tick()
+  expect(owner()).toHaveLength(2)
+  expect(owner()[1]!.text).toContain('After the restart')
+  asks()
+  store.close()
 })
 
 test('a blocked person reads whom to write to', async () => {
