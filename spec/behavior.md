@@ -650,7 +650,9 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
   or **Ask for more** (registered), which opens the card. After a sign-up the refused side draws
   itself again (the side that worked stays as it was), and a refused first screen of a new mockup is
   sent again; if the person closes the card instead, the generate panel opens with their prompt still
-  in it. Esc or a press outside closes it. What was
+  in it. A side that failed for another reason (the 20 s deadline, a cut-off reply) shows **Try
+  again**, which draws that side alone; merely opening the screen again never draws it, so a click
+  costs nothing. Esc or a press outside closes it. What was
   typed and the step stay while it is closed; Enter sends; a refusal (*Sign-ups are full for today.*)
   shows in the card in the server's words.
   - A visitor: *You have used your free screens. Register to get about 37 more.* (from **Register**:
