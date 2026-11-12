@@ -101,7 +101,7 @@ describe('public mode', () => {
     expect(evil.cookie).toBe('')
   })
 
-  test('a side refused at the limit is drawn alone once there is more: the side that worked is not paid twice', async () => {
+  test('a side refused at the limit is drawn alone when asked again: the side that worked is not paid twice', async () => {
     start()
     store.setCaps({ visitor: 0.003 }) // one call's hold is $0.004: the first side passes, the second is refused
     const ana = browser()
@@ -115,18 +115,23 @@ describe('public mode', () => {
     const a = (await sides())[kept]
     expect(a).not.toBeNull()
     expect((await sides())[refused]).toBeNull()
-    // Still at the limit: refused at the door, as any paid request.
-    expect((await ana.post('/api/screen', { app: 'App one' })).status).toBe(402)
+    // Not asked again: the free cache hit it always was, at the limit too, the side there and the missing one as they were.
+    const hit = await lines(await ana.post('/api/screen', { app: 'App one' }))
+    expect(hit.map((e) => e.type)).toEqual(['meta', 'done'])
+    expect(hit[0].cached).toBe(true)
+    expect(calls.haiku).toBe(1)
+    // Asked again at the limit: refused at the door, as any paid request.
+    expect((await ana.post('/api/screen', { app: 'App one', again: true })).status).toBe(402)
     expect(calls.haiku).toBe(1)
     store.give(personOf(ana).id, 1)
-    const again = await lines(await ana.post('/api/screen', { app: 'App one' }))
+    const again = await lines(await ana.post('/api/screen', { app: 'App one', again: true }))
     expect(calls.haiku).toBe(2)
     expect(again.filter((e) => e.type === 'version').map((e) => e.variant).sort()).toEqual([0, 1])
     expect(again.at(-1).type).toBe('done')
     expect((await sides())[kept]).toEqual(a)
     expect((await sides())[refused]).not.toBeNull()
-    // Both sides there: a cache hit, free.
-    await lines(await ana.post('/api/screen', { app: 'App one' }))
+    // Both sides there: a cache hit, free, asked again or not.
+    await lines(await ana.post('/api/screen', { app: 'App one', again: true }))
     expect(calls.haiku).toBe(2)
   })
 

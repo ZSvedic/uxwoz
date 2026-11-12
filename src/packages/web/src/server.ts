@@ -213,7 +213,7 @@ export function createServer(opts: ServerOptions = {}) {
           const p = pickers(b)
           if (p instanceof Response) return p
           const click = typeof b?.from === 'string' && b.from ? { from: b.from.slice(0, 3000), label: String(b?.label ?? '').slice(0, 200) } : null
-          return ndjson(at(req).screenEvents(app, action, p.model, p.device, click, req.signal))
+          return ndjson(at(req).screenEvents(app, action, p.model, p.device, click, req.signal, b?.again === true))
         }),
       },
       '/api/pick': {
