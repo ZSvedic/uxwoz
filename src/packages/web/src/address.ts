@@ -29,6 +29,14 @@ export function entryAt(app: string, entries: Entries, sid: string | null): Cach
   return undefined
 }
 
+/** Where an address lands in its mockup: the screen it names, else (deleted since) the first screen and a word why; null with no first screen. */
+export function landing(app: string, entries: Entries, sid: string | null): { entry: CacheEntry; why: string | null } | null {
+  const named = entryAt(app, entries, sid)
+  if (named) return { entry: named, why: null }
+  const root = entries.get(normalizePrompt(app))
+  return root ? { entry: root, why: 'That screen is not here.' } : null
+}
+
 /** The open A OR B's key: a screen with no version yet. */
 export function openChoice(entries: Entries): string | null {
   for (const e of entries.values()) if (!e.versions.length && e.kind !== 'component') return e.key
