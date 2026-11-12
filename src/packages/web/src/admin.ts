@@ -4,8 +4,8 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Io } from '@uxwoz/core'
-import { CAPS, type Caps, type People } from './people.ts'
-import { answerMail, readyMail, send, type Mail } from './mail.ts'
+import { CAPS, SCREEN_USD, type Caps, type People } from './people.ts'
+import { answerMail, contactOf, send, type Mail } from './mail.ts'
 import adminPage from './admin.html'
 
 /** What the store does not know, given by the server. */
@@ -27,7 +27,7 @@ export interface AdminExtras {
 /** The largest amount one op may give, and each cap's largest value. */
 export const MAX_USD = 100
 const CAP_MAX: Record<keyof Caps, number> = {
-  visitor: MAX_USD, topup: MAX_USD, topupHours: 24 * 30,
+  visitor: MAX_USD, topup: MAX_USD,
   addressUsd: 1000, addressVisitors: 100_000, addressAccounts: 100_000,
   dayUsd: 10_000, monthUsd: 100_000, mailPerDay: 100_000,
 }
@@ -48,6 +48,7 @@ export function adminRoutes(store: People, extras: AdminExtras) {
       people: s.people.map(({ steps: _, ...p }) => ({ ...p, mockups: extras.mockups(p.id) })),
       address: extras.address(req),
       startersCurrent: extras.startersCurrent(),
+      screenUsd: SCREEN_USD,
     }
   }
 
@@ -97,15 +98,6 @@ export function adminRoutes(store: People, extras: AdminExtras) {
       store.deletePerson(b.id)
       return {}
     },
-    topup: async (b, req) => {
-      if (!isId(b.id)) return fail(400, 'id must be a person\'s id')
-      const p = store.person(b.id)
-      if (!p) return fail(404, 'no such person')
-      if (p.topupDue === null) return fail(409, 'No top-up waits for this person.')
-      const after = store.grantTopup(b.id)
-      if (!after) return fail(409, 'No top-up waits for this person.')
-      return { mailed: after.email ? await mail(readyMail(after.email, store.settings().caps.topup, appUrl(req))) : false }
-    },
     answer: async (b, req) => {
       if (typeof b.request !== 'number' || !Number.isSafeInteger(b.request) || b.request < 1) return fail(400, 'request must be a request\'s id')
       if (typeof b.approved !== 'boolean') return fail(400, 'approved must be true or false')
@@ -125,7 +117,7 @@ export function adminRoutes(store: People, extras: AdminExtras) {
     if (privacy !== null) return privacy
     const e = env()
     const operator = e.UXWOZ_OPERATOR?.trim() || 'the person who runs this site'
-    const contact = e.UXWOZ_CONTACT?.trim() || e.UXWOZ_ADMIN_EMAIL?.trim() || ''
+    const contact = contactOf(e)
     const style = ['tokens.css', 'base.css', 'admin.css']
       .map((f) => readFileSync(join(import.meta.dir, 'design', f), 'utf8'))
       .join('\n').replace(/@font-face\s*{[^}]*}/g, '')

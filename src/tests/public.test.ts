@@ -65,7 +65,7 @@ describe('public mode', () => {
   test('a visitor\'s first screen makes the visitor and its cookie; /api/me and /api/config answer for them', async () => {
     start()
     const ana = browser()
-    expect(await ana.me()).toMatchObject({ role: 'new', left: 0.1, allowance: 0.1, screensLeft: 14, paused: false, may: { share: false, exportZip: false } })
+    expect(await ana.me()).toMatchObject({ role: 'new', left: 0.1, allowance: 0.1, screensLeft: 25, more: 37, paused: false, may: { share: false, exportZip: false } })
     // With no person yet: an empty Recent, nothing else, and a warm-up that calls nothing.
     expect(await (await ana.get('/api/apps')).json()).toEqual({ apps: [] })
     // Opening a mockup reads its map first: an empty one, and no person is made.
@@ -82,7 +82,7 @@ describe('public mode', () => {
     expect((await lines(res)).at(-1).type).toBe('done')
     expect(calls.haiku).toBe(2)
     const me = await ana.me()
-    expect(me).toMatchObject({ role: 'visitor', allowance: 0.1, screensLeft: 11 })
+    expect(me).toMatchObject({ role: 'visitor', allowance: 0.1, screensLeft: 20, more: 37 })
     expect(me.left).toBeCloseTo(0.08, 6)
     expect(me.email).toBeUndefined()
     // `arrived` came before there was a person: counted for the day only.
@@ -130,6 +130,9 @@ describe('public mode', () => {
     expect(bo.cookie).toMatch(/^uxwoz_who=/)
     // Another address is fine.
     expect((await screen(browser('10.0.0.2'), 'Cy\'s app')).status).toBe(200)
+    // At 70% of the day's cap guests stop, before their allowance or address is asked.
+    store.setCaps({ dayUsd: store.spent().today / 0.8 })
+    expect((await screen(browser('10.0.0.4'), 'Ed\'s app')).body).toEqual({ reason: 'guests', error: 'Today\'s free screens for guests are used up. Register to carry on.' })
     // The day's cap pauses everyone.
     store.setCaps({ dayUsd: 0.05 })
     expect((await screen(browser('10.0.0.3'), 'Di\'s app')).body).toMatchObject({ reason: 'paused' })

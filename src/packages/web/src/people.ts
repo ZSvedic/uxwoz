@@ -4,25 +4,27 @@
 import { Database } from 'bun:sqlite'
 import { createHash, createHmac, randomBytes } from 'node:crypto'
 
-export type Reason = 'allowance' | 'address' | 'paused' | 'blocked'
+export type Reason = 'allowance' | 'address' | 'paused' | 'guests' | 'blocked'
 export type Mode = 'open' | 'starters'
 export const STEPS = ['arrived', 'starter', 'picked', 'own', 'limit', 'asked', 'verified'] as const
 export type Step = (typeof STEPS)[number]
 
 /** The limits, each changeable on the admin's page. Money in USD. */
 export interface Caps {
-  visitor: number; topup: number; topupHours: number
+  visitor: number; topup: number
   addressUsd: number; addressVisitors: number; addressAccounts: number
   dayUsd: number; monthUsd: number; mailPerDay: number
 }
 export const CAPS: Caps = {
-  visitor: 0.1, topup: 0.15, topupHours: 12,
+  visitor: 0.1, topup: 0.15,
   addressUsd: 0.3, addressVisitors: 20, addressAccounts: 3,
   dayUsd: 3, monthUsd: 20, mailPerDay: 100,
 }
 /** What a call whose cost never arrived is charged; what one picked screen costs, for "screens left". */
 export const UNKNOWN_USD = 0.002
-export const SCREEN_USD = 0.007
+export const SCREEN_USD = 0.004
+/** The share of the public's day (`dayUsd`) past which visitors stop; registered users go on to the whole. */
+export const GUESTS_SHARE = 0.7
 /** What a live call holds from its start until its cost arrives. */
 export const RESERVE_USD = 0.004
 /** A code's life and its wrong tries; how many `arrived` an address counts a day; idle days before a visitor goes; the default answer. */
@@ -41,7 +43,7 @@ export const NOTE_CHARS = 500
 
 export interface Person {
   id: string; email: string | null; created: number; seen: number
-  allowance: number; spent: number; blocked: boolean; topupDue: number | null; steps: Step[]
+  allowance: number; spent: number; blocked: boolean; steps: Step[]
 }
 export interface Request { id: number; person: string; email: string | null; note: string; at: number; answer: 'approved' | 'refused' | null; answeredAt: number | null; usd: number | null }
 export type Verified = { person: Person; token: string; merged: string | null }
@@ -72,7 +74,7 @@ export function network(raw: string): string {
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS people (id TEXT PRIMARY KEY, email TEXT UNIQUE, created INTEGER NOT NULL, seen INTEGER NOT NULL,
-  allowance INTEGER NOT NULL, spent INTEGER NOT NULL DEFAULT 0, blocked INTEGER NOT NULL DEFAULT 0, topupDue INTEGER, steps TEXT NOT NULL DEFAULT '');
+  allowance INTEGER NOT NULL, spent INTEGER NOT NULL DEFAULT 0, blocked INTEGER NOT NULL DEFAULT 0, steps TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, person TEXT NOT NULL, created INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS codes (email TEXT PRIMARY KEY, hash TEXT NOT NULL, person TEXT, expires INTEGER NOT NULL, tries INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS calls (at INTEGER NOT NULL, person TEXT, usd INTEGER NOT NULL, model TEXT NOT NULL);
@@ -89,10 +91,10 @@ CREATE TABLE IF NOT EXISTS emails (day TEXT NOT NULL, hash TEXT NOT NULL, codes 
 CREATE TABLE IF NOT EXISTS blocked (hash TEXT PRIMARY KEY);
 `
 
-type Row = { id: string; email: string | null; created: number; seen: number; allowance: number; spent: number; blocked: number; topupDue: number | null; steps: string }
+type Row = { id: string; email: string | null; created: number; seen: number; allowance: number; spent: number; blocked: number; steps: string }
 const toPerson = (r: Row): Person => ({
   id: r.id, email: r.email, created: r.created, seen: r.seen, allowance: usd(r.allowance), spent: usd(r.spent),
-  blocked: !!r.blocked, topupDue: r.topupDue, steps: r.steps ? (r.steps.split(',') as Step[]) : [],
+  blocked: !!r.blocked, steps: r.steps ? (r.steps.split(',') as Step[]) : [],
 })
 
 export type People = ReturnType<typeof people>
@@ -119,7 +121,9 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
     const p = byId(person.id)
     if (!p || p.blocked) return { reason: 'blocked', hash: null }
     const c = caps()
-    if (mode() === 'starters' || over(spentSince(dayStart()), held.all, micros(c.dayUsd)) || over(spentSince(monthStart()), held.all, micros(c.monthUsd))) return { reason: 'paused', hash: null }
+    const today = spentSince(dayStart())
+    if (mode() === 'starters' || over(today, held.all, micros(c.dayUsd)) || over(spentSince(monthStart()), held.all, micros(c.monthUsd))) return { reason: 'paused', hash: null }
+    if (p.email === null && over(today, held.all, micros(c.dayUsd * GUESTS_SHARE))) return { reason: 'guests', hash: null }
     if (over(micros(p.spent), held.people.get(p.id) ?? 0, micros(p.allowance))) return { reason: 'allowance', hash: null }
     if (p.email !== null) return { reason: null, hash: null }
     const a = addr(address)
@@ -132,7 +136,11 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
   const byId = (id: string) => { const r = row(id); return r ? toPerson(r) : null }
   const byEmail = (email: string) => { const r = db.query('SELECT * FROM people WHERE email = ?').get(normalEmail(email)) as Row | null; return r ? toPerson(r) : null }
 
-  const caps = (): Caps => ({ ...CAPS, ...JSON.parse(get('caps') ?? '{}') })
+  /** The defaults with the owner's changes; a cap no longer known (an old database's) is left out. */
+  const caps = (): Caps => {
+    const saved = JSON.parse(get('caps') ?? '{}') as Record<string, unknown>
+    return { ...CAPS, ...Object.fromEntries(Object.entries(saved).filter(([k]) => Object.hasOwn(CAPS, k))) }
+  }
   const mode = (): Mode => (get('mode') === 'starters' ? 'starters' : 'open')
 
   /** The day's salt: made new each UTC day; yesterday's address rows go with the old one. */
@@ -160,10 +168,11 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
     db.query('INSERT INTO sessions (hash, person, created) VALUES (?, ?, ?)').run(sha(token), person, now())
     return token
   }
-  function insertPerson(email: string | null, topupDue: number | null) {
+  /** A new person: a visitor's allowance, and the top-up with it when they come with an email. */
+  function insertPerson(email: string | null) {
     const id = hex(16)
-    db.query('INSERT INTO people (id, email, created, seen, allowance, topupDue) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(id, email, now(), now(), micros(caps().visitor), topupDue)
+    db.query('INSERT INTO people (id, email, created, seen, allowance) VALUES (?, ?, ?, ?, ?)')
+      .run(id, email, now(), now(), micros(caps().visitor + (email ? caps().topup : 0)))
     return id
   }
   /** Every row of a person goes; their calls stay for the day's and month's sums, with no person. */
@@ -177,8 +186,13 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
     db.query('DELETE FROM shares WHERE person = ?').run(id)
     db.query('DELETE FROM people WHERE id = ?').run(id)
   }
-  const topupAt = () => now() + caps().topupHours * 3600_000
   const requestOf = (r: any): Request => ({ ...r, usd: r.usd === null ? null : usd(r.usd) })
+
+  // A database from when the top-up waited 12 hours: a waiting one arrives now, and the column goes.
+  if ((db.query('PRAGMA table_info(people)').all() as { name: string }[]).some((c) => c.name === 'topupDue')) db.transaction(() => {
+    db.query('UPDATE people SET allowance = allowance + ? WHERE topupDue IS NOT NULL').run(micros(caps().topup))
+    db.exec('ALTER TABLE people DROP COLUMN topupDue')
+  })()
 
   const spent = () => ({ today: usd(spentSince(dayStart())), month: usd(spentSince(monthStart())) })
   /** An email's day: its codes asked, wrong tries and when it last asked. The email itself is kept only as a hash. */
@@ -234,7 +248,7 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
         const a = addr(address)
         if (a.visitors >= caps().addressVisitors) return null
         bump(a.hash, 'visitors')
-        const id = insertPerson(null, null)
+        const id = insertPerson(null)
         return { person: byId(id)!, token: session(id) }
       })()
     },
@@ -330,7 +344,7 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
     /** A code whose mail did not go: it can never be used. */
     dropCode(email: string) { db.query('DELETE FROM codes WHERE email = ?').run(normalEmail(email)) },
     /** Sign in by code, with a new session. A new email takes over the visitor (or makes a person) and its
-     * top-up waits; an existing account comes back with `merged`, the visitor's id, whose rows are gone: the
+     * top-up arrives with it; an existing account comes back with `merged`, the visitor's id, whose rows are gone: the
      * caller moves that cache file in. `code` for a wrong code, `locked` when the email made its 15 wrong tries today,
      * `blocked` for a blocked email (after the right code, so only its owner learns it), `address` when the address
      * made its accounts (the right code stays good then). */
@@ -353,8 +367,8 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
         }
         bump(a.hash, 'accounts')
         let id = fromVisitor
-        if (id) db.query('UPDATE people SET email = ?, topupDue = ? WHERE id = ?').run(e, topupAt(), id)
-        else id = insertPerson(e, topupAt())
+        if (id) db.query('UPDATE people SET email = ?, allowance = allowance + ? WHERE id = ?').run(e, micros(caps().topup), id)
+        else id = insertPerson(e)
         return { person: byId(id)!, token: session(id), merged: null }
       })()
     },
@@ -362,18 +376,7 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
     mailed() { put('mail', `${day()}:${mailToday() + 1}`) },
     mailToday,
 
-    // ── Top-ups and requests ──
-    /** The people whose waiting top-up is due now. */
-    topupsDue(): Person[] { return (db.query('SELECT * FROM people WHERE topupDue IS NOT NULL AND topupDue <= ? AND blocked = 0').all(now()) as Row[]).map(toPerson) },
-    /** Hands out a person's waiting top-up now; null when none waits (so it never comes twice). */
-    grantTopup(id: string): Person | null {
-      return db.transaction(() => {
-        const p = row(id)
-        if (!p || p.topupDue === null) return null
-        db.query('UPDATE people SET allowance = allowance + ?, topupDue = NULL WHERE id = ?').run(micros(caps().topup), id)
-        return byId(id)
-      })()
-    },
+    // ── Requests ──
     /** A quota request: its id, or `register` (a visitor), `note` (empty or over 500), `open` (one waits already). */
     ask(id: string, note: string): number | 'register' | 'blocked' | 'note' | 'open' {
       const p = row(id)
@@ -396,6 +399,10 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
       })()
     },
     request,
+    /** The requests not answered yet, oldest first, for the owner's mail. */
+    openRequests(): Request[] {
+      return db.query('SELECT r.*, p.email FROM requests r LEFT JOIN people p ON p.id = r.person WHERE r.answer IS NULL ORDER BY r.id').all().map(requestOf)
+    },
     /** A person's latest request, for /api/me. */
     lastRequest(id: string): Request | null {
       const r = db.query('SELECT r.*, p.email FROM requests r LEFT JOIN people p ON p.id = r.person WHERE r.person = ? ORDER BY r.id DESC LIMIT 1').get(id)

@@ -45,25 +45,18 @@ export const codeMail = (to: string, code: string): Mail => ({
   text: `Your code is ${code}.\n\nType it in the tab where you asked for it. It works for 15 minutes.\n\nIf you did not ask for it, ignore this email.\n`,
 })
 
-/** The waiting top-up arrived (or the owner approved it early). */
-export const readyMail = (to: string, usd: number, appUrl: string): Mail => ({
-  to, subject: 'Your free screens are ready',
-  text: `Your ${about(usd)} free screens are ready in UX Woz. Carry on where you left off:\n\n${appUrl}\n`,
-})
+/** Whom a person writes to: UXWOZ_CONTACT, else UXWOZ_ADMIN_EMAIL; '' when neither is set. */
+export const contactOf = (env: Env) => env.UXWOZ_CONTACT?.trim() || env.UXWOZ_ADMIN_EMAIL?.trim() || ''
 
-/** A quota request, to the owner at once. */
-export const requestMail = (to: string, r: { email: string; note: string; spent: number; allowance: number }, adminUrl: string): Mail => ({
-  to, subject: `UX Woz: ${r.email} asks for more`,
-  text: `${r.email} spent ${money(r.spent)} of ${money(r.allowance)} and asks for more:\n\n${r.note}\n\nApprove or refuse: ${adminUrl}\n`,
+export interface Asking { email: string | null; note: string; spent: number; allowance: number }
+/** The open quota requests, to the owner, one email an hour at most (the caller keeps the hour). */
+export const requestMail = (to: string, open: Asking[], adminUrl: string): Mail => ({
+  to, subject: open.length === 1 ? `UX Woz: ${open[0]!.email ?? 'someone'} asks for more` : `UX Woz: ${open.length} people ask for more`,
+  text: open.map((r) => `${r.email ?? 'someone'} spent ${money(r.spent)} of ${money(r.allowance)} and asks for more:\n\n${r.note}\n`).join('\n')
+    + `\nApprove or refuse: ${adminUrl}\n`,
 })
 
 /** The owner's answer to a quota request, to the user. */
 export const answerMail = (to: string, approved: boolean, usd: number, appUrl: string): Mail => approved
   ? { to, subject: 'You have more free screens', text: `Your request was approved: ${about(usd)} more screens are ready in UX Woz.\n\n${appUrl}\n` }
   : { to, subject: 'About your request for more screens', text: `Sorry, we cannot give more free screens right now. Your mockups stay open: look, click, export.\n\n${appUrl}\n` }
-
-/** Sign-ups waiting for their top-up, to the owner, one email an hour at most (the caller keeps the hour). */
-export const waitingMail = (to: string, count: number, adminUrl: string): Mail => ({
-  to, subject: `UX Woz: ${count} sign-up${count === 1 ? '' : 's'} waiting`,
-  text: `${count} new user${count === 1 ? ' waits' : 's wait'} for free screens. Approve now or let the 12 hours run: ${adminUrl}\n`,
-})

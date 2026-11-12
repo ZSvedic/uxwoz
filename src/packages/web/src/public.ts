@@ -6,7 +6,7 @@
 
 import { STARTERS, canonicalAction, normalizePrompt, type Io, type ModelId } from '@uxwoz/core'
 import { screensOf, type People, type Person, type Reason, type Step } from './people.ts'
-import { meOf } from './account.ts'
+import { closedOf, meOf, moreOf } from './account.ts'
 import type { Desk, Desks } from './desks.ts'
 
 /** The public's one model. */
@@ -22,6 +22,7 @@ export const REASONS: Record<Reason, string> = {
   allowance: 'Your free screens are used up.',
   address: 'This network has used today\'s free screens. Register to carry on.',
   paused: 'Live designs are paused for now. The starters still work.',
+  guests: 'Today\'s free screens for guests are used up. Register to carry on.',
   blocked: 'This account is closed.',
 }
 
@@ -78,6 +79,8 @@ export interface GateOptions {
   addressHeader?: string
   /** server.ts's check of a POST from another site: run before a visitor is made. */
   refuse: (req: Request) => Response | null
+  /** The environment, for the address a blocked person writes to; default process.env. */
+  env?: () => Record<string, string | undefined>
 }
 
 export type Gate = ReturnType<typeof gate>
@@ -85,6 +88,8 @@ export type Gate = ReturnType<typeof gate>
 /** The public's gate. Made only in public mode. */
 export function gate(o: GateOptions) {
   const { store } = o
+  /** A reason's words; a blocked person's say whom to write to. */
+  const words = (r: Reason) => (r === 'blocked' ? closedOf(o.env?.() ?? process.env) : REASONS[r])
   const header = (o.addressHeader ?? process.env.UXWOZ_ADDRESS_HEADER ?? 'x-real-ip').toLowerCase()
   const known = new WeakMap<Request, Who>()
   /** Each person's last address: their background calls are charged to it. */
@@ -130,7 +135,7 @@ export function gate(o: GateOptions) {
       allow: () => {
         const p = store.person(id)
         const r = p ? store.reserve(p, lastAddress.get(id) ?? 'unknown') : 'blocked'
-        if (typeof r === 'string') throw new Error(REASONS[r])
+        if (typeof r === 'string') throw new Error(words(r))
         holds.push(r)
         base.allow?.()
       },
@@ -153,7 +158,7 @@ export function gate(o: GateOptions) {
     if (w.role === 'owner') return { role: 'owner', paused, may: { share: true, exportZip: true } }
     if (w.role === 'new') {
       const a = store.settings().caps.visitor
-      return { role: 'new', left: a, allowance: a, screensLeft: screensOf(a), paused, may: { share: false, exportZip: false } }
+      return { role: 'new', left: a, allowance: a, screensLeft: screensOf(a), more: moreOf(store), paused, may: { share: false, exportZip: false } }
     }
     return meOf(store, store.person(w.person.id) ?? w.person)
   }
@@ -215,7 +220,7 @@ export function gate(o: GateOptions) {
       const reason = store.mayCall(person, address(req))
       if (reason) {
         if (reason === 'allowance') step(id, 'limit', req)
-        return answer(fail(REASONS[reason], 402, { reason }))
+        return answer(fail(words(reason), 402, { reason }))
       }
       // Claimed with no wait since the check, so warm-ups sent together make one call.
       if (warm) warmClaim = Date.now()

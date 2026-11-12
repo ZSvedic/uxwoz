@@ -1,10 +1,12 @@
 // The account's routes (spec/public.md, Routes; spec/behavior.md, The account card): sign in by a code, verify,
-// sign out, delete the account, ask for more; and the check once a minute that hands out the waiting top-ups.
+// sign out, delete the account, ask for more; and the check once a minute that tells the owner of the open requests.
 // The server registers the routes and gives what the store does not know in `AccountExtras`.
 
 import type { Io } from '@uxwoz/core'
 import { left, normalEmail, screensOf, validEmail, NOTE_CHARS, type People, type Person } from './people.ts'
-import { codeMail, mailReady, readyMail, requestMail, send, waitingMail, type Mail } from './mail.ts'
+
+type Env = Record<string, string | undefined>
+import { codeMail, contactOf, mailReady, requestMail, send, type Mail } from './mail.ts'
 
 /** What the store does not know, given by the server. */
 export interface AccountExtras {
@@ -22,17 +24,19 @@ export interface AccountExtras {
   deleteFile: (id: string) => void | Promise<void>
   /** For mail (fetch, env, log). */
   io: Io
-  /** The app's address for the links in emails: by default the request's origin, and https://app.uxwoz.com/ for the check. */
+  /** The app's address for the links in the owner's mail of requests; https://app.uxwoz.com/ by default. */
   appUrl?: (req?: Request) => string
   /** What /api/verify answers as `me`; by default `meOf`. */
   me?: (person: Person) => unknown
   /** The clock of the once-a-minute check, in ms; tests inject it. */
   now?: () => number
+  /** A request was made: the owner's mail goes now unless one went in the last hour (`startAsks`'s `tick`). */
+  asked?: () => unknown | Promise<unknown>
 }
 
-/** How often the check runs, and how often at most the owner hears of waiting sign-ups. */
-export const TOPUP_EVERY_MS = 60_000
-export const WAITING_MAIL_MS = 3600_000
+/** How often the check runs, and how often at most the owner hears of open requests. */
+export const ASKS_EVERY_MS = 60_000
+export const ASKS_MAIL_MS = 3600_000
 const APP_URL = 'https://app.uxwoz.com/'
 
 const json = (body: unknown, status = 200) => Response.json(body, { status })
@@ -42,6 +46,8 @@ const FULL = 'Sign-ups are full for today.'
 const SOON = 'A code is on its way: wait a minute before asking again.'
 const LOCKED = 'Too many codes for this email today. Try again tomorrow.'
 const CLOSED = 'This account is closed.'
+/** What a blocked person reads: whom to write to, when the site has an address. */
+export const closedOf = (env: Env) => { const c = contactOf(env); return c ? `${CLOSED} Write to ${c}.` : CLOSED }
 const REGISTER = 'Register first.'
 
 async function body(req: Request): Promise<Record<string, unknown> | null> {
@@ -51,13 +57,15 @@ async function body(req: Request): Promise<Record<string, unknown> | null> {
   } catch { return null }
 }
 
+/** The screens a new account adds, for `more` in /api/me. */
+export const moreOf = (store: People) => screensOf(store.settings().caps.topup)
+
 /** `/api/me` for a person (spec/public.md, Routes). */
 export function meOf(store: People, p: Person) {
   const l = left(p), r = store.lastRequest(p.id), registered = p.email !== null
   return {
     role: registered ? 'user' : 'visitor', ...(p.email ? { email: p.email } : {}),
-    left: l, allowance: p.allowance, screensLeft: screensOf(l),
-    ...(p.topupDue !== null ? { topupDue: p.topupDue } : {}),
+    left: l, allowance: p.allowance, screensLeft: screensOf(l), ...(registered ? {} : { more: moreOf(store) }),
     ...(r ? { request: { at: r.at, ...(r.answer ? { answer: r.answer } : {}) } } : {}),
     paused: store.paused(), may: { share: registered, exportZip: registered },
   }
@@ -72,9 +80,8 @@ async function mailer(store: People, io: Io, m: Mail) {
 
 export function accountRoutes(store: People, extras: AccountExtras) {
   const env = () => extras.io.env ?? process.env
-  const appUrl = (req: Request) => extras.appUrl?.(req) ?? new URL('/', req.url).href
   const me = (p: Person) => (extras.me ?? ((x: Person) => meOf(store, x)))(p)
-  const mail = (m: Mail) => mailer(store, extras.io, m)
+  const closed = () => closedOf(env())
 
   return {
     '/api/signin': {
@@ -110,7 +117,7 @@ export function accountRoutes(store: People, extras: AccountExtras) {
         if (done === 'code') return fail(400, 'That code is not right.')
         if (done === 'address') return fail(429, FULL)
         if (done === 'locked') return fail(429, LOCKED)
-        if (done === 'blocked') return fail(403, CLOSED)
+        if (done === 'blocked') return fail(403, closed())
         if (done.merged) await extras.move(done.merged, done.person.id)
         store.step(done.person.id, 'verified', address)
         return extras.cookie(json({ me: me(store.person(done.person.id) ?? done.person) }), done.token, req)
@@ -142,12 +149,10 @@ export function accountRoutes(store: People, extras: AccountExtras) {
         if (typeof b?.note !== 'string') return fail(400, `Say what you are building, in 1 to ${NOTE_CHARS} characters.`)
         const id = store.ask(p.id, b.note)
         if (id === 'register') return fail(403, REGISTER, 'register')
-        if (id === 'blocked') return fail(403, CLOSED)
+        if (id === 'blocked') return fail(403, closed())
         if (id === 'note') return fail(400, `Say what you are building, in 1 to ${NOTE_CHARS} characters.`)
         if (id === 'open') return fail(409, 'You asked already: the answer comes by email.')
-        const owner = env().UXWOZ_ADMIN_EMAIL?.trim()
-        const r = store.request(id)
-        if (owner && r) await mail(requestMail(owner, { email: p.email, note: r.note, spent: p.spent, allowance: p.allowance }, new URL('/admin', appUrl(req)).href))
+        await extras.asked?.()
         return none()
       },
     },
@@ -155,35 +160,30 @@ export function accountRoutes(store: People, extras: AccountExtras) {
 }
 
 /**
- * Every minute: grants the top-ups that are due, each with *Your free screens are ready*; tells the owner of
- * sign-ups that started waiting since the last such email, one email an hour at most. Returns a stop function
- * (with `tick`, one run now, for tests); its timer does not keep the process alive.
+ * Every minute: tells the owner of the open quota requests when one is new since the last such email, one email an
+ * hour at most, listing them all. `/api/ask` runs it at once, so a first request is heard of at once. Returns a stop
+ * function (with `tick`, one run now); its timer does not keep the process alive.
  */
-export function startTopups(store: People, extras: Pick<AccountExtras, 'io' | 'appUrl' | 'now'>, everyMs = TOPUP_EVERY_MS) {
+export function startAsks(store: People, extras: Pick<AccountExtras, 'io' | 'appUrl' | 'now'>, everyMs = ASKS_EVERY_MS) {
   const now = extras.now ?? Date.now
   const app = () => extras.appUrl?.() ?? APP_URL
-  const told = new Set<string>()
-  let lastWaiting = -Infinity
+  const told = new Set<number>()
+  let last = -Infinity
   let running: Promise<void> | null = null
 
   async function run() {
-    const caps = () => store.settings().caps
-    const room = () => store.mailToday() < caps().mailPerDay
-    for (const due of store.topupsDue()) {
-      const p = store.grantTopup(due.id)
-      if (p?.email && room()) await mailer(store, extras.io, readyMail(p.email, caps().topup, app()))
-    }
     const owner = (extras.io.env ?? process.env).UXWOZ_ADMIN_EMAIL?.trim()
-    const waiting = store.summary().people.filter((p) => p.email && p.topupDue !== null && !p.blocked)
-    for (const id of told) if (!waiting.some((p) => p.id === id)) told.delete(id)
-    if (!owner || !waiting.some((p) => !told.has(p.id)) || now() - lastWaiting < WAITING_MAIL_MS || !room()) return
-    if (await mailer(store, extras.io, waitingMail(owner, waiting.length, new URL('/admin', app()).href))) {
-      lastWaiting = now()
-      for (const p of waiting) told.add(p.id)
+    const open = store.openRequests()
+    for (const id of told) if (!open.some((r) => r.id === id)) told.delete(id)
+    if (!owner || !open.some((r) => !told.has(r.id)) || now() - last < ASKS_MAIL_MS || store.mailToday() >= store.settings().caps.mailPerDay) return
+    const asking = open.map((r) => { const p = store.person(r.person); return { email: r.email, note: r.note, spent: p?.spent ?? 0, allowance: p?.allowance ?? 0 } })
+    if (await mailer(store, extras.io, requestMail(owner, asking, new URL('/admin', app()).href))) {
+      last = now()
+      for (const r of open) told.add(r.id)
     }
   }
   /** One run; a run still going is waited for, never doubled. */
-  const tick = () => (running ??= run().catch((e) => (extras.io.log ?? console.log)(`top-ups: ${(e as Error).message}`)).finally(() => { running = null }))
+  const tick = () => (running ??= run().catch((e) => (extras.io.log ?? console.log)(`asks: ${(e as Error).message}`)).finally(() => { running = null }))
 
   const timer = setInterval(tick, everyMs)
   timer.unref?.()

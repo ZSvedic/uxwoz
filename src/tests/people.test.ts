@@ -34,7 +34,7 @@ describe('people and sessions', () => {
     const { s } = store()
     const v = s.makeVisitor(IP)!
     expect(v.token).toMatch(/^[a-f0-9]{32}$/)
-    expect(v.person).toMatchObject({ email: null, allowance: 0.1, spent: 0, blocked: false, topupDue: null })
+    expect(v.person).toMatchObject({ email: null, allowance: 0.1, spent: 0, blocked: false })
     expect(s.byToken(v.token)!.id).toBe(v.person.id)
     expect(JSON.stringify(s.db.query('SELECT * FROM sessions').all())).not.toContain(v.token)
     expect(s.byToken('f'.repeat(32))).toBeNull()
@@ -141,20 +141,54 @@ describe('the meter', () => {
     expect(s.mayCall(u, IP)).toBeNull()
   })
 
-  test('the public pauses at $3 a day, then the next UTC day opens again', () => {
+  test('the public pauses at $3 a day, then the next UTC day opens again', async () => {
     const { s, at } = store('2026-11-11T23:59:00Z')
     const rich = visitor(s, '198.51.100.9')
     s.give(rich.id, 100)
-    const p = visitor(s)
+    const u = (await signUp(s, 'ana@example.com', null)).person
     s.charge(rich, 2.99, HAIKU, '198.51.100.9')
-    expect(s.mayCall(p, IP)).toBeNull()
+    expect(s.mayCall(u, IP)).toBeNull()
     expect(s.paused()).toBe(false)
     s.charge(rich, 0.01, HAIKU, '198.51.100.9')
-    expect(s.mayCall(p, IP)).toBe('paused')
+    expect(s.mayCall(u, IP)).toBe('paused')
     expect(s.paused()).toBe(true)
     at('2026-11-12T00:00:00Z')
-    expect(s.mayCall(p, IP)).toBeNull()
+    expect(s.mayCall(u, IP)).toBeNull()
     expect(s.spent()).toEqual({ today: 0, month: 3 })
+  })
+
+  test('guests stop at 70% of the day; registered users go on to the whole, then the next UTC day opens again', async () => {
+    const { s, at } = store('2026-11-11T23:00:00Z')
+    const rich = visitor(s, '198.51.100.9')
+    s.give(rich.id, 100)
+    const p = visitor(s)
+    const u = (await signUp(s, 'ana@example.com', null)).person
+    s.charge(rich, 2.09, HAIKU, '198.51.100.9')
+    expect(s.mayCall(p, IP)).toBeNull()
+    s.charge(rich, 0.01, HAIKU, '198.51.100.9')
+    expect(s.mayCall(p, IP)).toBe('guests')
+    expect(s.reserve(p, IP)).toBe('guests')
+    expect(s.mayCall(u, IP)).toBeNull()
+    expect(s.paused()).toBe(false)
+    // Reservations count: a guest is refused while the running calls would pass the 70%.
+    s.charge(rich, -0.01, HAIKU, '198.51.100.9')
+    expect(s.mayCall(p, IP)).toBeNull()
+    const holds = [0, 1, 2].map(() => s.reserve(u, IP))
+    expect(holds.every((h) => typeof h === 'function')).toBe(true)
+    expect(s.mayCall(p, IP)).toBe('guests')
+    for (const h of holds) (h as () => void)()
+    expect(s.mayCall(p, IP)).toBeNull()
+    // Order: blocked, paused, then guests before allowance and address.
+    spend(s, p, 0.1)
+    s.charge(rich, 0.01, HAIKU, '198.51.100.9')
+    expect(s.mayCall(p, IP)).toBe('guests')
+    s.setMode('starters')
+    expect(s.mayCall(p, IP)).toBe('paused')
+    s.block(p.id, true)
+    expect(s.mayCall(p, IP)).toBe('blocked')
+    s.block(p.id, false); s.setMode('open')
+    at('2026-11-12T00:00:00Z')
+    expect(s.mayCall(visitor(s), IP)).toBeNull()
   })
 
   test('the public pauses at $20 a month, then the next month opens again', () => {
@@ -224,10 +258,10 @@ describe('the meter', () => {
   })
 
   test('screens left from dollars', () => {
-    expect(screensOf(0.1)).toBe(14)
-    expect(screensOf(0.15)).toBe(21)
-    expect(screensOf(0.007)).toBe(1)
-    expect(screensOf(0.0069)).toBe(0)
+    expect(screensOf(0.1)).toBe(25)
+    expect(screensOf(0.15)).toBe(37)
+    expect(screensOf(0.004)).toBe(1)
+    expect(screensOf(0.0039)).toBe(0)
   })
 })
 
@@ -313,30 +347,41 @@ describe('sign-in codes', () => {
 })
 
 describe('verify: takeover and merge', () => {
-  test('a new email takes over the visitor; the top-up waits 12 hours', async () => {
+  test('a new email takes over the visitor; the top-up comes with it, once', async () => {
     const { s, later } = store()
     const v = s.makeVisitor(IP)!
     spend(s, v.person, 0.1)
+    expect(s.mayCall(v.person, IP)).toBe('allowance')
     const r = await signUp(s, 'ana@example.com', v.person.id)
     expect(r.merged).toBeNull()
-    expect(r.person).toMatchObject({ id: v.person.id, email: 'ana@example.com', allowance: 0.1, spent: 0.1 })
-    expect(r.person.topupDue).toBe(Date.parse('2026-11-11T22:00:00Z'))
+    expect(r.person).toEqual({ id: v.person.id, email: 'ana@example.com', created: v.person.created, seen: v.person.seen, allowance: 0.25, spent: 0.1, blocked: false, steps: [] })
     expect(s.byToken(r.token)!.id).toBe(v.person.id)
-    expect(s.mayCall(r.person, IP)).toBe('allowance')
-    later(12 * 3600_000 - 1)
-    expect(s.topupsDue()).toEqual([])
-    later(1)
-    expect(s.topupsDue().map((p) => p.id)).toEqual([v.person.id])
-    expect(s.grantTopup(v.person.id)!.allowance).toBe(0.25)
-    expect(s.grantTopup(v.person.id)).toBeNull()
-    expect(s.topupsDue()).toEqual([])
-    expect(s.mayCall(s.person(v.person.id)!, IP)).toBeNull()
+    expect(s.mayCall(r.person, IP)).toBeNull()
+    later(60_000)
+    expect((await signUp(s, 'ana@example.com', null)).person.allowance).toBe(0.25)
   })
 
-  test('the owner approves the top-up early', async () => {
+  test('the top-up follows its cap; an account with no visitor gets both', async () => {
     const { s } = store()
-    const r = await signUp(s, 'ana@example.com', visitor(s).id)
-    expect(s.grantTopup(r.person.id)).toMatchObject({ allowance: 0.25, topupDue: null })
+    s.setCaps({ topup: 0.4 })
+    expect((await signUp(s, 'bo@example.com', null)).person.allowance).toBe(0.5)
+  })
+
+  test('an old database: a waiting top-up arrives at start, once, and the column and the old cap go', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'uxwoz-old-'))
+    const file = join(dir, 'old.db')
+    const old = people(file)
+    old.db.exec('ALTER TABLE people ADD COLUMN topupDue INTEGER')
+    const a = old.makeVisitor(IP)!.person, b = old.makeVisitor(IP)!.person
+    old.db.query("UPDATE people SET email = 'a@example.com', topupDue = 1 WHERE id = ?").run(a.id)
+    old.db.query("INSERT INTO settings (key, value) VALUES ('caps', '{\"topupHours\":12,\"visitor\":0.2}')").run()
+    old.close()
+    const s = people(file)
+    expect(s.person(a.id)!.allowance).toBe(0.25)
+    expect(s.person(b.id)!.allowance).toBe(0.1)
+    expect(s.settings().caps).toEqual({ ...CAPS, visitor: 0.2 })
+    s.close()
+    expect(people(file).person(a.id)!.allowance).toBe(0.25)
   })
 
   test('an existing account: both ids come back and the visitor is gone', async () => {
@@ -358,7 +403,7 @@ describe('verify: takeover and merge', () => {
     const { s, later } = store()
     const a = (await signUp(s, 'ana@example.com', visitor(s).id)).person
     const b = (await signUp(s, 'bo@example.com', null)).person
-    expect(b).toMatchObject({ email: 'bo@example.com', allowance: 0.1 })
+    expect(b).toMatchObject({ email: 'bo@example.com', allowance: 0.25 })
     later(CODE_AGAIN_MS)
     const r = await signUp(s, 'ana@example.com', b.id)
     expect(r).toMatchObject({ person: { id: a.id }, merged: null })
@@ -379,13 +424,13 @@ describe('requests, steps, shares, the admin', () => {
     expect(s.ask(u.id, 'again')).toBe('open')
     expect(s.lastRequest(u.id)).toMatchObject({ id, answer: null, email: 'ana@example.com' })
     const a = s.answer(id, true)!
-    expect(a.person.allowance).toBe(0.6)
+    expect(a.person.allowance).toBe(0.75)
     expect(a.request).toMatchObject({ answer: 'approved', usd: 0.5 })
     expect(s.answer(id, true)).toBeNull()
     const id2 = s.ask(u.id, 'again') as number
-    expect(s.answer(id2, false)!.person.allowance).toBe(0.6)
+    expect(s.answer(id2, false)!.person.allowance).toBe(0.75)
     const id3 = s.ask(u.id, 'once more') as number
-    expect(s.answer(id3, true, 0.2)!.person.allowance).toBe(0.8)
+    expect(s.answer(id3, true, 0.2)!.person.allowance).toBe(0.95)
   })
 
   test('steps count once per person; arrived at most 50 a day per address', () => {

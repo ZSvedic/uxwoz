@@ -75,7 +75,7 @@ src/packages/web/src/
                  /api/box (also undo, a box's Undo and Edit, Visit now), /api/warmup, /api/backup, /api/me, /api/step,
                  themes; request checks; a visit every 5 picks;
                  every route takes its cache from the request's desk; in public mode the account's and the
-                 admin's routes, the top-ups each minute, idle visitors swept each day, the backup as a zip
+                 admin's routes, the owner's mail of requests, idle visitors swept each day, the backup as a zip
   drawing.ts     the work behind the routes: filing and visits in one chain per mockup (a click waits for it), a
                  visit's redraws as Edits; a screen's stream (A OR B at once, a revise) as NDJSON; a
                  starter's recording replayed in place of those calls, and `replayed` (would a request be)
@@ -102,14 +102,14 @@ src/packages/web/src/
   boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes and their rails, editing and adding in
                  place, Export
   people.ts      the public's people and money over bun:sqlite (spec/public.md): visitors, sessions, the meter
-                 (mayCall, reserve: $0.004 held per running call, hold, charge), sign-in codes (per network, per email and day) and verify, blocked emails, top-ups, quota requests, steps, caps, share
+                 (mayCall, reserve: $0.004 held per running call, hold, charge), sign-in codes (per network, per email and day) and verify, blocked emails, the top-up at verify, guests at 70% of the day, quota requests, steps, caps, share
                  tokens, the admin's summary, deletes, the day's address HMAC; no routes
   mail.ts        mail through Resend (logs with no key off production) and the texts of the emails
   admin.ts       adminRoutes(store, extras): GET and POST /api/admin (the ops, their checks, their emails), /admin,
                  /privacy (privacy.html with the operator and contact from the env, the design inline); no gate
   account.ts     accountRoutes(store, extras): /api/signin, /api/verify, /api/signout, /api/delete-account,
-                 /api/ask, meOf (/api/me's body); startTopups: the once-a-minute top-ups and the owner's emails
-  admin.html, admin-page.ts   browser: the admin's page: spend and mode, caps, steps, Waiting, Requests, People
+                 /api/ask, meOf (/api/me's body), closedOf; startAsks: the owner's mail of open requests, one an hour
+  admin.html, admin-page.ts   browser: the admin's page: spend and mode, caps, steps, Requests, People, each dollar amount in screens too
   share.ts       share links per role, the player's map, feedback (a name first; a visitor's own; Resolve) and
                  trips, an edit link's scope and cap, the owner's gate (UXWOZ_OWNER); `guard` wraps server.ts's routes
   sharing.ts     browser: the drawer's Share and feedback pane (a comment jumps to it), a screen's thumbs in Info,

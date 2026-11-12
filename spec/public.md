@@ -11,11 +11,11 @@ choice was made: `process/plans/2026-11-11-public-users.md`.
 POST /api/screen {app: "a dog walking app"}     no cookie
   → a person is made (a visitor, $0.10), Set-Cookie: uxwoz_who=<token>
   → two Haiku designs stream; each call's cost is taken from the person when it ends
-GET /api/me → {role: "visitor", left: 0.0984, allowance: 0.1, screensLeft: 14, …}
+GET /api/me → {role: "visitor", left: 0.0984, allowance: 0.1, screensLeft: 24, more: 37, …}
 …
 POST /api/screen → 402 {error: "Your free screens are used up.", reason: "allowance"}
 POST /api/signin {email} → 204, a six-digit code by email
-POST /api/verify {email, code} → {me}; the $0.15 arrives 12 hours later, or when the owner approves
+POST /api/verify {email, code} → {me}; the $0.15 top-up is in the allowance at once
 ```
 
 ## Modes
@@ -51,7 +51,7 @@ store's methods take and give USD. Times are milliseconds since 1970, days and m
 
 | Table | Holds |
 |---|---|
-| `people` | id, email (unique or null), created, seen (each request), allowance, spent, blocked, topupDue (when a waiting top-up arrives), steps done |
+| `people` | id, email (unique or null), created, seen (each request), allowance, spent, blocked, steps done |
 | `sessions` | token hash, person, created |
 | `codes` | email, code hash, the person who asked, expires, wrong tries |
 | `calls` | one row per model call: at, person, usd, model. A deleted person's rows stay, with no person, so the day's and the month's sums hold |
@@ -91,10 +91,12 @@ store's methods take and give USD. Times are milliseconds since 1970, days and m
 |---|---|---|
 | `allowance` | the person's `spent` is at or over their `allowance`, or with the running calls' reservations over it | *Your free screens are used up.* |
 | `address` | a visitor, and visitors from this address spent $0.30 today | *This network has used today's free screens. Register to carry on.* |
+| `guests` | a visitor, and the public spent 70% of the day's cap (`dayUsd`) today, the running calls' reservations counted | *Today's free screens for guests are used up. Register to carry on.* |
 | `paused` | the mode is `starters`, or the public spent $3 today or $20 this month | *Live designs are paused for now. The starters still work.* |
-| `blocked` | the owner blocked the person | *This account is closed.* |
+| `blocked` | the owner blocked the person | *This account is closed. Write to <contact>.* (`UXWOZ_CONTACT`, else `UXWOZ_ADMIN_EMAIL`; with neither, the first sentence only) |
 
-The store checks in the order `blocked`, `paused`, `allowance`, `address`: a reason the person cannot fix
+So registered users go on to the whole day's cap after guests stop. The store checks in the order
+`blocked`, `paused`, `guests`, `allowance`, `address`: a reason the person cannot fix
 comes before one that registering fixes, so a refused person is never sent to a sign-up that would not
 help. The 21st new visitor from an address in a day gets 402 `address` at their first `POST /api/screen`.
 
@@ -109,7 +111,7 @@ help. The 21st new visitor from an address in a day gets 402 `address` at their 
   through in the last 4 minutes (it answers 204 without a call then, before the meter is asked). The
   warm-up claims that slot, one for the whole public, before it calls, so warm-ups sent together make
   one call.
-- Defaults, each changeable on the admin's page: visitor allowance $0.10, top-up $0.15 after 12 hours,
+- Defaults, each changeable on the admin's page: visitor allowance $0.10, top-up $0.15 at sign-up,
   $0.30 a day per address for visitors, 20 new visitors and 3 new accounts a day per address, $3 a day
   and $20 a month for the public as a whole, 100 emails a day (Resend's free plan).
 - **The address** is the header named by `UXWOZ_ADDRESS_HEADER` (default `x-real-ip`), else the
@@ -141,8 +143,10 @@ the index.
 ## Routes
 
 - `GET /api/me` → `{role: "owner" | "user" | "visitor" | "new", email?, left, allowance, screensLeft,
-  topupDue?, request?: {at, answer?}, paused, may: {share, exportZip}}`. `left` is allowance minus spent, never below 0;
-  `screensLeft` is `floor(left / 0.007)`; `paused` is true when a paid request would get `paused`.
+  more?, request?: {at, answer?}, paused, may: {share, exportZip}}`. `left` is allowance minus spent, never below 0;
+  `screensLeft` is `floor(left / SCREEN_USD)`, with `SCREEN_USD` $0.004 (`people.ts`); `more`, for `new` and
+  `visitor` only, is the screens a new account adds, `floor(topup / SCREEN_USD)`; `paused` is true when a paid
+  request would get `paused`.
 - `POST /api/step {step: "arrived"}` → 204 (another step is 400). The other steps (`starter`, `picked`, `own`, `limit`,
   `asked`, `verified`) the server counts itself, each once per person: `starter` and `own` at a
   `POST /api/screen` for a Home not in the person's cache, with a starter's prompt or another;
@@ -161,33 +165,35 @@ the index.
   verify only. 503 *Sign-up is not set up yet.* in production with no mail
   key, 503 when the email did not go. The code is never logged in production.
 - `POST /api/verify {email, code}` → `{me}` and a new session cookie. A new email takes over the
-  visitor's person (the mockups stay where they are) and sets `topupDue` 12 hours ahead. An email with
+  visitor's person (the mockups stay where they are) and adds the top-up (`topup`, $0.15) to its
+  allowance at once; with no visitor it makes a person with the visitor's allowance and the top-up. An email with
   an account signs in to it: the visitor's mockups move in, except those whose prompt the account
-  already has, and the visitor's person is deleted. 400 *That code is not right.* (each wrong one counts
-  toward the email's 15 a day), 429 *Too many codes…* past them, 403 *This account is closed.* for a
+  already has, and the visitor's person is deleted; signing in again adds nothing. 400 *That code is not right.* (each wrong one counts
+  toward the email's 15 a day), 429 *Too many codes…* past them, 403 *This account is closed. Write to <contact>.* for a
   blocked email (after the right code, so only its owner learns it), 429 when the address made its
   accounts and the email is new; the right code stays good then, to use from another network.
 - `POST /api/signout` → 204, the session is deleted and the cookie cleared.
 - `POST /api/delete-account {email}` (registered; `email` must be the account's) → 204 and the cookie
   cleared: the cache file, every row and share link of the person go (their `calls` stay with no
   person). 400 for another email.
-- `POST /api/ask {note}` (registered, 1 to 500 characters) → 204, and the owner gets it by email at
-  once. One open request per person (409). A blocked person gets 403 *This account is closed.*
+- `POST /api/ask {note}` (registered, 1 to 500 characters) → 204, and the owner is told by email (see
+  below). One open request per person (409). A blocked person gets 403 *This account is closed. Write to <contact>.*
 - `GET /api/admin` (owner) → `{spent: {today, month}, caps, mode, steps: {day, …counts}[] (30 days),
-  people: {id, email, created, seen, allowance, spent, mockups, blocked, topupDue}[], requests[],
-  address, mailToday, startersCurrent}`. `address` is the caller's as the server sees it.
+  people: {id, email, created, seen, allowance, spent, mockups, blocked}[], requests[],
+  address, mailToday, startersCurrent, screenUsd}`. `address` is the caller's as the server sees it;
+  `screenUsd` is `SCREEN_USD`, so the page says about how many screens each dollar amount is.
 - `POST /api/admin {op, …}` (owner): `mode`, `caps`, `give {id, usd}`, `block {id, blocked}`,
-  `delete {id}`, `topup {id}` (now), `answer {request, approved, usd?}`. `block` blocks the person's
+  `delete {id}`, `answer {request, approved, usd?}`. `block` blocks the person's
   email too (hashed, in `blocked`); a blocked person may still delete their account, and the email stays
   blocked; unblocking takes it off. `caps` takes only `CAPS`'s own keys. It answers the same body as
   `GET /api/admin`, with `mailed: false` when the op's email did not go. A bad input is 400 (an unknown
   op or cap, a cap below 0 or over its ceiling, an amount over $100, `give` of 0 or below −$100, an
-  `answer` amount of 0 or less), an unknown person or request 404, a top-up that no longer waits or an
-  answered request 409. `topup` emails *Your free screens are ready*, `answer` the answer; each sent
-  email counts toward the day's.
+  `answer` amount of 0 or less), an unknown person or request 404, an answered request 409. `answer`
+  emails the answer; each sent email counts toward the day's.
 - `GET /admin` (owner: anyone else gets 403, as at `/design`; the page itself is served from a path with a
   secret made per process, which only the server's own fetch knows), `GET /privacy` (everyone): pages. The privacy page names `UXWOZ_OPERATOR` as who
-  runs the site and `UXWOZ_CONTACT` (else `UXWOZ_ADMIN_EMAIL`) as whom to write to. An email address there is
+  runs the site and `UXWOZ_CONTACT` (else `UXWOZ_ADMIN_EMAIL`) as whom to write to, and who handles the data:
+  Railway (the host), Resend (mail), OpenRouter with Anthropic's Claude, and OpenAI (the models). An email address there is
   kept from scrapers: the HTML holds it backwards in two pieces and as words (*name at site dot com*),
   and a script builds the link in the browser.
 - `GET /api/config` gains `public: true`, `starters: Starter[]` (both only in public mode, the owner's
@@ -196,10 +202,11 @@ the index.
   (a snapshot of the database) and `users/<id>.json` for every person with a cache, open or on disk.
   `src/scripts/backup.sh` keeps either kind.
 
-A check once a minute hands out the top-ups that are due (never a blocked person's) and emails each user *Your free screens are
-ready* (not when the day's emails are used up). Approving in the admin's page does the same at once.
-The same check tells the owner of sign-ups (not blocked) that started waiting since its last such email, one email an
-hour at most. These routes and the check are `web/src/account.ts`. The links in every email start with
+The owner hears of quota requests in one email an hour at most, listing every open request: a request
+sends it at once when none went in the last hour, and a check once a minute (`startAsks`) sends it when
+the hour is up and a request is new since the last one (not when the day's emails are used up). A
+database from when the top-up waited 12 hours gives each waiting top-up when the server starts. These
+routes and the check are `web/src/account.ts`. The links in every email start with
 `UXWOZ_URL` (default `https://app.uxwoz.com/`).
 
 ## Mail
@@ -207,7 +214,7 @@ hour at most. These routes and the check are `web/src/account.ts`. The links in 
 `web/src/mail.ts` sends through Resend: `POST https://api.resend.com/emails` with
 `Authorization: Bearer $RESEND_API_KEY` and `{from, to: [to], subject, text}`, through the server's
 `Io.fetch` (so tests fake it). With no key outside production it logs the message instead. The owner
-(`UXWOZ_ADMIN_EMAIL`) gets a quota request at once, and waiting sign-ups in one email an hour at most.
+(`UXWOZ_ADMIN_EMAIL`) gets the open quota requests, one email an hour at most.
 
 | Var | Use |
 |---|---|
@@ -215,7 +222,7 @@ hour at most. These routes and the check are `web/src/account.ts`. The links in 
 | `UXWOZ_DB`, `UXWOZ_USERS_DIR` | the database file and the folder of people's cache files |
 | `UXWOZ_ADDRESS_HEADER` | the header with the visitor's address, default `x-real-ip` |
 | `RESEND_API_KEY`, `UXWOZ_MAIL_FROM`, `UXWOZ_ADMIN_EMAIL` | mail: the key, the sender (default `UX Woz <hello@mail.uxwoz.com>`), the owner's address |
-| `UXWOZ_OPERATOR`, `UXWOZ_CONTACT` | the privacy page: who runs the site, whom to write to |
+| `UXWOZ_OPERATOR`, `UXWOZ_CONTACT` | the privacy page: who runs the site, whom to write to (also in a blocked person's refusal) |
 | `UXWOZ_URL` | the app's address in emails, default `https://app.uxwoz.com/` |
 
 ## Recordings

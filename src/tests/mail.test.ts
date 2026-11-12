@@ -1,7 +1,7 @@
 // Mail through Resend with a fake fetch, and the texts of the emails.
 import { expect, test } from 'bun:test'
 import type { Fetch } from '@uxwoz/core'
-import { MAIL_FROM, RESEND_URL, answerMail, codeMail, mailReady, readyMail, requestMail, send, waitingMail } from '../packages/web/src/mail.ts'
+import { MAIL_FROM, RESEND_URL, answerMail, codeMail, contactOf, mailReady, requestMail, send } from '../packages/web/src/mail.ts'
 
 function fake(status = 200) {
   const calls: { url: string; init: RequestInit }[] = []
@@ -50,20 +50,20 @@ test('no key: logged on a dev machine, not sent in production', async () => {
 })
 
 test('the texts', () => {
-  expect(readyMail('a@b.co', 0.15, 'https://app.uxwoz.com/')).toEqual({
-    to: 'a@b.co', subject: 'Your free screens are ready', text: expect.stringContaining('about 21 free screens'),
-  })
-  expect(readyMail('a@b.co', 0.15, 'https://app.uxwoz.com/').text).toContain('https://app.uxwoz.com/')
-  const r = requestMail('owner@x.co', { email: 'ana@example.com', note: 'For a pitch on Friday', spent: 0.25, allowance: 0.25 }, 'https://app.uxwoz.com/admin')
+  const r = requestMail('owner@x.co', [{ email: 'ana@example.com', note: 'For a pitch on Friday', spent: 0.25, allowance: 0.25 }], 'https://app.uxwoz.com/admin')
   expect(r.to).toBe('owner@x.co')
-  expect(r.subject).toContain('ana@example.com')
+  expect(r.subject).toBe('UX Woz: ana@example.com asks for more')
   expect(r.text).toContain('For a pitch on Friday')
   expect(r.text).toContain('$0.25 of $0.25')
   expect(r.text).toContain('/admin')
-  expect(answerMail('a@b.co', true, 0.5, 'u').text).toContain('about 71 more screens')
+  const two = requestMail('o@x.co', [{ email: 'a@x.co', note: 'one', spent: 0, allowance: 0.25 }, { email: null, note: 'two', spent: 0, allowance: 0.25 }], 'u')
+  expect(two.subject).toBe('UX Woz: 2 people ask for more')
+  expect(two.text).toMatch(/one[\s\S]*someone spent[\s\S]*two/)
+  expect(answerMail('a@b.co', true, 0.5, 'u').text).toContain('about 125 more screens')
   expect(answerMail('a@b.co', false, 0.5, 'u').subject).toContain('request')
-  expect(waitingMail('o@x.co', 1, 'u').subject).toBe('UX Woz: 1 sign-up waiting')
-  expect(waitingMail('o@x.co', 3, 'u').subject).toBe('UX Woz: 3 sign-ups waiting')
-  for (const m of [codeMail('a', '1'), readyMail('a', 1, 'u'), r, answerMail('a', true, 1, 'u'), answerMail('a', false, 1, 'u'), waitingMail('a', 2, 'u')])
+  for (const m of [codeMail('a', '1'), r, two, answerMail('a', true, 1, 'u'), answerMail('a', false, 1, 'u')])
     expect(m.subject + m.text).not.toContain('—')
+  expect(contactOf({ UXWOZ_CONTACT: ' c@x.co ', UXWOZ_ADMIN_EMAIL: 'o@x.co' })).toBe('c@x.co')
+  expect(contactOf({ UXWOZ_ADMIN_EMAIL: 'o@x.co' })).toBe('o@x.co')
+  expect(contactOf({})).toBe('')
 })

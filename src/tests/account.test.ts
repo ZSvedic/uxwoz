@@ -2,7 +2,7 @@
 // clock, caches in memory for the mockups a sign-in moves.
 import { beforeEach, expect, test } from 'bun:test'
 import { ScreenCache, type Fetch, type Version } from '@uxwoz/core'
-import { accountRoutes, startTopups, WAITING_MAIL_MS, type AccountExtras } from '../packages/web/src/account.ts'
+import { accountRoutes, startAsks, ASKS_MAIL_MS, type AccountExtras } from '../packages/web/src/account.ts'
 import { RESEND_URL } from '../packages/web/src/mail.ts'
 import { people, type People } from '../packages/web/src/people.ts'
 
@@ -15,6 +15,7 @@ let caches: Map<string, ScreenCache>
 let logs: string[]
 let routes: ReturnType<typeof accountRoutes>
 let extras: AccountExtras
+let asks: ReturnType<typeof startAsks>
 
 function make(env: Record<string, string | undefined> = { RESEND_API_KEY: 're_test', UXWOZ_ADMIN_EMAIL: ADMIN }) {
   const f: Fetch = async (url, init) => {
@@ -33,6 +34,9 @@ function make(env: Record<string, string | undefined> = { RESEND_API_KEY: 're_te
     appUrl: () => 'https://uxwoz.example/',
     now: () => clock.t,
   }
+  asks?.()
+  asks = startAsks(store, extras)
+  extras.asked = () => asks.tick()
   routes = accountRoutes(store, extras)
 }
 const token = (req: Request) => req.headers.get('cookie')?.match(/uxwoz_who=([a-f0-9]{32})/)?.[1] ?? null
@@ -63,7 +67,7 @@ async function signIn(email: string, who: string | null, address = ADDR) {
   return post('/api/verify', { email, code: codeOf(email) }, who, address)
 }
 
-test('a visitor registers, waits, and the top-up arrives with its email; the owner hears once', async () => {
+test('a visitor registers and the top-up comes with the code: no wait, no mail but the code', async () => {
   const v = store.makeVisitor(ADDR)!
   mockup(v.person.id, 'Dog walks', '<h1>dogs</h1>')
   store.charge(v.person, 0.1, 'haiku', ADDR)
@@ -72,36 +76,28 @@ test('a visitor registers, waits, and the top-up arrives with its email; the own
   expect(mails).toHaveLength(1)
   expect(mails[0]!.to).toEqual(['ana@example.com'])
   expect((await post('/api/verify', { email: 'ana@example.com', code: '000000' === codeOf('ana@example.com') ? '111111' : '000000' }, v.token)).status).toBe(400)
+  expect(store.person(v.person.id)!.allowance).toBe(0.1)
   const r = await post('/api/verify', { email: 'ana@example.com', code: codeOf('ana@example.com') }, v.token)
   expect(r.status).toBe(200)
   const { me } = await r.json() as any
-  expect(me).toMatchObject({ role: 'user', email: 'ana@example.com', left: 0, allowance: 0.1, screensLeft: 0, paused: false, may: { share: true, exportZip: true } })
-  expect(me.topupDue).toBe(clock.t + 12 * 3600_000)
+  // $0.15 at $0.004 a screen: 37 screens at once.
+  expect(me).toEqual({ role: 'user', email: 'ana@example.com', left: 0.15, allowance: 0.25, screensLeft: 37, paused: false, may: { share: true, exportZip: true } })
   const t = cookieOf(r)
   expect(store.byToken(t)!.id).toBe(v.person.id)
   // The mockups stay where they are; the steps are counted.
   expect(cacheOf(v.person.id).apps().map((a) => a.app)).toEqual(['Dog walks'])
   expect(store.person(v.person.id)!.steps).toEqual(['asked', 'verified'])
+  // Signing in again gives nothing more, and the owner is told nothing.
+  clock.t += 60_000
+  expect((await signIn('ana@example.com', null)).status).toBe(200)
+  expect(store.person(v.person.id)!.allowance).toBe(0.25)
+  await asks.tick()
+  expect(mails.filter((m) => m.to[0] === ADMIN)).toEqual([])
+})
 
-  const stop = startTopups(store, extras)
-  await stop.tick()
-  expect(mails.at(-1)).toMatchObject({ to: [ADMIN], subject: 'UX Woz: 1 sign-up waiting' })
-  await stop.tick()
-  clock.t += WAITING_MAIL_MS
-  await stop.tick()
-  expect(mails.filter((m) => m.to[0] === ADMIN)).toHaveLength(1)
-
-  clock.t = me.topupDue - 1
-  await stop.tick()
-  expect(store.person(v.person.id)!.topupDue).not.toBeNull()
-  clock.t = me.topupDue
-  await stop.tick()
-  expect(store.person(v.person.id)).toMatchObject({ topupDue: null, allowance: 0.25 })
-  expect(mails.at(-1)).toMatchObject({ to: ['ana@example.com'], subject: 'Your free screens are ready' })
-  expect(mails.at(-1)!.text).toContain('https://uxwoz.example/')
-  await stop.tick()
-  expect(mails.filter((m) => m.subject === 'Your free screens are ready')).toHaveLength(1)
-  stop()
+test('a first account from a second browser gets the visitor\'s allowance and the top-up', async () => {
+  const r = await signIn('new@example.com', null)
+  expect(((await r.json()) as any).me).toMatchObject({ left: 0.25, allowance: 0.25, screensLeft: 62 })
 })
 
 test('an account signs in from a second browser: the visitor\'s mockups move in, a prompt it has stays its own', async () => {
@@ -234,8 +230,49 @@ test('ask: the owner hears at once; a second ask waits for the answer; a visitor
   expect((await post('/api/ask', { note: 'Hi' })).status).toBe(403)
 })
 
+test('the owner gets one mail of requests an hour at most, listing the open ones', async () => {
+  const ask = async (email: string, note: string) => {
+    clock.t += 60_000
+    const t = cookieOf(await signIn(email, null, `192.0.2.${mails.length}`))
+    expect((await post('/api/ask', { note }, t)).status).toBe(204)
+  }
+  const owner = () => mails.filter((m) => m.to[0] === ADMIN)
+  await ask('k1@example.com', 'First note')
+  expect(owner()).toHaveLength(1)
+  await ask('k2@example.com', 'Second note')
+  await ask('k3@example.com', 'Third note')
+  await asks.tick()
+  expect(owner()).toHaveLength(1)
+  // One answered before the hour is up drops out of the list.
+  store.answer(store.openRequests()[0]!.id, false)
+  clock.t += ASKS_MAIL_MS
+  await asks.tick()
+  expect(owner()).toHaveLength(2)
+  const m = owner()[1]!
+  expect(m.subject).toBe('UX Woz: 2 people ask for more')
+  expect(m.text).toContain('k2@example.com spent')
+  expect(m.text).toContain('Third note')
+  expect(m.text).not.toContain('First note')
+  // Nothing new: no mail, however long it waits.
+  clock.t += 3 * ASKS_MAIL_MS
+  await asks.tick()
+  expect(owner()).toHaveLength(2)
+})
+
+test('a blocked person reads whom to write to', async () => {
+  make({ RESEND_API_KEY: 're_test', UXWOZ_ADMIN_EMAIL: ADMIN, UXWOZ_CONTACT: 'help@example.com' })
+  const t = cookieOf(await signIn('l@example.com', null))
+  store.block(store.byToken(t)!.id, true)
+  const r = await post('/api/ask', { note: 'Hi' }, t)
+  expect(r.status).toBe(403)
+  expect(await r.json()).toEqual({ error: 'This account is closed. Write to help@example.com.' })
+  clock.t += 60_000
+  const again = await signIn('l@example.com', null)
+  expect(await again.json()).toEqual({ error: 'This account is closed. Write to help@example.com.' })
+})
+
 test('the check\'s timer does not keep the process alive, and stop ends it', () => {
-  const stop = startTopups(store, extras, 10)
+  const stop = startAsks(store, extras, 10)
   expect(typeof stop).toBe('function')
   stop()
 })

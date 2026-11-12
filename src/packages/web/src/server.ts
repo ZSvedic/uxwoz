@@ -6,7 +6,7 @@ import {
   BOX_TITLES, DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, ScreenCache, canonicalAction, isComponent, isDevice, isModelId, normalizePrompt,
   screenKey, screenRef, STARTERS, VISIT_EVERY, startersCurrent, warmUp, zip, type BoxName, type Io,
 } from '@uxwoz/core'
-import { accountRoutes, startTopups } from './account.ts'
+import { accountRoutes, startAsks } from './account.ts'
 import { adminRoutes } from './admin.ts'
 import { desks } from './desks.ts'
 import { drawing, ndjson } from './drawing.ts'
@@ -82,7 +82,7 @@ export function createServer(opts: ServerOptions = {}) {
   const store = publicMode(opts.public ?? process.env.UXWOZ_PUBLIC === '1', owner) ? (opts.people ?? people(process.env.UXWOZ_DB ?? ':memory:')) : null
   let server: ReturnType<typeof Bun.serve> | null = null
   const pub = store ? gate({
-    store, owner: owner!, desks: () => all, addressHeader: opts.addressHeader, refuse: refuseForeign,
+    store, owner: owner!, desks: () => all, addressHeader: opts.addressHeader, refuse: refuseForeign, env,
     socket: (req) => server?.requestIP(req)?.address ?? null,
   }) : undefined
   /** A desk's Io and whether its background work may start: the owner's as given, a person's metered. */
@@ -109,7 +109,7 @@ export function createServer(opts: ServerOptions = {}) {
 
   const { guard } = sharing(all, api, { app: index, player }, owner, pub)
 
-  // Public mode: the account's and the admin's routes, the top-ups each minute and the idle visitors each day.
+  // Public mode: the account's and the admin's routes, the owner's mail of requests and the idle visitors each day.
   const appUrl = () => env().UXWOZ_URL?.trim() || APP_URL
   const mailIo: Io = { fetch: opts.fetch, env: opts.env, log }
   /** A person's cache file and desk go; the store's rows are the caller's. */
@@ -125,9 +125,12 @@ export function createServer(opts: ServerOptions = {}) {
     headers.append('Set-Cookie', token ? setCookie(token, req) : clearCookie(req))
     return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
   }
+  /** The owner hears of open requests at once, then one email an hour at most. */
+  const asks = store ? startAsks(store, { io: mailIo, appUrl }) : null
   /** Each POST of the account's routes refuses a foreign request first, as every other POST does. */
   const accounts = store ? Object.fromEntries(Object.entries(accountRoutes(store, {
     who: personOf, token: tokenOf, address: (req) => pub!.address(req), cookie: withCookie, move, deleteFile, io: mailIo, appUrl,
+    asked: () => asks?.tick(),
   })).map(([path, r]) => [path, { POST: (req: Request) => refuseForeign(req) ?? r.POST(req) }])) : {}
   const admin = store ? adminRoutes(store, {
     mockups: (id) => all.peek(id)?.apps().length ?? 0, address: (req) => pub!.address(req), startersCurrent: () => startersCurrent(),
@@ -136,7 +139,6 @@ export function createServer(opts: ServerOptions = {}) {
   const adminApi = admin ? { '/api/admin': { GET: admin['/api/admin'].GET, POST: (req: Request) => refuseForeign(req) ?? admin['/api/admin'].POST(req) } } : {}
   /** The public's own pages and routes: `/admin` and `/api/admin` get the owner's gate in share.ts, `/privacy` is open. */
   const publicRoutes: Record<string, any> = admin ? { '/admin': admin['/admin'], '/privacy': admin['/privacy'], ...accounts, ...adminApi } : {}
-  const topups = store ? startTopups(store, { io: mailIo, appUrl }) : null
   /** Visitors idle for 30 days lose their file, then their rows. */
   const sweepIdle = async () => {
     if (!store) return []
@@ -320,8 +322,8 @@ export function createServer(opts: ServerOptions = {}) {
   return Object.assign(server, {
     desks: all, people: store,
     /** One run of the once-a-minute top-ups and of the daily idle sweep, for tests. */
-    tick: { topups: () => topups?.tick() ?? Promise.resolve(), idle: sweepIdle },
-    stop: (closeActive?: boolean) => { topups?.(); if (idleTimer) clearInterval(idleTimer); return stop(closeActive) },
+    tick: { asks: () => asks?.tick() ?? Promise.resolve(), idle: sweepIdle },
+    stop: (closeActive?: boolean) => { asks?.(); if (idleTimer) clearInterval(idleTimer); return stop(closeActive) },
   })
 }
 

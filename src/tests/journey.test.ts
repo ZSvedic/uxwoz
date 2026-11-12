@@ -78,7 +78,7 @@ const callRows = () => (store.db.query('SELECT COUNT(*) AS n FROM calls').get() 
 const fileOf = (id: string) => join(dir, `${id}.json`)
 
 describe('a person\'s journey', () => {
-  test('a starter for free, an own prompt to zero, sign-up, the top-up after 12 hours, a paid call, a request approved', async () => {
+  test('a starter for free, an own prompt to zero, sign-up and its top-up at once, a paid call, a request approved', async () => {
     start()
     const ana = browser()
     // No cookie: the starter makes the visitor, replays its recording and costs nothing.
@@ -99,20 +99,11 @@ describe('a person\'s journey', () => {
     expect(await screen(ana, 'Fish tanks')).toMatchObject({ status: 402, body: { reason: 'allowance' } })
     expect(personOf(ana).steps).toEqual(['starter', 'picked', 'own', 'limit'])
 
-    // Sign up: nothing is granted at verify.
+    // Sign up: the top-up arrives with the code, and the next screen draws at once.
     const me = await signUp(ana, 'ana@example.com')
-    expect(me).toMatchObject({ role: 'user', email: 'ana@example.com', left: 0, allowance: 0.1, topupDue: clock.t + 12 * 3600_000 })
-    expect(await screen(ana, 'Fish tanks')).toMatchObject({ status: 402, body: { reason: 'allowance' } })
-    await server!.tick.topups()
-    expect(personOf(ana).topupDue).not.toBeNull()
-
-    // The tick after 12 hours grants the top-up and emails it, with the app's address.
-    clock.t += 12 * 3600_000
-    await server!.tick.topups()
-    expect(personOf(ana)).toMatchObject({ allowance: 0.25, topupDue: null })
-    const ready = mails.findLast((m) => m.to[0] === 'ana@example.com')!
-    expect(ready.subject).toBe('Your free screens are ready')
-    expect(ready.text).toContain('https://woz.test/')
+    expect(me).toMatchObject({ role: 'user', email: 'ana@example.com', left: 0.13, allowance: 0.25, screensLeft: 32 })
+    expect(me).not.toHaveProperty('more')
+    expect(mails.filter((m) => m.to[0] === 'ana@example.com').map((m) => m.subject)).toEqual([expect.stringMatching(/^Your UX Woz code/)])
     expect((await screen(ana, 'Fish tanks')).status).toBe(200)
 
     // Ask for more; the owner gets it, approves it, and the answer is emailed.

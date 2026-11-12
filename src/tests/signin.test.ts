@@ -116,20 +116,21 @@ describe('sign-in and mail against abuse', () => {
     expect(store.mailToday()).toBe(2)
   })
 
-  test('a blocked email stays closed after delete-account; it cannot ask; it gets no top-up; unblock opens it', async () => {
+  test('a blocked email stays closed after delete-account; it cannot ask; unblock opens it', async () => {
     start()
     const ana = browser()
     expect((await signUp(ana, 'ana@example.com')).status).toBe(200)
     const id = store.byEmail('ana@example.com')!.id
     expect((await owner.post('/api/admin', { op: 'block', id, blocked: true })).status).toBe(200)
 
-    // Blocked: no request reaches the owner, no top-up and no ready mail when it is due.
+    // Blocked: no request reaches the owner, and the refusal says whom to write to.
     const before = mails.length
-    expect((await ana.post('/api/ask', { note: 'more please' })).status).toBe(403)
+    const asked = await ana.post('/api/ask', { note: 'more please' })
+    expect(asked.status).toBe(403)
+    expect(await asked.json()).toEqual({ error: `This account is closed. Write to ${ADMIN}.` })
     clock.t += 13 * 3600_000
-    await server!.tick.topups()
-    expect(store.person(id)).toMatchObject({ topupDue: expect.any(Number), allowance: 0.1 })
-    expect(mails.slice(before).filter((m) => m.to[0] === 'ana@example.com' || m.subject.includes('waiting'))).toHaveLength(0)
+    await server!.tick.asks()
+    expect(mails.slice(before)).toHaveLength(0)
 
     // Deleting the account is their right; signing up again with that email is refused at verify.
     expect((await ana.post('/api/delete-account', { email: 'ana@example.com' })).status).toBe(204)
@@ -138,7 +139,7 @@ describe('sign-in and mail against abuse', () => {
     const back = browser('10.0.0.2')
     const r = await signUp(back, 'ana@example.com')
     expect(r.status).toBe(403)
-    expect(await r.json()).toEqual({ error: 'This account is closed.' })
+    expect(await r.json()).toEqual({ error: `This account is closed. Write to ${ADMIN}.` })
     expect(store.byEmail('ana@example.com')).toBeNull()
 
     // Unblock takes the email off the list.

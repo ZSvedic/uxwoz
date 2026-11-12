@@ -42,7 +42,7 @@ const post = (body: unknown) => routes['/api/admin'].POST(new Request('http://x/
 const ok = async (body: unknown) => { const r = await post(body); expect(r.status).toBe(200); return r.json() as Promise<any> }
 const status = async (body: unknown) => (await post(body)).status
 
-/** A registered user by code, with their top-up waiting. */
+/** A registered user by code, their top-up given. */
 function user(email: string) {
   const v = store.makeVisitor(ADDR)!
   const c = store.makeCode(email, v.person.id, ADDR) as { code: string }
@@ -60,8 +60,9 @@ test('GET: the summary, each person\'s mockups, the address, the starters; no st
   expect(a.caps.visitor).toBe(0.1)
   expect(a.address).toBe(ADDR)
   expect(a.startersCurrent).toBe(true)
+  expect(a.screenUsd).toBe(0.004)
   expect(a.mailToday).toBe(0)
-  expect(a.people).toEqual([{ id: v.id, email: null, created: clock.t, seen: clock.t, allowance: 0.1, spent: 0.01, mockups: 2, blocked: false, topupDue: null }])
+  expect(a.people).toEqual([{ id: v.id, email: null, created: clock.t, seen: clock.t, allowance: 0.1, spent: 0.01, mockups: 2, blocked: false }])
   expect(a.requests).toEqual([])
 })
 
@@ -112,20 +113,11 @@ test('delete: the file first, then the person; an unknown id 404 and no file del
   expect(deleted).toEqual([v.id])
 })
 
-test('topup: hands out the waiting top-up now and emails the user; once only', async () => {
+test('topup is no op any more: the top-up comes with the code', async () => {
   const u = user('ana@example.com')
-  expect((await get()).people[0].topupDue).not.toBeNull()
-  const a = await ok({ op: 'topup', id: u.id })
-  expect(a.mailed).toBe(true)
-  expect(a.people[0].allowance).toBeCloseTo(0.25)
-  expect(a.people[0].topupDue).toBeNull()
-  // The sign-in code's mail is counted when the code is made, and the ready mail after it.
-  expect(a.mailToday).toBe(2)
-  expect(mails).toEqual([expect.objectContaining({ to: ['ana@example.com'], subject: 'Your free screens are ready', text: expect.stringContaining('https://uxwoz.example/') })])
-  expect(await status({ op: 'topup', id: u.id })).toBe(409)
-  expect(mails).toHaveLength(1)
-  expect(await status({ op: 'topup', id: 'b'.repeat(32) })).toBe(404)
-  expect(await status({ op: 'topup' })).toBe(400)
+  expect((await get()).people[0].allowance).toBeCloseTo(0.25)
+  expect(await status({ op: 'topup', id: u.id })).toBe(400)
+  expect(mails).toEqual([])
 })
 
 test('answer: approve adds the amount and emails it; refuse emails the refusal; once only', async () => {
@@ -133,18 +125,18 @@ test('answer: approve adds the amount and emails it; refuse emails the refusal; 
   const r1 = store.ask(u.id, 'A vet clinic app') as number
   const a = await ok({ op: 'answer', request: r1, approved: true, usd: 1 })
   expect(a.requests[0]).toEqual(expect.objectContaining({ id: r1, answer: 'approved', usd: 1, email: 'ana@example.com', note: 'A vet clinic app' }))
-  expect(a.people[0].allowance).toBeCloseTo(1.1)
-  expect(mails.at(-1)).toEqual(expect.objectContaining({ to: ['ana@example.com'], subject: 'You have more free screens', text: expect.stringContaining('about 142 more') }))
+  expect(a.people[0].allowance).toBeCloseTo(1.25)
+  expect(mails.at(-1)).toEqual(expect.objectContaining({ to: ['ana@example.com'], subject: 'You have more free screens', text: expect.stringContaining('about 250 more') }))
   expect(await status({ op: 'answer', request: r1, approved: false })).toBe(409)
 
   const r2 = store.ask(u.id, 'More please') as number
   await ok({ op: 'answer', request: r2, approved: false })
-  expect(store.person(u.id)!.allowance).toBeCloseTo(1.1)
+  expect(store.person(u.id)!.allowance).toBeCloseTo(1.25)
   expect(mails.at(-1)).toEqual(expect.objectContaining({ subject: 'About your request for more screens' }))
 
   const r3 = store.ask(u.id, 'Default amount') as number
   await ok({ op: 'answer', request: r3, approved: true })
-  expect(store.person(u.id)!.allowance).toBeCloseTo(1.6)
+  expect(store.person(u.id)!.allowance).toBeCloseTo(1.75)
   expect(mails).toHaveLength(3)
 })
 
@@ -170,11 +162,11 @@ test('a body that is not JSON, no op or an unknown op is 400', async () => {
 test('a mail that does not go is said, and not counted', async () => {
   make({ RESEND_API_KEY: 're_test' }, { io: { fetch: async () => new Response('no', { status: 500 }), env: { RESEND_API_KEY: 're_test' }, log: () => {} } })
   const u = user('ana@example.com')
-  const a = await ok({ op: 'topup', id: u.id })
+  const a = await ok({ op: 'answer', request: store.ask(u.id, 'More') as number, approved: true })
   expect(a.mailed).toBe(false)
   // Only the sign-in code's mail, counted when the code was made.
   expect(a.mailToday).toBe(1)
-  expect(a.people[0].topupDue).toBeNull()
+  expect(a.people[0].allowance).toBeCloseTo(0.75)
 })
 
 test('/privacy names the operator and the contact from the env, escaped, with the design inline', async () => {
@@ -193,6 +185,7 @@ test('/privacy names the operator and the contact from the env, escaped, with th
   expect(html).not.toContain('{{')
   expect(html).not.toContain('@font-face')
   expect(html).toContain('30 days')
+  for (const who of ['Railway', 'Resend', 'OpenRouter', 'Anthropic', 'OpenAI']) expect(html).toContain(who)
 })
 
 test('/admin is the admin page', () => {
