@@ -86,7 +86,8 @@ src/packages/web/src/
   nav.ts         browser: the current screen, ← → trail, the map after filing, Nav
   drawer.ts      browser: box changes and rail tools, the drawer (Edit, Info, and Comments for a screen) for a screen or a box
   toolbar.ts     browser: generate panel (the starters, above the prompt box for a first-time visitor) and
-                 pickers, toolbar menus (Theme too), Recent, zoom and its keys
+                 pickers, toolbar menus (Theme too), Recent, zoom and its keys; the bar's fit (`fitBar`: tight,
+                 then fold the boxes, by measuring), Export project with its hint
   net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill, the brief hint
                  and the lasting one (`coach`)
   onboarding.ts  the public's hints: which is due from what the visitor did, kept in local storage, and when one on
