@@ -1,6 +1,6 @@
 // The rope between a screen and its parent: down to the bottom of the parent's row, then one S-curve in the gap.
 import { describe, expect, test } from 'bun:test'
-import { READABLE, curve, firstSeen, fitOf, fitZoom, headH, hit, landing, rope, seenOn, sidesOf, touchStep } from '../packages/web/src/canvas.ts'
+import { READABLE, curve, firstSeen, fitOf, fitZoom, headH, hit, landing, peekZoom, rope, seenOn, sidesOf, touchStep } from '../packages/web/src/canvas.ts'
 
 describe('where the view lands', () => {
   const phone = { x: 600, y: 600, w: 450, h: 930 }
@@ -53,6 +53,18 @@ describe('on a phone', () => {
     const z = fitOf(375, 700, { w: narrow.w, h: narrow.h + 100 }, true, true, { top: true })
     expect(z).toBe(0.92)
     expect(fitOf(375, 700, { w: wide.w, h: wide.h }, false, true, { top: true })).toBeLessThan(0.3)
+  })
+
+  test('a stacked A OR B opens zoomed so the top of B shows under A, never below 70%, never wider than the window', () => {
+    // A tall window: A, the OR and 80 px of B fit at the width's zoom.
+    expect(peekZoom(1400, 800, 0.92)).toBe(0.92)
+    // A shorter one: the zoom by height, so B's top is at the bottom of the window.
+    const z = peekZoom(1100, 800, 0.92)
+    expect(z).toBeLessThan(0.92)
+    expect(z).toBeGreaterThan(0.7)
+    expect(z * 816 + 2 * 136 + 130 + 80).toBeLessThanOrEqual(1100)
+    // A phone: the height would need 33%, so it stays readable at 70%.
+    expect(peekZoom(688, 791, 0.92)).toBe(0.7)
   })
 
   test('a picked screen fits the window by its width, with its rail under it, never cut off at the right', () => {
