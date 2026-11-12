@@ -127,6 +127,8 @@ export interface AccountDeps {
   signedUp: () => void
   /** The card closed by Esc, a press outside or Cancel, with no sign-up. */
   dismissed: () => void
+  /** A brief hint (net.ts). */
+  say: (text: string) => void
 }
 
 let deps: AccountDeps | null = null
@@ -137,6 +139,10 @@ const card = { why: 'register' as Why, step: 'email' as CardStep, email: '', cod
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 /** The email and a code on its way also outlive a reload of this tab. */
 const KEPT = 'uxwoz:signin'
+/** The address's hash after Delete my account. */
+export const DELETED = '#deleted'
+/** How long the thanks stays before it leaves by itself. */
+export const THANKS_MS = 3000
 function keep() {
   try { sessionStorage.setItem(KEPT, JSON.stringify({ email: card.email, code: card.step === 'code' })) } catch { /* private mode */ }
 }
@@ -153,6 +159,11 @@ export function initAccount(d: AccountDeps, cfg: { public?: boolean }) {
       fetch('/api/step', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ step: 'arrived' }) }).catch(() => {})
     }
   } catch { /* no storage: not counted */ }
+  // The account was deleted on the page before this one: say so once, and clean the address.
+  if (location.hash === DELETED) {
+    history.replaceState(null, '', location.pathname + location.search)
+    d.say('Your account is deleted.')
+  }
   try {
     const k = JSON.parse(sessionStorage.getItem(KEPT) ?? 'null')
     if (typeof k?.email === 'string') Object.assign(card, { email: k.email, step: k.code ? 'code' : 'email' })
@@ -226,7 +237,9 @@ function deleteAccount() {
   return call('/api/delete-account', { email: card.confirm.trim() }, () => {
     $('account').hidden = true // so nothing is kept again before the reload
     try { forget(localStorage); forget(sessionStorage) } catch { /* private mode */ }
-    location.replace('/')
+    // A new start page that says it happened (`DELETED`); a change of hash alone would load no page.
+    history.replaceState(null, '', `/${DELETED}`)
+    location.reload()
   })
 }
 
@@ -346,6 +359,7 @@ function verify() {
     keep()
     setMe(m)
     if (card.step === 'email') closeCard()
+    else setTimeout(() => { if (card.step === 'thanks' && !$('account').hidden) closeCard() }, THANKS_MS)
     deps!.loadRecent()
     deps!.signedUp()
   })

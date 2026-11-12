@@ -619,13 +619,15 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
   opens the app with mockups in Recent has done it all, so the owner sees none. A brief hint (*One
   screen at a time…*) shows over it for 2.5 s and gives it back. A hint never goes stale: it also
   leaves when the visitor opens another mockup or screen, a box, a drawer (but Edit for *press Edit*),
-  a card or the generate panel; a reload, or opening a mockup with its A OR B open, shows none; a
-  hint still due shows again at the visitor's next step. A hint belongs to where its step left the
+  a card or the generate panel; a reload, or opening a mockup with its A OR B open, shows none. A
+  hint shows only at the step that brings it (each below), so one that left never comes back over
+  something else; the same step later brings it again. A hint belongs to where its step left the
   visitor: *press Edit* stays on the screen just picked until Edit is pressed. None shows with no mockup open, and the red pill takes its place while it
   shows.
   1. Two designs are ready for the first time: *Pick the one you like.*
   2. After the first pick: *Click anything in it.*
-  3. After the second pick: *Change it in words: press Edit.* Sending an Edit does it.
+  3. After the second pick: *Change it in words: press Edit.*, only while a drawn screen is current
+     and no A OR B is open. Opening Edit does it.
   4. After the first Edit that made a new version: *Changed your mind? Undo brings the old one back.*
   5. After the first Undo: *That is the whole app. Now describe your own.* A press on it, or **+**,
      opens the generate panel.
@@ -648,14 +650,15 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
   without a reload. **Delete my account…** opens the account card: *Delete your
   account? Its mockups and its links go at once, for good. Type your email once more.*, the email
   field, **Delete** and **Cancel**; Delete removes the mockups, the links and the account at once, and
-  every `uxwoz:` key this browser kept but the one that counted its arrival. After Sign out or Delete the page starts again.
+  every `uxwoz:` key this browser kept but the one that counted its arrival. After Sign out or Delete the page starts again;
+  after Delete the start page says briefly *Your account is deleted.*
 - **The account card** opens over the dimmed canvas, like the generate panel, when a live design is
   refused for lack of free screens, or from **Register**. When the free screens run out during an
   A OR B, the side that was refused shows the server's words and under them **Register** (a visitor)
-  or **Ask for more** (registered), which opens the card. After a sign-up the refused side draws
-  itself again (the side that worked stays as it was), and a refused first screen of a new mockup is
-  sent again; if the person closes the card instead, the generate panel opens with their prompt still
-  in it. A side that failed for another reason (the 20 s deadline, a cut-off reply) shows **Try
+  or **Ask for more** (registered), which opens the card. After a sign-up the last request refused for
+  lack of free screens is sent again: a first screen, a click into a new screen, an Edit, or the
+  refused side alone (the side that worked stays as it was). If the person closes the card instead
+  of a refused first screen, the generate panel opens with their prompt still in it. A side that failed for another reason (the 20 s deadline, a cut-off reply) shows **Try
   again**, which draws that side alone; merely opening the screen again never draws it, so a click
   costs nothing. Esc or a press outside closes it. What was
   typed and the step stay while it is closed; Enter sends; a refusal (*Sign-ups are full for today.*)
@@ -669,7 +672,8 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
   - Then *We sent a code to ana@example.com.*, a field for it, **Verify** and *Send a new one*. A wrong
     code says *That code is not right.*
   - Verified, a new account (`/api/verify` says `created`): its free screens are there at once, and the
-    card says *Thanks. You have about 37 more free screens.*, the number it promised.
+    card says *Thanks. You have about 37 more free screens.*, the number it promised; it leaves by
+    itself after 3 s, or at a press outside.
   - Verified, an account that exists: the card closes and the mockups made as a visitor are in Recent.
   - A registered user with none left: *You have used your free screens.* A field *What are you
     building?*, **Ask for more**, then *Asked. The answer comes by email.*

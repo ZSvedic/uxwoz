@@ -1,7 +1,7 @@
 // The public's hints (spec/behavior.md, The public): which one is due, kept in this browser, the spark on a step done.
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
-import { Coach, HINTS, LIVE, OnShow, due, fresh, left, record, veteran, type Hint, type Step, type Where } from '../packages/web/src/onboarding.ts'
+import { Coach, HINTS, LIVE, OnShow, doneBy, due, fits, fresh, left, record, veteran, type Hint, type Step, type Where } from '../packages/web/src/onboarding.ts'
 
 const walk = (...steps: Step[]) => steps.reduce(record, fresh())
 const text = (p: ReturnType<typeof fresh>) => due(p)?.text ?? null
@@ -27,7 +27,7 @@ describe('the chain of five', () => {
     expect(text(walk('ready', 'pick', 'click', 'pick', 'editSent'))).toBeNull() // until the Edit made a version
     expect(text(walk('ready', 'pick', 'click', 'pick', 'editSent', 'edited'))).toBe('Changed your mind? Undo brings the old one back.')
     const five = walk('ready', 'pick', 'click', 'pick', 'editSent', 'edited', 'undo')
-    expect(due(five)).toEqual({ text: 'That is the whole app. Now describe your own.', opens: true })
+    expect(due(five)).toEqual({ text: 'That is the whole app. Now describe your own.', opens: true, after: 'undo' })
     expect(text(record(five, 'own'))).toBeNull()
   })
 
@@ -78,6 +78,22 @@ describe('Coach', () => {
     expect(coach('{broken').c.p).toBeNull()
   })
 
+  test('a hint that went away does not come back over the next mockup: only the step that brings it shows it', () => {
+    const a = coach()
+    a.c.begin(false)
+    for (const s of ['ready', 'pick', 'click', 'pick', 'editSent', 'edited'] as Step[]) a.c.did(s)
+    a.waits.splice(0).forEach((w) => w())
+    expect(a.shown.at(-1)).toBe('Changed your mind? Undo brings the old one back.')
+    a.c.away() // the visitor started their own mockup from the panel
+    expect(a.shown.at(-1)).toBeNull()
+    const from = a.shown.length
+    for (const s of ['ready', 'pick', 'click', 'pick'] as Step[]) a.c.did(s) // six screens of it
+    a.waits.splice(0).forEach((w) => w())
+    expect(a.shown.slice(from).filter(Boolean)).toEqual([])
+    a.c.did('edited') // a new Edit brings it again
+    expect(a.shown.at(-1)).toBe('Changed your mind? Undo brings the old one back.')
+  })
+
   test('going elsewhere takes the hint away, still due, until the next step', () => {
     const a = coach()
     a.c.begin(false)
@@ -125,8 +141,21 @@ describe('Coach', () => {
 })
 
 describe('a hint on show goes stale', () => {
-  const at: Where = { app: 'a', current: 'k', box: null, drawer: null, card: false }
-  const pick: Hint = { text: 'Pick the one you like.' }, edit = HINTS.find((h) => h.drawer)!
+  const at: Where = { app: 'a', current: 'k', box: null, drawer: null, card: false, drawn: true, choice: false }
+  const pick: Hint = { text: 'Pick the one you like.', after: 'ready' }, edit = HINTS.find((h) => h.drawer)!
+  test('press Edit shows only on a drawn screen with no A OR B open', () => {
+    expect(fits(edit, at)).toBe(true)
+    expect(fits(edit, { ...at, choice: true })).toBe(false)
+    expect(fits(edit, { ...at, drawn: false })).toBe(false)
+    expect(fits(pick, { ...at, choice: true, drawn: false })).toBe(true)
+  })
+  test('opening Edit is the step that ends press Edit', () => {
+    expect(doneBy(edit, { ...at, drawer: 'edit' })).toBe('editSent')
+    expect(doneBy(edit, { ...at, drawer: 'info' })).toBeNull()
+    expect(doneBy(pick, { ...at, drawer: 'edit' })).toBeNull()
+    const p = record({ picks: 2, ready: true, click: true }, doneBy(edit, { ...at, drawer: 'edit' })!)
+    expect(due(p)).toBeNull()
+  })
   test('when the visitor opens another mockup, screen, box, drawer, or a card', () => {
     expect(left(pick, at, { ...at })).toBe(false)
     expect(left(pick, at, { ...at, app: 'b' })).toBe(true)

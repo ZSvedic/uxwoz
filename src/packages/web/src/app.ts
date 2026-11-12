@@ -121,7 +121,7 @@ async function deleteApp(again: boolean) {
 async function init() {
   const cfg = await (await fetch('/api/config')).json()
   if (cfg.warning) showError(cfg.warning)
-  initAccount({ post, showError, loadRecent, closeMenus, signedUp: again, dismissed: cardClosed }, cfg)
+  initAccount({ post, showError, loadRecent, closeMenus, signedUp: again, dismissed: cardClosed, say: (t) => hint(t) }, cfg)
   for (const [s, name] of PICKERS) {
     const list: { id: string; label: string }[] = cfg[`${name}s`], saved = store.get(`uxwoz:${name}`)
     for (const x of list) s.add(new Option(x.label, x.id))
