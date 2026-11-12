@@ -50,9 +50,10 @@ microphone (in a browser with speech input) | the account (the public's).
 **+** opens the generate panel (New mockup). The four menus (mockup, Nav, Theme, zoom) look alike,
 have the same chevron, and open upward, never taller than the window above the bar. The bar never
 scrolls sideways and nothing in it runs past its edge: the screen's name, which a
-person steers by, always keeps its level and about ten letters (*L2 History*). The mockup's name
-takes the room that is left, so short of room it gives way first, down to about three letters; then
-the theme's name gets shorter; then the wordmark (the logo is the hat alone), the zoom's − + and
+person steers by, always keeps its level and about ten letters (*L2 History*). Room then goes to the mockup's name up
+to about twelve letters, then to the theme's name whole, and what is left to the mockup's name.
+Short of room it is taken back in reverse: the mockup's name past twelve letters, then the theme's
+name down to a few letters (*Mo…*), then the mockup's name down to about three; then the wordmark (the logo is the hat alone), the zoom's − + and
 Fit screen, and the lines between the box buttons go; else the four box buttons fold into **Boxes
 ▾** with those back; else all of it. So a window 980 px wide keeps the four box buttons in the row.
 Under 720 px (a phone) the bar has two fixed rows with no lines: the hat, **+**, the mockup menu

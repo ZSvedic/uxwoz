@@ -12,12 +12,13 @@
   gap: 4px; padding: 6px; border-radius: 20px; background: linear-gradient(var(--wood1), var(--wood2)); box-shadow: var(--wood-shadow); }
 .tb-left, .tb-mid, .tb-right { display: contents; }
 .pop { position: relative; flex: none; display: flex; gap: 4px; align-items: center; min-width: 0; }
-/* The screen's name keeps its level and about ten letters; the mockup's and the theme's start at a few letters. The
-   theme's shows whole until toolbar.ts finds no room (.slim); the mockup's takes what is left, so it is cut first. */
+/* Room goes to the screen's level and about ten letters, the mockup's name up to about twelve, the theme's whole, then
+   the rest to the mockup's name; toolbar.ts takes it back in reverse: the theme's to a few letters (.slim), the mockup's to four (.short). */
 .pop:has(> #themeButton) { flex: 1 0 max-content; max-width: max-content; }
-.slim .pop:has(> #themeButton) { flex-basis: 5em; }
+.slim .pop:has(> #themeButton) { flex: 99999 0 5em; } /* slim: the theme's name takes what twelve letters leave */
+.short .pop:has(> #themeButton) { flex-grow: 1; } .short .pop:has(> #projectButton:not([hidden])) { flex-basis: 4em; }
 .nav-pop:has(> #navButton:not([hidden])) { flex: 100 0 calc(105px + 5.4em); max-width: max-content; }
-.pop:has(> #projectButton:not([hidden])) { flex: 10000 0 4em; max-width: max-content; }
+.pop:has(> #projectButton:not([hidden])) { flex: 10000 0 calc(32px + 7.5em); max-width: max-content; }
 .bar button { flex: none; display: inline-flex; gap: 5px; align-items: center; padding: 6px 10px; border-radius: 12px; white-space: nowrap; }
 .bar button:hover:not(:disabled) { background: var(--wood-hover); }
 .bar button:disabled { color: var(--bar-disabled); }
