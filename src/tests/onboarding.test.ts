@@ -1,7 +1,7 @@
 // The public's hints (spec/behavior.md, The public): which one is due, kept in this browser, the spark on a step done.
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
-import { Coach, HINTS, LIVE, due, fresh, left, record, veteran, type Hint, type Step, type Where } from '../packages/web/src/onboarding.ts'
+import { Coach, HINTS, LIVE, OnShow, due, fresh, left, record, veteran, type Hint, type Step, type Where } from '../packages/web/src/onboarding.ts'
 
 const walk = (...steps: Step[]) => steps.reduce(record, fresh())
 const text = (p: ReturnType<typeof fresh>) => due(p)?.text ?? null
@@ -144,6 +144,20 @@ describe('a hint on show goes stale', () => {
     expect(edit.text).toBe('Change it in words: press Edit.')
     expect(left(edit, at, { ...at, drawer: 'edit' })).toBe(false)
     expect(left(edit, at, { ...at, drawer: 'info' })).toBe(true)
+  })
+  test('where a hint shows is taken once its step has finished: a pick shows it before the picked screen is current', () => {
+    const o = new OnShow()
+    o.show(edit)
+    // The parent was current when the pick showed it; the next draw sees the picked screen.
+    expect(o.stale({ ...at, current: 'picked' })).toBe(false)
+    o.settle({ ...at, current: 'picked' })
+    expect(o.stale({ ...at, current: 'picked' })).toBe(false)
+    expect(o.stale({ ...at, current: 'picked', drawer: 'edit' })).toBe(false)
+    expect(o.stale({ ...at, current: 'other' })).toBe(true)
+    o.settle({ ...at, current: 'other' }) // settles once
+    expect(o.stale({ ...at, current: 'other' })).toBe(true)
+    o.show(null)
+    expect(o.stale(at)).toBe(false)
   })
   test('the live hint says it in plain words', () => {
     expect(LIVE.text).toBe('This design was drawn fresh for you, so it used one of your free screens.')

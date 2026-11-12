@@ -64,7 +64,10 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
   stream. `action` is `@name: prompt`, `@name` alone (a screen the mockup has or plans; one with no
   plan is made from the name and `label`); anything else but `home` is 400. A screen with that name
   is a cache hit. A cache hit sends `meta` (cached true, variants 0) and `done` only; a screen whose A OR B
-  is still open comes back with its `proposals`, at no cost. Otherwise two designs stream at once:
+  is still open comes back with its `proposals`, at no cost, unless a side is missing (refused or
+  failed): then it streams like a new screen (`meta.variants` 2), sends the side there as `version` at
+  once, and draws only the missing side, a paid request like any other (a recording still answers a
+  starter's). Otherwise two designs stream at once:
   `meta.variants` is 2 and each `chunk` names its side (`variant` 0 or 1). One random side is asked
   for a clearly different design. Each side that finishes is stored at once as that side's
   proposal and sent as `version`; one that fails sends `failed` with its message. The first side to

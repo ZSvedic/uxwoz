@@ -544,8 +544,9 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
   opens the app with mockups in Recent has done it all, so the owner sees none. A brief hint (*One
   screen at a time…*) shows over it for 2.5 s and gives it back. A hint never goes stale: it also
   leaves when the visitor opens another mockup or screen, a box, a drawer (but Edit for *press Edit*),
-  a card or the generate panel, and a reload shows none; a hint still due shows again at the
-  visitor's next step. None shows with no mockup open, and the red pill takes its place while it
+  a card or the generate panel; a reload, or opening a mockup with its A OR B open, shows none; a
+  hint still due shows again at the visitor's next step. A hint belongs to where its step left the
+  visitor: *press Edit* stays on the screen just picked until Edit is pressed. None shows with no mockup open, and the red pill takes its place while it
   shows.
   1. Two designs are ready for the first time: *Pick the one you like.*
   2. After the first pick: *Click anything in it.*
@@ -566,15 +567,19 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
   registered user's shows the first letter of their email. Its menu: *About 25 free screens left*
   (*No free screens left* at none); **Register** (a visitor) or the email; **Ask for more**
   (registered, none left); **Sign out** and **Delete my account…** (registered); **Privacy**. The count
-  is read again after every live call ends, after a refusal, and when the tab gets focus, so a gift
-  from the owner shows without a reload. **Delete my account…** opens the account card: *Delete your
+  is read again after every live call ends (for a pick, a box's Edit and Visit now, when their filing
+  or visit ends), after a refusal, and when the tab gets focus, so a gift from the owner shows
+  without a reload. **Delete my account…** opens the account card: *Delete your
   account? Its mockups and its links go at once, for good. Type your email once more.*, the email
   field, **Delete** and **Cancel**; Delete removes the mockups, the links and the account at once, and
-  every `uxwoz:` key this browser kept. After Sign out or Delete the page starts again.
+  every `uxwoz:` key this browser kept but the one that counted its arrival. After Sign out or Delete the page starts again.
 - **The account card** opens over the dimmed canvas, like the generate panel, when a live design is
   refused for lack of free screens, or from **Register**. When the free screens run out during an
   A OR B, the side that was refused shows the server's words and under them **Register** (a visitor)
-  or **Ask for more** (registered), which opens the card. Esc or a press outside closes it. What was
+  or **Ask for more** (registered), which opens the card. After a sign-up the refused side draws
+  itself again (the side that worked stays as it was), and a refused first screen of a new mockup is
+  sent again; if the person closes the card instead, the generate panel opens with their prompt still
+  in it. Esc or a press outside closes it. What was
   typed and the step stay while it is closed; Enter sends; a refusal (*Sign-ups are full for today.*)
   shows in the card in the server's words.
   - A visitor: *You have used your free screens. Register to get about 37 more.* (from **Register**:
@@ -585,8 +590,8 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
     **Send the code**, and *No password: we email you a six-digit code.* with a link to Privacy.
   - Then *We sent a code to ana@example.com.*, a field for it, **Verify** and *Send a new one*. A wrong
     code says *That code is not right.*
-  - Verified, a new account: its free screens are there at once, and the card says *Thanks. You have
-    about 37 more free screens.*
+  - Verified, a new account (`/api/verify` says `created`): its free screens are there at once, and the
+    card says *Thanks. You have about 37 more free screens.*, the number it promised.
   - Verified, an account that exists: the card closes and the mockups made as a visitor are in Recent.
   - A registered user with none left: *You have used your free screens.* A field *What are you
     building?*, **Ask for more**, then *Asked. The answer comes by email.*

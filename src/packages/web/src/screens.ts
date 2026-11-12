@@ -9,11 +9,11 @@ import type { CardView, ScreenView } from './canvas.ts'
 import { canvas, closeMockup, side } from './app.ts'
 import { boxOp, renderDrawer } from './drawer.ts'
 import { checkHint, coach, mapOf, post, showError, hint, stream, streamInto, themeCss, type StreamRenderer } from './net.ts'
-import { loadMe, sideAct } from './account-ui.ts'
+import { sideAct } from './account-ui.ts'
 import { pickFx } from './design/fx.ts'
 import { applyMap, filed, saveCurrent, setCurrent } from './nav.ts'
-import { loadRecent, renderToolbar } from './toolbar.ts'
-import { changeInput, deviceSelect, generate, modelSelect, state, type Making, type Side } from './state.ts'
+import { loadRecent, openGenerate, renderToolbar } from './toolbar.ts'
+import { changeInput, deviceSelect, generate, modelSelect, promptInput, state, type Making, type Side } from './state.ts'
 
 // ---- Views
 
@@ -152,9 +152,37 @@ export async function openScreen(action: string | null, from: string | null, lab
         }
       }
     }
-  }, (failed) => {
+  }, (failed, answered) => {
     if (failed) { stopMaking(); back() }
+    // A new mockup's first screen the account card answered: sent again after a sign-up (`again`).
+    if (failed && answered && action == null && !state.entries.size) refusedFirst = state.app
   })
+}
+
+/** The mockup whose first screen was refused for lack of free screens, until a sign-up or the card is closed. */
+let refusedFirst: string | null = null
+
+/** After a sign-up: a refused first screen is sent again, and each side refused for free screens draws itself. */
+export async function again() {
+  const app = state.app
+  if (!app) return
+  if (refusedFirst === app && !state.entries.size) { refusedFirst = null; return openScreen(null, null, null) }
+  refusedFirst = null
+  const e = all().find((x) => !x.versions.length && x.proposals?.some((p, i) => !p && sideAct(state.failed.get(`${x.key}#${i}`) ?? '')))
+  if (!e || state.busy) return
+  e.proposals!.forEach((_, i) => state.failed.delete(`${e.key}#${i}`))
+  // The server draws only the missing side of the open A OR B; the side there comes back as it is.
+  await openScreen(e.name && e.action != null ? `@${e.name}` : null, e.parent?.key ?? null, e.parent?.label ?? null)
+}
+
+/** The account card closed with no sign-up: a refused first screen's prompt goes back into the generate panel. */
+export function cardClosed() {
+  const app = refusedFirst
+  refusedFirst = null
+  if (!app || app !== state.app || state.entries.size) return
+  closeMockup()
+  openGenerate()
+  promptInput.value = app
 }
 
 /** Once a screen (or an A OR B) has its size, fit it snugly, unless the view moved since `fitted` or the A OR B was picked. */
@@ -166,8 +194,8 @@ async function refit(key: string, fitted: number | null, choice = true) {
 }
 
 /** Fit a finished A OR B by width now, then snugly once both have their size. */
-export function fitChoice(key: string) {
-  coach.did('ready')
+export function fitChoice(key: string, step = true) {
+  if (step) coach.did('ready')
   canvas.fit(key, { top: true })
   refit(key, performance.now())
 }
@@ -220,11 +248,11 @@ export async function pick(key: string, index: number) {
     const { entry, filing, visiting } = await res.json() as { entry: CacheEntry; filing: boolean; visiting: boolean }
     keep(entry)
     Object.assign(state, { filing, visiting: visiting || state.visiting })
-    if (filing || visiting) filed().then(loadMe) // filing and a visit are live calls too
-    coach.did('pick')
+    if (filing || visiting) filed()
     canvas.rename(`${key}#${index}`, key)
     state.current = key
     saveCurrent()
+    coach.did('pick')
     await draw()
     if (state.before) { back(); canvas.reveal(key, false) } else fitScreenSoon(key)
   } finally {
@@ -287,7 +315,7 @@ export async function revise(key: string, change: string | null) {
     else if (ev.type === 'done') {
       frame?.cancel()
       keep(ev.entry)
-      if (ev.filing) { state.filing = true; filed().then(loadMe) }
+      if (ev.filing) { state.filing = true; filed() }
       state.revising = null
       if (change) { changeInput.value = ''; coach.did('edited') }
       if (ev.entry.versions.at(-1)?.costUsd !== 0) coach.did('live')
