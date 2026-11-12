@@ -76,8 +76,8 @@ window. Where the device cannot hover, menus leave out their keys (⌘+, ⇧1).
 - **← and →** (either side of Nav): back to the screen looked at before, and forward again, like a
   browser: every screen that becomes current is a step, and reaching a screen any other way drops
   the steps ahead. Screens deleted since are skipped. ⌘[ and ⌘] do the same (also while a screen
-  has the focus), and so do the mouse's back and forward buttons. A step along them changes the
-  address in place (see The address), adding no step to the browser's Back.
+  has the focus), and so do the mouse's back and forward buttons. A step along them is a step of the
+  browser's Back too (see The address).
 - **Rules, Fixer, Components, Data**: each moves the view to its box (Fixer to Fixer's
   notes). A number beside it counts the entries filing or the fixer added or changed (for Fixer,
   the fixer's visits) since the user last looked; three seconds after a look, they count as seen
@@ -458,18 +458,23 @@ the address is `/`, which shows what it always did.
 
 - **Opening, reloading or pasting** an address opens that mockup at that screen; `/m/<mockup>` alone
   opens it at its first screen. An address naming a drawn screen shows that screen, even while an A OR
-  B waits elsewhere in the mockup.
+  B waits elsewhere in the mockup. A screen deleted since opens the mockup at its first screen, whose
+  address replaces it, with the brief hint *That screen is not here.*
 - **What the address names**: whatever came into view last, a screen made current or an A OR B that
   opened, so while an A OR B is open the address is its screen's; a pick keeps it. A new screen's
   address comes once its first design is stored; a screen that merely redraws (an Edit, a Regenerate)
-  keeps its address.
+  keeps its address. While a new mockup's first screen is made the address is `/` (a reload there
+  opens the last mockup, as before), and the mockup's own address is written when its ID arrives;
+  Start over puts `/` in place of the old address, so the dead one is not left in the history.
 - **Back and Forward** of the browser walk the screens that came into view, each one a step, and from a
-  mockup back to the start page. Opening a mockup from the panel is a step; a reload, ← and → change the
-  address in place.
-- **Not here**: an address of a mockup or screen this person does not have (deleted, or another
-  person's) opens the start page at `/` with the brief hint *That mockup is not here.*
+  mockup back to the start page. Every change of the screen shown is a step, whether by a click in a
+  screen, Nav, ← →, the tree or opening a mockup; a reload and Back and Forward themselves change the
+  address in place, so Back always returns to the screen shown before.
+- **Not here**: an address of a mockup this person does not have (deleted, or another person's) opens
+  the start page at `/` with the brief hint *That mockup is not here.* Sign out and Delete my account
+  start again at `/`.
 - **Not a share link**: an address works only for the person whose mockup it is, through the same gate
-  as `/`. An edit link keeps its own address (`/s/<token>`), and its page writes none.
+  as `/`. An edit link keeps its own address (`/s/<token>`): its page writes none and follows none.
 
 ## Streaming and timing
 

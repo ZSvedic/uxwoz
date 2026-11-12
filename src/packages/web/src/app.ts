@@ -9,9 +9,9 @@ import type { CacheEntry } from '@uxwoz/core'
 import { createSide, type Box } from './boxes.ts'
 import { Canvas } from './canvas.ts'
 import { boxOp, focusBox, onTool, openDrawer } from './drawer.ts'
-import { mapOf, post, showError, themeCss } from './net.ts'
-import { entryAt, readAddress } from './address.ts'
-import { address, applyMap, currentKey, followAddress, notHere, resetTrail, setCurrent, showsAt, syncAddress } from './nav.ts'
+import { hint, mapOf, post, showError, themeCss } from './net.ts'
+import { landing, readAddress } from './address.ts'
+import { address, applyMap, currentKey, followAddress, notHere, resetTrail, setCurrent, showsAt, syncAddress, toStart } from './nav.ts'
 import { again, all, cardClosed, components, dropChoice, draw, fitChoice, fitScreenSoon, onAction, openScreen, pick, stopMaking } from './screens.ts'
 import { PICKERS, closeMenus, loadRecent, openGenerate, warmUp } from './toolbar.ts'
 import { editLinkApp, loadShared, shareToken } from './sharing.ts'
@@ -39,10 +39,10 @@ export const canvas = new Canvas($('stage'), {
 export async function start(app: string, make = true, at: { sid?: string | null; inPlace?: boolean } = {}) {
   // Its draws write no address until it is open: then one, as a new step unless in place.
   address.hold++
-  try { await openMockup(app, make, at.sid) } finally { address.hold--; syncAddress(at.inPlace) }
+  try { await openMockup(app, make, at.sid, !!at.inPlace) } finally { address.hold--; syncAddress(at.inPlace) }
 }
 
-async function openMockup(app: string, make: boolean, sid: string | null | undefined) {
+async function openMockup(app: string, make: boolean, sid: string | null | undefined, inPlace: boolean) {
   showError(null)
   stopMaking()
   state.before = null
@@ -60,8 +60,11 @@ async function openMockup(app: string, make: boolean, sid: string | null | undef
   generate.classList.remove('open')
   applyMap(map)
   const root = screenKey(app, null)
-  const named = sid !== undefined ? entryAt(app, state.entries, sid) : undefined
-  if (sid !== undefined && !named) return notHere()
+  // The screen the address names; one deleted since lands on the first screen, with a word why.
+  const l = sid !== undefined ? landing(app, state.entries, sid) : null
+  if (sid !== undefined && !l) return notHere()
+  const named = l?.entry
+  if (l?.why) hint(l.why)
   const saved = named?.key ?? store.get(currentKey(app))
   state.current = saved && state.entries.get(saved)?.versions.length ? saved : state.entries.get(root)?.versions.length ? root : null
   resetTrail()
@@ -69,7 +72,7 @@ async function openMockup(app: string, make: boolean, sid: string | null | undef
   const made = state.entries.get(root)
   const device = made?.versions[0]?.device ?? made?.proposals?.find(Boolean)?.device
   if (device) deviceSelect.value = device // for this mockup only: the saved choice stays
-  if (!state.entries.has(root)) return openScreen(null, null, null)
+  if (!state.entries.has(root)) { toStart(inPlace); return openScreen(null, null, null) }
   await draw()
   loadShared()
   // An open A OR B is fitted, unless the address named a drawn screen: then that screen, and the address stays.
@@ -111,7 +114,7 @@ async function deleteApp(again: boolean) {
   if (!res?.ok) return showError('Could not delete the mockup')
   store.set(currentKey(app), '')
   loadRecent()
-  if (again) return start(app)
+  if (again) return start(app, true, { inPlace: true }) // the dead address leaves the history
   closeMockup()
 }
 

@@ -1,7 +1,7 @@
 // A mockup's address in the browser (spec/behavior.md, Navigation: The address), with no DOM.
 import { describe, expect, test } from 'bun:test'
 import type { CacheEntry } from '@uxwoz/core'
-import { Shown, addressOf, addressStep, entryAt, openChoice, readAddress } from '../packages/web/src/address.ts'
+import { Shown, addressOf, addressStep, entryAt, landing, openChoice, readAddress } from '../packages/web/src/address.ts'
 
 const v = { html: '', model: 'claude-haiku-5.5', servedModel: null, createdAt: '', costUsd: 0, costEstimated: false, firstChunkMs: null, totalMs: 0, finishReason: 'stop' } as const
 const entry = (key: string, sid: string, extra: Partial<CacheEntry> = {}): CacheEntry => ({ key, app: 'Sleep', action: null, parent: null, versions: [{ ...v }], sid, ...extra })
@@ -28,6 +28,13 @@ describe('the address', () => {
     expect(entryAt('Sleep', es, 'zz')).toBeUndefined()
   })
 
+  test('lands on the screen it names; a screen deleted since lands on the first screen, with a word why', () => {
+    expect(landing('Sleep', map(home, nights), 'a7')).toEqual({ entry: nights, why: null })
+    expect(landing('Sleep', map(home, nights), null)).toEqual({ entry: home, why: null })
+    expect(landing('Sleep', map(home), 'a7')).toEqual({ entry: home, why: 'That screen is not here.' })
+    expect(landing('Sleep', new Map(), 'a7')).toBeNull()
+  })
+
   test('shows what came into view last: a screen made current, an A OR B that opened, where Back went', () => {
     const shown = new Shown()
     expect(shown.next(home.key, map(home, nights))).toBe(home.key)
@@ -50,7 +57,11 @@ describe('the address', () => {
     expect(new Shown().next(null, map(home))).toBeNull()
   })
 
-  test('changes as a new step, in place, or not at all when the screen merely redraws', () => {
+  test('changes as a new step whenever the screen shown changes, in place for a reload or Back, not at all when it merely redraws', () => {
+    // A, B, C, then ← to B: a step of its own, so the browser's Back returns to C.
+    const steps = ['/m/k3f9x2/aa']
+    for (const want of ['/m/k3f9x2/bb', '/m/k3f9x2/cc', '/m/k3f9x2/bb', '/m/k3f9x2/bb']) if (addressStep(steps.at(-1)!, want, false) === 'push') steps.push(want)
+    expect(steps).toEqual(['/m/k3f9x2/aa', '/m/k3f9x2/bb', '/m/k3f9x2/cc', '/m/k3f9x2/bb'])
     expect(addressStep('/m/k3f9x2/h1', '/m/k3f9x2/a7', false)).toBe('push')
     expect(addressStep('/m/k3f9x2/h1', '/m/k3f9x2/a7', true)).toBe('replace')
     expect(addressStep('/m/k3f9x2/a7', '/m/k3f9x2/a7', false)).toBeNull()

@@ -217,7 +217,7 @@ async function leave(url: string, body: object) {
   const res = await deps!.post(url, body).catch(() => null)
   if (!res?.ok) return deps!.showError((await res?.json().catch(() => null))?.error ?? 'No answer: try again.')
   try { localStorage.setItem('uxwoz:app', ''); sessionStorage.removeItem(KEPT) } catch { /* private mode */ }
-  location.reload()
+  location.replace('/') // the start page, not a mockup's address the next person does not have
 }
 
 /** The account card's Delete: the account goes, and with it everything this browser kept of ours. */
@@ -226,7 +226,7 @@ function deleteAccount() {
   return call('/api/delete-account', { email: card.confirm.trim() }, () => {
     $('account').hidden = true // so nothing is kept again before the reload
     try { forget(localStorage); forget(sessionStorage) } catch { /* private mode */ }
-    location.reload()
+    location.replace('/')
   })
 }
 
