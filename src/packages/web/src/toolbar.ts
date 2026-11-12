@@ -6,7 +6,7 @@ import { MAX_ZOOM } from './canvas.ts'
 import { el, type Box } from './boxes.ts'
 import { canvas, restorePickers, side, start } from './app.ts'
 import { closeDrawer, unseen } from './drawer.ts'
-import { coach, post, showError, themeCss } from './net.ts'
+import { coach, hint, post, showError, themeCss } from './net.ts'
 import { currentAt, renderNav, trailStep, walkTrail } from './nav.ts'
 import { draw, labelOf } from './screens.ts'
 import { initVoice } from './voice-ui.ts'
@@ -47,7 +47,8 @@ function placeStarters(first: boolean) {
   const box = $('startersBox')
   if (first) $('genTitle').after(box)
   else generate.querySelector('.go')!.after(box)
-  $('genTitle').textContent = first ? 'Pick one and watch it drawn' : 'What should we mock up?'
+  $('genTitle').textContent = first ? 'Turn one sentence into a clickable mockup' : 'What should we mock up?'
+  $('genLead').hidden = !first
   $('startersTitle').hidden = first
   $('ownTitle').hidden = !first
 }
@@ -209,18 +210,55 @@ export function renderToolbar() {
   $('toolbar').classList.toggle('has-boxes', !side.el.hidden)
   $('boxesSum').textContent = sum ? String(sum) : ''
   if (!$('navMenu').hidden) renderNav()
+  fitBar()
 }
+
+/**
+ * Short of room, the bar gives way in steps, each tried in turn until the bar is one row and the mockup's name shows
+ * whole or at least four letters' width: first the wordmark and the zoom icons go (tight), then the boxes fold into
+ * the Boxes menu with them back, then both. A phone (two rows by design) is always tight and folded.
+ */
+const STEPS = [[], ['tight'], ['fold'], ['tight', 'fold']]
+const phone = matchMedia('(max-width: 720px)')
+function fitBar() {
+  const bar = $('toolbar'), name = $('projectName')
+  const fits = () => {
+    const tops = [...bar.querySelectorAll<HTMLElement>('.bar > * > *')].filter((e) => e.offsetParent).map((e) => e.getBoundingClientRect().top)
+    return Math.max(...tops) - Math.min(...tops) < 20 && name.clientWidth >= Math.min(name.scrollWidth, 4 * parseFloat(getComputedStyle(name).fontSize))
+  }
+  for (const step of phone.matches ? [STEPS[3]!] : STEPS) {
+    bar.classList.remove('tight', 'fold')
+    bar.classList.add(...step)
+    if (phone.matches || fits()) return
+  }
+}
+new ResizeObserver(() => setTimeout(fitBar)).observe($('toolbar').querySelector('.bar')!)
+addEventListener('resize', fitBar)
+document.fonts.ready.then(fitBar)
 
 for (const b of document.querySelectorAll<HTMLButtonElement>('[data-zoom]')) b.addEventListener('click', () => { closeMenus(); zoomTo(b.dataset.zoom!) })
 
-// The microphone, last in the toolbar (voice-ui.ts).
-initVoice($('toolbar').querySelector('.tb-right')!.appendChild(el('button')))
+// The microphone, after the speaker and before the account (voice-ui.ts).
+const mic = el('button')
+$('accountPop').before(mic)
+initVoice(mic)
 
 export const warmUp = (model: string) => post('/api/warmup', { model }).catch(() => {})
 modelSelect.addEventListener('change', () => warmUp(modelSelect.value))
 
-/** Export project: the whole mockup as a zip for a coding or design agent, downloaded from the server. */
-const exportProject = item('⇩ Export project…', 'zip', () => { if (state.app && !needsAccount('export')) location.href = `/api/export?app=${encodeURIComponent(state.app)}` })
+/** Export project: the whole mockup as a zip for a coding or design agent, from the server; a brief hint names the file. */
+const exportProject = item('⇩ Export project…', 'zip', () => {
+  if (!state.app || needsAccount('export')) return
+  fetch(`/api/export?app=${encodeURIComponent(state.app)}`).then(async (res) => {
+    if (!res.ok) throw new Error(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? `HTTP ${res.status}`)
+    const a = el('a')
+    a.download = res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ?? 'mockup.zip'
+    a.href = URL.createObjectURL(await res.blob())
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+    hint(`Saved ${a.download} to your downloads.`)
+  }).catch((e) => showError(`Could not export: ${e.message}`))
+})
 exportProject.id = 'exportProject'
 exportProject.title = 'Download the prompt, the boxes and every screen as a zip, to hand to a coding or design agent'
 $('exportBoxes').after(exportProject)

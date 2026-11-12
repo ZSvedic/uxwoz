@@ -23,11 +23,11 @@
 /* The account card (account-ui.ts): the generate panel's card, narrower, over the dim and over the panel itself. */
 .workspace:has(> .generate.account-card:not([hidden]))::after { z-index: 16; }
 .generate.account-card { z-index: 17; top: 16vh; width: min(460px, calc(100% - 32px)); gap: 10px; }
-.account-card p { margin: 0; }
+.generate p { margin: 0; }
 .account-card .lead { font-size: 16px; }
 .account-card input { width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 10px; background: var(--field); font-size: 15px; }
 .account-card label, .account-card small, .account-card .again { color: var(--muted); }
 .account-card .again { align-self: flex-start; padding: 0; border: 0; background: none; text-decoration: underline; }
 .account-card .err { color: var(--err); }
 .account-card a { color: inherit; }
-.menu h3.plain { text-transform: none; font-size: 13px; font-weight: 400; color: var(--text); }
+.menu h3.plain { text-transform: none; font-size: 13px; font-weight: 400; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

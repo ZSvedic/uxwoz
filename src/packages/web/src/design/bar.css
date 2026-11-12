@@ -12,11 +12,11 @@
   gap: 4px; padding: 6px; border-radius: 20px; background: linear-gradient(var(--wood1), var(--wood2)); box-shadow: var(--wood-shadow); }
 .tb-left, .tb-mid, .tb-right { display: contents; }
 .pop { position: relative; flex: none; display: flex; gap: 4px; align-items: center; min-width: 0; }
-/* The names of the theme, the screen and the mockup start at a few letters and grow in that order, so the mockup's
-   name is cut short first and the theme's last. When even the few letters do not fit, the bar takes another row. */
-.pop:has(> #themeButton) { flex: 10000 0 4.4em; max-width: max-content; }
+/* The names of the mockup, the screen and the theme start at a few letters and grow in that order, so the theme's
+   name is cut short first and the mockup's last. When even the few letters do not fit, toolbar.ts makes room. */
+.pop:has(> #themeButton) { flex: 1 0 6em; max-width: max-content; }
 .nav-pop:has(> #navButton:not([hidden])) { flex: 100 0 calc(74px + 4.6em); max-width: max-content; }
-.pop:has(> #projectButton:not([hidden])) { flex: 1 0 4em; max-width: max-content; }
+.pop:has(> #projectButton:not([hidden])) { flex: 10000 0 4em; max-width: max-content; }
 .bar button { flex: none; display: inline-flex; gap: 5px; align-items: center; padding: 6px 10px; border-radius: 12px; white-space: nowrap; }
 .bar button:hover:not(:disabled) { background: var(--wood-hover); }
 .bar button:disabled { color: var(--bar-disabled); }
@@ -39,9 +39,11 @@
 .icon { display: block; width: 1em; height: 1.4em; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
 #projectButton { max-width: min(36ch, 24vw); }
 #navButton { max-width: min(40ch, 30vw); }
-/* Short of room: closer items first; then the boxes fold (below); then the zoom icons and the wordmark go. */
+/* Short of room: closer items first; then, when toolbar.ts finds the row full (.tight), the wordmark, the zoom icons
+   and the lines between the boxes go; then the boxes fold (below). */
 @media (max-width: 1400px) { .bar, .pop, .bar .box-nav { gap: 3px; } .bar button { padding: 6px 7px; } .sep { margin: 0 1px; } }
-@media (max-width: 900px) { .bar .wide-only, .logo b { display: none; } #projectName { max-width: 12ch; } .logo { padding: 0; } }
+.tight .bar .wide-only, .tight .logo b, .tight .box-nav .sep { display: none; }
+.toolbar.tight { padding: 0 8px; } .tight .logo { padding: 0; } .tight .bar .box-nav button { padding: 6px 4px; }
 
 /* Menus open upward from their button and are never taller than the window above the bar; they scroll inside. */
 .menu { position: absolute; left: 0; bottom: calc(100% + 16px); z-index: 30; min-width: 240px; max-width: min(440px, calc(100vw - 20px));
@@ -57,6 +59,7 @@
 .bar .menu :is(.item, .menu-foot button):is(:hover, :focus-visible):not(:disabled) { background: var(--surface-2); }
 .bar .menu button:disabled { color: var(--disabled); }
 .menu .item small, .menu kbd { color: var(--muted); font: inherit; margin-left: auto; white-space: nowrap; }
+@media (hover: none) { .menu kbd { display: none; } }
 .menu-recent { display: flex; flex-direction: column; min-width: 320px; max-width: 460px; }
 .menu-recent .item.current { font-weight: 700; }
 .menu-foot { display: flex; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
@@ -68,35 +71,40 @@
 .nav-menu .item.current { font-weight: 700; background: var(--surface-2); }
 .nav-menu .item.planned { color: var(--muted); font-style: italic; }
 
-/* The box buttons in the bar: each moves the view to its box; the gold number counts what is new. In a narrow window
-   they fold into the Boxes menu. */
+/* The box buttons in the bar: each moves the view to its box; the gold number counts what is new. When the row cannot
+   hold them (.fold, set by toolbar.ts) they fold into the Boxes menu. */
 .box-nav { position: static; display: flex; flex-direction: row; align-items: center; min-width: 0; max-height: none; padding: 0; border: 0;
   box-shadow: none; background: none; color: inherit; font: inherit; gap: 4px; overflow: visible; }
 .box-nav b, #boxesButton b { min-width: 20px; padding: 0 6px; border-radius: 99px; background: var(--badge); color: var(--on-badge);
   font-size: 12px; font-weight: 600; line-height: 20px; text-align: center; }
 .toolbar b:empty, #boxesButton { display: none; }
 .toolbar.has-boxes .box-nav[hidden] { display: flex !important; }
-@media (max-width: 1200px) {
-  .toolbar.has-boxes #boxesButton { display: inline-flex; }
-  .box-nav { position: absolute; bottom: calc(100% + 16px); flex-direction: column; align-items: stretch; min-width: 200px; padding: 6px;
-    max-height: calc(100vh - var(--bar-h) - 12px); overflow: auto; border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
-    background: var(--surface); color: var(--text); font: 13px/1.4 system-ui, -apple-system, sans-serif; }
-  .toolbar.has-boxes .box-nav[hidden] { display: none !important; }
-  .bar .box-nav button { justify-content: space-between; padding: 5px 8px; border-radius: 6px; }
-  .bar .box-nav button:hover:not(:disabled) { background: var(--surface-2); }
-  .box-nav .sep { display: none; }
-}
+.toolbar.has-boxes.fold #boxesButton { display: inline-flex; }
+.fold .box-nav { position: absolute; bottom: calc(100% + 16px); flex-direction: column; align-items: stretch; min-width: 200px; padding: 6px;
+  max-height: calc(100vh - var(--bar-h) - 12px); overflow: auto; border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
+  background: var(--surface); color: var(--text); font: 13px/1.4 system-ui, -apple-system, sans-serif; }
+.toolbar.has-boxes.fold .box-nav[hidden], .fold .box-nav .sep { display: none !important; }
+.fold .bar .box-nav button { justify-content: space-between; padding: 5px 8px; border-radius: 6px; }
+.fold .bar .box-nav button:hover:not(:disabled) { background: var(--surface-2); }
 
-/* A phone: two rows (the hat, the mockup, Nav and + above, the rest below, with no lines); menus span the window. */
+/* A phone: two fixed rows, no lines: the hat, +, the mockup and Nav (at the right end) above; Boxes (its place kept
+   before a mockup), the theme taking what is left, zoom, the speaker, the microphone and the account below. Every
+   button is at least 36 px high; menus span the window. */
 @media (max-width: 720px) {
-  .toolbar { padding: 0 8px; }
+  .toolbar { grid-template-columns: 100%; }
   .bar .sep { display: none; }
-  .bar { row-gap: 2px; }
+  .bar { justify-self: stretch; justify-content: flex-start; row-gap: 2px; gap: 2px; padding: 4px; }
   .logo img { width: 30px; height: 30px; }
   .tb-left::after { content: ''; flex-basis: 100%; }
+  .nav-pop { margin-left: auto; }
   #projectButton, #navButton { max-width: none; }
-  .bar button { padding: 6px 5px; }
+  .bar button { min-height: 36px; padding: 6px 5px; }
   .bar .deck { height: 40px; width: 38px; }
+  .toolbar:not(.has-boxes) .pop:has(> #boxNav) { display: flex; visibility: hidden; }
+  .toolbar #boxesButton { display: inline-flex; min-width: 7em; }
+  .pop:has(> #themeButton) { flex: 1 1 0; max-width: none; }
+  #zoomValue { min-width: 0; }
+  #accountButton { min-width: 4.4em; justify-content: center; }
   .toolbar :is(.menu, .box-nav) { position: fixed; left: 8px; right: 8px; bottom: calc(var(--bar-h) - 2px); min-width: 0; max-width: none; }
   .menu-recent { min-width: 0; max-width: none; }
 }
