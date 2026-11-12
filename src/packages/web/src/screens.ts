@@ -114,6 +114,8 @@ export async function openScreen(action: string | null, from: string | null, lab
   /** When the A OR B was fitted; refitted once both finish unless the canvas moved since. */
   let fitted: number | null = null
   let m: Making | null = null
+  const app = state.app
+  refused = null
   await stream('/api/screen', { app: state.app!, action, model: modelSelect.value, device, from, label, ...(again && { again }) }, 'make this screen', async (ev, css) => {
     if (ev.type === 'meta' && !ev.cached) {
       m = { key: ev.key, parent: from, device, sides: [] }
@@ -137,7 +139,13 @@ export async function openScreen(action: string | null, from: string | null, lab
         s.version = ev.version
         if (ev.version.costUsd !== 0) coach.did('live') // a replayed design costs 0
         if (m!.sides.every((x) => x.version)) coach.did('ready')
-      } else { s.error = ev.message; state.failed.set(`${m!.key}#${ev.variant}`, ev.message) }
+      } else {
+        s.error = ev.message
+        state.failed.set(`${m!.key}#${ev.variant}`, ev.message)
+        // A side the meter refused: drawn alone after a sign-up.
+        const key = m!.key
+        if (sideAct(ev.message)) refused = { app, run: () => redraw(key) }
+      }
       draw()
     } else if (ev.type === 'done') {
       keep(ev.entry)
@@ -157,21 +165,24 @@ export async function openScreen(action: string | null, from: string | null, lab
   }, (failed, answered) => {
     if (failed) { stopMaking(); back() }
     // A new mockup's first screen the account card answered: sent again after a sign-up (`again`).
-    if (failed && answered && action == null && !state.entries.size) refusedFirst = state.app
+    if (failed && answered) {
+      // Refused whole (a first screen, a click into a new screen): sent again after a sign-up.
+      refused = { app, run: () => openScreen(action, from, label, again) }
+      if (action == null && !state.entries.size) refusedFirst = state.app
+    }
   })
 }
 
 /** The mockup whose first screen was refused for lack of free screens, until a sign-up or the card is closed. */
 let refusedFirst: string | null = null
+/** The last request the meter refused, in its mockup, until the next request: sent again after a sign-up. */
+let refused: { app: string | null; run: () => unknown } | null = null
 
-/** After a sign-up: a refused first screen is sent again, and each side refused for free screens draws itself. */
+/** After a sign-up: the last refused request is sent again (a first screen, a click, a missing side, an Edit). */
 export async function again() {
-  const app = state.app
-  if (!app) return
-  if (refusedFirst === app && !state.entries.size) { refusedFirst = null; return openScreen(null, null, null) }
-  refusedFirst = null
-  const e = all().find((x) => !x.versions.length && x.proposals?.some((p, i) => !p && sideAct(state.failed.get(`${x.key}#${i}`) ?? '')))
-  if (e) await redraw(e.key)
+  const r = refused
+  refused = refusedFirst = null
+  if (r && r.app === state.app && state.app) await r.run()
 }
 
 /** An open A OR B's missing side, drawn again (asked `again`: a paid request); the side there comes back as it is. */
@@ -315,6 +326,8 @@ export async function revise(key: string, change: string | null) {
   if (!e?.versions.length) return
   if (state.busy) return hint()
   state.revising = { key, change }
+  refused = null
+  const app = state.app
   if (change) coach.did('editSent')
   const edited = !change && !!e.versions.at(-1)!.feedback && e.versions.at(-1)!.by !== 'fixer'
   let frame: StreamRenderer | null = null
@@ -332,8 +345,9 @@ export async function revise(key: string, change: string | null) {
       // The new version may be taller or narrower: keep it in view once it has its size.
       canvas.sized(key).then(() => canvas.reveal(key))
     }
-  }, () => {
+  }, (failed, answered) => {
     frame?.cancel()
+    if (failed && answered) refused = { app, run: () => revise(key, change) }
     // After a failure, draw() puts the screen as it was back into its frame.
     if (state.revising?.key === key) state.revising = null
   })

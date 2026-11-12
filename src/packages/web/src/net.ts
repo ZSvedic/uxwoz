@@ -5,7 +5,7 @@ import type { ScreenEvent } from './server.ts'
 import { canvas } from './app.ts'
 import { draw, page } from './screens.ts'
 import { openGenerate } from './toolbar.ts'
-import { Coach, OnShow, type Where } from './onboarding.ts'
+import { Coach, OnShow, doneBy, fits, type Where } from './onboarding.ts'
 import { stepFx } from './design/fx.ts'
 import { loadMe, refused, sideAct } from './account-ui.ts'
 import { $, generate, state, store } from './state.ts'
@@ -77,17 +77,21 @@ const lasting = new OnShow()
 const where = (): Where => ({
   app: state.app, current: state.current, box: state.box, drawer: state.drawer,
   card: generate.classList.contains('open') || !$('account').hidden,
+  drawn: !state.box && !!state.current && !!state.entries.get(state.current)?.versions.length,
+  choice: !!state.making || [...state.entries.values()].some((e) => !e.versions.length),
 })
 function showLasting() {
   if (hintTimer) return
-  const h = $('hint'), on = state.app && $('error').hidden ? lasting.hint : null
+  const h = $('hint'), on = state.app && $('error').hidden && lasting.hint && fits(lasting.hint, where()) ? lasting.hint : null
   h.textContent = on?.text ?? ''
   h.hidden = !on
   h.classList.toggle('press', !!on?.opens || !!on?.live)
 }
 /** The visitor went elsewhere since the hint showed: it goes (draw() and every click or key ask). */
 export function checkHint() {
-  if (lasting.stale(where())) coach.away()
+  const w = where(), step = lasting.hint && doneBy(lasting.hint, w)
+  if (step) coach.did(step) // following the hint (opening Edit) is doing it
+  else if (lasting.stale(w)) coach.away()
   else showLasting()
 }
 const soon = () => setTimeout(checkHint)
