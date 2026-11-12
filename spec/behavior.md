@@ -562,8 +562,8 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
   click, Edit, Undo or a press on it. A Regenerate on a screen whose newest version was an Edit says
   briefly *A fresh design. Undo brings your edit back.*
 - **The account button** is the toolbar's last item, for the public only (not the owner). A visitor's
-  shows the free screens left (*14 free*) once they made a live design, a person's outline before; a
-  registered user's shows the first letter of their email. Its menu: *About 14 free screens left*
+  shows the free screens left (*25 free*) once they made a live design, a person's outline before; a
+  registered user's shows the first letter of their email. Its menu: *About 25 free screens left*
   (*No free screens left* at none); **Register** (a visitor) or the email; **Ask for more**
   (registered, none left); **Sign out** and **Delete my account…** (registered); **Privacy**. The count
   is read again after every live call ends, after a refusal, and when the tab gets focus, so a gift
@@ -577,8 +577,8 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
   or **Ask for more** (registered), which opens the card. Esc or a press outside closes it. What was
   typed and the step stay while it is closed; Enter sends; a refusal (*Sign-ups are full for today.*)
   shows in the card in the server's words.
-  - A visitor: *You have used your free screens. Register to get about 21 more.* (from **Register**:
-    *Register to get about 21 more free screens.*; for the network's day: *This network has used
+  - A visitor: *You have used your free screens. Register to get about 37 more.* (from **Register**:
+    *Register to get about 37 more free screens.*; for the network's day: *This network has used
     today's free screens. Register to carry on.*; for the guests' day: *Today's free screens for
     guests are used up. Register to carry on.*) The number is what a new account adds, as `/api/me`
     says (`more`). An email field,
@@ -586,27 +586,27 @@ it, so the app teaches itself. The owner's app is unchanged. Shapes and limits: 
   - Then *We sent a code to ana@example.com.*, a field for it, **Verify** and *Send a new one*. A wrong
     code says *That code is not right.*
   - Verified, a new account: its free screens are there at once, and the card says *Thanks. You have
-    about 21 more free screens.*
+    about 37 more free screens.*
   - Verified, an account that exists: the card closes and the mockups made as a visitor are in Recent.
   - A registered user with none left: *You have used your free screens.* A field *What are you
     building?*, **Ask for more**, then *Asked. The answer comes by email.*
 - **Paused.** When the owner switched the public to starters only, or the day's or the month's cap is
   reached, a live design answers with the red pill: *Live designs are paused for now. The starters
-  still work.* A blocked account's says *This account is closed.*
+  still work.* A visitor refused because guests used 70% of the day's cap gets the account card
+  (above), not the pill. A blocked account's says *This account is closed. Write to* and the contact address.
 - **What needs an account**: Share (View and Comment links) and Export project. A visitor who presses
   either (or Feedback) gets the account card with *Register to share a mockup* or *Register to export it*. Edit links
   are the owner's only. Export the boxes, voice and the boxes work for everyone.
 - **The admin's page** (`/admin`, the owner): today's and the month's public spend beside their caps,
   and the switch **Open / Starters only**; the caps and allowances, each editable; the steps by day for
   30 days (arrived, picked a starter, picked a design, typed an own prompt, hit the limit, asked for a
-  code, verified); **Waiting** (verified users whose free screens have not arrived, each with **Approve
-  now**); **Requests** (who, their note, what they spent, an amount, **Approve** and **Refuse**; the
+  code, verified); **Requests** (who, their note, what they spent, an amount, **Approve** and **Refuse**; the
   user gets the answer by email); **People** (email or *visitor*, since, last seen, spent of allowance,
-  mockups; **Give more**, **Block**, **Delete**); *Your address as the server sees it*; and whether the
+  mockups; **Give more**, **Block**, **Delete**); every dollar amount also says about how many screens it is; *Your address as the server sees it*; and whether the
   starters were recorded with today's prompt.
 - **Privacy** (`/privacy`, everyone): a short page on what is stored (the email, prompts and mockups, a
-  scrambled network address for one day, counts of steps), who else handles it (the host, the mail
-  service, the model providers), how long (a visitor's mockups 30 days after the last visit, an
+  scrambled network address for one day, counts of steps), who else handles it (Railway the host, Resend the mail
+  service, OpenRouter with Anthropic's Claude and OpenAI the model providers), how long (a visitor's mockups 30 days after the last visit, an
   account's until it is deleted), and whom to write to.
 
 ## Colours
