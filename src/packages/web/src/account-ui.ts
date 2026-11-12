@@ -62,7 +62,8 @@ export function cardOf(me: Me, why: Why, step: CardStep, email: string, promised
     if (step === 'asked' || (me.request && !me.request.answer)) return view('Asked. The answer comes by email.')
     return view('You have used your free screens.', { field: { kind: 'note', label: 'What are you building?', placeholder: 'e.g. a booking app for my dog walking business' }, send: 'Ask for more' })
   }
-  if (step === 'code') return view(`We sent a code to ${email}.`, { field: { kind: 'code', placeholder: 'Six digits' }, send: 'Verify', again: true })
+  // The email's hyphens are shown as non-breaking ones, so the line never breaks inside the address.
+  if (step === 'code') return view(`We sent a code to ${email.replaceAll('-', '\u2011')}.`, { field: { kind: 'code', placeholder: 'Six digits' }, send: 'Verify', again: true })
   return view(LEADS[why](me.more ?? MORE), { field: { kind: 'email', placeholder: 'you@example.com' }, send: 'Send the code', note: 'No password: we email you a six-digit code.', privacy: true })
 }
 
