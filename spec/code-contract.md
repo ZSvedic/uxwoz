@@ -60,14 +60,15 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
 - `GET /api/config`: models (id, label, costEstimated), themes (`mockup`, `clean`), devices (id,
   label, width), and the default model, theme and device; `warning` when the cache file is from a
   newer app (it is left alone and nothing is saved).
-- `POST /api/screen {app, action?, model?, device?, from?, label?}`: a new screen, as an NDJSON
+- `POST /api/screen {app, action?, model?, device?, from?, label?, again?}`: a new screen, as an NDJSON
   stream. `action` is `@name: prompt`, `@name` alone (a screen the mockup has or plans; one with no
   plan is made from the name and `label`); anything else but `home` is 400. A screen with that name
   is a cache hit. A cache hit sends `meta` (cached true, variants 0) and `done` only; a screen whose A OR B
-  is still open comes back with its `proposals`, at no cost, unless a side is missing (refused or
-  failed): then it streams like a new screen (`meta.variants` 2), sends the side there as `version` at
-  once, and draws only the missing side, a paid request like any other (a recording still answers a
-  starter's). Otherwise two designs stream at once:
+  is still open comes back with its `proposals`, at no cost, a missing side (refused or failed)
+  missing still. Asked `again: true` (after a sign-up, or a failed side's **Try again**), an open A OR B
+  with a side missing streams like a new screen (`meta.variants` 2), sends the side there as `version`
+  at once, and draws only the missing side, a paid request like any other (gated, one at a time; a
+  recording still answers a starter's). Otherwise two designs stream at once:
   `meta.variants` is 2 and each `chunk` names its side (`variant` 0 or 1). One random side is asked
   for a clearly different design. Each side that finishes is stored at once as that side's
   proposal and sent as `version`; one that fails sends `failed` with its message. The first side to

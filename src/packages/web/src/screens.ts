@@ -52,7 +52,8 @@ function sideCard(key: string, index: number, side: Side | null, stored: Version
   const idea = version ? ideaOf(version) : side && state.filing ? 'Waiting for filing, then drawing…' : ''
   return {
     id, width: widthOf(version?.device ?? device), device: version?.device ?? device, name: '', idea,
-    side: { index, pickable: !!version }, error, act: error ? sideAct(error) : undefined, streaming: !version && !error,
+    side: { index, pickable: !!version }, error, act: error ? sideAct(error) ?? (stored === null && !side ? { text: 'Try again', run: () => redraw(key) } : undefined) : undefined,
+    streaming: !version && !error,
   }
 }
 
@@ -108,12 +109,12 @@ export async function draw() {
 // ---- Screens
 
 /** Open a screen from the cache, else as A OR B: remember the view, fit both, stream them. */
-export async function openScreen(action: string | null, from: string | null, label: string | null) {
+export async function openScreen(action: string | null, from: string | null, label: string | null, again = false) {
   const device = deviceSelect.value as Device
   /** When the A OR B was fitted; refitted once both finish unless the canvas moved since. */
   let fitted: number | null = null
   let m: Making | null = null
-  await stream('/api/screen', { app: state.app!, action, model: modelSelect.value, device, from, label }, 'make this screen', async (ev, css) => {
+  await stream('/api/screen', { app: state.app!, action, model: modelSelect.value, device, from, label, ...(again && { again }) }, 'make this screen', async (ev, css) => {
     if (ev.type === 'meta' && !ev.cached) {
       m = { key: ev.key, parent: from, device, sides: [] }
       m.sides = Array.from({ length: ev.variants }, (_, i) => ({
@@ -170,10 +171,16 @@ export async function again() {
   if (refusedFirst === app && !state.entries.size) { refusedFirst = null; return openScreen(null, null, null) }
   refusedFirst = null
   const e = all().find((x) => !x.versions.length && x.proposals?.some((p, i) => !p && sideAct(state.failed.get(`${x.key}#${i}`) ?? '')))
-  if (!e || state.busy) return
-  e.proposals!.forEach((_, i) => state.failed.delete(`${e.key}#${i}`))
-  // The server draws only the missing side of the open A OR B; the side there comes back as it is.
-  await openScreen(e.name && e.action != null ? `@${e.name}` : null, e.parent?.key ?? null, e.parent?.label ?? null)
+  if (e) await redraw(e.key)
+}
+
+/** An open A OR B's missing side, drawn again (asked `again`: a paid request); the side there comes back as it is. */
+export async function redraw(key: string) {
+  const e = state.entries.get(key)
+  if (!e || e.versions.length) return
+  if (state.busy) return hint()
+  e.proposals?.forEach((_, i) => state.failed.delete(`${key}#${i}`))
+  await openScreen(e.name && e.action != null ? `@${e.name}` : null, e.parent?.key ?? null, e.parent?.label ?? null, true)
 }
 
 /** The account card closed with no sign-up: a refused first screen's prompt goes back into the generate panel. */

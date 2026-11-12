@@ -216,15 +216,15 @@ export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string
   const message = (err: unknown) => (err instanceof Error ? err.message : String(err))
 
   /**
-   * A new screen: from the cache when it is there (with its open A OR B, if any), else two designs at once. An open
-   * A OR B with a side missing (refused, or failed) draws that side only; the side there is sent as it is.
+   * A new screen: from the cache when it is there (with its open A OR B, if any), else two designs at once. Asked
+   * `again`, an open A OR B with a side missing (refused, or failed) draws that side only; the side there is sent as it is.
    */
-  async function* screenEvents(app: string, asked: string | null, model: ModelId, device: Device, click: { from: string; label: string } | null, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
+  async function* screenEvents(app: string, asked: string | null, model: ModelId, device: Device, click: { from: string; label: string } | null, signal: AbortSignal, again = false): AsyncGenerator<ScreenEvent> {
     let action = canonicalAction(asked)
     const hit = cache.find(app, action)
     const key = hit?.key ?? screenKey(app, action)
     const slots = Array.from({ length: PROPOSALS }, (_, i) => i)
-    const missing = hit ? (hit.versions.length || !hit.proposals ? [] : slots.filter((i) => !hit.proposals![i])) : slots
+    const missing = hit ? (!again || hit.versions.length || !hit.proposals ? [] : slots.filter((i) => !hit.proposals![i])) : slots
     if (hit && !missing.length) {
       yield { type: 'meta', key, cached: true, variants: 0 }
       yield { type: 'done', entry: hit }
