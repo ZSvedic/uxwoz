@@ -453,8 +453,10 @@ The owner sends a link to a reviewer or a potential customer, who clicks through
 browser and says what they think. Nothing is real-time and nobody signs in: a link is the key.
 
 - **Share…** (project menu) opens the drawer on *Share and feedback*: pick a role, **Make a link**
-  (it is copied), and the links below, each with when it was made, how often it was opened, **Copy**
-  and **Revoke** (it stops working for everyone). Roles:
+  (it is copied), and the links below, each with the day it was made (*Nov 12*), how often it was
+  opened, **Copy** and **Revoke** (it stops working for everyone); a link's line wraps. While the
+  pane is open it reads its links and feedback again when the tab gets focus and every 10 seconds, so
+  a comment that came in shows. Roles:
   - **View**: the player (below). A control with no drawn screen behind it says *Not designed yet*.
     Nothing is generated, so a viewer costs nothing.
   - **Comment**: the player plus feedback (below).
@@ -465,7 +467,8 @@ browser and says what they think. Nothing is real-time and nobody signs in: a li
     says *This link's budget is used up*.
 - **The player** shows one screen at a time in its device frame, in the Mockup theme, components
   pasted, in an ivory frame on the night sky; on a parchment strip at the top, the hat, **← Back**,
-  its name and the trail of names (each one clickable). It plays no sounds and no animation. A click on a
+  its name and the trail of names (each one clickable); the first screen has no **← Back** and no
+  trail, which would only say its name again. It plays no sounds and no animation. A click on a
   control opens the screen it names; `back` goes to the screen it hangs under; a control whose
   action names no screen (plain words) leads nowhere, as in the app. A desktop screen
   shrinks to fit a phone.
@@ -480,7 +483,9 @@ browser and says what they think. Nothing is real-time and nobody signs in: a li
   time; *The whole screen* opens one pinned to no part. **Send** (Enter) keeps it, Shift+Enter adds a
   line, **Cancel** drops it. A dead control opens the same card pinned to the control, asking *Not
   designed yet. What did you expect here?*; it is a comment too. **Done** asks *Would you use this? Why
-  or why not?* in the margin. There are no dialogs.
+  or why not?* in the margin. There are no dialogs. Nothing covers a card's buttons: a card that
+  opens, and *The whole screen* when it is half in view, scroll up above the bar and its message, on
+  a phone and on a desktop.
 - **The margin** sits right of the screen when the window has room for the device and about 280 px,
   and under it otherwise. It lists this screen's comments by this visitor, by pin number: the part's
   words (or *The whole screen*), the text, and *Resolved* once the owner resolved it. A comment whose
@@ -488,6 +493,8 @@ browser and says what they think. Nothing is real-time and nobody signs in: a li
   shows its card. Before the first comment the margin says *Comment pins what you say to a part of the
   screen.* A reviewer sees only their own comments, which load with the page; nothing polls. Why: a
   potential customer who reads the others' comments first is no longer a fresh pair of eyes.
+- **A part's words** are the texts inside it joined by spaces (*Desk 1 Desk 2*); a label shows at
+  most about 40 characters, then *…*. An anchor from when the words ran together still finds its part.
 - **An anchor** is the part's words, its tag and its place among the parts with the same tag and
   words. To find it again, the screen looks for the same tag and words, then the same words under any
   tag. The model rewrites the markup on every Edit; the words are what survive.
@@ -508,7 +515,7 @@ browser and says what they think. Nothing is real-time and nobody signs in: a li
   open A OR B, show none; a comment about the whole screen, or whose part is gone, has no pin. A pin
   takes only its own click: it makes its screen current and opens **Comments** at its comment, which
   gets a gold ring for a moment. Pointing at a comment in the tab rings its pin. The comments load
-  when a mockup opens and when Share or Comments opens; nothing polls.
+  when a mockup opens and when Share or Comments opens, and again while Share is open (above).
 - **Comments** (the drawer's third tab, for a screen; *💬 Comments 3* with 3 open) lists the
   screen's comments from every reviewer: the open ones by pin number, then the resolved ones, muted.
   Each shows its pin number in a gold dot (when it has a pin), the reviewer's name, the part's words

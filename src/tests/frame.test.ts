@@ -74,3 +74,15 @@ test('the frame script parses, and finds a part again by its words, its tag and 
   expect(run.find(q, { text: 'Save', tag: 'x)', nth: 0 })).toBe(title)
   expect(run.find(q, { text: 'Gone', tag: 'button', nth: 0 })).toBeNull()
 })
+
+test('a part\'s words keep a space between its elements, and an anchor from when they ran together still matches', () => {
+  const script = framePage('', '', true).match(/<script>([\s\S]*?)<\/script>/)![1]!
+  const lines = ['labelOf', 'PARTS', 'textOf'].map((n) => script.match(new RegExp(`const ${n} = [^\\n]*`))![0])
+  const find = script.match(/const find = [\s\S]*?\n {2}\}\n/)![0]
+  const run = new Function(`${lines.join('\n')}\n${find}\nreturn { find, labelOf }`)() as { find: (q: (s: string) => unknown[], a: object) => unknown; labelOf: (el: unknown) => string }
+  const text = (t: string) => ({ nodeType: 3, childNodes: [], textContent: t })
+  const cell = (t: string) => ({ nodeType: 1, childNodes: [text(t)], textContent: t })
+  const row = { nodeType: 1, tagName: 'TR', getAttribute: () => null, childNodes: [cell('Desk 1'), { nodeType: 8, childNodes: [], textContent: 'note' }, cell('Desk 2')], textContent: 'Desk 1Desk 2' }
+  expect(run.labelOf(row)).toBe('Desk 1 Desk 2')
+  expect(run.find((s) => (s === 'tr' ? [row] : []), { text: 'Desk 1Desk 2', tag: 'tr', nth: 0 })).toBe(row)
+})

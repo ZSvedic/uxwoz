@@ -119,7 +119,8 @@ src/packages/web/src/
   player.html, player.ts   the player at /s/<token>: one screen in its device frame, Back, the trail, the name card,
                  comments pinned to parts in the margin beside the screen, thumbs, Done, trips
   pins.ts        browser: a comment's anchor, the pin numbers of a screen's comments, the layer of pins over a frame
-                 (the player's and the app's), the rows of the owner's Comments tab (no DOM, tested)
+                 (the player's and the app's), the rows of the owner's Comments tab, a part's label, the player's
+                 trail, a link's day, the Share pane's refresh (no DOM, tested)
   index.html     the page around the canvas; links design/index.css
   design/        the look: tokens.css (every colour), base.css (shared by parts), one file per part (bar,
                  canvas, boxes, drawer, panel), motion.css; index.css imports them all; fx.ts (sparks, sounds, pickFx);

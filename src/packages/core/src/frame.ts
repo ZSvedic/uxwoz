@@ -53,7 +53,7 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     if (navigator.userActivation && !navigator.userActivation.isActive) return
     parent.postMessage({ uxwoz: 'action', prompt: prompt.trim().slice(0, 500), label: String(label || '').slice(0, 80), part }, '*')
   }
-  const labelOf = (el) => el ? (el.getAttribute('aria-label') || el.textContent || el.value || '').trim().replace(/\\s+/g, ' ') : ''
+  const labelOf = (el) => { const w = (n) => n.nodeType === 8 ? '' : n.childNodes?.length ? [...n.childNodes].map(w).join(' ') : n.textContent || ''; return el ? (el.getAttribute('aria-label') || w(el).trim() || el.value || '').trim().replace(/\\s+/g, ' ') : '' }
   addEventListener('pointerdown', () => parent.postMessage({ uxwoz: 'touch' }, '*'), true)
   // A part of the screen, as the page pins a comment to it: its words, its tag, its place among the elements with the
   // same tag and words, and where it is. The frame never scrolls, so its rectangle is in the page's own pixels.
@@ -68,8 +68,10 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
   }
   // An anchor found again: the nth with the same tag and words (the first if there are fewer), else any part with the words.
   const find = (q, a) => {
-    const same = /^[a-z][a-z0-9]*$/.test(a.tag) ? q(a.tag).filter((x) => textOf(x) === a.text) : []
-    return same[a.nth] || same[0] || q(PARTS).find((x) => textOf(x) === a.text) || null
+    // A part's words were once run together ("Desk 1Desk 2"): an anchor from then still matches without its spaces.
+    const bare = (t) => t.replace(/\\s/g, ''), is = (x) => textOf(x) === a.text || bare(textOf(x)) === bare(a.text)
+    const same = /^[a-z][a-z0-9]*$/.test(a.tag) ? q(a.tag).filter(is) : []
+    return same[a.nth] || same[0] || q(PARTS).find(is) || null
   }
   // The page's comment mode: after { uxwoz: 'name-part' }, the part under the pointer has an outline and the next
   // click names it instead of using it; { uxwoz: 'name-part', off: true } stops it. Until then this does nothing.

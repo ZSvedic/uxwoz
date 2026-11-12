@@ -1,5 +1,6 @@
 // Comments pinned to parts of a screen, for the player and the app: the anchor a comment sends its frame, the pin
 // numbers of a screen's comments, and the layer of gold pins over a frame. The frame finds the parts (`locate`).
+// Also the labels and lines the player and the Share pane show, kept here since they need no DOM.
 
 import type { Feedback } from '@uxwoz/core'
 
@@ -22,8 +23,25 @@ export function numbered(list: Feedback[]): { f: Feedback; n: number | null }[] 
     .map((f) => ({ f, n: f.resolved ? null : ++n }))
 }
 
+/** A part's words as a label: one space between words, cut at about 40 characters with an ellipsis. */
+export const partLabel = (text: string) => { const t = text.replace(/\s+/g, ' ').trim(); return t.length > 40 ? `${t.slice(0, 39).trimEnd()}…` : t }
+
 /** Where a comment is: at a dead control, on a part (its words), or the whole screen. */
-export const whereOf = (f: Feedback) => (f.kind === 'dead' || f.label ? `At "${f.label || 'a control'}", not designed yet` : f.about || 'The whole screen')
+export const whereOf = (f: Feedback) => (f.kind === 'dead' || f.label ? `At "${partLabel(f.label || 'a control')}", not designed yet` : f.about ? partLabel(f.about) : 'The whole screen')
+
+/** The player's trail under the screen's name: none while it would only say the name again (the first screen). */
+export const trailOf = (titles: string[]) => (titles.length > 1 ? titles : [])
+
+/** A day as "Nov 12", with the year when it is not this year's. */
+export const dayOf = (at: string, now = new Date()) => {
+  const d = new Date(at)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...d.getFullYear() !== now.getFullYear() && { year: 'numeric' } })
+}
+
+/** A handler that loads only while `isOpen` says the pane is open (for a timer and the tab's focus). */
+export const whileOpen = (isOpen: () => boolean, load: () => void) => () => { if (isOpen()) load() }
+/** How often an open Share and feedback pane reads its list again. */
+export const SHARE_REFRESH_MS = 10_000
 
 /** A comment as the owner's Comments tab shows it: its pin number (open ones), whether its pin is drawn, where it is,
  * and whether its part was not found in the newest version. */
