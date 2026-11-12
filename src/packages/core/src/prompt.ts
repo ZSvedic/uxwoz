@@ -195,7 +195,7 @@ export function paperText(p: Paper): string {
 }
 
 /** In every Draw, after the paper: in the system prompt Haiku ignored it (spec/prompt-screen.md). */
-export const AI_LINE = 'This is a 2026 product: where it helps the user, show AI as part of the screen (a draft, a summary, a suggestion, a question box), not a chatbot on every screen.'
+export const AI_LINE = 'This is a 2026 product: where it helps the user, show AI as part of the screen (a draft, a summary, a suggestion, a question box), not a chatbot on every screen. At most one AI thing on a screen, its finished result written out, never a loading state.'
 
 /** Draw one variant of a screen, from the screen the click came from (none for the first screen). */
 export function drawRequest(p: Paper, target: { id: string; line: string }, from: (Shown & { label: string }) | null, alternative = false): string {

@@ -33,7 +33,7 @@ Last night | 4.2
 The screen the click came from, home (the first screen):
 <title>Home</title> ...
 
-This is a 2026 product: where it helps the user, show AI as part of the screen (a draft, a summary, a suggestion, a question box), not a chatbot on every screen.
+This is a 2026 product: where it helps the user, show AI as part of the screen (a draft, a summary, a suggestion, a question box), not a chatbot on every screen. At most one AI thing on a screen, its finished result written out, never a loading state.
 
 Draw this screen: history: every night with its snore score, newest first
 The click came from "History" on home.
@@ -44,7 +44,9 @@ The jobs, each after the paper:
 - **Draw**: as above. The first screen has no screen it came from. The 2026 line, from the owner
   (every design was a classical app, with no AI in it), sits in Draw only, after the paper and
   before *Draw this screen*: in the system prompt Haiku ignored it (0 of 6 designs showed AI), here
-  it followed it (6 of 6). Edit and File do not carry it. One side of an A OR B (a random
+  it followed it (6 of 6), and then put AI on nearly every screen, two on some. Its second sentence
+  fixed that: 10 of 16 app designs showed AI, never two on one screen, and plain lists stayed plain.
+  Edit and File do not carry it. One side of an A OR B (a random
   one) adds: *Design this as a clearly different alternative to the obvious layout: arrange this
   screen's content another way, not just the wording.* Regenerate sends the screen's first request,
   without that line.
