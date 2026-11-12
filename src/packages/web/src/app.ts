@@ -135,11 +135,14 @@ async function init() {
   await themeCss(state.theme)
   // An address opens its mockup at its screen; else a reload opens the mockup that was open, with its A OR B if
   // one was waiting for a pick. An edit link keeps its own address.
-  if (!shareToken && readAddress(location.pathname)) return followAddress()
-  const last = shareToken ? await editLinkApp() : store.get('uxwoz:app')
-  if (last) return start(last, false, { inPlace: true })
-  draw()
-  promptInput.focus()
+  // Until then no draw writes an address (one with no mockup yet would add `/` as a step); then it replaces this one.
+  try {
+    if (!shareToken && readAddress(location.pathname)) return await followAddress()
+    const last = shareToken ? await editLinkApp() : store.get('uxwoz:app')
+    if (last) return await start(last, false, { inPlace: true })
+    draw()
+    promptInput.focus()
+  } finally { address.hold--; syncAddress(true) }
 }
 
 init().catch((e) => showError(`Could not load the app config: ${e.message}`))
