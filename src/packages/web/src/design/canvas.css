@@ -61,6 +61,7 @@
 .pick-hint { opacity: 0; padding: calc(5px / var(--z)) calc(18px / var(--z)); border-radius: 99px;
   background: var(--pick); color: var(--on-pick); font-weight: 600; font-size: calc(14px / var(--z)); box-shadow: var(--pick-shadow); }
 .card.side.pickable:hover .pick-hint { opacity: 1; }
+@media (hover: none) { .card.side.pickable .pick-hint { opacity: 1; } }
 .error-box { height: 100%; padding: calc(16px / var(--z)); border: calc(1px / var(--z)) dashed var(--err); border-radius: 10px;
   color: var(--err); font-size: calc(13px / var(--z)); overflow: auto; background: var(--surface); }
 /* The OR: a gold coin, and under it the ✕ that drops both designs as a round parchment button. */

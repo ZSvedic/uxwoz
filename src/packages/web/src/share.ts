@@ -198,10 +198,14 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
     return { root, b }
   }
 
-  /** Whether a request makes a model work: a new screen (not a cache hit), an Edit or a Regenerate, a pick (its filing), an Edit of a box or a visit. */
+  /** Whether a request makes a model work: a new screen (not a cache hit, unless an open A OR B lacks a side), an Edit or a Regenerate, a pick (its filing), an Edit of a box or a visit. */
   function costs(path: string, b: any, cache: ScreenCache): boolean {
     if (path === '/api/box') return b?.op === 'edit' || b?.op === 'visit'
-    if (path === '/api/screen') return !cache.find(String(b?.app ?? ''), canonicalAction(typeof b?.action === 'string' ? b.action : null))
+    if (path === '/api/screen') {
+      // A cache hit is free, but an open A OR B with a side missing draws that side.
+      const hit = cache.find(String(b?.app ?? ''), canonicalAction(typeof b?.action === 'string' ? b.action : null))
+      return !hit || (!hit.versions.length && !!hit.proposals?.some((p) => !p))
+    }
     return PAID.has(path)
   }
 

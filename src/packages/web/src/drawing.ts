@@ -215,12 +215,17 @@ export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string
 
   const message = (err: unknown) => (err instanceof Error ? err.message : String(err))
 
-  /** A new screen: from the cache when it is there (with its open A OR B, if any), else two designs at once. */
+  /**
+   * A new screen: from the cache when it is there (with its open A OR B, if any), else two designs at once. An open
+   * A OR B with a side missing (refused, or failed) draws that side only; the side there is sent as it is.
+   */
   async function* screenEvents(app: string, asked: string | null, model: ModelId, device: Device, click: { from: string; label: string } | null, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
     let action = canonicalAction(asked)
     const hit = cache.find(app, action)
     const key = hit?.key ?? screenKey(app, action)
-    if (hit) {
+    const slots = Array.from({ length: PROPOSALS }, (_, i) => i)
+    const missing = hit ? (hit.versions.length || !hit.proposals ? [] : slots.filter((i) => !hit.proposals![i])) : slots
+    if (hit && !missing.length) {
       yield { type: 'meta', key, cached: true, variants: 0 }
       yield { type: 'done', entry: hit }
       return
@@ -243,20 +248,23 @@ export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string
       const planned = plannedScreens(cache.map(app).entries).find((p) => p.name === ref.name)
       action = `@${ref.name}: ${planned?.action ?? promptFromLabel(ref.name, click?.label ?? '')}`
     }
-    const prompt = ref ? screenRef(action!)!.prompt : null
+    // The side missing of an open A OR B is drawn from that screen's own line.
+    if (hit?.action != null && hit.name) action = `@${hit.name}: ${hit.action}`
+    const prompt = ref || hit?.action != null ? screenRef(action!)!.prompt : null
     yield { type: 'meta', key, cached: false, variants: PROPOSALS }
+    for (const [slot, v] of (hit?.proposals ?? []).entries()) if (v) yield { type: 'version', variant: slot, version: v }
     // The paper should hold what the last decision filed: wait for it, a little.
     await filed(app, fileWaitMs)
     if (signal.aborted) return
     const from = click && cache.get(click.from)
-    const target = { id: ref ? ref.name : HOME_NAME, line: prompt ?? HOME_LINE }
+    const target = { id: hit?.action != null && hit.name ? hit.name : ref ? ref.name : HOME_NAME, line: prompt ?? HOME_LINE }
     const paper = cache.paper(app, device)
     // One random side asks for a clearly different design, so the side says nothing about which is which.
     const different = Math.min(PROPOSALS - 1, Math.floor(random() * PROPOSALS))
     // A starter's recorded screen replays its first two designs, A and B; any other is drawn live.
-    const recorded = Array.from({ length: PROPOSALS }, (_, slot) => recordedScreen(app, action, slot))
-    if (recorded.some((r) => !r)) goLive(app)
-    const streams = Array.from({ length: PROPOSALS }, (_, slot) => tagged(slot, generateScreen({
+    const recorded = slots.map((slot) => recordedScreen(app, action, slot))
+    if (missing.some((slot) => !recorded[slot])) goLive(app)
+    const streams = missing.map((slot) => tagged(slot, generateScreen({
       user: drawRequest(paper, target, from ? { ...shown(from), label: click!.label } : null, slot === different),
       model, device, signal, ...io, recorded: free(recorded[slot] ?? null),
     })))

@@ -9,6 +9,7 @@ import { canvas, closeMockup, side, start } from './app.ts'
 import { lookAt } from './drawer.ts'
 import { hint, mapOf, showError } from './net.ts'
 import { shareToken } from './sharing.ts'
+import { loadMe } from './account-ui.ts'
 import { all, components, draw, fitChoice, labelOf, openScreen, treeParent } from './screens.ts'
 import { item } from './toolbar.ts'
 import { $, state, store } from './state.ts'
@@ -89,6 +90,7 @@ export async function filed() {
   } finally {
     // Given up (no answer, or changes kept crossing it): the lines say filing and visiting no more.
     if (state.waiting) { state.waiting = state.filing = state.visiting = false; draw() }
+    loadMe() // filing, a box's Edit and a visit are live calls: the free screens left
   }
 }
 

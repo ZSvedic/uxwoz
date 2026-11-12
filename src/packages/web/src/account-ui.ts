@@ -54,15 +54,16 @@ export interface CardView {
 
 const view = (lead: string, rest: Partial<CardView> = {}): CardView => ({ lead, field: null, send: null, note: null, privacy: false, again: false, cancel: false, ...rest })
 
-/** What the card shows for `me`, given why it opened and where the sign-in is. */
-export function cardOf(me: Me, why: Why, step: CardStep, email: string): CardView {
+/** What the card shows for `me`, given why it opened and where the sign-in is; `promised`, the screens it promised. */
+export function cardOf(me: Me, why: Why, step: CardStep, email: string, promised = me.more ?? MORE): CardView {
   if (step === 'delete') return view('Delete your account? Its mockups and its links go at once, for good. Type your email once more.', { field: { kind: 'confirm', placeholder: 'Your email' }, send: 'Delete', cancel: true })
-  if (step === 'thanks') return view(`Thanks. You have about ${plural(me.screensLeft ?? 0, 'more free screen')}.`)
+  if (step === 'thanks') return view(`Thanks. You have about ${plural(promised, 'more free screen')}.`)
   if (me.role === 'user') {
     if (step === 'asked' || (me.request && !me.request.answer)) return view('Asked. The answer comes by email.')
     return view('You have used your free screens.', { field: { kind: 'note', label: 'What are you building?', placeholder: 'e.g. a booking app for my dog walking business' }, send: 'Ask for more' })
   }
-  if (step === 'code') return view(`We sent a code to ${email}.`, { field: { kind: 'code', placeholder: 'Six digits' }, send: 'Verify', again: true })
+  // The email's hyphens are shown as non-breaking ones, so the line never breaks inside the address.
+  if (step === 'code') return view(`We sent a code to ${email.replaceAll('-', '\u2011')}.`, { field: { kind: 'code', placeholder: 'Six digits' }, send: 'Verify', again: true })
   return view(LEADS[why](me.more ?? MORE), { field: { kind: 'email', placeholder: 'you@example.com' }, send: 'Send the code', note: 'No password: we email you a six-digit code.', privacy: true })
 }
 
@@ -109,9 +110,9 @@ export function sideOf(message: string, me: Me | null): { text: string; why: Why
   return { text: 'Register', why: /guests/i.test(message) ? 'guests' : /network/i.test(message) ? 'address' : 'allowance' }
 }
 
-/** Every key of ours (`uxwoz:`) in a storage, removed. */
+/** Every key of ours (`uxwoz:`) in a storage, removed, but `uxwoz:arrived`: this browser's arrival is counted once. */
 export function forget(s: Pick<Storage, 'length' | 'key' | 'removeItem'>) {
-  const ours = Array.from({ length: s.length }, (_, i) => s.key(i)).filter((k): k is string => !!k?.startsWith('uxwoz:'))
+  const ours = Array.from({ length: s.length }, (_, i) => s.key(i)).filter((k): k is string => !!k?.startsWith('uxwoz:') && k !== 'uxwoz:arrived')
   for (const k of ours) s.removeItem(k)
 }
 
@@ -122,13 +123,17 @@ export interface AccountDeps {
   showError: (msg: string | null) => void
   loadRecent: () => unknown
   closeMenus: () => void
+  /** A code verified: what the meter refused may be drawn now. */
+  signedUp: () => void
+  /** The card closed by Esc, a press outside or Cancel, with no sign-up. */
+  dismissed: () => void
 }
 
 let deps: AccountDeps | null = null
 let isPublic = false
 let me: Me | null = null
 /** The card's own state, kept while it is closed: why it opened, the step, what was typed, the last error. */
-const card = { why: 'register' as Why, step: 'email' as CardStep, email: '', code: '', note: '', confirm: '', error: '' }
+const card = { why: 'register' as Why, step: 'email' as CardStep, email: '', code: '', note: '', confirm: '', error: '', promised: MORE }
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 /** The email and a code on its way also outlive a reload of this tab. */
 const KEPT = 'uxwoz:signin'
@@ -156,13 +161,13 @@ export function initAccount(d: AccountDeps, cfg: { public?: boolean }) {
   const form = $<HTMLFormElement>('account')
   form.addEventListener('submit', (e) => { e.preventDefault(); send() })
   $('accountField').addEventListener('input', (e) => { const v = (e.target as HTMLInputElement).value; if (fieldKind()) card[fieldKind()!] = v })
-  $('accountAgain').addEventListener('click', () => { if (card.step === 'delete') { card.step = 'email'; closeCard() } else signIn() })
+  $('accountAgain').addEventListener('click', () => { if (card.step === 'delete') dismiss(); else signIn() })
   // The free screens left, read again when the tab comes back (the owner may have given more).
   addEventListener('focus', () => loadMe())
-  addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape') closeCard() })
+  addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape' && !form.hidden) dismiss() })
   document.addEventListener('pointerdown', (e) => {
     const t = e.target as Node
-    if (!form.hidden && !form.contains(t) && !$('accountPop').contains(t)) closeCard()
+    if (!form.hidden && !form.contains(t) && !$('accountPop').contains(t)) dismiss()
   })
   loadMe()
 }
@@ -267,11 +272,17 @@ export const closeCard = () => {
   if (card.step === 'delete') card.step = 'email'
 }
 
+/** Closed by the person, not by a sign-up. */
+function dismiss() {
+  closeCard()
+  deps!.dismissed()
+}
+
 const fieldKind = () => (me ? cardOf(me, card.why, card.step, card.email).field?.kind ?? null : null)
 
 function renderCard() {
   if (!me) return
-  const v = cardOf(me, card.why, card.step, card.email)
+  const v = cardOf(me, card.why, card.step, card.email, card.promised)
   $('accountLead').textContent = v.lead
   const f = $<HTMLInputElement>('accountField'), label = $('accountLabel')
   f.hidden = !v.field
@@ -327,14 +338,16 @@ function signIn() {
 function verify() {
   if (!card.code.trim()) return $('accountField').focus()
   return call('/api/verify', { email: card.email.trim(), code: card.code.trim() }, async (res) => {
-    const m = (await res.json()).me as Me, before = me?.screensLeft ?? 0
+    const { me: m, created } = await res.json() as { me: Me; created?: true }
     card.code = ''
-    // A new account has its free screens at once and says so; an account that existed takes the visitor's mockups.
-    card.step = (m.screensLeft ?? 0) > before ? 'thanks' : 'email'
+    // A new account has the screens the card promised at once and says so; one that existed takes the visitor's mockups.
+    card.promised = me?.more ?? MORE
+    card.step = created ? 'thanks' : 'email'
     keep()
     setMe(m)
     if (card.step === 'email') closeCard()
     deps!.loadRecent()
+    deps!.signedUp()
   })
 }
 

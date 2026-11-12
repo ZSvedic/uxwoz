@@ -12,7 +12,7 @@ import { boxOp, focusBox, onTool, openDrawer } from './drawer.ts'
 import { mapOf, post, showError, themeCss } from './net.ts'
 import { entryAt, readAddress } from './address.ts'
 import { address, applyMap, currentKey, followAddress, notHere, resetTrail, setCurrent, showsAt, syncAddress } from './nav.ts'
-import { all, components, dropChoice, draw, fitChoice, fitScreenSoon, onAction, openScreen, pick, stopMaking } from './screens.ts'
+import { again, all, cardClosed, components, dropChoice, draw, fitChoice, fitScreenSoon, onAction, openScreen, pick, stopMaking } from './screens.ts'
 import { PICKERS, closeMenus, loadRecent, openGenerate, warmUp } from './toolbar.ts'
 import { editLinkApp, loadShared, shareToken } from './sharing.ts'
 import { initAccount } from './account-ui.ts'
@@ -74,7 +74,7 @@ async function openMockup(app: string, make: boolean, sid: string | null | undef
   loadShared()
   // An open A OR B is fitted, unless the address named a drawn screen: then that screen, and the address stays.
   const open = all().find((e) => !e.versions.length)
-  if (open && !named?.versions.length) fitChoice(open.key)
+  if (open && !named?.versions.length) fitChoice(open.key, false) // a reload or another mockup opened: no hint
   else fitScreenSoon(state.current ?? root)
   if (named) showsAt(named.key)
 }
@@ -118,7 +118,7 @@ async function deleteApp(again: boolean) {
 async function init() {
   const cfg = await (await fetch('/api/config')).json()
   if (cfg.warning) showError(cfg.warning)
-  initAccount({ post, showError, loadRecent, closeMenus }, cfg)
+  initAccount({ post, showError, loadRecent, closeMenus, signedUp: again, dismissed: cardClosed }, cfg)
   for (const [s, name] of PICKERS) {
     const list: { id: string; label: string }[] = cfg[`${name}s`], saved = store.get(`uxwoz:${name}`)
     for (const x of list) s.add(new Option(x.label, x.id))
