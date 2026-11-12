@@ -142,16 +142,27 @@ hidden when the user branches.
 - **Live screens**: a picked screen works: controls that open another screen are blue, in both
   themes; everything else keeps the theme's own ink.
 - **A screen is as tall as its content**, and at least one device screen tall (844 px on a phone),
-  so nothing scrolls inside it: scrolling over a screen moves the canvas. `100vh` is one device
+  so the screen itself never scrolls: scrolling over it moves the canvas. A part of the screen that
+  scrolls on its own (a sideways card rail, a list in a box) takes the scroll first while it can
+  move that way, then the canvas moves, as in the boxes. `100vh` is one device
   screen, so "full-screen" screens keep a normal size; a screen that still grows with its window
   grows to 8,000 px at most.
 - **Size**: every screen of a device is as wide as the device, so the screens of a mockup line up.
-  The model is told to start small.
+  The model is told to start small. A screen is laid out once, at its device's width, and the zoom
+  only scales it: its text wraps the same at every zoom.
 - **Opening a mockup** fits its current screen, and fits it again once the screen has its real
-  size. **Fit screen** keeps a tall screen readable and shows its top, like the A OR B fit.
+  size. **Fit screen** keeps a tall screen readable and shows its top, like the A OR B fit: at
+  least 75%, unless its width needs less.
+- **The window**: when it changes size (or moves to another display), the canvas fits again as on
+  opening: an open A OR B, else the current screen or box. On a phone, a keyboard that opens while
+  typing moves nothing.
 - **Pan and zoom**: scroll, or drag the empty canvas, to pan. Pinch or Ctrl/Cmd + scroll zooms
-  around the pointer, also over a screen, from 10% to 200%. The stars zoom with
-  the canvas.
+  around the pointer, also over a screen, from 10% to 200%. The zoom menu, **+**, **−** and the keys
+  keep the current screen (or box) in view: centred when it fits, else its top left corner; with no
+  screen yet, the middle of the view stays. The stars zoom with the canvas.
+- **The current screen stays in view**: when it grows or moves (Regenerate, an Edit, a new A OR B,
+  the drawer opening), a current screen that was in view and no longer is comes back on that side:
+  centred when it fits, else its start. One the user scrolled away from stays where it is.
 - **Errors** show in a red pill at the bottom of the canvas, above the bar, until closed, or until the next screen
   or change starts. Time and cost are in Info.
 

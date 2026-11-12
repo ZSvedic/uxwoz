@@ -1,7 +1,35 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { FRAME_SANDBOX, SYSTEM_PROMPT, VIEWPORT_H, extractFragment, framePage, hasVisibleText } from '@uxwoz/core'
+import { FRAME_SANDBOX, SYSTEM_PROMPT, VIEWPORT_H, extractFragment, framePage, hasVisibleText, scrollsFirst } from '@uxwoz/core'
+
+describe('the wheel over a screen', () => {
+  const rail = { overflowX: 'auto', overflowY: 'hidden', scrollLeft: 0, scrollTop: 0, scrollWidth: 900, scrollHeight: 200, clientWidth: 340, clientHeight: 200 }
+  const plain = { overflowX: 'visible', overflowY: 'visible', scrollLeft: 0, scrollTop: 0, scrollWidth: 340, scrollHeight: 900, clientWidth: 340, clientHeight: 900 }
+
+  test('a sideways card rail takes a sideways swipe while it has room that way, then the canvas moves', () => {
+    expect(scrollsFirst([plain, rail, plain], 30, 2)).toBe(true)
+    expect(scrollsFirst([rail], -30, 0)).toBe(false) // at its start already
+    expect(scrollsFirst([{ ...rail, scrollLeft: 200 }], -30, 0)).toBe(true)
+    expect(scrollsFirst([{ ...rail, scrollLeft: 560 }], 30, 0)).toBe(false) // at its end
+  })
+
+  test('an up or down scroll over the rail, or over a part that cannot scroll, moves the canvas', () => {
+    expect(scrollsFirst([rail], 2, 40)).toBe(false)
+    expect(scrollsFirst([plain], 0, 40)).toBe(false)
+    expect(scrollsFirst([], 30, 0)).toBe(false)
+    expect(scrollsFirst([{ ...plain, overflowY: 'auto', clientHeight: 300 }], 0, 40)).toBe(true)
+  })
+
+  test('the rule goes into the frame whole, and the frame\'s script still parses', () => {
+    const script = framePage('', '', true).match(/<script>([\s\S]*?)<\/script>/)![1]!
+    expect(() => new Function(script)).not.toThrow()
+    const rule = script.match(/const scrollsFirst = ([\s\S]*?)\n {2}const chain/)![1]!
+    const run = new Function(`return (${rule})`)() as typeof scrollsFirst
+    expect(run([{ ...rail, scrollLeft: 200 }], -30, 0)).toBe(true)
+    expect(run([rail], 0, 30)).toBe(false)
+  })
+})
 
 describe('frame page', () => {
   test('only a markdown fence is stripped; the code is left alone', () => {

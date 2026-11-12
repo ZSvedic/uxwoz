@@ -41,6 +41,28 @@ const SVG_NS = 'http://www.w3.org/2000/svg'
 const MIN_ZOOM = 0.1
 export const MAX_ZOOM = 2
 const STEPS = [0.1, 0.15, 0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2]
+/** A fit of a tall screen never goes below this zoom, unless the screen's width needs less: its text stays readable. */
+export const READABLE = 0.75
+/** The room kept between a screen and the stage's edge when the view moves to it, in pixels on screen. */
+const EDGE = 24
+
+/** Where the view lands on a box (canvas pixels) at zoom z on a stage w × h: per axis centred when it fits, else its start `m` from the edge. */
+export function landing(b: Box, z: number, w: number, h: number, m = EDGE): { left: number; top: number } {
+  const axis = (lo: number, size: number, room: number) => (size * z <= room - 2 * m ? (lo + size / 2) * z - room / 2 : lo * z - m)
+  return { left: axis(b.x, b.w, w), top: axis(b.y, b.h, h) }
+}
+
+/** On one axis, whether a box from lo to hi (pixels on screen) is seen in a view from `at`, `size` long: all of it, or its
+ *  start when it is longer than the view, or it covers the view. */
+export const seenOn = (lo: number, hi: number, at: number, size: number) =>
+  (lo >= at - 1 && (hi <= at + size + 1 || (hi - lo > size && lo < at + size))) || (lo <= at + 1 && hi >= at + size - 1)
+
+/** The zoom of a fit: the width's and the height's, at most `max`. `top`: the width alone. `snug`: the height too, but at
+ *  least 60% of the width's fit and at least READABLE (or the width's fit when that is less). */
+export function fitZoom(zw: number, zh: number, { max = 1, top = false, snug = false } = {}): number {
+  const z = Math.min(max, MAX_ZOOM, zw, top ? Infinity : snug ? Math.max(zh, 0.6 * zw, Math.min(zw, READABLE)) : zh)
+  return Math.max(MIN_ZOOM, Math.floor(z * 100) / 100)
+}
 
 export interface CardView {
   /** The screen's key, or `key#0` and `key#1` for the sides of its A OR B. */
@@ -108,9 +130,12 @@ function newCard(key: string, on: CanvasHandlers) {
   frame.setAttribute('sandbox', FRAME_SANDBOX)
   frame.title = 'Generated screen'
   frame.style.height = `${START_H}px`
+  // A screen is laid out at zoom 1, at its device's width, and only scaled: its text wraps the same at every zoom.
+  Object.assign(frame.style, { position: 'absolute', left: '0', top: '0', transformOrigin: '0 0' })
   const shield = el('div', 'shield', el('span', 'pick-hint', 'Pick this design'))
   const pins = el('div', 'pins')
   const screen = el('div', 'screen', frame, pins, shield)
+  screen.style.height = screenH(START_H)
   const { el: rail, tools } = railOf(RAIL, (tool) => on.tool(c.key, tool))
   const c = {
     el: el('article', 'card', head, screen, error, rail), name, idea, more, note, screen, frame, pins, shield, error, rail, tools, key,
@@ -120,6 +145,15 @@ function newCard(key: string, on: CanvasHandlers) {
   return c
 }
 type Card = ReturnType<typeof newCard>
+
+/** The height of a card's screen around a frame `h` tall: the frame and its border (1 px on screen) above and below. */
+const screenH = (h: number) => `calc(${h}px + 2px / var(--z))`
+
+/** Undo the canvas's zoom inside a frame and scale it instead: the browser lays the screen out once, unzoomed. */
+function unzoom(frame: HTMLIFrameElement, z: number) {
+  frame.style.zoom = String(1 / z)
+  frame.style.transform = z === 1 ? '' : `scale(${z})`
+}
 
 const RAIL: [string, string, string][] = [
   ['edit', '✎', 'Edit: say what should change in this screen'],
@@ -154,6 +188,18 @@ export class Canvas {
     this.surface.style.setProperty('--z', '1')
     addEventListener('message', (e) => this.onFrameMessage(e))
     new ResizeObserver(() => this.queue()).observe(stage)
+    stage.addEventListener('scroll', () => { this.seen = this.currentSeen() }, { passive: true })
+    // The window changed size (or moved to another display): fit again, as on opening. A keyboard that opens on a
+    // phone changes only the height while a field has the focus: that is no reason to move.
+    let w0 = innerWidth, timer: ReturnType<typeof setTimeout> | undefined
+    const resized = () => { clearTimeout(timer); timer = setTimeout(() => this.refit(), 150) }
+    addEventListener('resize', () => {
+      const typing = document.activeElement?.matches('input, textarea, select, [contenteditable]')
+      if (innerWidth !== w0 || !typing) resized()
+      w0 = innerWidth
+    })
+    const watchDpr = () => matchMedia(`(resolution: ${devicePixelRatio}dppx)`).addEventListener('change', () => { resized(); watchDpr() }, { once: true })
+    watchDpr()
     // Pinch (a wheel with ctrlKey in Chrome and Firefox) and Ctrl/Cmd + scroll zoom around the pointer.
     stage.addEventListener('wheel', (e) => {
       this.moved = performance.now()
@@ -185,13 +231,61 @@ export class Canvas {
 
   /** When the user last scrolled, dragged or zoomed the canvas (performance.now()); fits do not count. */
   moved = 0
+  /** Whether the current screen or box was in view after the last layout, fit or scroll (see `keepSeen`). */
+  private seen = false
 
-  /** Zoom to `z`, keeping the point under (x, y) (the middle of the stage by default) in place. */
+  /** The current box's element, else the current screen's key. */
+  private currentTarget(): string | HTMLElement | undefined {
+    return this.side.querySelector<HTMLElement>('.box.current') ?? this.screens.find((s) => s.current)?.key
+  }
+
+  private currentSeen(): boolean {
+    const t = this.currentTarget(), b = t && this.box(t)
+    if (!b) return false
+    const st = this.stage, z = this.z
+    return seenOn(b.x * z, (b.x + b.w) * z, st.scrollLeft, st.clientWidth) && seenOn(b.y * z, (b.y + b.h) * z, st.scrollTop, st.clientHeight)
+  }
+
+  /** After a layout: a current screen or box that was in view and no longer is (it grew, the stage got narrower) comes
+   *  back on the axis it left: centred when it fits, else its start. */
+  private keepSeen() {
+    const t = this.currentTarget(), b = t && this.box(t)
+    if (b && this.seen && !this.currentSeen()) {
+      const st = this.stage, z = this.z, to = landing(b, z, st.clientWidth, st.clientHeight)
+      st.scrollTo({
+        left: seenOn(b.x * z, (b.x + b.w) * z, st.scrollLeft, st.clientWidth) ? st.scrollLeft : to.left,
+        top: seenOn(b.y * z, (b.y + b.h) * z, st.scrollTop, st.clientHeight) ? st.scrollTop : to.top,
+      })
+    }
+    this.seen = this.currentSeen()
+  }
+
+  /** Fit again after the window changed size, as on opening: an open A OR B, else the current box or screen, else the tree. */
+  refit() {
+    const choice = this.screens.find((s) => s.cards[0]?.side)?.key, t = choice ?? this.currentTarget()
+    if (t instanceof HTMLElement) this.fit(t, { top: true })
+    else if (t) this.fit(t, { snug: true })
+    else this.fit()
+  }
+
+  /**
+   * Zoom to `z`. Around a point (x, y), a pinch's, that point stays in place. Without one (the menu, + and −, the keys),
+   * the current screen or box stays in view: centred when it fits, else its top left corner; with none, the middle stays.
+   */
   setZoom(z: number, x?: number, y?: number) {
     this.moved = performance.now()
     z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z * 100) / 100))
     if (z === this.z) return
     const st = this.stage, r = st.getBoundingClientRect()
+    const cur = x == null ? this.currentTarget() : undefined
+    if (cur && this.box(cur)) {
+      this.applyZoom(z)
+      const to = landing(this.box(cur)!, z, st.clientWidth, st.clientHeight)
+      st.scrollLeft = to.left
+      st.scrollTop = to.top
+      this.seen = this.currentSeen()
+      return
+    }
     const ax = x == null ? st.clientWidth / 2 : x - r.left, ay = y == null ? st.clientHeight / 2 : y - r.top
     let px = (st.scrollLeft + ax) / this.z, py = (st.scrollTop + ay) / this.z
     // Names keep their size on screen, so screens shift with the zoom: follow the nearest one.
@@ -220,6 +314,7 @@ export class Canvas {
   private applyZoom(z: number) {
     this.z = z
     this.surface.style.zoom = String(z)
+    for (const c of this.cards.values()) unzoom(c.frame, z)
     this.surface.style.setProperty('--z', String(z))
     this.surface.classList.toggle('far', z < FAR)
     this.layout() // names keep their size on screen, so the room they need changes
@@ -259,14 +354,13 @@ export class Canvas {
     for (let i = 0; i < 4; i++) {
       const box = this.box(key)
       if (!box) return
-      const zw = (st.clientWidth - 2 * m) / box.w, zh = (st.clientHeight - 2 * m) / box.h
-      const z = Math.min(max, MAX_ZOOM, zw, top ? Infinity : snug ? Math.max(zh, 0.6 * zw) : zh)
-      const next = Math.max(MIN_ZOOM, Math.floor(z * 100) / 100)
+      const next = fitZoom((st.clientWidth - 2 * m) / box.w, (st.clientHeight - 2 * m) / box.h, { max, top, snug })
       if (next === this.z) break
       this.applyZoom(next)
     }
     const box = this.box(key)
     if (box) this.center(top ? { ...box, h: Infinity } : box)
+    this.seen = this.currentSeen()
   }
 
   /** Resolves once every card of a screen has its final screen and its size (or after 4 s). */
@@ -498,6 +592,7 @@ export class Canvas {
     this.surface.style.width = `${w}px`
     this.surface.style.height = `${h}px`
     this.drawLines(kids)
+    this.keepSeen()
     // Show "more" by each idea cut off at two lines; the room it has changes with the zoom.
     requestAnimationFrame(() => { for (const c of this.cards.values()) c.more.hidden = !!c.view?.side || (c.more.textContent !== 'less' && c.idea.scrollHeight <= c.idea.clientHeight + 1) })
   }
@@ -530,7 +625,7 @@ export class Canvas {
 
   private card(id: string, key: string, parent: HTMLElement): Card {
     const c = this.cards.get(id) ?? newCard(key, this.on)
-    if (!this.cards.has(id)) { parent.append(c.el); this.cards.set(id, c) }
+    if (!this.cards.has(id)) { parent.append(c.el); this.cards.set(id, c); unzoom(c.frame, this.z) }
     return c
   }
 
@@ -547,6 +642,7 @@ export class Canvas {
       if (c.height !== h) {
         c.height = h
         c.frame.style.height = `${h}px`
+        c.screen.style.height = screenH(h)
         this.queue()
       }
       if (this.pinTarget(c.el.dataset.id ?? '')) pinHook.size(c.key)
@@ -562,7 +658,7 @@ export class Canvas {
       const r = c.frame.getBoundingClientRect(), k = r.width / (c.frame.offsetWidth || 1)
       this.zoomBy(Number(d.dy) || 0, r.left + (Number(d.x) || 0) * k, r.top + (Number(d.y) || 0) * k)
     } else if (d.uxwoz === 'wheel') {
-      // The frame never scrolls itself: its gestures scroll the canvas.
+      // Nothing under the pointer in the screen could scroll that way: the gesture scrolls the canvas.
       this.moved = performance.now()
       this.stage.scrollBy(Number(d.dx) || 0, Number(d.dy) || 0)
     } else if (d.uxwoz === 'action' && typeof d.prompt === 'string' && !c.view?.side) {
