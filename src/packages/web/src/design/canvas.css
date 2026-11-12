@@ -2,7 +2,7 @@
 .workspace { flex: 1; min-height: 0; display: flex; position: relative; }
 .canvas-area { flex: 1; min-width: 0; min-height: 0; position: relative; display: flex; }
 .stage { flex: 1; min-width: 0; min-height: 0; position: relative; overflow: auto; outline: none;
-  background: transparent; mask-image: linear-gradient(to top, transparent, black 16px); }
+  background: transparent; mask-image: linear-gradient(to top, transparent, black 16px); touch-action: pan-x pan-y; }
 .stage.panning { cursor: grabbing; }
 .stage.panning iframe { pointer-events: none; }
 
@@ -82,3 +82,11 @@
 .rail .tool:focus-visible { box-shadow: 0 0 0 2px var(--focus-in), var(--lift); }
 .rail .tool:disabled { color: var(--disabled); }
 .rail .tool:hover:not(:disabled) { color: var(--text); border-color: var(--current); }
+/* A narrow window: nothing widens the page; the current screen's rail is a row under it that stays in the window
+   while the screen shows (the others' take no taps); a side's idea has a fourth line. */
+@media (max-width: 720px) {
+  .workspace { overflow: clip; }
+  .surface > .card .rail { position: sticky; top: auto; bottom: calc(24px / var(--z)); flex-direction: row; justify-content: center; padding: 10px 0 0; }
+  .surface > .card:not(.current) .rail { visibility: hidden; }
+  .card.side .idea { -webkit-line-clamp: 4; }
+}

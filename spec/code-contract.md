@@ -228,6 +228,11 @@ only from a card's own frame.
 { uxwoz: 'wheel', dx, dy }           // scroll over the screen: dy and dx scroll the canvas
 { uxwoz: 'zoom', dy, x, y }          // Ctrl/Cmd + scroll or a pinch over the screen, at (x, y) in
                                      // the frame: zooms the canvas around that point
+{ uxwoz: 'pan', x, y, d, start }     // a finger dragging over the screen that no part of it takes: its
+                                     // point in the frame; the canvas follows it from the last point
+                                     // (`start` begins a gesture); `d` is unused
+{ uxwoz: 'pinch', x, y, d, start }   // two fingers over the screen: their middle and their spread `d`;
+                                     // the canvas zooms by how the spread grew, around the middle
 { uxwoz: 'part', text, tag, nth, x, y, w, h } // the part clicked after the page sent { uxwoz: 'name-part' }:
                                      // its words (60 characters), tag, place among the parts with the same
                                      // tag and words, and its rectangle in the frame's own pixels; while

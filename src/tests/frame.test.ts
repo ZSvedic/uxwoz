@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { FRAME_SANDBOX, SYSTEM_PROMPT, VIEWPORT_H, extractFragment, framePage, hasVisibleText, scrollsFirst } from '@uxwoz/core'
+import { FRAME_SANDBOX, SYSTEM_PROMPT, VIEWPORT_H, dragOwner, extractFragment, framePage, hasVisibleText, scrollsFirst } from '@uxwoz/core'
 
 describe('the wheel over a screen', () => {
   const rail = { overflowX: 'auto', overflowY: 'hidden', scrollLeft: 0, scrollTop: 0, scrollWidth: 900, scrollHeight: 200, clientWidth: 340, clientHeight: 200 }
@@ -28,6 +28,28 @@ describe('the wheel over a screen', () => {
     const run = new Function(`return (${rule})`)() as typeof scrollsFirst
     expect(run([{ ...rail, scrollLeft: 200 }], -30, 0)).toBe(true)
     expect(run([rail], 0, 30)).toBe(false)
+  })
+})
+
+describe('a finger over a screen', () => {
+  const rail = { overflowX: 'auto', overflowY: 'hidden', scrollLeft: 200, scrollTop: 0, scrollWidth: 900, scrollHeight: 200, clientWidth: 340, clientHeight: 200 }
+  const takes = (chain: Parameters<typeof scrollsFirst>[0]) => (dx: number, dy: number) => scrollsFirst(chain, dx, dy)
+
+  test('a tap stays a tap; a drag up or down moves the canvas; a sideways drag on a card rail with room scrolls the rail', () => {
+    expect(dragOwner(3, 2, takes([rail]))).toBeNull()
+    expect(dragOwner(0, -40, takes([rail]))).toBe('canvas')
+    expect(dragOwner(-40, 0, takes([rail]))).toBe('screen') // the finger goes left: the rail scrolls on
+    expect(dragOwner(40, 0, takes([{ ...rail, scrollLeft: 0 }]))).toBe('canvas') // at its start: the canvas takes it
+    expect(dragOwner(0, -40, takes([]))).toBe('canvas')
+  })
+
+  test('the frame hands touches on as pan and pinch, its own source still parses', () => {
+    const script = framePage('', '', true).match(/<script>([\s\S]*?)<\/script>/)![1]!
+    const rule = script.match(/const dragOwner = ([\s\S]*?)\n {2}let drag/)![1]!
+    const run = new Function(`return (${rule})`)() as typeof dragOwner
+    expect(run(0, -40, () => false)).toBe('canvas')
+    expect(script).toContain("'touchmove'")
+    expect(script).toContain("'pinch' : 'pan'")
   })
 })
 
