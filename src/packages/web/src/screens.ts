@@ -11,7 +11,7 @@ import { boxOp, renderDrawer } from './drawer.ts'
 import { checkHint, coach, mapOf, post, showError, hint, stream, streamInto, themeCss, type StreamRenderer } from './net.ts'
 import { loadMe, sideAct } from './account-ui.ts'
 import { pickFx } from './design/fx.ts'
-import { applyMap, filed, saveCurrent, setCurrent } from './nav.ts'
+import { applyMap, filed, saveCurrent, setCurrent, syncAddress } from './nav.ts'
 import { loadRecent, renderToolbar } from './toolbar.ts'
 import { changeInput, deviceSelect, generate, modelSelect, state, type Making, type Side } from './state.ts'
 
@@ -83,6 +83,7 @@ export function views(): ScreenView[] {
 
 /** Draw every screen and put each stored design in its frame. Streaming frames are left to their streams. */
 export async function draw() {
+  syncAddress()
   state.tree = screenTree(all())
   side.el.hidden = !state.app || !state.entries.size || !state.boxes
   if (state.boxes) renderSide(side, { boxes: state.boxes, components: components(), past: state.past, visiting: state.visiting, current: state.box }, boxOp)

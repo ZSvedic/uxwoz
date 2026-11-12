@@ -22,7 +22,9 @@
      "name": "Today",
      "idea": "Today's habits as one checklist"
     }
-   ]
+   ],
+   "mid": "t78b4c",
+   "sid": "t9"
   },
   {
    "name": "habit-detail",
@@ -63,7 +65,8 @@
      "idea": "One habit with its streak",
      "feedback": "Make the streak the biggest thing on the screen"
     }
-   ]
+   ],
+   "sid": "wm"
   },
   {
    "name": "add-habit",
@@ -89,7 +92,8 @@
      "name": "Add a habit",
      "idea": "A short form, one field per line"
     }
-   ]
+   ],
+   "sid": "q8"
   },
   {
    "name": "stats",
@@ -115,7 +119,8 @@
      "name": "Stats",
      "idea": "This week as bars, one per habit"
     }
-   ]
+   ],
+   "sid": "te"
   },
   {
    "name": "reminders",
@@ -141,7 +146,8 @@
      "name": "Reminders",
      "idea": "One time per habit"
     }
-   ]
+   ],
+   "sid": "hn"
   },
   {
    "name": "history",
@@ -182,7 +188,8 @@
      "name": "History",
      "idea": "Weeks as cards with a bar each"
     }
-   ]
+   ],
+   "sid": "bz"
   },
   {
    "name": "tab-bar",
@@ -210,7 +217,8 @@
    "kind": "component",
    "by": "filing",
    "at": "2026-11-01T09:16:00.000Z",
-   "seen": false
+   "seen": false,
+   "sid": "dy"
   }
  ],
  "boxes": {

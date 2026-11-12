@@ -130,9 +130,55 @@ describe('screen cache', () => {
     screen(cache, 'Tea app', null, '<h1>Tea</h1>', null, '2026-10-21T00:00:00Z')
     screen(cache, 'coffee APP', 'Cart', '<h1>Cart</h1>', { key: menu.key, label: 'Cart' }, '2026-10-22T00:00:00Z')
     expect(cache.apps()).toEqual([
-      { app: 'Coffee app', screens: 2, updatedAt: '2026-10-22T00:00:00Z' },
-      { app: 'Tea app', screens: 1, updatedAt: '2026-10-21T00:00:00Z' },
+      { app: 'Coffee app', id: cache.get('coffee app')!.mid, screens: 2, updatedAt: '2026-10-22T00:00:00Z' },
+      { app: 'Tea app', id: cache.get('tea app')!.mid, screens: 1, updatedAt: '2026-10-21T00:00:00Z' },
     ])
+  })
+
+  test('each mockup gets a short ID and each entry one within it, made once and kept in the file; an old cache gets them on load', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'uxwoz-ids-'))
+    const file = join(dir, 'cache.json')
+    const cache = new ScreenCache(file)
+    const menu = screen(cache, 'Coffee app', null, '<h1>Menu</h1>', null, '2026-10-20T00:00:00Z')
+    const cart = screen(cache, 'Coffee app', 'Cart', '<h1>Cart</h1>', { key: menu.key, label: 'Cart' })
+    const tea = screen(cache, 'Tea app', null, '<h1>Tea</h1>')
+    expect(menu.mid).toMatch(/^[a-z0-9]{6}$/)
+    expect(cart.mid).toBeUndefined()
+    expect(tea.mid).not.toBe(menu.mid)
+    for (const e of [menu, cart, tea]) expect(e.sid).toMatch(/^[a-z0-9]{2,4}$/)
+    expect(cart.sid).not.toBe(menu.sid)
+    // Kept: the same after a new version, and after a reload.
+    cache.addVersion(menu.key, ver('<h1>Menu 2</h1>'))
+    expect(cache.get(menu.key)!.mid).toBe(menu.mid!)
+    const again = new ScreenCache(file)
+    expect([again.get(menu.key)!.mid, again.get(cart.key)!.sid]).toEqual([menu.mid, cart.sid])
+    expect(again.apps().map((a) => a.id).sort()).toEqual([menu.mid, tea.mid].sort())
+    // An old cache with no IDs gets them on load, the same on every load before it is saved.
+    const old = JSON.parse(readFileSync(file, 'utf8'))
+    for (const e of old.entries) { delete e.mid; delete e.sid }
+    writeFileSync(file, JSON.stringify(old))
+    const a = new ScreenCache(file), b = new ScreenCache(file)
+    expect(a.get(menu.key)!.mid).toMatch(/^[a-z0-9]{6}$/)
+    expect([b.get(menu.key)!.mid, b.get(cart.key)!.sid]).toEqual([a.get(menu.key)!.mid, a.get(cart.key)!.sid])
+    // Two entries of one mockup that came in with the same ID: the second gets another.
+    old.entries.find((e: any) => e.key === cart.key).sid = 'zz'
+    old.entries.find((e: any) => e.key === menu.key).sid = 'zz'
+    writeFileSync(file, JSON.stringify(old))
+    const c = new ScreenCache(file)
+    expect(c.get(menu.key)!.sid).toBe('zz')
+    expect(c.get(cart.key)!.sid).not.toBe('zz')
+  })
+
+  test('a mockup taken in at a sign-in keeps its IDs, unless this cache already has its mockup ID', () => {
+    const mine = new ScreenCache(), theirs = new ScreenCache()
+    const coffee = screen(mine, 'Coffee app', null, '<h1>Menu</h1>')
+    const tea = screen(theirs, 'Tea app', null, '<h1>Tea</h1>')
+    const tea2 = screen(theirs, 'Green tea app', null, '<h1>Green</h1>')
+    tea2.mid = coffee.mid
+    mine.takeIn(theirs)
+    expect(mine.get(tea.key)!.mid).toBe(tea.mid!)
+    expect(mine.get(coffee.key)!.mid).toBe(coffee.mid!)
+    expect(mine.get(tea2.key)!.mid).not.toBe(coffee.mid)
   })
 
   test('deleting a screen takes the screens only it reached; one a button elsewhere reaches stays, under that screen', () => {

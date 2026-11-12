@@ -173,6 +173,9 @@ export function createServer(opts: ServerOptions = {}) {
     development: process.env.NODE_ENV !== 'production',
     routes: guard({
       '/': index,
+      // A mockup's address, and a screen's in it: the same page as `/`, through the same gate (share.ts).
+      '/m/:mockup': index,
+      '/m/:mockup/:screen': index,
       '/design': sheet,
       ...publicRoutes,
       // For the host's health check: open with the owner's gate on, touches nothing.

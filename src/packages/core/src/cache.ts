@@ -52,6 +52,10 @@ export interface CacheEntry {
   by?: Mark['by']
   at?: string
   seen?: boolean
+  /** The first screen only: the mockup's ID in its address (`/m/<mid>/<sid>`), 6 letters and digits, unique in the cache. */
+  mid?: string
+  /** The entry's ID in its address, 2 to 4 letters and digits, unique within its mockup. */
+  sid?: string
 }
 
 /** A share link of a mockup: its role, its cap on the screens and changes it may ask for (edit links), and how much it was used. */
@@ -75,6 +79,14 @@ export interface Shared { shares: Share[]; feedback: Feedback[]; trips: Trip[] }
 const emptyBoxes = (): Boxes => ({ rules: [], data: [], gone: { components: [], rules: [], data: [] } })
 
 export const PROPOSALS = 2
+
+/** A short ID from a seed's hash: the shortest of `lengths` not `taken`, else from the seed again with a count. */
+function shortId(seed: string, lengths: number[], taken: Set<string>): string {
+  for (let k = 0; ; k++) {
+    const h = BigInt.asUintN(64, BigInt(Bun.hash(k ? `${seed}#${k}` : seed))).toString(36).padStart(13, '0')
+    for (const n of k ? lengths.slice(-1) : lengths) if (!taken.has(h.slice(-n))) return h.slice(-n)
+  }
+}
 
 // Format 5 adds the boxes (and later their states). Files of format 3 and 4 load with empty boxes.
 const FORMAT = 5
@@ -118,12 +130,32 @@ export abstract class ScreenCacheBase {
         })
         this.shared.set(root, s)
       }
+      this.stampIds()
     } catch (err) {
       this.entries.clear()
       const aside = `${file}.corrupt-${Date.now()}`
       renameSync(file, aside)
       console.warn(`screen cache ${file} was unreadable (${err}); moved it to ${aside} and started empty`)
     }
+  }
+
+  /**
+   * Give each mockup its ID (`mid`, on its first screen) and each entry its own (`sid`) where missing or taken twice.
+   * They come from a hash (of the prompt and its first design's time, of the key), so an old cache gets the same
+   * IDs on every load before its next save; once saved they stay as they are.
+   */
+  protected stampIds() {
+    const mids = new Set<string>(), sids = new Map<string, Set<string>>(), redo: CacheEntry[] = []
+    const sidsOf = (e: CacheEntry) => { const r = normalizePrompt(e.app); let s = sids.get(r); if (!s) sids.set(r, (s = new Set())); return s }
+    for (const e of this.entries.values()) {
+      const root = e.key === normalizePrompt(e.app)
+      if (root && (!e.mid || mids.has(e.mid))) redo.push(e)
+      else if (root) mids.add(e.mid!)
+      if (e.sid && !sidsOf(e).has(e.sid)) sidsOf(e).add(e.sid)
+      else delete e.sid
+    }
+    for (const e of redo) e.mid = shortId(`${e.key}|${(e.versions[0] ?? e.proposals?.find(Boolean))?.createdAt ?? ''}`, [6], mids), mids.add(e.mid)
+    for (const e of this.entries.values()) if (!e.sid) sidsOf(e).add((e.sid = shortId(e.key, [2, 3, 4], sidsOf(e))))
   }
 
   /** Keep a box's state before it changes (in cache-boxes.ts). */
@@ -249,11 +281,12 @@ export abstract class ScreenCacheBase {
   }
 
   /** Every mockup once, as first typed, with its number of screens; most recently changed first. */
-  apps(): { app: string; screens: number; updatedAt: string }[] {
-    const byRoot = new Map<string, { app: string; screens: number; updatedAt: string }>()
+  apps(): { app: string; id?: string; screens: number; updatedAt: string }[] {
+    const byRoot = new Map<string, { app: string; id?: string; screens: number; updatedAt: string }>()
     for (const e of this.entries.values()) {
       const root = normalizePrompt(e.app)
       const a = byRoot.get(root) ?? { app: e.app, screens: 0, updatedAt: '' }
+      if (e.key === root && e.mid) a.id = e.mid
       if (!isComponent(e)) a.screens++
       for (const v of [...e.versions, ...(e.proposals ?? [])]) if (v && v.createdAt > a.updatedAt) a.updatedAt = v.createdAt
       byRoot.set(root, a)
@@ -354,6 +387,7 @@ export abstract class ScreenCacheBase {
   }
 
   save() {
+    this.stampIds()
     if (!this.file) return
     mkdirSync(dirname(this.file), { recursive: true })
     // Write a temp file, then rename, so a crash never leaves half a cache file.

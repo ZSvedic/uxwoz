@@ -287,6 +287,21 @@ describe('public mode', () => {
     expect((await browser().get('/api/apps', { 'x-uxwoz-share': link.token })).status).toBe(200)
   })
 
+  test('a mockup\'s address is the page for everyone; only the person whose mockup it is finds its ID', async () => {
+    start()
+    const ana = browser('10.0.0.1'), bo = browser('10.0.0.2')
+    const made = await screen(ana, 'A dog walking app')
+    expect((await ana.post('/api/pick', { key: made.key, index: 0 })).status).toBe(200)
+    const [mine] = (await (await ana.get('/api/apps')).json()).apps
+    expect(mine.id).toMatch(/^[a-z0-9]{6}$/)
+    const map = await (await ana.get(`/api/map?app=${encodeURIComponent(mine.app)}`)).json()
+    const sid = map.entries[0].sid
+    for (const b of [ana, bo]) expect((await b.get(`/m/${mine.id}/${sid}`)).status).toBe(200)
+    expect((await bo.get(`/m/${mine.id}`)).status).toBe(200)
+    // Bo has no mockups, so the page finds nothing for that ID and opens the start page.
+    expect(await (await bo.get('/api/apps')).json()).toEqual({ apps: [] })
+  })
+
   test('the page is open to everyone; the design sheet is the owner\'s', async () => {
     start()
     expect((await fetch(url('/'))).status).toBe(200)
@@ -299,6 +314,9 @@ describe('private mode', () => {
   test('nothing of the public: /api/me is the owner, no cookie, every model', async () => {
     server = createServer({ port: 0, cache: new ScreenCache(), fetch: fakeFetch, env, log: () => {}, fileWaitMs: 0, public: false, owner: '' })
     expect(await (await fetch(url('/api/me'))).json()).toEqual({ role: 'owner' })
+    // With no owner's secret a mockup's address is the app's page, as `/` is.
+    expect((await fetch(url('/m/k3f9x2/a7'))).status).toBe(200)
+    expect((await fetch(url('/m/k3f9x2/a7/more'))).status).toBe(404)
     expect((await fetch(url('/api/step'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"step":"arrived"}' })).status).toBe(204)
     const cfg = await (await fetch(url('/api/config'))).json()
     expect(cfg.public).toBeUndefined()

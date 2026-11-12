@@ -156,6 +156,12 @@ describe('sharing', () => {
     const cookie = enter.headers.get('set-cookie')!.split(';')[0]!
     expect(cookie).toBe('uxwoz_owner=sesame')
     expect((await fetch(url('/'), { headers: { cookie } })).status).toBe(200)
+    // A mockup's address has the same gate as `/`; the secret's redirect keeps the address.
+    const id = cache.get(cache.map(APP).root)!.mid!
+    expect((await fetch(url(`/m/${id}/ab`))).status).toBe(403)
+    expect((await fetch(url(`/m/${id}`))).status).toBe(403)
+    expect((await fetch(url(`/m/${id}/ab`), { headers: { cookie } })).status).toBe(200)
+    expect((await fetch(url(`/m/${id}/ab?owner=sesame`), { redirect: 'manual' })).headers.get('location')).toBe(`/m/${id}/ab`)
     expect((await fetch(url('/api/apps'), { headers: { cookie } })).status).toBe(200)
     expect((await fetch(url(`/api/s/${token}/map`))).status).toBe(200)
     expect((await fetch(url(`/s/${token}`))).status).toBe(200)

@@ -10,7 +10,8 @@ import { createSide, type Box } from './boxes.ts'
 import { Canvas } from './canvas.ts'
 import { boxOp, focusBox, onTool, openDrawer } from './drawer.ts'
 import { mapOf, post, showError, themeCss } from './net.ts'
-import { applyMap, currentKey, resetTrail, setCurrent } from './nav.ts'
+import { entryAt, readAddress } from './address.ts'
+import { address, applyMap, currentKey, followAddress, notHere, resetTrail, setCurrent, showsAt, syncAddress } from './nav.ts'
 import { all, components, dropChoice, draw, fitChoice, fitScreenSoon, onAction, openScreen, pick, stopMaking } from './screens.ts'
 import { PICKERS, closeMenus, loadRecent, openGenerate, warmUp } from './toolbar.ts'
 import { editLinkApp, loadShared, shareToken } from './sharing.ts'
@@ -31,8 +32,17 @@ export const canvas = new Canvas($('stage'), {
 
 // ---- Mockups
 
-/** Open a mockup: its screens from the cache, else (unless `make` is false) its first screen as A OR B. */
-export async function start(app: string, make = true) {
+/**
+ * Open a mockup: its screens from the cache, else (unless `make` is false) its first screen as A OR B. `at`: the
+ * screen its address names (else the one last looked at here), and whether the address changes in place.
+ */
+export async function start(app: string, make = true, at: { sid?: string | null; inPlace?: boolean } = {}) {
+  // Its draws write no address until it is open: then one, as a new step unless in place.
+  address.hold++
+  try { await openMockup(app, make, at.sid) } finally { address.hold--; syncAddress(at.inPlace) }
+}
+
+async function openMockup(app: string, make: boolean, sid: string | null | undefined) {
   showError(null)
   stopMaking()
   state.before = null
@@ -42,7 +52,7 @@ export async function start(app: string, make = true) {
   if (!res.ok && res.status !== 401) throw new Error(`could not load the mockup: HTTP ${res.status}`)
   const map = res.ok ? await res.json() as { entries: CacheEntry[] } : { entries: [] }
   if (n !== state.starts) return // a newer mockup was opened meanwhile
-  if (!make && !map.entries.length) { store.set('uxwoz:app', ''); return draw() }
+  if (!make && !map.entries.length) { store.set('uxwoz:app', ''); return sid !== undefined ? notHere() : draw() }
   state.app = app
   state.drawer = state.box = null
   state.failed.clear()
@@ -50,7 +60,9 @@ export async function start(app: string, make = true) {
   generate.classList.remove('open')
   applyMap(map)
   const root = screenKey(app, null)
-  const saved = store.get(currentKey(app))
+  const named = sid !== undefined ? entryAt(app, state.entries, sid) : undefined
+  if (sid !== undefined && !named) return notHere()
+  const saved = named?.key ?? store.get(currentKey(app))
   state.current = saved && state.entries.get(saved)?.versions.length ? saved : state.entries.get(root)?.versions.length ? root : null
   resetTrail()
   // A mockup keeps the device it was made for: new screens in it, and Start over, use it too.
@@ -60,9 +72,11 @@ export async function start(app: string, make = true) {
   if (!state.entries.has(root)) return openScreen(null, null, null)
   await draw()
   loadShared()
+  // An open A OR B is fitted, unless the address named a drawn screen: then that screen, and the address stays.
   const open = all().find((e) => !e.versions.length)
-  if (open) fitChoice(open.key)
+  if (open && !named?.versions.length) fitChoice(open.key)
   else fitScreenSoon(state.current ?? root)
+  if (named) showsAt(named.key)
 }
 
 /** The pickers as last chosen in this browser. */
@@ -116,9 +130,11 @@ async function init() {
   warmUp(modelSelect.value)
   loadRecent()
   await themeCss(state.theme)
-  // A reload opens the mockup that was open, with its A OR B if one was waiting for a pick.
+  // An address opens its mockup at its screen; else a reload opens the mockup that was open, with its A OR B if
+  // one was waiting for a pick. An edit link keeps its own address.
+  if (!shareToken && readAddress(location.pathname)) return followAddress()
   const last = shareToken ? await editLinkApp() : store.get('uxwoz:app')
-  if (last) return start(last, false)
+  if (last) return start(last, false, { inPlace: true })
   draw()
   promptInput.focus()
 }

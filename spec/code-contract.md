@@ -129,8 +129,11 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
   visit, redraws included, have finished (at most a minute). Levels, the
   tree and planned screens are not stored: `screenTree` and `plannedScreens` in `core/src/tree.ts`
   work them out (server and browser).
-- `GET /api/apps`: `{apps: {app, screens, updatedAt}[]}`, every mockup once as first typed,
-  most recently changed first, for the Recent mockups lists.
+- `GET /api/apps`: `{apps: {app, id, screens, updatedAt}[]}`, every mockup once as first typed,
+  most recently changed first, for the Recent mockups lists; `id` is the mockup's ID in its address,
+  which the page looks up there.
+- `GET /m/:mockup` and `GET /m/:mockup/:screen`: the app's page, as `/` serves it (the same gate); the
+  page reads the IDs from its address (`web/src/address.ts`).
 - `GET /api/export?app=…`: the mockup as a zip (`application/zip`, stored entries, written by
   `core/src/zip.ts`), `Content-Disposition: attachment; filename="<slug>.zip"`, the slug being the
   prompt's letters, digits and dashes (40 at most). It holds one folder, `<slug>/`, with `HANDOFF.md`,
@@ -196,10 +199,10 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
   screen that is not a cache hit, a pick (its filing), `/api/revise`, and `/api/box` with `edit` or
   `visit`. A unit is taken before the call and given back when the call is refused; past the cap,
   429 *This link's budget is used up.*
-- **The owner**: with `UXWOZ_OWNER` set, `/`, `/design`, `/admin` (public mode) and every `/api` route but `/api/s/*` need the cookie
+- **The owner**: with `UXWOZ_OWNER` set, `/`, `/m/…`, `/design`, `/admin` (public mode) and every `/api` route but `/api/s/*` need the cookie
   `uxwoz_owner=<secret>` (401 on the API, a one-line 403 page on `/` and `/design`; `/og.png` and share links
   answer everyone); `/?owner=<secret>` sets it
-  (`HttpOnly; SameSite=Lax`, and `Secure` when the public origin is https) and redirects to `/`. The server fetches the
+  (`HttpOnly; SameSite=Lax`, and `Secure` when the public origin is https) and redirects to the same path without it. The server fetches the
   pages it proxies from itself (`127.0.0.1` and its port), never from the request's Host.
 - `GET /design`: the design sheet, built from the app's own CSS and classes on static markup: the logo, every
   colour token by day and night, type, controls, surfaces, motion, and a ▶ per sound.
@@ -243,6 +246,9 @@ does nothing until asked.
 CacheEntry { key; app; action: string | null; name?: string; parent: { key; label } | null;
              versions: Version[]; proposals?: (Version | null)[]; filed?: { at; screen; ms; costUsd; added; changed; refused; error? } }
              // filed: the screen's last filing, shown in its Info
+             // mid (the first screen only): the mockup's ID in its address, 6 of [a-z0-9], unique in the cache;
+             // sid: the entry's ID in the address, 2-4 of [a-z0-9], unique in its mockup. Made from a hash
+             // (the prompt and its first design's time; the key) where missing or taken twice, at load and save.
              // name never changes: "home" for the first screen, else the one in the link that
              // opened it ("@sleep-report: …"); unique in the mockup; links use it as "@sleep-report".
              // action is the screen's prompt (without "@name: "). parent is the screen and

@@ -1,11 +1,14 @@
-// Where the user is: the current screen, the ← → trail, the mockup from the server after filing, and Nav.
+// Where the user is: the current screen, the ← → trail, the address and Back and Forward, the mockup from the server
+// after filing, and Nav.
 
 import { normalizePrompt } from '@uxwoz/core/keys'
 import { isComponent, plannedScreens } from '@uxwoz/core/tree'
 import type { Boxes, CacheEntry } from '@uxwoz/core'
-import { canvas, side } from './app.ts'
+import { Shown, addressOf, addressStep, entryAt, readAddress } from './address.ts'
+import { canvas, closeMockup, side, start } from './app.ts'
 import { lookAt } from './drawer.ts'
-import { hint, mapOf } from './net.ts'
+import { hint, mapOf, showError } from './net.ts'
+import { shareToken } from './sharing.ts'
 import { all, components, draw, fitChoice, labelOf, openScreen, treeParent } from './screens.ts'
 import { item } from './toolbar.ts'
 import { $, state, store } from './state.ts'
@@ -126,6 +129,57 @@ export function renderNav() {
   }
   menu.replaceChildren(...rows)
 }
+
+// ---- The address: `/m/<mockup>/<screen>` (an edit link keeps its own)
+
+/** The screen the address names; `hold` counts mockups being opened, whose draws are half done. */
+let shown = new Shown()
+export const address = { hold: 0 }
+
+/** The address names this screen (Back or Forward went there, or it was opened by its address). */
+export const showsAt = (key: string) => shown.went(key, state.current, state.entries)
+
+/** Write the address of what is shown: a new step, or in place of this one (a reload, ← and →, Back and Forward). */
+export function syncAddress(inPlace = false) {
+  if (shareToken || address.hold) return
+  // With no mockup open, what was shown is forgotten: a mockup opened again starts afresh.
+  if (!state.app) shown = new Shown()
+  const want = addressOf(state.app, state.entries, state.app ? shown.next(state.current, state.entries) : null)
+  const how = addressStep(location.pathname, want, inPlace || trail.moving)
+  if (how) history[how === 'push' ? 'pushState' : 'replaceState'](null, '', want)
+}
+
+/** An address that names nothing here (deleted, or another person's): the start page, and a word why. */
+export function notHere() {
+  if (state.app) closeMockup()
+  history.replaceState(null, '', '/')
+  hint('That mockup is not here.')
+}
+
+/** Open what the address names (a reload, a pasted address, Back and Forward): a mockup at a screen, or the start page. */
+export async function followAddress() {
+  const at = readAddress(location.pathname)
+  if (!at) { if (state.app) closeMockup(); return }
+  const root = state.app ? state.entries.get(normalizePrompt(state.app)) : undefined
+  if (root?.mid === at.mid) {
+    const e = entryAt(state.app!, state.entries, at.sid)
+    if (!e) return notHere()
+    // Along the trail when the screen is on it, so ← and → still lead where they did.
+    const i = trail.keys.lastIndexOf(e.key)
+    if (i >= 0) trail.at = i
+    trail.moving = i >= 0
+    showsAt(e.key)
+    try { goTo(e.key) } finally { trail.moving = false }
+    return
+  }
+  const res = await fetch('/api/apps').catch(() => null)
+  const apps = res?.ok ? (await res.json() as { apps: { app: string; id?: string }[] }).apps : []
+  const app = apps.find((a) => a.id === at.mid)?.app
+  if (!app) return notHere()
+  await start(app, false, { sid: at.sid, inPlace: true })
+}
+
+addEventListener('popstate', () => { followAddress().catch((e) => showError(String(e))) })
 
 /** Make a screen current and bring it into view; an open A OR B is fitted instead. */
 function goTo(key: string) {

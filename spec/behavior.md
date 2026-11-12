@@ -67,7 +67,8 @@ and menus span the window.
 - **← and →** (either side of Nav): back to the screen looked at before, and forward again, like a
   browser: every screen that becomes current is a step, and reaching a screen any other way drops
   the steps ahead. Screens deleted since are skipped. ⌘[ and ⌘] do the same (also while a screen
-  has the focus), and so do the mouse's back and forward buttons.
+  has the focus), and so do the mouse's back and forward buttons. A step along them changes the
+  address in place (see The address), adding no step to the browser's Back.
 - **Rules, Fixer, Components, Data**: each moves the view to its box (Fixer to Fixer's
   notes). A number beside it counts the entries filing or the fixer added or changed (for Fixer,
   the fixer's visits) since the user last looked; three seconds after a look, they count as seen
@@ -414,6 +415,29 @@ control leads nowhere yet*, and the fixer redraws it. Other controls (filters, i
   A OR B is open.
 - One screen is made at a time: while one is being made or changed, a click that would open
   another does nothing, and a note says so for a moment at the bottom of the canvas.
+
+### The address
+
+The address bar shows the open mockup and screen by short IDs, never the prompt's words:
+`/m/<mockup>/<screen>` (`/m/k3f9x2/a7`). A mockup's ID is 6 letters and digits, a screen's (a
+component's too) 2 to 4, unique within its mockup; both are kept in the cache file, so they stay the
+same after a reload and a restart, and an old cache gets them when it is loaded. With no mockup open
+the address is `/`, which shows what it always did.
+
+- **Opening, reloading or pasting** an address opens that mockup at that screen; `/m/<mockup>` alone
+  opens it at its first screen. An address naming a drawn screen shows that screen, even while an A OR
+  B waits elsewhere in the mockup.
+- **What the address names**: whatever came into view last, a screen made current or an A OR B that
+  opened, so while an A OR B is open the address is its screen's; a pick keeps it. A new screen's
+  address comes once its first design is stored; a screen that merely redraws (an Edit, a Regenerate)
+  keeps its address.
+- **Back and Forward** of the browser walk the screens that came into view, each one a step, and from a
+  mockup back to the start page. Opening a mockup from the panel is a step; a reload, ← and → change the
+  address in place.
+- **Not here**: an address of a mockup or screen this person does not have (deleted, or another
+  person's) opens the start page at `/` with the brief hint *That mockup is not here.*
+- **Not a share link**: an address works only for the person whose mockup it is, through the same gate
+  as `/`. An edit link keeps its own address (`/s/<token>`), and its page writes none.
 
 ## Streaming and timing
 
