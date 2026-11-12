@@ -45,7 +45,7 @@ $('starters').replaceChildren(...STARTERS.map((s) => {
 /** A first-time visitor (no mockups) sees the starters above the prompt box; anyone else the prompt box first. */
 function placeStarters(first: boolean) {
   const box = $('startersBox')
-  if (first) $('genTitle').after(box)
+  if (first) $('genLead').after(box) // the line under the heading stays under it
   else generate.querySelector('.go')!.after(box)
   $('genTitle').textContent = first ? 'Turn one sentence into a clickable mockup' : 'What should we mock up?'
   $('genLead').hidden = !first
