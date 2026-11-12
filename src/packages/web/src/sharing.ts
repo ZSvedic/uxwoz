@@ -11,6 +11,7 @@ import { labelOf } from './screens.ts'
 import { closeMenus } from './toolbar.ts'
 import { needsAccount } from './account-ui.ts'
 import { $, state } from './state.ts'
+import { dayOf, SHARE_REFRESH_MS, whileOpen } from './pins.ts'
 
 /** The edit link this page was opened by, if any: the app then shows its one mockup, without the project menu. */
 export const shareToken = location.pathname.match(/^\/s\/([a-f0-9]+)/)?.[1] ?? null
@@ -43,7 +44,10 @@ export async function loadShared() {
   if (!app || shareToken) return
   const res = await fetch(`/api/shares?app=${encodeURIComponent(app)}`).catch(() => null)
   if (!res?.ok || app !== state.app) return
-  shared = { app, ...await res.json() }
+  const got = { app, ...await res.json() }
+  // A list read again with nothing new leaves the pane as it is (a half-made choice of role, the scroll).
+  if (JSON.stringify(got) === JSON.stringify(shared)) return
+  shared = got
   renderDrawer()
   relocate()
 }
@@ -53,6 +57,13 @@ export const feedbackOf = (): Feedback[] => mine()?.feedback ?? []
 /** Whether the open mockup has share links or feedback: then its screens have a Comments tab. */
 export const isShared = () => { const s = mine(); return !!s && (s.shares.length > 0 || s.feedback.length > 0) }
 
+// The open pane reads its list again when the tab gets focus and every 10 seconds: a comment that came in shows.
+const refresh = whileOpen(() => state.drawer === 'share' && !$('drawer').hidden, () => { loadShared() })
+setInterval(refresh, SHARE_REFRESH_MS)
+addEventListener('focus', refresh)
+
+/** The role and budget being chosen, kept when the pane draws again. */
+const making = { role: 'comment', cap: '20' }
 const ROLE_NAMES = { view: 'View: click through', comment: 'Comment: click through and leave feedback', edit: 'Edit: change this mockup' }
 const when = (at: string) => new Date(at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
 const thumbsOf = (list: Feedback[]) => {
@@ -78,15 +89,16 @@ export function renderShare() {
   const s = mine()
   const role = el('select')
   for (const [id, label] of Object.entries(ROLE_NAMES)) role.add(new Option(label, id))
-  role.value = 'comment'
+  role.value = making.role
   const cap = el('input')
-  Object.assign(cap, { type: 'number', min: '1', max: '1000', value: '20', title: 'How many new screens and changes this link may ask for: they cost your credits' })
+  Object.assign(cap, { type: 'number', min: '1', max: '1000', value: making.cap, title: 'How many new screens and changes this link may ask for: they cost your credits' })
   const capRow = el('label', 'share-cap', 'Budget: ', cap, ' new screens and changes')
-  capRow.hidden = true
-  role.addEventListener('change', () => { capRow.hidden = role.value !== 'edit' })
+  capRow.hidden = role.value !== 'edit'
+  role.addEventListener('change', () => { making.role = role.value; capRow.hidden = role.value !== 'edit' })
+  cap.addEventListener('input', () => { making.cap = cap.value })
   const make = button('Make a link', 'Make a new link with this role', () => makeLink(role.value, Number(cap.value)), 'primary')
   const links = (s?.shares ?? []).map((x) => el('li', 'share-link',
-    el('b', '', x.role), ` · made ${when(x.createdAt)} · opened ${x.opens}×${x.cap ? ` · ${x.used} of ${x.cap} used` : ''}`,
+    el('b', '', x.role), ` · made ${dayOf(x.createdAt)} · opened ${x.opens}×${x.cap ? ` · ${x.used} of ${x.cap} used` : ''}`,
     el('input', 'share-url'), button('Copy', 'Copy the link', () => copy(x.url)), button('Revoke', 'This link stops working', () => revoke(x.token))))
   links.forEach((li, i) => Object.assign(li.querySelector('input')!, { value: s!.shares[i]!.url, readOnly: true }))
 

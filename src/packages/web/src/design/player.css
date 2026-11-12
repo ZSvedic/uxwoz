@@ -2,6 +2,8 @@
    the feedback buttons on the wooden bar. A light F: no tilt, sparks, sounds or animation. Loaded after base.css. */
 
 /* The page scrolls (the app's body does not); the sky and its stars stay put behind it and do not zoom. */
+/* A card scrolled or focused into view stays clear of the strip at the top and the dock with its toast. */
+html { scroll-padding: 72px 0 128px; }
 body { height: auto; min-height: 100vh; display: block; overflow: visible; padding-bottom: 0; }
 body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background: url("./brand/stars-1.svg") 0 0 / 547px 547px, url("./brand/stars-2.svg") 131px 71px / 443px 443px,
@@ -20,7 +22,7 @@ body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-even
 
 /* The screen, fitted to the window by player.ts: white paper in a 7 px ivory frame with the halo, as on the canvas.
    The margin of comments is under it, or right of it when the window is wide (.wide). */
-.stage { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 16px 16px 104px; }
+.stage { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 16px 16px 128px; }
 .stage.wide { flex-direction: row; justify-content: center; align-items: flex-start; }
 .fit { position: relative; flex: none; }
 .device { position: absolute; top: 0; left: 0; transform-origin: top left; overflow: hidden; background: var(--screen);

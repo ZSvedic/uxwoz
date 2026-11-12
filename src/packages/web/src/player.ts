@@ -7,7 +7,7 @@ import type { Feedback } from '@uxwoz/core'
 import { DEVICES, FRAME_SANDBOX, framePage, markCurrent, pasteComponents, type Device } from '@uxwoz/core/frame'
 import { linkTarget } from '@uxwoz/core/keys'
 import { el } from './boxes.ts'
-import { anchorOf, numbered, pinLayer, type Spot } from './pins.ts'
+import { anchorOf, numbered, partLabel, pinLayer, trailOf, type Spot } from './pins.ts'
 
 interface Screen { key: string; name: string; title: string; html: string; device?: Device; parent: string | null }
 interface PlayerMap { role: 'view' | 'comment'; app: string; root: string; components: Record<string, string>; screens: Screen[] }
@@ -86,8 +86,9 @@ function show(key: string, push = true) {
   frame.srcdoc = framePage(markCurrent(pasteComponents(s.html, map.components), s.name), css, true, s.device)
   $('name').textContent = s.title
   document.title = `${s.title} · ${map.app.slice(0, 40)}`
-  $<HTMLButtonElement>('back').disabled = history.length < 2
-  $('trail').replaceChildren(...history.flatMap((k, i) => {
+  // The first screen has no Back and no trail: it would only say its name again.
+  $('back').hidden = history.length < 2
+  $('trail').replaceChildren(...trailOf(history).flatMap((k, i) => {
     const t = byKey.get(k)?.title ?? '?'
     const b = i === history.length - 1 ? el('span', '', t) : el('button', '', t)
     if (b instanceof HTMLButtonElement) b.addEventListener('click', () => { if (!leave()) return; history = history.slice(0, i + 1); show(k, false) })
@@ -212,6 +213,8 @@ function setPicking(on: boolean) {
   if (on) toast('Click the part you mean')
   renderMargin()
   drawPins()
+  // The card under the screen, half under the bar at the bottom, comes up above it; one out of sight stays there.
+  if (on && $('whole').getBoundingClientRect().top < innerHeight) $('whole').scrollIntoView({ block: 'nearest' })
 }
 addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape' && picking) setPicking(false) })
 
@@ -222,7 +225,7 @@ function openDraft(d: NonNullable<typeof draft>, question: string, placeholder: 
   $('composerQ').textContent = question
   $('composerQ').hidden = !question
   $('composerPin').textContent = String(pinned().length + 1)
-  $('composerAbout').textContent = d.part?.text ?? 'The whole screen'
+  $('composerAbout').textContent = d.part ? partLabel(d.part.text) : 'The whole screen'
   $('composer').querySelector('.head')!.toggleAttribute('hidden', d.kind === 'done')
   Object.assign($<HTMLTextAreaElement>('composerText'), { value: '', placeholder })
   renderMargin()
@@ -295,7 +298,7 @@ function renderMargin() {
   $('slips').replaceChildren(...list.map(({ f, n }) => {
     const gone = !f.resolved && anchorOf(f) && located && !located.has(f.id)
     const state = f.resolved ? 'Resolved' : gone ? 'About an earlier version' : ''
-    const li = el('li', 'slip', el('div', 'head', n ? el('span', 'dot', String(n)) : '', el('small', '', f.about || f.label || 'The whole screen')),
+    const li = el('li', 'slip', el('div', 'head', n ? el('span', 'dot', String(n)) : '', el('small', '', partLabel(f.about || f.label || '') || 'The whole screen')),
       el('p', '', f.text ?? ''), ...state ? [el('small', 'state', state)] : [])
     li.dataset.id = f.id
     return li
