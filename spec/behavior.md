@@ -63,7 +63,8 @@ two-digit sum, and the account room for its count, so no button moves when a moc
 count shows. Every button is inside the window and at least 36 px high, and menus span the
 window. Where the device cannot hover, menus leave out their keys (⌘+, ⇧1).
 
-- **Project menu**: a button with the mockup's prompt, cut short to the room it has.
+- **Project menu**: a button with the mockup's prompt, cut short to the room it has. With no mockup
+  open and none in Recent it reads *New mockup* with no chevron and opens nothing.
   Its menu has **Recent mockups** (the last ten, the open one
   ticked; choosing one opens it), and, with a mockup open, **⇩ Export the boxes** (a markdown file
   of Components, Rules and Data), **⇩ Export project…** (a zip, see Export below), **↺ Start over** (deletes every screen and the boxes, and makes
@@ -121,7 +122,8 @@ recently changed first, with its number of screens; the list comes from the serv
 same in every browser). For a first-time visitor (no mockups) the heading is *Turn one sentence into a
 clickable mockup*, with *Pick an example and watch it drawn, or describe your own.* under it, and the
 starters come first (see The public); anyone else sees *What should we mock up?*. The panel is the
-same with or without a mockup open: with none it shows on
+same with or without a mockup open, and it never reaches under the bar: it ends above it and
+scrolls inside when it must; on a phone it starts near the top, so Generate shows. With none it shows on
 its own, and **+** shows it over the dimmed canvas, where Esc or a press outside closes it.
 A prompt seen before opens its mockup from the cache, at no cost, with the current screen it had
 last time in this browser. A reload opens the mockup that

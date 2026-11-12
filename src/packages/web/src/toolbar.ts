@@ -87,6 +87,8 @@ addEventListener('keydown', (e: KeyboardEvent) => {
 let recentApps: { app: string; screens: number }[] = []
 const screensNote = (n: number) => `${n} screen${n === 1 ? '' : 's'}`
 
+const projectMenuEmpty = () => !state.app && recentApps.length === 0
+
 /** Fill the Recent list and the project menu's. */
 export async function loadRecent() {
   const res = await fetch('/api/apps').catch(() => null)
@@ -97,6 +99,8 @@ export async function loadRecent() {
   placeStarters(recentApps.length === 0)
   coach.begin(recentApps.length > 0)
   renderRecentMenu()
+  // Also when nothing else draws: an address that names no mockup leads to the start page with no draw().
+  renderToolbar()
 }
 
 /** The project menu's recent mockups, the open one ticked. */
@@ -138,7 +142,7 @@ export function closeMenus() {
 for (const [b, m] of MENUS) $(b).addEventListener('click', () => {
   const show = $(m).hidden
   closeMenus()
-  if (!show) return
+  if (!show || (m === 'projectMenu' && projectMenuEmpty())) return
   renderToolbar()
   if (m === 'navMenu') renderNav()
   if (m === 'projectMenu') renderRecentMenu()
@@ -187,6 +191,9 @@ export function renderToolbar() {
   $('projectName').textContent = app ? (app.length > 40 ? app.slice(0, 39) + '…' : app) : 'New mockup'
   $('projectButton').title = app ?? 'Make a new mockup'
   $('menuFoot').hidden = !app
+  // With no mockup open and none in Recent the menu would be empty: no caret, and the button opens nothing.
+  $('projectButton').querySelector<HTMLElement>('.caret')!.hidden = projectMenuEmpty()
+  $('projectButton').setAttribute('aria-haspopup', projectMenuEmpty() ? 'false' : 'menu')
   const nav = $<HTMLButtonElement>('navButton')
   nav.hidden = !app || !state.entries.size
   const cur = state.current ? state.entries.get(state.current) : undefined
