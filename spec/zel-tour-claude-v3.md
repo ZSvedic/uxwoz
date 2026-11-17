@@ -1,7 +1,6 @@
 # UXWoz Tutorial
 
-The words of the first-run tour, screen by screen. A line in [ brackets ] is the button to the next screen.
-This is Claude's v3 draft of [zel-tour.md](zel-tour.md); how the tour is built is not here.
+Claude's v3 draft of [zel-tour.md](zel-tour.md). A line in [ brackets ] is the button to the next screen.
 
 Idea: https://knowyourmeme.com/memes/be-like-bill
 
@@ -32,36 +31,28 @@ Bill worked 40 hours.
 He decided things for 4.  
 He waited for 36.
 
-Hundreds of millions of tokens later, Anthropic is happy, but Bill is not.
-
 > The bottleneck is *human decisions about what to build*.
 
-Bill wanted to see a different menu.
-To show him one, Claude rebuilt a real app with 670 tests.
-
-Bill did not need an app yet. He needed a mock: a picture of the app that he can click.
+Bill wanted to see a different menu. To show him one, Claude rebuilt a real app with 670 tests.  
+Hundreds of millions of tokens later, Anthropic is happy, but Bill is not.
 
 (Bill is me, by the way.)
 
-The solution is already here, and it is older than Bill.
-
-[ What solution? ]
+[ So what should Bill do? ]
 
 ## Screen: The Wizard
 
-In 1980, researchers wanted to test software that did not exist yet.  
-So a person hid in the next room and typed the computer's answers.  
-They named the trick after the ordinary man who pulls levers behind a curtain:
-the [Wizard of Oz experiment](https://en.wikipedia.org/wiki/Wizard_of_Oz_experiment).
+In 1980, researchers tested software that did not exist yet: a person hid in the next room and typed the
+computer's answers. They named the trick after the man behind the curtain: the
+[Wizard of Oz experiment](https://en.wikipedia.org/wiki/Wizard_of_Oz_experiment).
 
-Now it works the other way round. The model hides behind the curtain and pretends to be your app.
+Now the model hides behind the curtain and pretends to be your app.
 
-UXWoz (**U**ser e**X**perience **W**izard of **Oz**), Woz for short, turns your idea into a clickable mock.
-You change it until it is right. Then a coding agent builds it.
+UXWoz (**U**ser e**X**perience **W**izard of **Oz**), Woz for short, turns your idea into a clickable mock
+that you change before a coding agent builds it.
 
-You could ask Claude for a wireframe yourself, and you would get one picture.
-Woz draws the next mock on every click, keeps the same rules and components on all of them, undoes any
-change, and packs the result for your coding agent.
+Asking Claude for a wireframe gets you one picture. Woz draws the next mock on every click, keeps the same
+rules and components on all of them, and packs the result for your coding agent.
 
 Pay no attention to the model behind the curtain.
 
@@ -70,56 +61,46 @@ Pay no attention to the model behind the curtain.
 ## Screen: How Woz works
 
 Claude Haiku, a cheap model, drew this mock in 2.4 sec for less than half a cent.
-Click any button or link in it, and Woz draws the next mock on the spot.
+Click any button or link in it, and Woz draws the next mock.
 
-Under the mock are its buttons (off during this tour):
+The buttons under the mock (off during this tour):
 
 - 🎲 Don't like it? Roll again.
 - ✏️ Say or type what to change.
 - ⏪ Changed your mind? Go back.
 
-To the right of the home mock, four boxes hold what all mocks share:
+Four boxes to the right of the home mock hold what all mocks share:
 
-- 📐 **Rules**: what every mock must follow.
-- 🧩 **Components**: parts the mocks reuse.
-- 🗄️ **Data**: made-up data the mocks reuse.
-- 🕵️ **Fixer's notes**: every 5 mocks, or when you ask, the fixer makes the mocks and the boxes agree, and
-  notes what it changed.
+- 📐 **Rules** every mock follows.
+- 🧩 **Components** the mocks reuse.
+- 🗄️ **Data**, made up, that the mocks reuse.
+- 🕵️ **Fixer's notes**: every 5 mocks, the fixer makes mocks and boxes agree and notes what it changed.
 
 Like mocks, boxes have edit and undo, so you can edit and revert changes.
 
-There are two ways to get to a mock or a box:
-
-- Move the canvas (two fingers / mouse scroll).
-- The navigation dropdown at the top, with ← and → for back and forward.
-
-Try it now: pick Rules in the dropdown, then press ← to come back.
+Get around by moving the canvas (two fingers / mouse scroll), or with the navigation dropdown at the top
+and its ← → arrows. Try it now: pick Rules in the dropdown, then press ←.
 
 [ Done. But what happened to Bill? ]
 
 ## Screen: Be like Bill
 
-Bill has a new app idea. He types it into Woz.  
+Bill types his new idea into Woz.  
 3 sec later, there is a mock.
 
-The menu is wrong. Bill says so.  
+The menu is wrong. Change.  
 3 sec.  
 The dialogs are wrong. Change.  
-3 sec.  
-The layout could be better. Change.  
 3 sec.
 
 Bill says only what is different from the usual app: "Same checkout, but pay without an account."
-The usual part, the model already knows. The fixer writes it all down in the boxes.
+The model already knows the usual part.
 
-Then Bill shows the mocks to target users. They change what confuses them, right on the mock.
+Bill shows the mocks to target users. They change what confuses them, right on the mock.
 
-After one afternoon, Bill has zero tests, zero Supabase and an empty repo.
-He also has mocks that he and his users like.
-
-Now Bill downloads the handoff: the mocks and the boxes, as text. He gives it to Claude Code.
-The data and the logic were fake until now, so Claude Code still writes the real ones. But it writes them
-once, because the decisions are already made.
+After one afternoon, Bill has zero tests, zero Supabase, and mocks that his users like.  
+He downloads the handoff, the mocks and the boxes as text, and gives it to Claude Code.  
+Claude Code still writes the real data and logic, but only once: the decisions are already made.
 
 Bill is smart.  
 Be like Bill.
