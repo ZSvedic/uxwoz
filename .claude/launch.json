@@ -1,0 +1,41 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "uxwoz",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd src && bun run dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "uxwoz-night",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd src && PORT=3001 UXWOZ_CACHE_FILE=../temp/screen-cache-night.json bun run dev"
+      ],
+      "port": 3001
+    },
+    {
+      "name": "uxwoz-public",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd src && D=$(mktemp -d) && echo files in $D && PORT=3200 UXWOZ_PUBLIC=1 UXWOZ_OWNER=letmein UXWOZ_ADMIN_EMAIL=owner@example.com UXWOZ_OPERATOR='The owner' UXWOZ_CACHE_FILE=$D/screen-cache.json UXWOZ_DB=$D/uxwoz.db UXWOZ_USERS_DIR=$D/users bun --env-file=../.env packages/web/src/server.ts"
+      ],
+      "port": 3200
+    },
+    {
+      "name": "uxwoz-demo",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd src && PORT=3131 bun run demo"
+      ],
+      "port": 3131
+    }
+  ]
+}
