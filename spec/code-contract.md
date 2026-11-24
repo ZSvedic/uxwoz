@@ -4,21 +4,22 @@ This doc owns the shapes the code agrees on: packages, the HTTP API, the stored 
 the test setup. It does not own what the user sees ([behavior.md](behavior.md)) or the screen format
 and model settings ([ui-generation.md](ui-generation.md)).
 
+The app says *mock* and *project*; routes, types and files keep their older names, so a mock is a
+`screen` and a project an `app` here.
+
 ## Example
 
 ```
-POST /api/screen  {"app": "A coffee shop ordering app", "action": null, "model": "claude-haiku-5.5", "device": "phone"}
+POST /api/screen  {"app": "A coffee shop ordering app", "action": null, "model": "claude-haiku-5.5", "device": "small-phone"}
 
-{"type":"meta","key":"a coffee shop ordering app","cached":false,"variants":2}
-{"type":"chunk","variant":0,"text":"<title>Menu</title><meta name=\"idea\" ..."}
-{"type":"chunk","variant":1,"text":"<title>Order"}
+{"type":"meta","key":"a coffee shop ordering app","cached":false}
+{"type":"chunk","text":"<title>Menu</title><meta name=\"idea\" ..."}
 ...
-{"type":"version","variant":1,"version":{...Version}}
-{"type":"version","variant":0,"version":{...Version}}
-{"type":"done","entry":{...CacheEntry, "versions":[], "proposals":[{...}, {...}]}}
+{"type":"version","version":{...Version}}
+{"type":"done","entry":{...CacheEntry, "versions":[{...}]}}
 
-POST /api/pick  {"key": "a coffee shop ordering app", "index": 1}
-{"entry":{...CacheEntry, "versions":[{...the second proposal}]}, "filing":true, "visiting":false}
+POST /api/screen  {"app": "A coffee shop ordering app", "action": "@cart: The cart with its items", "from": "a coffee shop ordering app", "label": "Cart"}
+(the click settles the mock it came from: its filing starts, and the new mock waits for it, 5 s at most)
 
 GET /api/map?app=A%20coffee%20shop%20ordering%20app&wait=1      (answers once filing and a visit are done)
 {"root":"a coffee shop ordering app","entries":[...],"boxes":{...Boxes},"past":{"components":[],"rules":[{"what":"Filing after home","at":"…"}],"data":[]},"filing":false,"visiting":false}
@@ -30,9 +31,9 @@ GET /api/map?app=A%20coffee%20shop%20ordering%20app&wait=1      (answers once fi
   boxes, filing, the fixer, cache keys, frame page (with paste by ID and the current link) and devices. `frame.ts`, `keys.ts` and `tree.ts` run in the browser too, so they use
   no Node or Bun APIs.
 - `@uxwoz/web` (`src/packages/web`): `Bun.serve` server, the page (`index.html`, `app.ts`
-  as the entry, `state.ts`, `screens.ts`, `nav.ts`, `drawer.ts`, `toolbar.ts`, `net.ts`, `canvas.ts`,
+  as the entry, `state.ts`, `screens.ts`, `nav.ts`, `cards.ts`, `bar.ts`, `menu.ts`, `net.ts`, `canvas.ts`,
   `boxes.ts`, `sharing.ts`, `comments.ts`, the CSS in `design/`, bundled by Bun's HTML import), the player (`player.html`,
-  `player.ts`, `pins.ts` (shared with the app), its CSS in `design/player.css` on the shared tokens), the design sheet (`design/sheet.html`, `design/sheet.ts`), the share routes (`share.ts`), the desks (`desks.ts`), and the themes in `themes/`.
+  `player.ts`, `pins.ts` (shared with the app), its CSS in `design/player.css` on the shared tokens), the design sheet (`design/sheet.html`, `design/sheet.ts`), the share routes (`share.ts`), the desks (`desks.ts`), the tour (`tour.ts`, reading `tour/`), and the themes in `themes/`.
 
 There are no runtime dependencies; `@types/bun` and `typescript` are dev-only.
 
@@ -58,39 +59,34 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
 - `GET /healthz` → 200 `ok` (text) for the host's health check: open with `UXWOZ_OWNER` set, touches nothing.
 
 - `GET /api/config`: models (id, label, costEstimated), themes (`mockup`, `clean`), devices (id,
-  label, width), and the default model, theme and device; `warning` when the cache file is from a
+  label, width, height: the four sizes; the two older ones are not offered), and the default model and theme; `warning` when the cache file is from a
   newer app (it is left alone and nothing is saved).
-- `POST /api/screen {app, action?, model?, device?, from?, label?, again?}`: a new screen, as an NDJSON
-  stream. `action` is `@name: prompt`, `@name` alone (a screen the mockup has or plans; one with no
-  plan is made from the name and `label`); anything else but `home` is 400. A screen with that name
-  is a cache hit. A cache hit sends `meta` (cached true, variants 0) and `done` only; a screen whose A OR B
-  is still open comes back with its `proposals`, at no cost, a missing side (refused or failed)
-  missing still. Asked `again: true` (after a sign-up, or a failed side's **Try again**), an open A OR B
-  with a side missing streams like a new screen (`meta.variants` 2), sends the side there as `version`
-  at once, and draws only the missing side, a paid request like any other (gated, one at a time; a
-  recording still answers a starter's). Otherwise two designs stream at once:
-  `meta.variants` is 2 and each `chunk` names its side (`variant` 0 or 1). One random side is asked
-  for a clearly different design. Each side that finishes is stored at once as that side's
-  proposal and sent as `version`; one that fails sends `failed` with its message. The first side to
-  finish makes the screen, with the click as its parent (`from`, the key of the screen clicked in,
-  and `label`, the control's text). `done` ends the stream with the screen; `error` comes when both sides fail. A side that finishes after the other was
-  picked, or after the screen, the screen clicked in or its mockup was deleted (even before the
-  screen existed: the cache remembers when each key was deleted), is dropped. A `from` that is not
-  a picked screen gets `error` before any model call. 400 on an empty or too long
-  `app` (2,000) or `action` (500), or an unknown model or device. A later screen of a mockup without
-  a first screen gets `error` before any model call. A closed browser connection aborts the model
-  calls; a side that already finished is still stored.
-- `POST /api/pick {key, index}`: keep proposal `index` as the screen's first version and drop the
-  other; `{entry, filing: true, visiting}`, as filing starts in the background (see below), and on
-  every 5th pick of the mockup (`VISIT_EVERY`, counted in `boxes.picks`) a visit after it; 404 if
-  the screen has no open A OR B or that side has not finished.
-- **Filing** runs after a pick and after a screen's Edit (whose `done` event has `filing: true`), on
+- `POST /api/screen {app, action?, model?, device?, from?, label?}`: a new screen, as an NDJSON
+  stream of one design: `meta`, `chunk`*, `version`, `done` with the screen, or `error`. `action` is
+  `@name: prompt`, `@name` alone (a screen the mockup has or plans; one with no plan is made from the
+  name and `label`); anything else but `home` is 400. A screen with that name is a cache hit: `meta`
+  (cached true) and `done` only. `device` counts for a first screen only: every later screen takes
+  the first screen's. `from` is the key of the screen clicked in and `label` the control's text: they
+  are the new screen's parent, and the server settles `from` first (below). The design is stored
+  when it finishes and makes the screen. One that finishes after the screen clicked in or its mockup
+  was deleted (the cache remembers when each key was deleted) is dropped. A `from` that is not a
+  drawn screen gets `error` before any model call, and so does a later screen of a mockup without a
+  first screen. 400 on an empty or too long `app` (2,000) or `action` (500), or an unknown model or
+  device. A closed browser connection aborts the model call.
+- **Settling**: a screen is settled the first time the user clicks on from it, and again after a new
+  design of it (`CacheEntry.settled` holds the `createdAt` of the version that was filed). `POST
+  /api/screen` settles its `from`; `POST /api/settle {key}` does the same for a click that leads to
+  a screen already drawn, and answers `{entry, filing, visiting}` at once (404 for an unknown
+  screen; a settled one answers with `filing: false`). Settling starts filing in the background,
+  and on every 5th screen of the mockup settled for the first time (`VISIT_EVERY`, counted in
+  `boxes.settled`) a visit after it.
+- **Filing** runs when a screen is settled and after a screen's Edit (whose `done` event has `filing: true`), on
   the background model GPT-6.1 Terra, one filing per mockup at a time. It applies the reply's lines
   to the boxes (`applyFiling` in `core/src/filing.ts`) and refuses, in the server log and in the
   screen's `filed.refused`, a bad or used ID, a line over 120 characters, a full box, a part that is
   not there, a row with no table above it or naming another table, the rows of a refused table. A
   row joins the table above it whatever ID it names. A new screen or a revise waits for a running filing at most 5 s (`fileWaitMs`) before
-  its model calls, after its `meta` event.
+  its model call, after its `meta` event.
 - **A visit** of the fixer (`visitPaper` and `applyVisit` in `core/src/fixer.ts`) takes its turn in
   the same chain, so filing and the fixer never change the boxes at once. Terra reads the paper and
   the screens whose newest version is newer than the last visit, oldest first, parts numbered
@@ -100,13 +96,13 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
   applied with refusals in `visits[].refused`: no such entry, an entry `by: 'user'` (except in the
   box of an Edit, below; a component the user wrote is redrawn only in an Edit of Components), two IDs of
   different boxes, a used ID, a part not there, a second redraw of one screen, more than 5
-  redraws (`MAX_REDRAWS`, a cost limit), a screen with an open A OR B. A merge removes the newer
+  redraws (`MAX_REDRAWS`, a cost limit), a screen being drawn. A merge removes the newer
   entry of the two; a component removed this way leaves its HTML in place (`removeComponent`). The
   reply is dropped when the mockup was deleted or started over after the visit began. Redraws then
   run at once, as `/api/revise` Edits on the screen's own model that start no filing, skipping a
   screen with a version newer than the visit; their versions have `by: 'fixer'`, and a redrawn
   component keeps its `by`. They join the visit's one change of the boxes (`Applied.group`). A visit
-  asked for while one runs (Visit now, the 5th pick) comes after it. Start over and
+  asked for while one runs (Run fixer, the 5th settled screen) comes after it. Start over and
   deleting the mockup stop them. The next visit reads what changed since the last visit that did
   not fail. The map's `filing` counts filings only, so a visit in the chain is `visiting`.
 - **An Edit of a box** is a visit with `ask: {box, text}`: the request names the box and the
@@ -118,15 +114,22 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
   is named by what it did (*You changed score-direction*). They are saved in the cache file under `states`, by mockup. An Undo that drops
   a component pastes its HTML into the screens that paste it; no Undo frees an ID (`gone` keeps
   every ID it drops).
-- `POST /api/revise {key, change?, model?, device?}`: one new version of a picked screen or a
-  component (a component takes `change` only, else 400), streamed
-  like `/api/screen` with one side (`meta.variants` 1, then `chunk`*, `version`, `done`). With
-  `change` (1-1,000 characters) it is an Edit: the model gets the newest version's HTML and the
-  change, and the version stores it as `feedback`. Without it, a Regenerate from the screen's own
-  prompt. Both keep the device of the newest version (`device` only for screens made before
-  devices). 400 on a bad `change`, model or device, 404 for an unknown screen, 409 while its A OR B
-  is open; `error` if the model fails or the screen was deleted meanwhile.
-- `POST /api/undo {key}`: drop the newest version; `{entry}`, or 404 when one or none is left.
+- `POST /api/revise {key, change?, prompt?, model?}`: one new version of a drawn screen or a
+  component (a component takes `change` only, else 400), streamed like `/api/screen` (`meta`,
+  `chunk`*, `version`, `done`). With `change` (1-1,000 characters) it is an Edit: the model gets the
+  showing version's HTML and the change, and the version stores it as `feedback`. With neither it is
+  Another: a design from the screen's own prompt with `ALTERNATIVE_REQUEST` added, and
+  `CacheEntry.draws` goes up by one. With `prompt` (1-500 characters) it is Draw again: the prompt
+  becomes the screen's `action`, the design is drawn from it, and `draws` is 1; for the first
+  screen the mockup takes the prompt as its name (every key of the mockup changes, the IDs in its
+  address stay), 409 when the person has another mockup of that name. A new version goes to the end
+  of `versions` after any `redo` ones, and the oldest goes past 10 (`VERSIONS`). All keep the
+  screen's device. 400 on a bad `change`, `prompt` or model, 404 for an unknown screen, 409 while
+  the screen is being drawn; `error` if the model fails or the screen was deleted meanwhile.
+- `POST /api/undo {key, at?}`: show another version. Without `at`, the one before the one showing;
+  with `at` (a version's `createdAt`), that one, so Redo sends the next one's. Versions newer than
+  the one showing move to `redo`, so the last of `versions` is always the one showing. `{entry}`,
+  or 404 when there is no such version.
 - `GET /api/map?app=…[&wait=1]`: `{root, entries: CacheEntry[], boxes: Boxes, past, filing, visiting}`
   (`past`: each box's changes that Undo can take back, oldest first, `{what, at}`)
   for one mockup, oldest first, components included; with `wait=1` once its running filing and
@@ -136,15 +139,21 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
 - `GET /api/apps`: `{apps: {app, id, screens, updatedAt}[]}`, every mockup once as first typed,
   most recently changed first, for the Recent mockups lists; `id` is the mockup's ID in its address,
   which the page looks up there.
-- `GET /m/:mockup` and `GET /m/:mockup/:screen`: the app's page, as `/` serves it (the same gate); the
-  page reads the IDs from its address (`web/src/address.ts`).
+- `GET /m/:mockup`, `GET /m/:mockup/:screen`, `GET /tour` and `GET /tour/:name`: the app's page, as
+  `/` serves it (the same gate); the page reads the IDs from its address (`web/src/address.ts`). A
+  `:screen` that starts with `box-` names a box.
+- `GET /api/tour`: the tour as `/api/map` sends a mockup, read from the folder `tour/` at each
+  request (`web/src/tour.ts`): `<name>.html` is a screen whose name is the file's (`home.html`
+  first), its `<title>` the screen's title; `rules.md` and `data.md` in the form Export writes;
+  `components/<id>.html`; `notes.md`, whose lines are the changes of one visit. Parents come from the
+  links, as in any mockup. Every other route refuses the tour's `app` (404), so nothing changes it.
 - `GET /api/export?app=…`: the mockup as a zip (`application/zip`, stored entries, written by
   `core/src/zip.ts`), `Content-Disposition: attachment; filename="<slug>.zip"`, the slug being the
   prompt's letters, digits and dashes (40 at most). It holds one folder, `<slug>/`, with `HANDOFF.md`,
   `README.md`, `rules.md`, `data.md`, `components.md` and `screens/<name>.html` per drawn screen
-  (newest version, components pasted, Pico and `mockup.css` inlined, vh as pixels of the device's
+  (the showing version, components pasted, Pico and `mockup.css` inlined, vh as pixels of the device's
   height, centred on a grey page, our link script in place of the frame's); see
-  [behavior.md](behavior.md#export). 404 for a mockup with no picked first screen.
+  [behavior.md](behavior.md#export). 404 for a mockup with no drawn first screen.
 - `GET /api/backup`: the whole screen cache, the same bytes `save()` would write to the cache file
   now (every mockup, the boxes, the shares, feedback and trips), as `application/json` with
   `Content-Disposition: attachment; filename="screen-cache.json"` and `Cache-Control: no-store`; it
@@ -169,17 +178,17 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
   yet (`undoVisit`): changes it cannot undo are skipped, the visit is marked `undone`, and the map
   comes back with `error` saying the first skip. `op: 'visit'` asks for a visit now (after the
   running one, if any); `op: 'edit', box, text` (1-1,000 characters) starts an Edit of the box.
-  Both 409 with why: *Wait for Home's pick.*, or for an Edit *The fixer is visiting now*. The whole mockup as `/api/map` sends it; 400 with `{error}` for a refused edit, 404 for
+  Both 409 with why: *Wait for Home.*, or for an Edit *The fixer is visiting now*. The whole mockup as `/api/map` sends it; 400 with `{error}` for a refused edit, 404 for
   a mockup with no first screen. A component is deleted with `/api/delete`, changed with
   `/api/revise`, undone with `/api/undo`.
 - `POST /api/warmup {model}`: 204 at once; sends a 16-token request in the background.
 - **Sharing** (`web/src/share.ts`): `POST /api/share {app, role, cap?}` makes a link (`role` view,
   comment or edit; `cap` 1-1,000, default 20, edit only) and answers the `Share` with its `url`; 404
-  before the first pick. `GET /api/shares?app=` → `{shares, feedback, trips}`. `POST /api/unshare
+  before the first screen is drawn. `GET /api/shares?app=` → `{shares, feedback, trips}`. `POST /api/unshare
   {token}` (404 if unknown). `GET /s/:token` serves the player (`player.html`), or the app for an
   edit link, from the hidden routes `/_player` and `/_app`; 404 for a revoked link. A visitor's
   routes: `GET /api/s/:token/map` → `{role, app, root, components, screens: {key, name, title, html,
-  device, parent}[]}` (picked screens' newest versions and their tree parents only; it counts an
+  device, parent}[]}` (drawn screens' showing versions and their tree parents only; it counts an
   open in memory; a GET never writes the file), `POST /api/s/:token/feedback {visitor, name, kind,
   screen, text?, about?, tag?, nth?, up?, label?}` → `{ok, id}` (`kind` comment, thumb or done; 400
   *Type your name first.* without a `name`, for a text over 1,000 characters, or an empty one but a
@@ -194,16 +203,16 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
   owner only: 403 through an edit link) sets or clears a comment's `resolved` → `{ok}`; 404 for an
   unknown id. Every request body is at most 64 KB (`maxRequestBodySize`).
 - **An edit link**: its page sends `x-uxwoz-share: <token>` on every `/api` call. It may use
-  `/api/config`, `/api/apps` (its mockup only), `/api/map`, `/api/screen`, `/api/pick`,
+  `/api/config`, `/api/apps` (its mockup only), `/api/map`, `/api/screen`, `/api/settle`,
   `/api/revise`, `/api/undo`, `/api/box` and `/api/delete`, each for its own mockup only: the mockup
   is a GET's `?app=`, or a POST body's `app` or the first part of its `key`; a POST whose `app` or
   `key` is not a string, or whose `?app=` names another mockup than its body, is 403. It may not use
   `/api/share`, `/api/shares`, `/api/unshare`, `/api/feedback`, `/api/delete-app`, `/api/warmup`, `/api/backup`, `/api/admin`, or `/api/delete` of
   its first screen (all 403). Its budget (`cap`) counts each call that makes a model work: a new
-  screen that is not a cache hit, a pick (its filing), `/api/revise`, and `/api/box` with `edit` or
+  screen that is not a cache hit, a `/api/settle` that starts a filing, `/api/revise`, and `/api/box` with `edit` or
   `visit`. A unit is taken before the call and given back when the call is refused; past the cap,
   429 *This link's budget is used up.*
-- **The owner**: with `UXWOZ_OWNER` set, `/`, `/m/…`, `/design`, `/admin` (public mode) and every `/api` route but `/api/s/*` need the cookie
+- **The owner**: with `UXWOZ_OWNER` set, `/`, `/m/…`, `/tour/…`, `/design`, `/admin` (public mode) and every `/api` route but `/api/s/*` need the cookie
   `uxwoz_owner=<secret>` (401 on the API, a one-line 403 page on `/` and `/design`; `/og.png` and share links
   answer everyone); `/?owner=<secret>` sets it
   (`HttpOnly; SameSite=Lax`, and `Secure` when the public origin is https) and redirects to the same path without it. The server fetches the
@@ -220,28 +229,28 @@ The script we add to every screen talks to the app with `postMessage`; the app a
 only from a card's own frame.
 
 ```ts
-{ uxwoz: 'action', prompt, label, part } // a click on a control with an action prompt (ignored on a side of an A OR B)
+{ uxwoz: 'action', prompt, label, part } // a click on a control with an action prompt
+{ uxwoz: 'open', url }               // a click on a link to a full web address (http or https): the app opens it in a new tab
 { uxwoz: 'touch' }                   // any press in the screen: it becomes the current screen
-{ uxwoz: 'key', key, code, shift, mod } // a zoom key (⌘/Ctrl with + − 0), ⌘[ ⌘], ⇧1-3 outside a text field,
+{ uxwoz: 'key', key, code, shift, mod } // a zoom key (⌘/Ctrl with + − 0), ⌘[ ⌘], ⇧1 outside a text field,
                                      // or Esc: the app handles it as if pressed outside the screen
-{ uxwoz: 'size', height, width }     // the screen's size, so the frame fits it (160-8000 px tall;
-                                     // the card is the device's width; `width` is reported, not used)
-{ uxwoz: 'wheel', dx, dy }           // scroll over the screen: dy and dx scroll the canvas
+{ uxwoz: 'scroll', above, below }    // whether content lies beyond the frame's top and bottom edge, at load and
+                                     // as it changes: the card's scroll corners, and the pins asked for again
+{ uxwoz: 'wheel', dx, dy }           // a scroll over the screen that nothing in it can take: the canvas pans
 { uxwoz: 'zoom', dy, x, y }          // Ctrl/Cmd + scroll or a pinch over the screen, at (x, y) in
                                      // the frame: zooms the canvas around that point
-{ uxwoz: 'pan', x, y, d, start }     // a finger dragging over the screen that no part of it takes: its
-                                     // point in the frame; the canvas follows it from the last point
-                                     // (`start` begins a gesture); `d` is unused
 { uxwoz: 'pinch', x, y, d, start }   // two fingers over the screen: their middle and their spread `d`;
-                                     // the canvas zooms by how the spread grew, around the middle
+                                     // the canvas follows the middle and zooms by how the spread grew
 { uxwoz: 'part', text, tag, nth, x, y, w, h } // the part clicked after the page sent { uxwoz: 'name-part' }:
                                      // its words (60 characters), tag, place among the parts with the same
                                      // tag and words, and its rectangle in the frame's own pixels; while
                                      // picking, the part under the pointer has an outline
-{ uxwoz: 'located', n, spots: [{ id, x, y, w, h }] } // the answer to locate (n echoed): an anchor not found is left out
+{ uxwoz: 'located', n, spots: [{ id, x, y, w, h }] } // the answer to locate (n echoed): an anchor not found, or
+                                     // outside the frame's view, is left out
 ```
 
-An `action` also carries `part`, the control clicked as above. The page sends the frame
+A frame has its device's size and scrolls inside, so it reports no size, and one finger on it never
+moves the canvas. An `action` also carries `part`, the control clicked as above. The page sends the frame
 `{ uxwoz: 'name-part' }` to pick a part, `{ uxwoz: 'name-part', off: true }` to stop picking, and
 `{ uxwoz: 'locate', anchors: [{ id, text, tag, nth }] }` (at most 200) to find parts again: the `nth`
 element with that tag and words (the first if there are fewer), else the first part of any tag with
@@ -253,7 +262,7 @@ does nothing until asked.
 
 ```ts
 CacheEntry { key; app; action: string | null; name?: string; parent: { key; label } | null;
-             versions: Version[]; proposals?: (Version | null)[]; filed?: { at; screen; ms; costUsd; added; changed; refused; error? } }
+             versions: Version[]; redo?: Version[]; draws?: number; settled?: string; filed?: { at; screen; ms; costUsd; added; changed; refused; error? } }
              // filed: the screen's last filing, shown in its Info
              // mid (the first screen only): the mockup's ID in its address, 6 of [a-z0-9], unique in the cache;
              // sid: the entry's ID in the address, 2-4 of [a-z0-9], unique in its mockup. Made from a hash
@@ -262,26 +271,28 @@ CacheEntry { key; app; action: string | null; name?: string; parent: { key; labe
              // opened it ("@sleep-report: …"); unique in the mockup; links use it as "@sleep-report".
              // action is the screen's prompt (without "@name: "). parent is the screen and
              // click that first made it.
-             // A planned screen (plannedScreens) has the same shape with no versions and no
-             // proposals; it is never stored.
-             // The last version shows; versions is empty and proposals holds the two sides of
-             // the open A OR B (null until a side finishes) until a pick
+             // A planned screen (plannedScreens) has the same shape with no versions; it is never stored.
+             // The last of versions shows. redo holds the versions newer than it, oldest first, after
+             // an Undo; versions and redo together keep 10. draws counts the designs drawn from the
+             // current prompt (an Edit is not one). settled is the createdAt of the version filed.
+             // A version 5 file's proposals (an open A OR B) load as versions: B, then A, which shows.
              // A component has kind: 'component', its ID as name, where it belongs as action,
              // the screen it was taken from as parent, and by, at, seen (as Mark); its key is
              // normalize(app) + ' » #' + ID. It is in no tree; its links count where it is pasted.
 Mark       { by: 'filing' | 'fixer' | 'user'; at; seen }   // who last wrote an entry, when, and whether its box was looked at since
 Boxes      { rules: (Mark & { id; text })[]; data: (Mark & { id; columns: string[]; rows: string[][] })[];
              gone: { components, rules, data: string[] }   // IDs used and deleted, never used again
-             visits?: Visit[]; picks?: number }   // the fixer's last 20 visits, oldest first; picks so far
+             visits?: Visit[]; settled?: number }   // the fixer's last 20 visits, oldest first; screens settled so far (`picks` in a version 5 file)
 Visit      { at; ask?: string; undone?: boolean; ms; costUsd; screens; changes: Change[]; refused: string[]; error?; seen }
 Change     { text; note?; undo?: Undo; undone? }   // text says what changed: "merged a into b"
 Undo       { put: box; entry; index } | { drop: box; id } | { key; createdAt }
            // put a removed or changed entry (a component's whole CacheEntry) back; delete an added one; drop a redraw's version
 Version    { html; model: ModelId; servedModel; createdAt; costUsd: number | null;
              costEstimated; firstChunkMs; totalMs; finishReason; device?: Device;
-             name?; idea?; feedback?; by?: 'fixer' }
+             name?; idea?; feedback?; prompt?; by?: 'fixer' }
              // name comes from the model's <title>, idea from its <meta name="idea">;
-             // feedback is the Edit request that made this version, by: 'fixer' when a visit asked
+             // feedback is the Edit request that made this version, by: 'fixer' when a visit asked;
+             // prompt is the new words of a Draw again
 Shared     { shares: Share[]; feedback: Feedback[]; trips: Trip[] }   // per mockup, in the cache file under `shared`
 Share      { token; role: 'view' | 'comment' | 'edit'; createdAt; cap?; used; opens }   // token: 32 hex characters
 Feedback   { id; at; visitor; name; screen: key; title; kind: 'comment' | 'thumb' | 'dead' | 'done'; text?; about?; tag?; nth?;
@@ -289,18 +300,13 @@ Feedback   { id; at; visitor; name; screen: key; title; kind: 'comment' | 'thumb
              // written; about, tag, nth: the anchor; resolved: when the owner resolved it
 Trip       { id; visitor; name; at; screens: string[]; dead: string[] }   // the last 500 feedback and trips are kept
 TreeNode   { level; parent: key | null; label }
-             // from screenTree: level 1 is the first screen, the fewest clicks from it otherwise
-VoiceState 'off' | 'asleep' | 'awake' | 'countdown'   // web/src/voice.ts, the microphone's state
-VoiceEvent { type: 'state'; state } | { type: 'interim'; text } | { type: 'countdown'; text; secondsLeft }
-           | { type: 'send'; text } | { type: 'error'; message }   // what VoiceMachine tells the page
-           | { type: 'heard'; text; final; woke; phrase }   // every piece with words while on; woke: it starts with the
-           // wake phrase, or the machine was awake or counting down already; phrase: the piece is a stop or cancel phrase
-           | { type: 'quiet' }   // the browser heard no speech, once per turn-on and only before any words; an 'error'
-           // from SpeechInput need not turn it off
+             // from screenTree: level 1 is the first screen, the fewest clicks from it otherwise; the
+             // canvas's rows and the dropdown's indent, never shown as a number
 ModelId    'claude-haiku-5.5' | 'gpt-6-luna-fast' | 'gpt-6.1-sol-ultrafast' | 'gpt-6.1-terra'
            // Terra is the background model (filing, the fixer): never a screen model, never in /api/config
-Device     'phone' (390 × 844 px) | 'desktop' (1024 × 768 px): every screen is that wide and at
-           least that tall
+Device     'small-phone' (360 × 500 px) | 'large-phone' (412 × 620) | 'laptop' (1280 × 560) | 'monitor' (1920 × 780):
+           the frame of every screen of the mockup. 'phone' (390 × 844) and 'desktop' (1024 × 768) are read
+           from mockups made before, never offered
 key        normalize(app) for the first screen, normalize(app) + ' » @' + name for any other
            (version 3 and 4 files also hold screens under normalize(app) + ' » ' + normalize(prompt));
            normalize turns » into >; action "home" or "@home" means the first screen
@@ -316,7 +322,7 @@ Read from the repo-root `.env` by `bun --env-file=../.env`; the browser never se
 | `OPENAI_API_KEY` | GPT-6 Luna, GPT-6.1 Sol, GPT-6.1 Terra (filing, the fixer) |
 | `PORT` | server port, default 3000 |
 | `UXWOZ_HOST` | listen address, default `127.0.0.1` |
-| `UXWOZ_CACHE_FILE` | screen cache `{version: 5, entries, boxes, states, shared}`, default `temp/screen-cache.json` |
+| `UXWOZ_CACHE_FILE` | screen cache `{version: 6, entries, boxes, states, shared}`, default `temp/screen-cache.json` |
 | `UXWOZ_USERS_DIR` | people's caches, `<id>.json` each (see Desks), default `users/` beside the cache file |
 | `UXWOZ_OWNER` | the owner's secret: when set, only a browser with its cookie uses the app (see Sharing) |
 | `UXWOZ_PUBLIC`, `UXWOZ_URL`, … | the public app: see [public.md](public.md#mail) |

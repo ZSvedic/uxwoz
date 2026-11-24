@@ -40,14 +40,16 @@ Before it shows a stored screen, the app makes two changes to its HTML, and stor
   charts as inline SVG, logic in one `<script>` at the end using plain DOM APIs, no fetch or
   external assets, no markdown fences. "Keep the reply under about 2,500 characters" keeps it fast.
 - **Rendering:** `<iframe sandbox="allow-scripts allow-forms" srcdoc=...>`. The sandbox keeps
-  generated code away from the app; `allow-forms` matters because models often build todo-style
+  generated code away from the app, so a link to a web address is opened by the app, in a new tab; `allow-forms` matters because models often build todo-style
   screens as `<form>`, and both OpenUI and CopilotKit failed the todo task by blocking submit.
-- **Size:** every screen of a device is as wide as the device (390 px phone, 1024 px desktop) and
-  at least one device screen tall (844 px, 768 px); a longer screen grows, and the frame is as tall
-  as its content and never scaled. vh units are pixels of the device's height. This replaced "only
-  as wide as its content": screens of one mockup differed in width, and some did not fill a phone. Shrinking a 1280 px screen to fit
-  made 5 px text and broke the sketch theme's thin curved borders into gaps. Text is a fixed 16 px: Pico grows it with the window (up to
-  21 px), which made screens look larger than the app around them.
+- **Size:** every screen of a mockup is a frame of one fixed size, the mockup's (360 × 500,
+  412 × 620, 1280 × 560 or 1920 × 780; see behavior.md, A mock). Its content scrolls inside the
+  frame, so vh units are the frame's own and a bar the model pins to the bottom stays there. The app
+  scales the whole frame to fit the window and never lays it out again, so its text wraps the same
+  at every zoom. Until the rework a frame grew as tall as its content and the canvas scrolled: on a
+  phone one finger could not tell the screen from the canvas, and a tab bar sat at the end of a
+  long page. Text is a fixed 16 px: Pico grows it with the window (up to 21 px), which made screens
+  look larger than the app around them.
 - **Inline the theme CSS** into the srcdoc. A null-origin frame cannot be relied on to fetch a
   stylesheet (one browser skipped it), and web fonts in it need CORS headers or `data:` URLs.
 - **Streaming:** rebuild the srcdoc at most every 300 ms while chunks arrive (each rebuild reloads

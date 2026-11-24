@@ -1,7 +1,7 @@
 # The public: people, the meter, sign-up, recordings
 
 This doc owns the shapes behind the public app: who a request is, what a person may spend, the routes
-for the account and the admin, and the starters' recordings. What a visitor sees is in
+for the account and the admin, and the recordings of the examples (`starters` in code). What a visitor sees is in
 [behavior.md](behavior.md); the other routes are in [code-contract.md](code-contract.md). Why each
 choice was made: `process/plans/2026-11-11-public-users.md`.
 
@@ -10,7 +10,7 @@ choice was made: `process/plans/2026-11-11-public-users.md`.
 ```
 POST /api/screen {app: "a dog walking app"}     no cookie
   → a person is made (a visitor, $0.10), Set-Cookie: uxwoz_who=<token>
-  → two Haiku designs stream; each call's cost is taken from the person when it ends
+  → a Haiku design streams; the call's cost is taken from the person when it ends
 GET /api/me → {role: "visitor", left: 0.0984, allowance: 0.1, screensLeft: 24, more: 37, …}
 …
 POST /api/screen → 402 {error: "Your free screens are used up.", reason: "allowance"}
@@ -79,11 +79,12 @@ store's methods take and give USD. Times are milliseconds since 1970, days and m
   the person's last request.
 - A reservation holds against the person's allowance, a visitor's address and the public's day and
   month. A check counts what is spent plus what the running calls hold: a call may start while
-  something is left and the reservations do not pass the cap. So with $0.004 left an A OR B gets both
-  designs, and spend passes a cap by at most one reservation beyond the calls' real costs.
+  something is left and the reservations do not pass the cap. So spend passes a cap by at most one
+  reservation beyond the calls' real costs.
 - **Paid** requests are the ones an edit link's cap counts (`costs` in `share.ts`) and `/api/warmup`,
-  except `/api/pick`: a pick is never refused (the two designs are paid for already), and its filing
-  and visit start only while the person may make a paid request (`may` in `drawing.ts`). A request a
+  except `/api/settle`: it is never refused (the click it belongs to may lead to a stored screen), and
+  the filing and visit of a settled screen start only while the person may make a paid request (`may`
+  in `drawing.ts`). A request a
   recording answers is free (`replayed` in `drawing.ts`). A paid request is refused before any model
   call with 402 `{error, reason}`:
 
@@ -92,7 +93,7 @@ store's methods take and give USD. Times are milliseconds since 1970, days and m
 | `allowance` | the person's `spent` is at or over their `allowance`, or with the running calls' reservations over it | *Your free screens are used up.* |
 | `address` | a visitor, and visitors from this address spent $0.30 today | *This network has used today's free screens. Register to carry on.* |
 | `guests` | a visitor, and the public spent 70% of the day's cap (`dayUsd`) today, the running calls' reservations counted | *Today's free screens for guests are used up. Register to carry on.* |
-| `paused` | the mode is `starters`, or the public spent $3 today or $20 this month | *Live designs are paused for now. The starters still work.* |
+| `paused` | the mode is `starters`, or the public spent $3 today or $20 this month | *Live designs are paused for now. The examples still work.* |
 | `blocked` | the owner blocked the person | *This account is closed. Write to <contact>.* (`UXWOZ_CONTACT`, else `UXWOZ_ADMIN_EMAIL`; with neither, the first sentence only) |
 
 So registered users go on to the whole day's cap after guests stop. The store checks in the order
@@ -101,7 +102,7 @@ comes before one that registering fixes, so a refused person is never sent to a 
 help. The 21st new visitor from an address in a day gets 402 `address` at their first `POST /api/screen`.
 
 - A person runs one paid request at a time (409 *One at a time: wait for this one.*): a new screen or
-  a revise holds until its stream ends or the browser leaves. A warm-up, a box's Edit and Visit now
+  a revise holds until its stream ends or the browser leaves. A warm-up, a box's Edit and Run fixer
   answer at once and are not held. Background work (filing, a visit) starts only while a paid request
   of the person would pass (no 402 reason), and each of its calls is checked again as it starts. Two
   people share a cap (the address's, the day's) through the reservations, as one person's calls do.
@@ -147,10 +148,11 @@ the index.
   `screensLeft` is `floor(left / SCREEN_USD)`, with `SCREEN_USD` $0.004 (`people.ts`); `more`, for `new` and
   `visitor` only, is the screens a new account adds, `floor(topup / SCREEN_USD)`; `paused` is true when a paid
   request would get `paused`.
-- `POST /api/step {step: "arrived"}` → 204 (another step is 400). The other steps (`starter`, `picked`, `own`, `limit`,
-  `asked`, `verified`) the server counts itself, each once per person: `starter` and `own` at a
-  `POST /api/screen` for a Home not in the person's cache, with a starter's prompt or another;
-  `picked` at a pick that worked; `limit` at a 402 `allowance`. `arrived` is counted at most 50 times
+- `POST /api/step {step}` → 204 for `arrived` and `toured` (the tour's last mock came into view); another step
+  is 400. The other steps (`starter`, `picked`, `own`, `limit`, `asked`, `verified`) the server counts itself,
+  each once per person: `starter` and `own` at a `POST /api/screen` for a Home not in the person's cache, with
+  a starter's prompt or another; `picked` (the admin's page calls it *clicked on from a mock*; the stored name
+  stays) at the person's first settled screen; `limit` at a 402 `allowance`. `arrived` is counted at most 50 times
   a day per address, and an `arrived` before the person exists counts for the day only.
 - `POST /api/signin {email}` → 204, and a code is sent: six digits, good for 15 minutes, dead after 5
   wrong tries; a new one replaces the old. 400 for a bad email, 429 *Sign-ups are full for today.*
@@ -223,38 +225,40 @@ routes and the check are `web/src/account.ts`. The links in every email start wi
 | `UXWOZ_PUBLIC` | `1` opens the app to the public |
 | `UXWOZ_DB`, `UXWOZ_USERS_DIR` | the database file and the folder of people's cache files |
 | `UXWOZ_ADDRESS_HEADER` | the header with the visitor's address, default `x-real-ip` |
-| `RESEND_API_KEY`, `UXWOZ_MAIL_FROM`, `UXWOZ_ADMIN_EMAIL` | mail: the key, the sender (default `UX Woz <hello@mail.uxwoz.com>`), the owner's address |
+| `RESEND_API_KEY`, `UXWOZ_MAIL_FROM`, `UXWOZ_ADMIN_EMAIL` | mail: the key, the sender (default `UXWoz <hello@mail.uxwoz.com>`), the owner's address |
 | `UXWOZ_OPERATOR`, `UXWOZ_CONTACT` | the privacy page: who runs the site, whom to write to (also in a blocked person's refusal) |
 | `UXWOZ_URL` | the app's address in emails, default `https://app.uxwoz.com/` |
 
 ## Recordings
 
-A recording is what the models said for one starter, with its timing; it is replayed where the model
-would be called. `recordings/<id>.json`, one per starter in `core/src/starters.ts`:
+A recording is what the models said for one example at one size, with its timing; it is replayed
+where the model would be called. `recordings/<id>.<device>.json`, four per starter in
+`core/src/starters.ts` (seven starters, 28 files):
 
 ```
-{starter, prompt, promptHash, recordedAt,
- screens: {<name>: {action, designs: Recorded[4]}},   // home, and every @name any Home design links to
- filings: Recorded[2]}                                 // Home's filing when A was picked, when B was
+{starter, device, prompt, promptHash, recordedAt,
+ screens: {<name>: {action, designs: Recorded[2]}},   // home, and every @name either Home design links to
+ filings: Recorded[2]}                                 // Home's filing with its first design showing, with its second
 Recorded = {events: [ms, text][], final: FinalEvent}   // ms since the call began
 ```
 
 - `Io.record?: (r: Recorded, call: {model, user}) => void` captures a live call; `recorded?: Recorded`
   on a call replays one: the same events, each after its recorded delay, no network, no `spent`.
-- In a mockup whose normalized prompt is a starter's: a recorded screen's A is `designs[0]` and B
-  `designs[1]`; each Regenerate takes the next (2, 3, then 0 again). The filing after Home's pick is
-  `filings[side picked]`. A pick of another recorded screen files nothing. Anything else (a screen with
-  no recording, an Edit, a box's Edit, Visit now) is a live, paid call.
-- This holds for everyone, the owner too. A Regenerate takes design *versions held + 1*, so after an
-  Undo the same design comes back; a screen whose newest version an Edit or the fixer made regenerates
-  live. A pick answered by a recording (Home's replayed filing, or nothing) never brings the fixer's
-  visit. Once the mockup has had a live call (here, or a screen's design that cost something, or a
-  visit), its picks file live and visits run as usual; recorded screens still draw from the recording.
-  A replayed design or filing costs 0. `drawing(…, may)` starts a live filing or visit only when `may()`
-  says so; a replay always runs. `replayed(path, body)` says whether a request to `/api/screen`,
-  `/api/revise` or `/api/pick` would be answered by a recording, with no model call.
-- `bun run starters:record [id…]` (live calls) drives the real server on a temporary cache: Home's two
-  designs, two Regenerates, then each linked name from a Home version that links to it, its four
-  designs the same way. `promptHash` is a hash of the system prompt; `startersCurrent` is false when a
-  recording's differs from today's.
+- In a mockup whose normalized prompt is a starter's and whose device has a recording: a recorded
+  screen's first design is `designs[0]`, and Another on it, while its prompt is the recorded one and
+  one design shows in its History, is `designs[1]`. Home's first filing is `filings[n]` for the design
+  showing. A recorded screen other than Home files nothing when settled. Anything else (a screen with
+  no recording, Draw again, a third design, an Edit, a box's Edit, Run fixer) is a live, paid call.
+- This holds for everyone, the owner too. A settle answered by a recording (Home's replayed filing,
+  or nothing) never brings the fixer's visit. Once the mockup has had a live call (a design that cost
+  something, an Edit, a visit), its screens file live and visits run as usual; recorded screens still
+  draw from the recording. A replayed design or filing costs 0. `drawing(…, may)` starts a live filing
+  or visit only when `may()` says so; a replay always runs. `replayed(path, body)` says whether a
+  request to `/api/screen`, `/api/revise` or `/api/settle` would be answered by a recording, with no
+  model call.
+- `bun run starters:record [id…] [--device <id>]` (live calls, about $5 for all 28) drives the real
+  server on a temporary cache, once per size: Home, Another on it, then each linked name from a Home
+  design that links to it, with its Another. `promptHash` is a hash of the system prompt;
+  `startersCurrent` is false when a recording's differs from today's.
+- The tour is not a recording: its mocks are files (`tour/`, see `GET /api/tour` in the contract).
 - The tests' cassettes are separate and never read these files.
