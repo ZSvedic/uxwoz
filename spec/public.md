@@ -134,7 +134,7 @@ for a visitor, plain 403 otherwise):
 
 A visitor's cache file and rows are deleted after 30 days with no request, by a check once a day (the first a
 day after the server starts). A cache file that passed 5 MB takes no
-new screen and no revise (413 *This account is full: delete a mockup first.*); a cache hit still opens.
+new screen and no revise (413 *This account is full: delete a project first.*); a cache hit still opens.
 
 A person's share links are in the `shares` index: added by `/api/share`, dropped by `/api/unshare`, by
 `/api/delete` of a mockup's Home and by `/api/delete-app` (Start over). `whose(token)` looks in the
