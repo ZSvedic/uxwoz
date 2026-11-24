@@ -21,14 +21,14 @@ figcaption { font-size: 13px; color: #333; margin-bottom: 8px; min-height: 76px;
 .cv { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; align-items: center; padding: 8px; }
 .rope { position: absolute; left: calc(50% - 1.5px); width: 3px; background: repeating-linear-gradient(#fff 0 6px, #999 6px 9px); } .rope.in { top: 0; height: 42px; } .rope.out { bottom: 0; height: 72px; }
 .chip { flex: none; align-self: flex-start; position: relative; font: 700 15px system-ui; background: #eee; border: 1.5px solid #111; border-radius: 8px; padding: 2px 10px; margin: 0 0 6px 2px; }
-.ab { flex: none; position: relative; width: 100%; height: 52px; display: flex; justify-content: space-evenly; margin-top: 7px; }
+.ab { flex: none; position: relative; width: 100%; height: 52px; display: flex; justify-content: center; gap: 22px; margin-top: 7px; }
 .ab button { flex: none; width: 62px; height: auto; padding: 0; font-size: 12px; line-height: 1.25; } .ab button i { display: block; font-style: normal; font-size: 19px; }
-.ab .on { background: #111; color: #fff; } .ab .off, .tb .off { color: #aaa; border-color: #aaa; } .ab .off i { opacity: .35; } .ab .none { visibility: hidden; }
+.ab .on { background: #111; color: #fff; } .ab .off, .tb .off { color: #aaa; border-color: #aaa; } .ab .off i { opacity: .35; } .ab .none { display: none; }
 
 /* A mock: white paper in the sketch look. Its content scrolls inside; what is pinned stays at its bottom. */
 .mock { flex: 1; min-height: 0; width: 100%; position: relative; background: #fff; border: 2px solid #111; border-radius: 16px; display: flex; flex-direction: column; overflow: hidden;
   font: 14px/1.4 "Chalkboard SE", "Comic Sans MS", "Segoe Print", cursive; }
-.mock.cur, .card.cur { box-shadow: 0 0 0 3px #fff; } .lp .mock { border-radius: 8px; }
+.mock.cur, .card.cur, .pad.cur { box-shadow: 0 0 0 3px #fff; } .lp .mock { border-radius: 8px; }
 /* More to scroll to: that edge's corners go flat and the edge fades into the sky. */
 .mock.below { border-bottom-left-radius: 0; border-bottom-right-radius: 0; --b: 26px; } .mock.above { border-top-left-radius: 0; border-top-right-radius: 0; --a: 26px; }
 .mock.below, .mock.above { -webkit-mask: linear-gradient(transparent, #000 var(--a, 0px), #000 calc(100% - var(--b, 0px)), transparent); mask: linear-gradient(transparent, #000 var(--a, 0px), #000 calc(100% - var(--b, 0px)), transparent); box-shadow: none; }
@@ -48,6 +48,16 @@ figcaption { font-size: 13px; color: #333; margin-bottom: 8px; min-height: 76px;
 .card .li { background: #fff; border: 1.5px solid #111; border-radius: 8px; padding: 7px 9px; } .card .li.now { border-width: 3px; }
 .card dl { margin: 0; } .card dt { font-weight: 700; font-size: 12px; margin-top: 7px; } .card dd { margin: 0; }
 .card .del { margin-top: auto; align-self: flex-start; background: none; border: 0; text-decoration: underline; color: #111; font: 13px system-ui; padding: 6px 0 0; }
+
+/* A box: a page of a ruled pad (yellow in the app, as today). Each entry is a line or two of writing on the ruling. */
+.pad { flex: 1; min-height: 0; width: 100%; position: relative; overflow: auto; border: 2px solid #111; border-radius: 6px; padding: 26px 12px 8px 40px; font: 14px/26px system-ui;
+  background: linear-gradient(90deg, transparent 30px, #888 30px 31.5px, transparent 31.5px 34px, #888 34px 35px, transparent 35px), repeating-linear-gradient(#f4f4f4 0 25px, #bdbdbd 25px 26px); background-attachment: local; }
+.pad::before { content: ""; position: absolute; left: calc(50% - 7px); top: 5px; width: 14px; height: 14px; border-radius: 50%; background: #111; box-shadow: 0 0 0 2px #fff; }
+.pad p { margin: 0; } .pad .tag { font-size: 11px; border: 1px solid #111; border-radius: 6px; padding: 0 4px; margin-left: 3px; background: #fff; } .pad u { margin-left: 4px; }
+.pad .demo { background: #fff; border: 1.5px solid #111; border-radius: 6px; height: 40px; margin: 6px 0; display: flex; align-items: center; justify-content: space-around; padding: 0 8px; font: 13px "Chalkboard SE", "Comic Sans MS", cursive; }
+.pad .now { outline: 2.5px solid #111; outline-offset: 3px; border-radius: 4px; } .pad table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; } .pad td, .pad th { border: 1px solid #111; height: 26px; padding: 0 5px; text-align: left; line-height: 1; }
+.pad .dim { color: #555; }
+.lp .box { background: repeating-linear-gradient(#f4f4f4 0 9px, #bdbdbd 9px 10px); }
 
 /* Things that lie over the canvas: the dropdown, the left panel, the new project panel. */
 .dim-bg { position: absolute; inset: 0; background: #0009; }
@@ -72,7 +82,9 @@ figcaption { font-size: 13px; color: #333; margin-bottom: 8px; min-height: 76px;
 <div class="lead">
 <p>These show where things are and what they say. Colour, wood, parchment and the stars' real look come from today's app and are not shown.
 Each picture has a number: answer with the number and what to change. A mock's content here scrolls, as it will in the app.</p>
-<p><b>Round 4</b> (after Zel's notes): Bill is smaller; a tour mock's name is on its tag only, and the tag is bigger; the four buttons are narrower
+<p><b>Round 5</b> (after Zel's notes): a box is a page of the ruled pad again, with no frame round each entry, so more fits (pictures 10 to 13);
+the buttons are centred under their mock or box, so Components shows its three with no hole.</p>
+<p><b>Round 4:</b> Bill is smaller; a tour mock's name is on its tag only, and the tag is bigger; the four buttons are narrower
 with more room between them; the dropdown shows <i>Components</i> in full and counts what is new on a box's corner.</p>
 <p><b>Standing from round 3:</b> a mock is a card with its name above and ropes in and out; the four buttons are on the canvas under the current mock
 or box only; the starting view is called 100%; an edge with more to scroll to has flat corners and fades; a small phone's mock is 360 × 500.</p>
@@ -155,15 +167,25 @@ const app = [
 
 const BOX = (first) => [first, ['✏️', 'Edit'], ['⏪', 'History'], ['ℹ️', 'Info']]
 const boxes = [
-  phone(10, '📐 Rules', 'A box is a card on the canvas like a mock, with its own buttons under it while it is the current one. Its first button is its own: Add rule. Tap a sentence to change it in place, as today.',
-    { name: '📐 Rules', zoom: '100%', acts: BOX(['➕', 'Add rule']), body: chip('📐 Rules') + `<div class="card cur" style="outline:0"><div class="li"><b>water-days</b><br>Watering shows as days from today.</div><div class="li"><b>light-needs</b> · new<br>Light is one line under the photo.</div><div class="li"><b>one-summary</b> · yours<br>Each mock ends with one summary line.</div></div>` }),
-  phone(11, '🧩 Components', 'A tap on a component makes it current (the thick line), and the buttons are that component\'s. There is no first button. Its Edit card has Delete this component.',
-    { name: '🧩 Components', zoom: '100%', acts: BOX(['', '']), body: chip('🧩 Components') + `<div class="card cur" style="outline:0"><div class="li now"><b>tab-bar</b> · at the bottom of every mock<div style="display:flex;border:1.5px solid #111;border-radius:6px;padding:6px;margin-top:6px;font-family:'Chalkboard SE','Comic Sans MS',cursive"><span class="tab" style="flex:1;text-align:center">Plants</span><span style="flex:1;text-align:center">Schedule</span><span style="flex:1;text-align:center">Add</span></div></div>
-      <div class="li"><b>plant-row</b> · a plant in a list<div style="display:flex;justify-content:space-between;border:1.5px solid #111;border-radius:6px;padding:6px;margin-top:6px;font-family:'Chalkboard SE','Comic Sans MS',cursive"><span>Monstera</span><span>water in 2 days</span></div></div></div>` }),
-  phone(12, '🗄️ Data', 'Its first button is Add table. Tap a cell to change it, as today.',
-    { name: '🗄️ Data', zoom: '100%', acts: BOX(['➕', 'Add table']), body: chip('🗄️ Data') + `<div class="card cur" style="outline:0"><div class="li"><b>plants</b><table style="width:100%;border-collapse:collapse;margin-top:5px;font-size:13px" border="1" cellpadding="4"><tr><th>name</th><th>water every</th><th>light</th></tr><tr><td>Monstera</td><td>7 days</td><td>bright</td></tr><tr><td>Basil</td><td>2 days</td><td>sun</td></tr><tr><td>Fern</td><td>5 days</td><td>shade</td></tr></table><div class="dim" style="margin-top:5px">+ row · + column · ✕</div></div></div>` }),
-  phone(13, '🕵️ Fixer', 'Its first button is Run fixer (Visit now today). Each change keeps its own Undo.',
-    { name: '🕵️ Fixer', zoom: '100%', acts: BOX(['▶️', 'Run fixer']), body: chip('🕵️ Fixer\'s notes') + `<div class="card cur" style="outline:0"><div class="li"><b>Visit, 14:02</b> · read 5 mocks · 3.1 s · ~$0.008<br>merged <b>water-day</b> into <b>water-days</b>: they said one thing <u>Undo</u><br>redrew <b>Schedule</b>: paste tab-bar <u>Undo</u></div><div class="dim">The next visit comes after 3 more mocks.</div></div>` }),
+  phone(10, '📐 Rules', 'A box is a page of the ruled pad, as today (yellow in the app): one rule a line, no frame round each. Its buttons are under it while it is current; the first is its own: Add rule. Tap a sentence to change it in place.',
+    { name: '📐 Rules', zoom: '100%', acts: BOX(['➕', 'Add rule']), body: chip('📐 Rules') + `<div class="pad cur">
+      <p><b>water-days</b> Watering shows as days from today.</p><p><b>light-needs</b><span class="tag">new</span> Light is one line under the photo.</p>
+      <p><b>one-summary</b><span class="tag">yours</span> Each mock ends with one summary line.</p><p><b>plant-names</b><span class="tag">new</span> A plant goes by its common name.</p>
+      <p><b>back-top-left</b> Back is a link at the top left.</p><p><b>dates-short</b> Dates read Nov 21, never 21.11.</p><p><b>empty-lists</b> An empty list says what to add.</p></div>` }),
+  phone(11, '🧩 Components', 'Each component is its name, where it belongs, and the thing itself, drawn as in a mock. A tap makes one current (the line round it), and the buttons are that component\'s: three, since a component has no action of its own. Its Edit card has Delete this component.',
+    { name: '🧩 Components', zoom: '100%', acts: BOX(['', '']), body: chip('🧩 Components') + `<div class="pad cur">
+      <div class="now"><p><b>tab-bar</b> at the bottom of every mock</p><div class="demo"><span><u>Plants</u></span><span>Schedule</span><span>Add</span></div></div>
+      <p><b>plant-row</b> a plant in a list</p><div class="demo" style="justify-content:space-between"><span><u>Monstera</u></span><span>water in 2 days</span></div>
+      <p><b>care-entry</b> one line of a care log</p><div class="demo" style="justify-content:space-between"><span>Watered</span><span>Nov 21</span></div></div>` }),
+  phone(12, '🗄️ Data', 'Tables on the pad. Its first button is Add table. Tap a cell to change it, as today.',
+    { name: '🗄️ Data', zoom: '100%', acts: BOX(['➕', 'Add table']), body: chip('🗄️ Data') + `<div class="pad cur">
+      <p><b>plants</b></p><table><tr><th>name</th><th>water every</th><th>light</th></tr><tr><td>Monstera</td><td>7 days</td><td>bright</td></tr><tr><td>Basil</td><td>2 days</td><td>sun</td></tr><tr><td>Fern</td><td>5 days</td><td>shade</td></tr></table><p class="dim">+ row · + column · ✕</p>
+      <p><b>care-log</b></p><table><tr><th>plant</th><th>what</th><th>day</th></tr><tr><td>Monstera</td><td>Watered</td><td>Nov 21</td></tr><tr><td>Monstera</td><td>Fed</td><td>Nov 14</td></tr></table><p class="dim">+ row · + column · ✕</p></div>` }),
+  phone(13, '🕵️ Fixer', 'The fixer\'s notes, a visit after a visit, each change on its line with its own Undo. Its first button is Run fixer (Visit now today).',
+    { name: '🕵️ Fixer', zoom: '100%', acts: BOX(['▶️', 'Run fixer']), body: chip('🕵️ Fixer\'s notes') + `<div class="pad cur">
+      <p><b>Visit, 14:02</b> <span class="dim">5 mocks · 3.1 s · ~$0.008</span></p><p>merged <b>water-day</b> into <b>water-days</b>: they said one thing <u>Undo</u></p><p>redrew <b>Schedule</b>: paste tab-bar <u>Undo</u></p>
+      <p><b>Visit, 13:40</b> <span class="dim">5 mocks · 2.6 s · ~$0.006</span></p><p>added rule <b>dates-short</b>: two mocks wrote dates two ways <u>Undo</u></p>
+      <p class="dim">The next visit comes after 3 more mocks.</p></div>` }),
 ]
 
 const bill = `<div class="bill"><svg viewBox="0 0 60 124" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="30" cy="26" r="13"/><path d="M17 23C18 9 42 9 43 23Z" fill="#111"/><circle cx="30" cy="9" r="3" fill="#111"/><path d="M30 39V84M30 52L13 70M30 52L47 70M30 84L16 120M30 84L44 120"/></svg></div>`
@@ -187,7 +209,7 @@ const wide = [
   `<figure class="wide"><figcaption><b>18. A laptop, a phone-size project</b><br>Zoomed out to 45%. The top bar has room for the word UXWoz, the four boxes, − + and ⛶ (fit). The canvas shows the tree: Home on top, its boxes to the right, the next mocks below on ropes. Only the current mock has the ring and the four buttons under it; they zoom with it. A tap on the sky leaves no mock current and no buttons.</figcaption>
     <div class="lp">${wbar('Monstera', '45%')}<div class="cv"><svg class="ropes"><path d="M152 168 C152 184 97 176 97 192"/><path d="M152 168 C152 184 217 176 217 192"/><path d="M152 168 C152 184 337 176 337 192"/></svg>
       ${small(110, 28, 84, 140, 'Home')}${box(226, 28, '📐 Rules')}${box(340, 28, '🕵️ Fixer\'s notes')}${box(454, 28, '🧩 Components')}${box(568, 28, '🗄️ Data')}
-      ${small(55, 211, 84, 140, 'Monstera', 'cur')}<div class="ab" style="left:55px;top:354px;width:84px;height:13px">${MOCK.map(() => '<button style="width:13px;border-width:1px;border-radius:3px"></button>').join('')}</div>${small(175, 211, 84, 140, 'Schedule')}${small(295, 211, 84, 140, 'Add a plant')}</div></div></figure>`,
+      ${small(55, 211, 84, 140, 'Monstera', 'cur')}<div class="ab" style="left:55px;top:354px;width:84px;height:13px;gap:5px">${MOCK.map(() => '<button style="width:13px;border-width:1px;border-radius:3px"></button>').join('')}</div>${small(175, 211, 84, 140, 'Schedule')}${small(295, 211, 84, 140, 'Add a plant')}</div></div></figure>`,
   `<figure class="wide"><figcaption><b>19. A laptop, a laptop-size project, Edit open</b><br>A project made on a laptop has laptop-size mocks, so at 100% one mock fills most of the canvas, as on a phone. Edit flips the mock to the card here too, and its buttons stay under it. There is no drawer at the side any more.</figcaption>
     <div class="lp">${wbar('Today', '100%')}<div class="cv"><div class="chip" style="left:74px;top:8px">Today</div>
       <div class="card" style="position:absolute;left:74px;top:28px;width:652px;height:276px;flex:none"><h4>Edit Today <span>✕</span></h4><label>What should change?</label><div class="ta" style="min-height:80px">group the appointments by doctor</div>

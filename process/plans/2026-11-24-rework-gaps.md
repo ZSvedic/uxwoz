@@ -105,7 +105,7 @@ OK all. 2: keep the long sheet. 6: keep "hey Woz" too. 18: call it Reroll.
 **The buttons under a mock**
 
 17. Decided by Zel: the four buttons are on the canvas, under the current mock or box only, and zoom
-    with it. They are narrow, with room between them. With nothing current there are none. The rail beside each mock goes.
+    with it. They are narrow, with room between them, and centred under it. With nothing current there are none. The rail beside each mock goes.
 18. *New* reads as a new project. Suggest 🎲 **Another**.
 19. 🎲 draws the second design when pressed, not ahead: half of today's cost. It is asked to differ
     clearly from the first. Both stay in History.
@@ -117,7 +117,8 @@ OK all. 2: keep the long sheet. 6: keep "hey Woz" too. 18: call it Reroll.
     becomes **Added to the boxes**. *Reached by* lists the links, without levels.
 22. A box's bar keeps the four places: its own action first (📐 ➕ **Add rule**, 🗄️ ➕ **Add table**,
     🕵️ ▶️ **Run fixer**, 🧩 none), then ✏️ **Edit**, ⏪ **History**, ℹ️ **Info**. A tap on a component
-    makes it current, and the bar is that component's.
+    makes it current, and the buttons are that component's: three, centred. A box keeps today's look, a
+    page of a ruled yellow pad with no frame round each entry.
 23. In the dropdown the four boxes are one row at the top, always, each with its full name and, on its
     corner, the count of what is new in it since the last look. The tree
     scrolls under it. Planned mocks stay, grey. Components leave the list.
