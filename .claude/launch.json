@@ -31,7 +31,13 @@
     {
       "name": "rework-mocks",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "3300", "--bind", "127.0.0.1"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "3300",
+        "--bind",
+        "127.0.0.1"
+      ],
       "port": 3300
     },
     {
@@ -42,6 +48,15 @@
         "cd src && PORT=3131 bun run demo"
       ],
       "port": 3131
+    },
+    {
+      "name": "uxwoz-rework",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd src && PORT=3210 UXWOZ_CACHE_FILE=../temp/rework-cache.json bun --env-file=../.env packages/web/src/server.ts"
+      ],
+      "port": 3210
     }
   ]
 }

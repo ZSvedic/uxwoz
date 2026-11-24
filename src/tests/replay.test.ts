@@ -158,7 +158,7 @@ describe('a starter replays its recording', () => {
 
   test('`replayed` is false at a size with no recording, for another mockup, a component, an unknown key or path', async () => {
     const d = desk()
-    expect(d.replayed('/api/screen', { app: APP, device: 'laptop' })).toBe(false)
+    expect(d.replayed('/api/screen', { app: APP, device: 'desktop' })).toBe(false)
     expect(d.replayed('/api/screen', { app: 'A habit tracker' })).toBe(false)
     expect(d.replayed('/api/settle', { key: 'nope' })).toBe(false)
     const home = (await draw(d, null)).entry
@@ -168,7 +168,7 @@ describe('a starter replays its recording', () => {
     expect(d.replayed('/api/undo', { key: home.key })).toBe(false)
     // A laptop mockup of the same starter draws live.
     const laptop = desk()
-    await draw(laptop, null, undefined, 'laptop')
+    await draw(laptop, null, undefined, 'desktop')
     expect(laptop.calls.length).toBe(1)
   })
 })
