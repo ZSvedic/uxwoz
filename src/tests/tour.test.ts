@@ -88,6 +88,11 @@ describe('the tour in the server', () => {
     ]
     expect((await Promise.all(refused)).map((r) => r.status)).toEqual(Array(refused.length).fill(404))
     expect(cache.size).toBe(0)
+    // No project takes the tour's name by Draw again.
+    const mine = cache.addScreen('My shop', null, { html: '<h1>Shop</h1>', model: 'claude-haiku-5.5', servedModel: null, createdAt: '2026-11-24T00:00:00Z', costUsd: 0.001, costEstimated: false, firstChunkMs: 1, totalMs: 2, finishReason: 'stop' })!
+    expect((await post('/api/revise', { key: mine.key, prompt: ' the UXWoz TOUR. ' })).status).toBe(409)
+    expect(cache.get('my shop')).toBeDefined()
+    cache.deleteApp('My shop')
     expect(calls).toEqual([])
   })
 })

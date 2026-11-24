@@ -17,7 +17,7 @@ import sheet from './design/sheet.html'
 import { people, type People } from './people.ts'
 import { PUBLIC_MODEL, clearCookie, gate, publicMode, setCookie, tokenOf } from './public.ts'
 import { hostOf, sharing } from './share.ts'
-import { tourMap } from './tour.ts'
+import { isTour, tourMap } from './tour.ts'
 
 const THEMES_DIR = resolve(import.meta.dir, '../themes')
 /** Theme ids and labels; the first is the default. `clean` is Pico alone, `mockup` is Pico plus mockup.css. */
@@ -227,6 +227,9 @@ export function createServer(opts: ServerOptions = {}) {
           const p = pickers(b)
           if (p instanceof Response) return p
           const click = typeof b?.from === 'string' && b.from ? { from: b.from.slice(0, 3000), label: String(b?.label ?? '').slice(0, 200) } : null
+          // One drawing of a new screen at a time: a second request for it while it is drawn is refused.
+          const { cache, drawingNow } = at(req), canon = canonicalAction(action)
+          if (!cache.find(app, canon) && drawingNow(screenKey(app, canon))) return fail('This mock is being drawn: wait for it.', 409)
           return ndjson(at(req).screenEvents(app, action, p.model, p.device, click, req.signal))
         }),
       },
@@ -254,8 +257,10 @@ export function createServer(opts: ServerOptions = {}) {
           if (isComponent(entry) && !change) return fail('a component changes by Edit')
           if (drawingNow(entry.key)) return fail('This mock is being drawn: wait for it.', 409)
           // Home's new words are the mockup's new name: refused when another mockup has it.
-          const other = prompt && entry.key === normalizePrompt(entry.app) ? cache.find(prompt, null) : null
+          const home = !!prompt && entry.key === normalizePrompt(entry.app)
+          const other = home ? cache.find(prompt, null) : null
           if (other && other.key !== entry.key) return fail('You have another project with these words.', 409)
+          if (home && isTour(prompt)) return fail('That is the tour\'s name: choose other words.', 409)
           return ndjson(reviseEvents(entry, change ? { change } : prompt ? { prompt } : null, p.model, req.signal))
         }),
       },

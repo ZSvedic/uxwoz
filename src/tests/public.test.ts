@@ -70,6 +70,8 @@ describe('public mode', () => {
     expect(await (await ana.get('/api/apps')).json()).toEqual({ apps: [] })
     // Opening a mockup reads its map first: an empty one, and no person is made.
     expect((await ana.get('/api/map?app=x')).status).toBe(200)
+    // The tour opens for a first visitor, and makes no person.
+    expect((await ana.get('/api/tour')).status).toBe(200)
     expect((await ana.post('/api/undo', { key: 'x' })).status).toBe(401)
     expect((await ana.post('/api/warmup', {})).status).toBe(204)
     expect((await ana.post('/api/step', { step: 'arrived' })).status).toBe(204)

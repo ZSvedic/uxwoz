@@ -112,16 +112,20 @@ export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string
   function file(key: string, decision: Record<string, never> | { change: string }, replay?: Recorded): boolean {
     const e = cache.get(key)
     if (!e || isComponent(e)) return false
-    const root = normalizePrompt(e.app), t0 = performance.now(), since = cache.now()
+    const root = normalizePrompt(e.app), t0 = performance.now(), since = cache.now(), filedAt = e.versions.at(-1)?.createdAt
     if (!replay) {
       if (!may()) return false
       goLive(e.app)
     }
+    /** A filing dropped because the project was renamed meanwhile: the screen, still here, is not filed, so its next click settles it again. */
+    const unsettle = () => { if (cache.get(e.key) === e && e.settled === filedAt && !decision.change) { delete e.settled; cache.save() } }
     count(root, 1)
     chain(root, () => fileDecision({ cache, key, decision, ...io, log, recorded: free(replay ?? null) }))
+      .then((run) => { if (!run) unsettle(); return run })
       .then((run) => run && log(`filed ${run.screen} in ${(run.ms / 1000).toFixed(1)} s for $${run.costUsd?.toFixed(4)}: added ${run.added.join(', ') || 'nothing'}, changed ${run.changed.join(', ') || 'nothing'}, refused ${run.refused.length}`))
       .catch((err) => {
         log(`filing failed: ${message(err)}`)
+        if (cache.removedSince(root, since)) unsettle()
         if (cache.get(root) && !cache.removedSince(root, since)) cache.noteFiling(key, { at: new Date().toISOString(), screen: e.name ?? HOME_NAME, ms: Math.round(performance.now() - t0), costUsd: null, added: [], changed: [], refused: [], error: message(err) })
       })
       .finally(() => count(root, -1))
@@ -135,9 +139,12 @@ export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string
   function settle(key: string): { entry: CacheEntry; filing: boolean; visiting: boolean } | null {
     const entry = cache.get(key)
     if (!entry || isComponent(entry) || !entry.versions.length) return null
-    const how = cache.settle(key)
+    const how = cache.wouldSettle(key)
     if (!how) return { entry, filing: false, visiting: false }
     const p = plan(entry, how)
+    // A live filing that may not start leaves the screen unsettled, so a later click files it.
+    if (p === 'live' && !may()) return { entry, filing: false, visiting: false }
+    cache.settle(key)
     const filing = p === 'nothing' ? false : file(key, {}, p === 'live' ? undefined : p.replay)
     const every = how === 'first' && p === 'live' && cache.boxesOf(entry.app).settled! % VISIT_EVERY === 0
     return { entry, filing, visiting: every && !visit(entry.app) }
@@ -162,15 +169,21 @@ export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string
     goLive(app)
     const since = cache.now(), t0 = performance.now(), stop = new AbortController()
     stops.set(root, stop)
-    const p = chain(root, () => visitPaper({ cache, app, ask, ...io, log }, () => cache.removedSince(root, since)))
+    /** The version each screen showed when the visit began: a redraw skips a screen that changed since (an Edit, an Undo). */
+    let showing = new Map<string, string | undefined>()
+    const p = chain(root, () => {
+      showing = new Map(cache.map(app).entries.map((e) => [e.key, e.versions.at(-1)?.createdAt]))
+      return visitPaper({ cache, app, ask, ...io, log }, () => cache.removedSince(root, since))
+    })
       .then(async (r) => {
         if (!r) return log('visit dropped: the mockup changed meanwhile')
         let cost = r.visit.costUsd ?? 0
         await Promise.all(r.redraws.map(async (d) => {
           const e = cache.get(d.key), v = e?.versions.at(-1)
           if (!e || !v) return
-          if (v.createdAt > r.visit.at || drawingNow.has(e.key)) return void (d.change.text = `did not redraw ${e.name}: it changed during the visit`)
-          for await (const ev of reviseEvents(e, { change: d.sentence }, isModelId(v.model) ? v.model : DEFAULT_MODEL, stop.signal, r.group)) {
+          if (v.createdAt > r.visit.at || v.createdAt !== showing.get(e.key) || drawingNow.has(e.key)) return void (d.change.text = `did not redraw ${e.name}: it changed during the visit`)
+          // Marked as being drawn, so a user's Edit meanwhile is refused (409), not buried under the redraw.
+          for await (const ev of drawingKey(e.key, reviseEvents(e, { change: d.sentence }, isModelId(v.model) ? v.model : DEFAULT_MODEL, stop.signal, r.group))) {
             if (ev.type === 'version') Object.assign(d.change, { text: d.change.text.replace('redrawing', 'redrew'), undo: { key: d.key, createdAt: ev.version.createdAt } }), cost += ev.version.costUsd ?? 0
             if (ev.type === 'error') d.change.text = `could not redraw ${e.name}: ${ev.message}`
           }
@@ -218,6 +231,9 @@ export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string
    */
   async function* screenEvents(app: string, asked: string | null, model: ModelId, device: Device, click: { from: string; label: string } | null, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
     let action = canonicalAction(asked)
+    // A click counts only from a screen of this mockup.
+    const fromEntry = click && cache.get(click.from)
+    if (fromEntry && normalizePrompt(fromEntry.app) !== normalizePrompt(app)) click = null
     if (click && cache.get(click.from)?.versions.length) settle(click.from)
     const hit = cache.find(app, action)
     const key = hit?.key ?? screenKey(app, action)

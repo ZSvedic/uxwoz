@@ -245,15 +245,25 @@ export abstract class ScreenCacheBase {
   }
 
   /**
-   * Settle a screen the user clicks on from: the version showing is the one filing reads, unless it was filed
-   * already (or is an Edit, which files itself). 'first' the first time (counted in the boxes' `settled`), 'again'
-   * after a new design, null when there is nothing to file.
+   * What settling a screen would do, changing nothing: 'first' the first time, 'again' when the version showing is
+   * newer than the one filed and no Edit (which files itself), else null (an Undo or Redo to an older one files nothing).
+   */
+  wouldSettle(key: string): 'first' | 'again' | null {
+    const entry = this.entries.get(key), v = entry?.versions.at(-1)
+    if (!entry || !v || isComponent(entry)) return null
+    if (!entry.settled) return 'first'
+    return v.createdAt > entry.settled && !v.feedback ? 'again' : null
+  }
+
+  /**
+   * Settle a screen the user clicks on from: the version showing is the one filing reads (see wouldSettle). 'first'
+   * the first time (counted in the boxes' `settled`), 'again' after a newer design, null when there is nothing to file.
    */
   settle(key: string): 'first' | 'again' | null {
-    const entry = this.entries.get(key), v = entry?.versions.at(-1)
-    if (!entry || !v || isComponent(entry) || entry.settled === v.createdAt || (entry.settled && v.feedback)) return null
-    const first = !entry.settled
-    entry.settled = v.createdAt
+    const how = this.wouldSettle(key), entry = this.entries.get(key)
+    if (!how || !entry) return null
+    const first = how === 'first'
+    entry.settled = entry.versions.at(-1)!.createdAt
     if (first) { const b = this.own(entry.app); b.settled = (b.settled ?? 0) + 1 }
     this.save()
     return first ? 'first' : 'again'

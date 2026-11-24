@@ -167,7 +167,7 @@ export function gate(o: GateOptions) {
   const OWNERS = new Set(['/api/backup', '/api/admin'])
   const REGISTER = new Set(['/api/share', '/api/shares', '/api/unshare', '/api/feedback', '/api/export'])
   /** The paths a request with no person yet may use: signing in needs none (a second browser). */
-  const OPEN = new Set(['/api/config', '/api/me', '/api/step', '/api/signin', '/api/verify', '/api/signout'])
+  const OPEN = new Set(['/api/config', '/api/me', '/api/step', '/api/tour', '/api/signin', '/api/verify', '/api/signout'])
 
   /**
    * A non-owner's /api request (no edit link): onto their own desk, within the role table and the meter.

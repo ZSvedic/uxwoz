@@ -322,6 +322,12 @@ describe('versions, Redo, draws and settling', () => {
     cache.addVersion(home.key, ver('v3', at(3)))
     expect(cache.settle(home.key)).toBe('again')
     expect([cache.get(home.key)!.settled, cache.boxesOf('Cafe').settled]).toEqual([at(3), 1])
+    // Undo and Redo show versions no newer than the one filed: nothing to file.
+    cache.undo(home.key, at(1))
+    expect(cache.wouldSettle(home.key)).toBeNull()
+    expect(cache.settle(home.key)).toBeNull()
+    cache.undo(home.key, at(3))
+    expect(cache.settle(home.key)).toBeNull()
     const cart = cache.addScreen('Cafe', '@cart', ver('c', at(4)), { key: home.key, label: 'Cart' })!
     expect(cache.settle(cart.key)).toBe('first')
     expect(cache.boxesOf('Cafe').settled).toBe(2)
