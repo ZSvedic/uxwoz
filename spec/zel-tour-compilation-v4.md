@@ -3,7 +3,15 @@ Text in [ brackets ] is the button.
 # App layout
 
 Top Navigation bar: 
-[←] [ UXWoz Tour v ] [→]
+[W+] [←] [ UXWoz Tour v ] [→] [100% v]
+Where:
+[W+]    New UXWoz logo, tap on it opens the app menu left panel.
+[←]     Navigate to the previous mock/box (same as browser).
+[ UXWoz Tour v ]    Dropdown containing all screens in a hierarchical tree, then vertical separator, then each of the specification and fixer boxes.
+If the number of screens becomes too large, maybe better way is to have dropdown with a mock tree and on the top of that dropdown a bar with boxes navigation in one row (📐 Rules, 🧩 Components, 🗄️ Data, 🕵️ Fixer)?
+[→]     Navigate to the mext mock/box (same as browser).
+[100% v]    Shows current zoom. 
+Dropdown menu opens zoom options, same as in current uxwoz.
 
 Middle content: 
 * Canvas with stars as background (same as now).
@@ -16,12 +24,19 @@ Below are four mock action buttons:
 [  🎲  ]  [  ✏️  ]  [  ⏪  ]  [  ℹ️  ]
 [ New ]  [ Edit ]  [History]  [ Info ]
 
-# Behavior
+# Mock size
 
-
+When new mockup is created it has the size and aspect ratio compatible with the current device it is run on.
+But, that can present a problem for mockup cacheing, as every user and different devices from the same user will have different viewport.
+One idea Zel as is to have predefined viewport sizes:
+* Small phone, portrait.
+* Large phone, portrait.
+* Tablet/laptop, landscape.
+* Large monitor, landscape.
+The most appropriate viewpoer is selected based on the current device viewport. 
+That way it will be possible to cache tutorial and sample apps with max 8 cached mocks per step (4 predefined viewport sizes x 2 variants).
 
 # UXWoz Tutorial
-
 
 Idea: https://knowyourmeme.com/memes/be-like-bill
 
@@ -111,3 +126,65 @@ Prototyping apps is fun again.
 Bill is smart. Be like Bill.
 
 [ Try another example ]
+
+# Behavior
+
+# Mock action buttons
+
+Main difference is that, in order to be mobile frienldy, edit/info boxes don't show on the right side panel.
+Instead, mock is replaced in place with edit/info box (flip animation), and then flipped back once it is done.
+
+[  🎲  ]
+[ New ]
+First time it is pressed, it generates another variants of the mock, and replaces the current mock.
+The second time it is pressed, it replaces mock with edit mock prompt screen:
+```md
+Both varaints were rejected, please edit the current screen prompt:
+{ current screen prompt input box }
+
+[ Regenerate]
+(Suports voice input by holding 🎙️ button.)
+```
+I am not sure about the wording, but that is the gist. 
+After new prompt is entered, 2 new variants can be generated, then edit prompt again.
+
+[  ✏️  ]
+[ Edit ]
+Edit box replaces the mock, edit layout the same as in current uxwoz (with past changes). 
+After hitting [ Make the change ], edit box is replaced with edited mock.
+Suports voice input by holding 🎙️ button. 
+
+[  ⏪  ]
+[History]
+History box replaces the mock, it has undo/redo at the top, and condensed list of previous mocks below.
+I am not sure if History should be merged with Edit, maybe that is more intuitive?
+
+[  ℹ️  ]
+[ Info ]
+Shows info for the screen, but less info than now:
+* Idea: {A live demo: a mini mockup you tap to see the next screen appear, with a stepped timeline on the side}
+* Link ID: {@lesson-click}
+* Reached by: {
+  - Click anything to draw the next screen 
+  - Tap a button or link and the app draws in L1 UX Woz }
+* Model: {Claude Haiku 5.5} in {4.3 s} for {$0.0010}
+* Prompt: {The lesson click screen, opened by "3. Click anything to draw the next screen Tap a button or link and the app draws"}
+* Spec edits: {none}
+The only problem is, it is not obvious what is the difference between an Idea and a Prompt? 
+That should be clear from the info panel.
+
+[  ❌  ]
+[Delete]
+I am not sure if delete should be a separate action or a part of the Edit box?
+
+# Box action buttons
+Also put them below a box. 
+Of course, actions should be similar as box actions in the current uxwoz, and different than mock action buttons.
+For example, Rules has an action to add items, Fixer has an action to run fixer.
+Suggest icons and names for boxes:
+📐 Rules, 🧩 Components, 🗄️ Data, 🕵️ Fixer
+
+# Behavior on larger screens
+Above minimal design works on mobile devices. 
+On larger screens, navigation bar becomes larger and can have additional icons like +, -, ⛶, and 🎙️.
+Also, navigation bar can have quick links to boxes, as now (📐 Rules, 🧩 Components, 🗄️ Data, 🕵️ Fixer). 
