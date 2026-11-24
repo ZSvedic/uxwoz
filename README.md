@@ -3,7 +3,7 @@
 *UXWoz* is short for *UX Wizard of Oz*, after the
 [prototyping technique](https://en.wikipedia.org/wiki/Wizard_of_Oz_experiment) where a hidden person plays
 the system. Here a model plays it: type a product idea, click around, and each screen you reach is drawn
-on demand, two designs at a time, and kept. The result is a clickable mockup you can share for comments
+on demand and kept; a roll of the dice draws another design. The result is a clickable mockup you can share for comments
 or export for a coding agent.
 
 ## Run it
@@ -16,7 +16,7 @@ You need [bun](https://bun.sh). Every `bun` command runs from `src/`.
 | Make your own mockups | `bun run dev`, then http://127.0.0.1:3000 | a root `.env` with `OPENROUTER_API_KEY` and `OPENAI_API_KEY` |
 | Test and typecheck | `bun run check` | nothing: tests replay `cassettes/` offline |
 | Re-record after a prompt change | `bun run test:record` | the keys, a few cents |
-| Re-record the starters after a prompt change | `bun run starters:record` (or `… plants bill` for some) | the keys, about 2 cents a starter |
+| Re-record the examples after a prompt change | `bun run starters:record` (or `… plants --device laptop` for some) | the keys, about 20 cents for all 28 files |
 
 Your mockups are saved in `temp/screen-cache.json`. `PORT=3001` picks another port. Restart `bun run dev`
 after adding a frontend file: live reload cannot add one.

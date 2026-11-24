@@ -5,9 +5,8 @@ what is still open, which tests go, change and come, and the steps by part with 
 The spec on this branch (`rework-spec`) already describes the new app; no code and no prompt byte
 has changed.
 
-Status: Zel approved the spec and this plan on 2026-11-24, with the open points as written. The build
-is under way on `rework-spec`. `onboarding.test.ts` is red until wave 1 lands, which deletes it with the
-hints it checks.
+Status: built on `rework-spec` on 2026-11-24, not pushed. What happened, with the measured sizes, is in
+[the journal](../journal/2026-11-24-rework.md). The estimates below are the plan's, kept as they were.
 
 ## In one picture
 

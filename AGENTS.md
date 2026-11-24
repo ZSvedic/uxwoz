@@ -116,7 +116,7 @@ src/packages/web/src/
   net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill, the brief hint,
                  the note while a design is drawn (`note`), and the hint that stays (after a live design, until the next click or key)
   account-ui.ts  browser: the public's account line in the menu (`lineOf`) and the account card (sign in by code, Ask for
-                 more, Delete my account), a refused live design (402, or a refused side of an A OR B) or a thing
+                 more, Delete my account), a refused live design (402, or a design refused while it streams) or a thing
                  that needs an account; what each shows from
                  /api/me as functions with no DOM (tested); nothing of it in private mode; the live hint's text and
                  its record in this browser (`liveHint`)
@@ -204,9 +204,9 @@ edit links. Start it in the background (your shell tool's background option, or 
 it with `kill $(lsof -ti tcp:3131)`. Open the printed `127.0.0.1` URLs in a browser tab of your own and
 pass its tabId on every call: other agents share the pane. The app opens on Recent: click the mockup.
 A field's blur does not fire from script in a hidden pane, so click for real. It reads no `.env` and clears the model keys, so a model call
-is impossible: a new screen, Edit, Regenerate, filing after a pick and a fixer visit fail by design.
+is impossible: a new mock, Edit, Another, Draw again, filing after a click on and a fixer visit fail by design.
 You can still exercise the tree, the boxes (add, change, delete, Undo), Undo on Habit detail, the
-fixer's Undo, picking the open A OR B on History, Delete, Share, Comments, Export, and the player:
+fixer's Undo, History's Undo and Redo, the cards (Edit, History, Info), the tour at `/tour`, Delete, Share, Comments, Export, and the player:
 walking the screens, thumbs, a new comment, Done. The pinned comment on Habit detail shows in the
 player only for its visitor (the demo prints how). Frontend edits show on reload. The mockup is
 `src/tests/fixtures/demo-cache.json`; to change it, edit `src/scripts/make-demo-cache.ts` and run it.
@@ -235,16 +235,16 @@ same time only in different parts.
 |---|---|---|---|
 | Engine | core: `models`, `prompt`, `providers`, `generate`, `starters`, `recordings` | `generate-screen`, `cut-off`, `recordings` | `prompt-screen.md`, `ui-generation.md` |
 | Cache | core: `cache`, `cache-boxes`, `keys`, `tree` | `cache`, `boxes`, `tree`, `demo-cache` | contract: Types |
-| Server | web: `server`, `drawing`, `desks`, `public`, `export`, `people`, `mail`, `admin`, `account`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks`, `public`, `people`, `mail`, `admin`, `account`, `replay`, `journey` | contract: HTTP API, `public.md` |
-| Canvas | web: `app`, `state`, `screens`, `nav`, `canvas`, `toolbar`, `net`, `onboarding`, `account-ui`; core: `frame` | `ropes`, `frame`, `onboarding`, `account-ui` | behavior: Toolbar to Rail, Navigation |
-| Boxes and drawer | web: `boxes`, `drawer`, `voice`, `voice-ui` | `boxes`, `voice` | behavior: Drawer, Voice, Boxes |
+| Server | web: `server`, `drawing`, `desks`, `public`, `export`, `people`, `mail`, `admin`, `account`, `tour`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks`, `public`, `people`, `mail`, `admin`, `account`, `replay`, `journey` | contract: HTTP API, `public.md` |
+| Canvas | web: `app`, `state`, `screens`, `nav`, `address`, `canvas`, `bar`, `menu`, `net`, `account-ui`; core: `frame` | `ropes`, `frame`, `bar`, `address`, `account-ui` | behavior: Top bar to A mock, Navigation |
+| Boxes and cards | web: `boxes`, `cards`, `flip`, `voice` | `boxes`, `cards`, `voice` | behavior: The buttons under a mock, Voice, Boxes |
 | Sharing | web: `share`, `sharing`, `comments`, `pins`, `player.*` | `share`, `comments`, `pins` | behavior: Sharing |
 | Design | web: `design/` | `design`, `fx` | **Design** above |
 
 Facts that cost builders a search:
 
 - On a canvas card `note` is the status line (*Making the change…*), and "notes" is the fixer's box.
-- A card's name is `labelOf` in `screens.ts`; Nav, the drawer and Delete use it too.
+- A card's name is `labelOf` in `screens.ts`; the bar, the cards and Delete use it too.
 - The player's map (`playerMap` in `share.ts`) lists drawn screens only, each with its `parent`, in no
   promised order. Share tokens are hex.
 - `guard` in `share.ts` wraps every `/api` route: a route that takes `key` or `app` is already limited
