@@ -29,6 +29,12 @@
       "port": 3200
     },
     {
+      "name": "rework-mocks",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "3300", "--bind", "127.0.0.1"],
+      "port": 3300
+    },
+    {
       "name": "uxwoz-demo",
       "runtimeExecutable": "bash",
       "runtimeArgs": [
