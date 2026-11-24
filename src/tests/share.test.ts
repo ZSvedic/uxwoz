@@ -145,7 +145,7 @@ describe('sharing', () => {
     start(cache)
     const home = await fetch(url('/'))
     expect(home.status).toBe(403)
-    expect(await home.text()).toBe('This UX Woz is private.')
+    expect(await home.text()).toBe('This UXWoz is private.')
     expect((await fetch(url('/api/apps'))).status).toBe(401)
     expect((await post('/api/share', { app: APP, role: 'view' })).status).toBe(401)
     const secure = await fetch(url('/?owner=sesame'), { redirect: 'manual', headers: { 'x-forwarded-proto': 'https' } })

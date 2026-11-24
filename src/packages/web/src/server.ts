@@ -1,4 +1,4 @@
-// The UX Woz web server: serves the app, streams screens from the models, keeps the screen cache.
+// The UXWoz web server: serves the app, streams screens from the models, keeps the screen cache.
 // API keys stay here; the browser only ever sees generated HTML.
 
 import { dirname, join, resolve } from 'node:path'
@@ -335,5 +335,5 @@ if (import.meta.main) {
   const cache = new ScreenCache(file)
   const open = process.env.UXWOZ_PUBLIC === '1'
   const server = createServer({ cache, usersDir: process.env.UXWOZ_USERS_DIR ?? join(dirname(file), 'users'), ...(open && { people: people(process.env.UXWOZ_DB ?? join(dirname(file), 'uxwoz.db')) }) })
-  console.log(`UX Woz on ${server.url} (cache: ${file}, ${cache.size} screens${open ? ', open to the public' : ''})`)
+  console.log(`UXWoz on ${server.url} (cache: ${file}, ${cache.size} screens${open ? ', open to the public' : ''})`)
 }

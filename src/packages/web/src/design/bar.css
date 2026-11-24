@@ -1,11 +1,9 @@
 /* The bar's strip along the bottom of the window, the wooden bar in its middle. No transform here or on the bar: it
-   would trap the menus, which are fixed on a phone. The logo is the bar's first item: the hat and the name on the wood. */
+   would trap the menus, which are fixed on a phone. The logo is the bar's first item: the wordmark on the wood, the mark alone when tight. */
 .toolbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--bar-h); padding: 0 16px;
   display: grid; grid-template-columns: 1fr; align-items: center; font-size: 15px; font-weight: 500; color: var(--bar-text); }
-.logo { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 2px; white-space: nowrap; }
-.logo img { display: block; width: 36px; height: 36px; }
-.logo b { font-size: 19px; font-weight: 700; }
-.logo b span { color: var(--bar-wordmark); }
+.logo { flex: none; display: flex; align-items: center; padding: 0 8px 0 2px; --sparkle: var(--bar-sparkle); }
+.logo .mark, .tight .logo .wm { display: none; } .tight .logo .mark { display: block; }
 /* The wooden tray: a vertical gradient, a lit top edge and a shaded bottom one. It never scrolls sideways.
    Its three groups are one row of items (two on a phone), so the names can give way in a set order. */
 .bar { justify-self: center; min-width: 0; max-width: 100%; display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
@@ -44,7 +42,7 @@
 /* Short of room: closer items first; then, when toolbar.ts finds the row full (.tight), the wordmark, the zoom icons
    and the lines between the boxes go; then the boxes fold (below). */
 @media (max-width: 1400px) { .bar, .pop, .bar .box-nav { gap: 3px; } .bar button { padding: 6px 7px; } .sep { margin: 0 1px; } }
-.tight .bar .wide-only, .tight .logo b, .tight .box-nav .sep { display: none; }
+.tight .bar .wide-only, .tight .box-nav .sep { display: none; }
 .toolbar.tight { padding: 0 8px; } .tight .logo { padding: 0; } .tight .bar .box-nav button { padding: 6px 4px; }
 
 /* Menus open upward from their button and are never taller than the window above the bar; they scroll inside. */
@@ -89,14 +87,14 @@
 .fold .bar .box-nav button { justify-content: space-between; padding: 5px 8px; border-radius: 6px; }
 .fold .bar .box-nav button:hover:not(:disabled) { background: var(--surface-2); }
 
-/* A phone: two fixed rows, no lines: the hat, +, the mockup and Nav (at the right end) above; Boxes (its place kept
+/* A phone: two fixed rows, no lines: the logo, +, the mockup and Nav (at the right end) above; Boxes (its place kept
    before a mockup), the theme taking what is left, zoom, the speaker, the microphone and the account below. Every
    button is at least 36 px high; menus span the window. */
 @media (max-width: 720px) {
   .toolbar { grid-template-columns: 100%; }
   .bar .sep { display: none; }
   .bar { justify-self: stretch; justify-content: flex-start; row-gap: 2px; gap: 2px; padding: 4px; }
-  .logo img { width: 30px; height: 30px; }
+  .logo .mark { width: 30px; height: 30px; }
   .tb-left::after { content: ''; flex-basis: 100%; }
   .nav-pop { margin-left: auto; }
   #projectButton, #navButton { max-width: none; }

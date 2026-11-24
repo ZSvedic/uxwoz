@@ -174,7 +174,7 @@ test('/privacy names the operator and the contact from the env, escaped, with th
   const res = routes['/privacy']()
   expect(res.headers.get('content-type')).toContain('text/html')
   const html = await res.text()
-  expect(html).toContain('UX Woz is run by Ana &#60;Studio&#62;.')
+  expect(html).toContain('UXWoz is run by Ana &#60;Studio&#62;.')
   // The address is not in the HTML as written: backwards in two pieces, and as words for a reader with no script.
   expect(html).not.toContain('privacy@example.com')
   expect(html).not.toContain('mailto:')

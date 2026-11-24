@@ -67,7 +67,7 @@ async function screen(b: Browser, app: string) {
   return { status: 200, key: evs[0].key as string, body: evs.at(-1) }
 }
 const personOf = (b: Browser) => store.byToken(b.cookie.split('=')[1]!)!
-const codeOf = (email: string) => mails.findLast((m) => m.to[0] === email && m.subject.startsWith('Your UX Woz code'))!.subject.slice(-6)
+const codeOf = (email: string) => mails.findLast((m) => m.to[0] === email && m.subject.startsWith('Your UXWoz code'))!.subject.slice(-6)
 async function signUp(b: Browser, email: string) {
   expect((await b.post('/api/signin', { email })).status).toBe(204)
   const r = await b.post('/api/verify', { email, code: codeOf(email) })
@@ -103,7 +103,7 @@ describe('a person\'s journey', () => {
     const me = await signUp(ana, 'ana@example.com')
     expect(me).toMatchObject({ role: 'user', email: 'ana@example.com', left: 0.13, allowance: 0.25, screensLeft: 32 })
     expect(me).not.toHaveProperty('more')
-    expect(mails.filter((m) => m.to[0] === 'ana@example.com').map((m) => m.subject)).toEqual([expect.stringMatching(/^Your UX Woz code/)])
+    expect(mails.filter((m) => m.to[0] === 'ana@example.com').map((m) => m.subject)).toEqual([expect.stringMatching(/^Your UXWoz code/)])
     expect((await screen(ana, 'Fish tanks')).status).toBe(200)
 
     // Ask for more; the owner gets it, approves it, and the answer is emailed.

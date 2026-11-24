@@ -50,7 +50,7 @@ const owner = {
   get: (p: string) => fetch(url(p), { headers: OWNER }),
   post: (p: string, body: object) => fetch(url(p), { method: 'POST', headers: { ...OWNER, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
 }
-const codeIn = (list: { to: string[]; subject: string }[], email: string) => list.findLast((m) => m.to[0] === email && m.subject.startsWith('Your UX Woz code'))?.subject.slice(-6)
+const codeIn = (list: { to: string[]; subject: string }[], email: string) => list.findLast((m) => m.to[0] === email && m.subject.startsWith('Your UXWoz code'))?.subject.slice(-6)
 const wrongFor = (code: string) => String((Number(code) + 1) % 1_000_000).padStart(6, '0')
 const minute = () => { clock.t += 60_000 }
 async function signUp(b: ReturnType<typeof browser>, email: string) {
