@@ -4,84 +4,76 @@
 <title>UXWoz logo versions</title>
 <style>
 @font-face { font-family: Fredoka; src: url("../../../src/packages/web/src/design/brand/fredoka.woff2") format("woff2"); font-weight: 500 700; }
-:root { --sky: #0b1030; --indigo: #1a1f4a; --parchment: #f6ecd2; --wood: #7d4e30; --cream: #fbf4e2; --dark: #2a1f3d; --gold: #f5c542; --amber: #e0a100; }
+:root { --sky: #0b1030; --parchment: #f6ecd2; --wood: #7d4e30; --cream: #fbf4e2; --dark: #2a1f3d; --gold: #f5c542; --amber: #e0a100; }
 body { margin: 0; padding: 20px 16px 60px; font: 15px/1.45 system-ui, sans-serif; background: #fff; color: #222; max-width: 980px; margin: auto; }
 h1 { font: 700 24px Fredoka, system-ui; margin: 0 0 4px; } h2 { font: 700 18px Fredoka, system-ui; margin: 34px 0 6px; }
 p { margin: 4px 0 12px; color: #444; } small { color: #666; }
 .row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
-.cell { text-align: center; } .cell small { display: block; margin-top: 6px; }
+.cell { text-align: center; margin-bottom: 10px; } .cell small { display: block; margin-top: 6px; }
 .tile { display: grid; place-items: center; border-radius: 12px; padding: 14px 18px; }
-.sky { background: linear-gradient(#1b2160, var(--sky)); color: var(--cream); --spark: var(--gold); --cut: #141a4c; }
-.wood { background: linear-gradient(#8f5c3a, var(--wood)); color: var(--cream); --spark: var(--gold); --cut: #86553a; }
-.parch { background: var(--parchment); color: var(--dark); --spark: var(--amber); --cut: var(--parchment); border: 1px solid #c9ad72; }
-.bw { background: #fff; color: #111; --spark: #111; --cut: #fff; border: 1px solid #bbb; }
+.sky { background: linear-gradient(#1b2160, var(--sky)); color: var(--cream); --spark: var(--gold); }
+.wood { background: linear-gradient(#8f5c3a, var(--wood)); color: var(--cream); --spark: var(--gold); }
+.parch { background: var(--parchment); color: var(--dark); --spark: var(--amber); border: 1px solid #c9ad72; }
+.bw { background: #fff; color: #111; --spark: #111; border: 1px solid #bbb; }
 svg { display: block; overflow: visible; } svg text { font-family: Fredoka; font-weight: 700; fill: currentColor; }
 .ink { stroke: currentColor; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.spark { fill: var(--spark); } .cutout { stroke: var(--cut); stroke-width: 2.5; paint-order: stroke; vector-effect: non-scaling-stroke; }
-.fav { border-radius: 22%; background: linear-gradient(#232a78, var(--sky)); color: var(--cream); --spark: var(--gold); --cut: #1a2060; }
+.spark { fill: var(--spark); }
+.fav { border-radius: 22%; background: linear-gradient(#232a78, var(--sky)); color: var(--cream); --spark: var(--gold); display: grid; place-items: center; }
 .bar { display: flex; align-items: center; gap: 8px; border-radius: 12px; padding: 6px 10px; width: 340px; box-sizing: border-box; font: 600 15px Fredoka; }
 .bar .b { background: #0002; border-radius: 8px; padding: 6px 9px; white-space: nowrap; } .bar .grow { flex: 1; overflow: hidden; text-overflow: ellipsis; }
-.pick { border: 2px solid #2f5bff; border-radius: 14px; padding: 10px; }
 </style>
 
 <svg width="0" height="0" style="position:absolute"><defs>
   <!-- A four-point sparkle, 1 unit to each tip. -->
   <path id="s" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/>
-  <!-- The drawn W: one rounded line. -->
-  <polyline id="w" points="6,17 13,39 21,23 29,39 36,17"/>
 </defs></svg>
 
-<h1>UXWoz logo: versions to choose from</h1>
-<p>One ink colour and one yellow sparkle. Each mark is shown on the night sky, the wood bar, parchment, and in black and white.
-Tell me a letter for the mark (A, B or C) and a number for the wordmark (1, 2 or 3).</p>
+<h1>UXWoz logo, round 2: B and the changed C</h1>
+<p>Each block is one version: its mark, its wordmark, its favicons, and the phone's top bar. Tell me a name (B, B2, C2 or C3).</p>
+<ul>
+  <li><b>B</b>: as in round 1, to compare.</li>
+  <li><b>B2</b>: B with a smaller sparkle and a W that leans less.</li>
+  <li><b>C2</b>: C with a smaller sparkle and a W that leans less. The sparkle sits above the tip of the short last stroke.</li>
+  <li><b>C3</b>: C2 with a still smaller sparkle, for comparison.</li>
+</ul>
+<p>In every wordmark the sparkle sits right at the W, above the start of the small o, so the word is no wider than its letters.
+The last block is round 1's wordmark 2 (Fredoka's own W) with the sparkle moved to the W.</p>
 
-<h2>The mark, W+</h2>
-<p><b>A</b>: Fredoka's own W, the sparkle as a superscript beside it. <b>B</b>: a W drawn as one rounded line, the sparkle beside it.
-<b>C</b>: the same W with a shorter last stroke and the sparkle above its tip, like a wand. C is the narrowest, so it is the largest in a favicon.</p>
-
-<div class="row" id="marks"></div>
-
-<h2>The wordmark, UXW+oz</h2>
-<p><b>1</b>: the sparkle sits between W and o and takes its own room. <b>2</b>: the sparkle sits in the free room above the small o, so the word is
-no wider than its letters. <b>3</b>: as 2, with the drawn W of B and C.</p>
-<div class="row" id="words"></div>
-
-<h2>In a tab and on a home screen</h2>
-<p>The mark on a night-sky tile at 16, 32, 64 and 180 px, for A, B and C in turn. Look at the 16 px ones: that is a browser tab.</p>
-<div class="row" id="favs"></div>
-
-<h2>In the phone's top bar (340 px wide)</h2>
-<p>The bar from the tour's layout: the mark opens the menu, then ←, the dropdown, →, the zoom.</p>
-<div class="row" id="bars"></div>
+<div id="out"></div>
 
 <script>
-const S = (x, y, r, cut) => `<use href="#s" class="spark${cut ? ' cutout' : ''}" transform="translate(${x} ${y}) scale(${r})"/>`
-const marks = {
-  A: `<text x="0" y="40" font-size="38">W</text>${S(41.5, 11, 8)}`,
-  B: `<use href="#w" class="ink" stroke-width="6.5" transform="translate(-2 0)"/>${S(41.5, 10, 8)}`,
-  C: `<polyline class="ink" stroke-width="7" points="7,19 14,41 22,25 30,41 34.5,27"/>${S(37.5, 12, 11)}`,
+const S = (x, y, r) => `<use href="#s" class="spark" transform="translate(${x} ${y}) scale(${r})"/>`
+const poly = (pts, sw, tf = '') => `<polyline class="ink" stroke-width="${sw}" points="${pts.map(p => p.join(',')).join(' ')}" transform="${tf}"/>`
+// Each version: the W's five points, its line width, the mark's shift, and the sparkle (x, y, size) in the W's own units.
+const V = {
+  B:  { w: [[6, 17], [13, 39], [21, 23], [29, 39], [36, 17]], sw: 6.5, dx: -2, sp: [43.5, 10, 8], beside: true },
+  B2: { w: [[8.5, 17], [13.5, 39], [21, 24], [28.5, 39], [33.5, 17]], sw: 6.5, dx: 0, sp: [40.5, 10.5, 6.6], beside: true },
+  C2: { w: [[8.5, 19], [13.5, 41], [21, 26], [28.5, 41], [31.7, 27]], sw: 7, dx: 3, sp: [34.6, 14.2, 8.6] },
+  C3: { w: [[8.5, 19], [13.5, 41], [21, 26], [28.5, 41], [31.7, 27]], sw: 7, dx: 3, sp: [34.4, 15.6, 7.2] },
 }
-const mark = (k, px) => `<svg width="${px}" height="${px}" viewBox="0 0 50 48">${marks[k]}</svg>`
+const mark = (k, px) => { const v = V[k]; return `<svg width="${px}" height="${px}" viewBox="0 0 50 48"><g transform="translate(${v.dx} 0)">${poly(v.w, v.sw)}${S(...v.sp)}</g></svg>` }
+
 const meas = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); document.body.append(meas)
 const wd = (t) => { meas.innerHTML = `<text font-size="38">${t}</text>`; return meas.firstChild.getComputedTextLength() }
-let words = {}
-function makeWords() {
-  const ux = wd('UX'), uxw = wd('UXW'), o = wd('o'), all = wd('UXWoz'), oz = wd('oz'), r = 8
-  words = {
-    1: `<svg height="44" viewBox="0 0 ${uxw + 2 * r + 3 + oz} 48"><text x="0" y="40" font-size="38">UXW</text>${S(uxw + r + 1, 11, r)}<text x="${uxw + 2 * r + 3}" y="40" font-size="38">oz</text></svg>`,
-    2: `<svg height="44" viewBox="0 0 ${all} 48"><text x="0" y="40" font-size="38">UXWoz</text>${S(uxw + o / 2 + 1, 8, r)}</svg>`,
-    3: `<svg height="44" viewBox="0 0 ${ux + 42 + oz} 48"><text x="0" y="40" font-size="38">UX</text><use href="#w" class="ink" stroke-width="6" transform="translate(${ux - 3} -5.5) scale(1.13)"/><text x="${ux + 42}" y="40" font-size="38">oz</text>${S(ux + 42 + o / 2 + 1, 8, r)}</svg>`,
-  }
+// The wordmark: UX and oz in Fredoka, the drawn W between them at the capitals' height.
+function word(k) {
+  const v = V[k], ux = wd('UX'), oz = wd('oz'), K = 26.6 / (v.w[1][1] - v.w[0][1] + v.sw), h = v.sw * K / 2
+  const ty = 40 - (v.w[1][1] + v.sw / 2) * K, tx = ux + 1.5 + h - K * v.w[0][0], right = tx + K * v.w[4][0] + h
+  const sx = tx + K * v.sp[0], sy = ty + K * v.sp[1], sr = K * v.sp[2]
+  const ozx = v.beside ? right + 1.5 : right + .5
+  return `<svg height="44" viewBox="0 0 ${ozx + oz} 48"><text x="0" y="40" font-size="38">UX</text>${poly(v.w, v.sw, `translate(${tx} ${ty}) scale(${K})`)}${S(sx, sy, sr)}<text x="${ozx}" y="40" font-size="38">oz</text></svg>`
 }
+const fredoka = () => { const uxw = wd('UXW'), all = wd('UXWoz'); return `<svg height="44" viewBox="0 0 ${all} 48"><text x="0" y="40" font-size="38">UXWoz</text>${S(uxw + 3.5, 9.5, 6.2)}</svg>` }
 const faces = ['sky', 'wood', 'parch', 'bw']
-document.fonts.load('700 38px Fredoka').then(() => { makeWords(); meas.remove()
-document.getElementById('marks').innerHTML = Object.keys(marks).map(k =>
-  `<div class="cell"><div class="row">${faces.map(f => `<div class="tile ${f}">${mark(k, 64)}</div>`).join('')}</div><small><b>${k}</b></small></div>`).join('')
-document.getElementById('words').innerHTML = Object.keys(words).map(k =>
-  `<div class="cell"><div class="row">${faces.map(f => `<div class="tile ${f}">${words[k]}</div>`).join('')}</div><small><b>${k}</b></small></div>`).join('')
-document.getElementById('favs').innerHTML = Object.keys(marks).map(k =>
-  `<div class="cell"><div class="row">${[16, 32, 64, 180].map(px => `<div class="fav" style="width:${px}px;height:${px}px;display:grid;place-items:center">${mark(k, px * .9)}</div>`).join('')}</div><small><b>${k}</b></small></div>`).join('')
-document.getElementById('bars').innerHTML = Object.keys(marks).map(k =>
-  `<div class="cell"><div class="bar wood"><span class="b" style="padding:3px 6px">${mark(k, 30)}</span><span class="b">←</span><span class="b grow">This is Bill ▾</span><span class="b">→</span><span class="b">92% ▾</span></div><small><b>${k}</b></small></div>`).join('')
+const tiles = (svg) => `<div class="row">${faces.map(f => `<div class="tile ${f}">${svg}</div>`).join('')}</div>`
+
+document.fonts.load('700 38px Fredoka').then(() => {
+  document.getElementById('out').innerHTML = Object.keys(V).map(k => `<h2>${k}</h2>
+    <div class="cell">${tiles(mark(k, 64))}</div>
+    <div class="cell">${tiles(word(k))}</div>
+    <div class="row">${[16, 32, 64, 128].map(px => `<div class="fav" style="width:${px}px;height:${px}px">${mark(k, px * .9)}</div>`).join('')}
+      <div class="bar wood"><span class="b" style="padding:3px 6px">${mark(k, 30)}</span><span class="b">←</span><span class="b grow">This is Bill ▾</span><span class="b">→</span><span class="b">92% ▾</span></div></div>`).join('')
+    + `<h2>Round 1's wordmark 2, the sparkle moved to the W</h2><div class="cell">${tiles(fredoka())}</div>`
+  meas.remove()
 })
 </script>
