@@ -88,9 +88,9 @@ export function makeDemoCache(file: string): ScreenCache {
   draw('@reminders: when to remind me of this habit', REMINDERS, { key: detail.key, label: 'Reminders' })
   // A second version, so Undo on Habit detail has one to take back.
   cache.addVersion(detail.key, ver(DETAIL_2, { feedback: 'Make the streak the biggest thing on the screen' }))
-  // The open A OR B: both sides done, none picked.
-  cache.propose(app, '@history: every past week, newest first', 0, ver(HISTORY_A), { key: stats.key, label: 'History' })
-  cache.propose(app, '@history: every past week, newest first', 1, ver(HISTORY_B))
+  // Two designs of History from one prompt (Another): the second shows, the first is in its History.
+  const history = draw('@history: every past week, newest first', HISTORY_A, { key: stats.key, label: 'History' })
+  cache.addVersion(history.key, ver(HISTORY_B))
 
   cache.addComponent(app, 'tab-bar', 'bottom of every main screen', ver(TAB_BAR, { name: undefined, idea: undefined }), 'filing', { key: home.key, label: 'Today' })
   cache.setBox(app, 'add', 'rules', { id: 'one-tap-check', text: 'Checking off a habit takes one tap from Today.' }, 'filing')

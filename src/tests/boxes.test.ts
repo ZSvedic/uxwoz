@@ -138,14 +138,14 @@ describe('the boxes in the cache', () => {
     expect(cache.freeId('Snore', 'rules', 'Calm')).toBe('calm-2')
   })
 
-  test('the boxes survive a restart in a format 5 file, and go with their mockup', () => {
+  test('the boxes survive a restart in a format 6 file, and go with their mockup', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
     const cache = new ScreenCache(file)
     cache.pick(cache.propose('Snore', null, 0, ver('<h1>x</h1>'))!.key, 0)
     cache.setBox('Snore', 'add', 'data', { id: 'nights', columns: ['night'], rows: [['Mon']] }, 'filing')
     cache.markSeen('Snore', 'data')
     const again = new ScreenCache(file)
-    expect(JSON.parse(readFileSync(file, 'utf8')).version).toBe(5)
+    expect(JSON.parse(readFileSync(file, 'utf8')).version).toBe(6)
     expect(again.boxesOf('snore').data).toMatchObject([{ id: 'nights', rows: [['Mon']], by: 'filing', seen: true }])
     again.deleteApp('Snore')
     expect(new ScreenCache(file).boxesOf('Snore').data).toEqual([])

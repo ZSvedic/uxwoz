@@ -47,12 +47,14 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
   fixer.ts       the fixer's visit: the paper and the screens new since the last one, parse its lines, apply them
                  with refusals and an Undo per change; the redraws are left to the server
   keys.ts        cache keys: a link by @name, normalize a prompt, "home" means the first screen, `back`; box limits and IDs,
-                 states kept, visits kept and how often; a Data table as markdown
+                 states and versions kept, visits kept and how often; a Data table as markdown
   tree.ts        the tree, worked out: links in each screen (components pasted), @names, planned screens,
                  shortest-path levels, the titles and lines of the paper
   cache.ts       screen cache, the screens (ScreenCacheBase): entry and version types, find by name, proposals
-                 (the open A OR B) and pick, versions and undo, parents, delete with pruning, apps, sharing data,
-                 takeIn (another cache's mockups, at a sign-in), the JSON file (load, format, save, detach),
+                 (the open A OR B, until the server stops using them) and pick, versions with Undo and Redo (`redo`,
+                 10 kept), draws, settle, rename (every key of a mockup), parents, delete with pruning, apps, sharing
+                 data, takeIn (another cache's mockups, at a sign-in), the JSON file (version 6; a version 5 A OR B
+                 loads as two versions; load, format, save, detach),
                  the address IDs (a mockup's `mid`, an entry's `sid`, stamped at load and save)
   cache-boxes.ts screen cache, the boxes (ScreenCache extends the base): components as entries, rules, tables,
                  limits, IDs, a box's states, Past and Undo, the fixer's notes and their Undo, markSeen, the paper

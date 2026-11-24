@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test'
+import { VERSIONS } from '@uxwoz/core'
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { AI_LINE, ALTERNATIVE_REQUEST, ScreenCache, drawRequest, editRequest, isBack, nameFrom, normalizePrompt, paperText, screenIdea, screenKey, screenTree, type Paper, type Version } from '@uxwoz/core'
+import { AI_LINE, ALTERNATIVE_REQUEST, ScreenCache, drawRequest, editRequest, isBack, nameFrom, normalizePrompt, paperText, screenIdea, screenKey, screenTree, type CacheEntry, type Paper, type Version } from '@uxwoz/core'
 
 const ver = (html: string, createdAt = '2026-10-23T00:00:00Z'): Version => ({
   html, model: 'claude-haiku-5.5', servedModel: null, createdAt,
@@ -44,12 +45,13 @@ describe('screen cache', () => {
     expect(cache.pick(e.key, 0)).toBeDefined()
   })
 
-  test('versions stack up, and Undo drops the newest but never the last', () => {
+  test('versions stack up; Undo shows the one before and keeps the newer for Redo, never past the first', () => {
     const cache = new ScreenCache()
     const { key } = screen(cache, 'Cafe', null, '<h1>v1</h1>')
     cache.addVersion(key, { ...ver('<h1>v2</h1>'), feedback: 'Bigger title' })
     expect(cache.get(key)!.versions.map((v) => v.html)).toEqual(['<h1>v1</h1>', '<h1>v2</h1>'])
     expect(cache.undo(key)!.versions.map((v) => v.html)).toEqual(['<h1>v1</h1>'])
+    expect(cache.get(key)!.redo!.map((v) => v.html)).toEqual(['<h1>v2</h1>'])
     expect(cache.undo(key)).toBeUndefined()
     // No versions while the A OR B is open.
     const open = cache.propose('Cafe', '@cart', 0, ver('<h1>c</h1>'), { key, label: 'Cart' })!
@@ -261,6 +263,137 @@ describe('screen cache', () => {
     const again = new ScreenCache(file)
     expect(again.get(menu.key)?.versions[0]?.html).toBe('<h1>Menu</h1>')
     expect(again.get(screenKey('coffee app', '@cart'))?.proposals).toEqual([null, ver('<h1>Cart</h1>')])
+  })
+})
+
+describe('versions, Redo, draws and settling', () => {
+  const at = (n: number) => `2026-10-23T00:00:${String(n).padStart(2, '0')}Z`
+  const htmls = (vs?: Version[]) => (vs ?? []).map((v) => v.html)
+
+  test('Undo with a time shows that version, back or forward; the versions after it wait in redo', () => {
+    const cache = new ScreenCache()
+    const { key } = screen(cache, 'Cafe', null, 'v1', null, at(1))
+    cache.addVersion(key, ver('v2', at(2)))
+    cache.addVersion(key, ver('v3', at(3)))
+    let e = cache.undo(key, at(1))!
+    expect([htmls(e.versions), htmls(e.redo)]).toEqual([['v1'], ['v2', 'v3']])
+    // Redo sends the next one's time.
+    e = cache.undo(key, at(2))!
+    expect([htmls(e.versions), htmls(e.redo)]).toEqual([['v1', 'v2'], ['v3']])
+    e = cache.undo(key, at(3))!
+    expect([htmls(e.versions), e.redo]).toEqual([['v1', 'v2', 'v3'], undefined])
+    // The one showing: nothing changes. No such version: undefined.
+    expect(htmls(cache.undo(key, at(3))!.versions)).toEqual(['v1', 'v2', 'v3'])
+    expect(cache.undo(key, at(9))).toBeUndefined()
+    expect(cache.undo('no such screen')).toBeUndefined()
+  })
+
+  test('a new version puts the redo ones back first and goes last; the oldest go past VERSIONS', () => {
+    const cache = new ScreenCache()
+    const { key } = screen(cache, 'Cafe', null, 'v1', null, at(1))
+    cache.addVersion(key, ver('v2', at(2)))
+    cache.addVersion(key, ver('v3', at(3)))
+    cache.undo(key, at(1))
+    const e = cache.addVersion(key, ver('v4', at(4)))!
+    expect([htmls(e.versions), e.redo]).toEqual([['v1', 'v2', 'v3', 'v4'], undefined])
+    for (let n = 5; n <= 12; n++) cache.addVersion(key, ver(`v${n}`, at(n)))
+    expect(cache.get(key)!.versions).toHaveLength(VERSIONS)
+    expect(cache.get(key)!.versions[0]!.html).toBe('v3')
+    // With some in redo, versions and redo together keep VERSIONS.
+    cache.undo(key, at(5))
+    cache.addVersion(key, ver('v13', at(13)))
+    expect(htmls(cache.get(key)!.versions)).toEqual(['v4', 'v5', 'v6', 'v7', 'v8', 'v9', 'v10', 'v11', 'v12', 'v13'])
+  })
+
+  test('a component gets Undo and Redo too, each a change of its box', () => {
+    const cache = new ScreenCache()
+    const c = cache.addComponent('Cafe', 'tab-bar', 'bottom of every screen', ver('<nav>1</nav>', at(1)), 'user') as CacheEntry
+    cache.addVersion(c.key, { ...ver('<nav>2</nav>', at(2)), feedback: 'Bigger' })
+    expect(htmls(cache.undo(c.key)!.versions)).toEqual(['<nav>1</nav>'])
+    expect(htmls(cache.undo(c.key, at(2))!.versions)).toEqual(['<nav>1</nav>', '<nav>2</nav>'])
+    expect(cache.past('Cafe').components.map((p) => p.what)).toEqual(['Added tab-bar', 'Edit of tab-bar: Bigger', 'You undid a version of tab-bar', 'You redid a version of tab-bar'])
+  })
+
+  test('draws counts the designs from the current prompt: Another adds one, an Edit none, a Draw again starts at 1', () => {
+    const cache = new ScreenCache()
+    const { key } = screen(cache, 'Cafe', null, 'v1', null, at(1))
+    expect(cache.get(key)!.draws).toBe(1)
+    cache.addVersion(key, ver('v2', at(2)))
+    expect(cache.get(key)!.draws).toBe(2)
+    cache.addVersion(key, { ...ver('v3', at(3)), feedback: 'Bigger' })
+    expect(cache.get(key)!.draws).toBe(2)
+    cache.addVersion(key, { ...ver('v4', at(4)), prompt: 'a menu with photos' })
+    expect(cache.get(key)!.draws).toBe(1)
+  })
+
+  test('settling: the first time counts in the boxes, again only after a new design, never for an Edit', () => {
+    const cache = new ScreenCache()
+    const home = cache.propose('Cafe', null, 0, ver('v1', at(1)))!
+    expect(cache.settle(home.key)).toBeNull()
+    cache.pick(home.key, 0)
+    // A pick settles the screen it keeps.
+    expect([cache.get(home.key)!.settled, cache.boxesOf('Cafe').settled]).toEqual([at(1), 1])
+    expect(cache.settle(home.key)).toBeNull()
+    cache.addVersion(home.key, { ...ver('v2', at(2)), feedback: 'Bigger' })
+    expect(cache.settle(home.key)).toBeNull()
+    cache.addVersion(home.key, ver('v3', at(3)))
+    expect(cache.settle(home.key)).toBe('again')
+    expect([cache.get(home.key)!.settled, cache.boxesOf('Cafe').settled]).toEqual([at(3), 1])
+    const cart = cache.propose('Cafe', '@cart', 0, ver('c', at(4)), { key: home.key, label: 'Cart' })!
+    cart.versions = [cart.proposals![0]!]
+    delete cart.proposals
+    expect(cache.settle(cart.key)).toBe('first')
+    expect(cache.boxesOf('Cafe').settled).toBe(2)
+  })
+
+  test('rename moves every key of the project and keeps its address IDs; a name in use throws', () => {
+    const cache = new ScreenCache()
+    const home = screen(cache, 'Cafe', null, '<a data-action="@cart">Cart</a>')
+    const cart = screen(cache, 'Cafe', 'cart', '<h1>Cart</h1>', { key: home.key, label: 'Cart' })
+    cache.addComponent('Cafe', 'tab-bar', 'bottom', ver('<nav></nav>'), 'user')
+    cache.setBox('Cafe', 'add', 'rules', { id: 'calm', text: 'Calm.' }, 'user')
+    cache.noteVisit('Cafe', { at: at(9), ms: 1, costUsd: 0, screens: 1, refused: [], seen: false, changes: [{ text: 'redrew cart', undo: { key: cart.key, createdAt: cart.versions[0]!.createdAt } }] })
+    cache.ownShared('Cafe').feedback.push({ id: 'f'.repeat(16), at: at(1), visitor: 'v', name: 'V', screen: cart.key, title: 'Cart', kind: 'comment', text: 'Hi' })
+    screen(cache, 'Bakery', null, '<h1>Bread</h1>')
+    const ids = [home.mid, home.sid, cart.sid]
+
+    expect(() => cache.rename('Cafe', 'bakery!')).toThrow()
+    cache.rename('Cafe', 'A Coffee Bar')
+    const m = cache.map('a coffee bar')
+    expect(m.entries.map((e) => [e.key, e.app])).toEqual([['a coffee bar', 'A Coffee Bar'], ['a coffee bar » @cart', 'A Coffee Bar'], ['a coffee bar » #tab-bar', 'A Coffee Bar']])
+    expect(cache.get('a coffee bar » @cart')!.parent).toEqual({ key: 'a coffee bar', label: 'Cart' })
+    expect([cache.get('a coffee bar')!.mid, cache.get('a coffee bar')!.sid, cache.get('a coffee bar » @cart')!.sid]).toEqual(ids)
+    expect(m.boxes.rules.map((r) => r.id)).toEqual(['calm'])
+    expect(m.boxes.visits![0]!.changes[0]!.undo).toMatchObject({ key: 'a coffee bar » @cart' })
+    expect(cache.past('A coffee bar').rules).toHaveLength(1)
+    expect(cache.sharedOf('a coffee bar').feedback[0]!.screen).toBe('a coffee bar » @cart')
+    expect(cache.map('Cafe').entries).toEqual([])
+    expect(cache.boxesOf('Cafe').rules).toEqual([])
+    expect(cache.apps().map((a) => a.app).sort()).toEqual(['A Coffee Bar', 'Bakery'])
+    // Undo of a component still finds it under its new key.
+    expect(cache.undoBox('A coffee bar', 'rules')).toBeNull()
+    expect(cache.undoBox('A coffee bar', 'components')).toBeNull()
+    expect(cache.component('A coffee bar', 'tab-bar')).toBeUndefined()
+  })
+
+  test('a version 5 file: an open A OR B loads as versions B then A, one side as that one, none not at all', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
+    const home = { key: 'cafe', app: 'Cafe', action: null, name: 'home', parent: null, versions: [ver('home', at(1))] }
+    const open = (name: string, proposals: (Version | null)[]) => ({ key: `cafe » @${name}`, app: 'Cafe', action: name, name, parent: { key: 'cafe', label: name }, versions: [], proposals })
+    writeFileSync(file, JSON.stringify({ version: 5, entries: [home, open('both', [ver('A', at(2)), ver('B', at(3))]), open('one', [null, ver('B', at(4))]), open('none', [null, null])],
+      boxes: { cafe: { rules: [], data: [], gone: { components: [], rules: [], data: [] }, picks: 7 } } }))
+    const cache = new ScreenCache(file)
+    expect(htmls(cache.get('cafe » @both')!.versions)).toEqual(['B', 'A'])
+    expect(cache.get('cafe » @both')!.proposals).toBeUndefined()
+    expect(cache.get('cafe » @both')!.settled).toBeUndefined()
+    expect(htmls(cache.get('cafe » @one')!.versions)).toEqual(['B'])
+    expect(cache.get('cafe » @none')).toBeUndefined()
+    expect(cache.get('cafe')!.settled).toBe(at(1))
+    expect(cache.boxesOf('Cafe').settled).toBe(7)
+    cache.save()
+    const saved = JSON.parse(readFileSync(file, 'utf8'))
+    expect(saved.version).toBe(6)
+    expect(saved.boxes.cafe.picks).toBeUndefined()
   })
 })
 

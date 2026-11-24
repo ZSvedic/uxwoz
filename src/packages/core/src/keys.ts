@@ -41,8 +41,12 @@ export function linkTarget(action: string): { back: true } | { name: string } | 
 /** The manual's limits on the boxes: a full box refuses a new entry. A line is a rule, or where a component belongs. */
 export const LIMITS = { components: 20, rules: 20, data: 10, columns: 6, rows: 8, line: 120 }
 
-/** Undo of a box goes back this many changes; the fixer visits after every VISIT_EVERY picks, and its notes keep VISITS_KEPT visits. */
+/**
+ * Undo of a box goes back this many changes; a screen keeps VERSIONS versions (`versions` and `redo` together); the
+ * fixer visits after every VISIT_EVERY screens settled for the first time, and its notes keep VISITS_KEPT visits.
+ */
 export const BOX_STATES = 10
+export const VERSIONS = 10
 export const VISIT_EVERY = 5
 export const VISITS_KEPT = 20
 
