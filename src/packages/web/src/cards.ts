@@ -54,9 +54,22 @@ export function lookAt(box: Box) {
   if (side.el.hidden) return
   focusBox(box)
   canvas.showBox(side.sections[box])
-  // Only the entries new at the look count as seen: one filed meanwhile stays marked. The tour changes nothing.
+  seenSoon(box)
+}
+
+/** The boxes whose new entries wait their 3 seconds. */
+const seeing = new Set<Box>()
+/** A box looked at, or getting new entries while it is current: 3 s later what was new then counts as seen, while that
+ *  project is still open. Only the entries new at the start count: one filed meanwhile stays marked until the map
+ *  that brings it (applyMap) starts its own 3 s. The tour changes nothing. */
+export function seenSoon(box: Box) {
   const ids = unseen(box), app = state.app
-  if (ids.length && !state.tour) setTimeout(() => { if (state.app === app && !state.tour) boxOp({ op: 'seen', box, ids }) }, 3000)
+  if (!ids.length || state.tour || seeing.has(box)) return
+  seeing.add(box)
+  setTimeout(() => {
+    seeing.delete(box)
+    if (state.app === app && !state.tour) boxOp({ op: 'seen', box, ids })
+  }, 3000)
 }
 
 /** Export the boxes: the three boxes as a markdown file. */
@@ -181,9 +194,10 @@ export function renderCards() {
   drop()
   const card = el('div', 'flip')
   card.append(...build(t, state.flip))
-  if (!fresh) card.scrollTop = scroll
-  else if (!reduced()) card.classList.add('turn')
+  if (fresh && !reduced()) card.classList.add('turn')
   host.append(card)
+  // The same card drawn again (Resolve, Reopen) keeps its scroll; a detached element cannot hold one.
+  if (!fresh) card.scrollTop = scroll
   host.closest('.card, .box')?.classList.add('flipped')
   shown = { host, sig, el: card }
   update(t)
@@ -332,6 +346,7 @@ function renderBoxButtons() {
       const b = el('button', 'act', el('i', '', icon), label)
       b.type = 'button'
       b.title = state.tour ? 'Off in the tour.' : title
+      b.setAttribute('aria-label', label)
       b.dataset.act = tool
       const off = state.tour || (tool === 'visit' && state.visiting) || (comp && !!state.busy && tool !== 'info')
       b.classList.toggle('off', off)

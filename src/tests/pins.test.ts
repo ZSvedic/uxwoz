@@ -1,7 +1,7 @@
 // The pins' helpers: the anchor a comment sends its frame, and the pin numbers of a screen's comments.
 import { expect, test } from 'bun:test'
 import type { Feedback } from '@uxwoz/core'
-import { anchorOf, dayOf, inLayer, numbered, partLabel, playerFit, SHARE_REFRESH_MS, trailOf, whereOf, whileOpen } from '../packages/web/src/pins.ts'
+import { anchorOf, dayOf, inLayer, numbered, numbers, partLabel, playerFit, SHARE_REFRESH_MS, trailOf, visit, whereOf, whileOpen } from '../packages/web/src/pins.ts'
 
 const f = (id: string, at: string, more: Partial<Feedback> = {}): Feedback =>
   ({ id, at, visitor: 'v', name: 'Ana', screen: 's', title: 'Home', kind: 'comment', text: id, ...more })
@@ -12,10 +12,13 @@ test('an anchor is the part\'s words, tag and place; a whole-screen comment has 
   expect(anchorOf(f('c', '1'))).toBeNull()
 })
 
-test('the open comments count 1, 2, 3 by time; resolved ones and thumbs get no number', () => {
+test('comments count 1, 2, 3 by time, resolved ones too; thumbs get no number; a number the server sent is kept', () => {
   const list = [f('late', '2026-11-03'), f('thumb', '2026-11-01', { kind: 'thumb', up: true }), f('first', '2026-11-01'),
     f('done', '2026-11-02', { resolved: '2026-11-04' }), f('old', '2026-11-02T01', { kind: 'dead', label: 'Pair' })]
-  expect(numbered(list).map((x) => [x.f.id, x.n])).toEqual([['first', 1], ['done', null], ['old', 2], ['late', 3]])
+  expect(numbered(list).map((x) => [x.f.id, x.n, x.open])).toEqual([['first', 1, true], ['done', 2, false], ['old', 3, true], ['late', 4, true]])
+  // The player has only its visitor's own, numbered as the owner sees them.
+  expect(numbered([{ ...f('mine', '2026-11-05'), n: 7 } as any]).map((x) => x.n)).toEqual([7])
+  expect(numbers([...list, f('x', '2026-11-01', { screen: 'other' })]).get('x')).toBe(1)
 })
 
 test('a part\'s label has one space between words and is cut at about 40 characters', () => {
@@ -29,6 +32,10 @@ test('a part\'s label has one space between words and is cut at about 40 charact
 test('the trail shows only once it says more than the name; a link\'s day reads "Nov 12"', () => {
   expect(trailOf(['home'])).toEqual([])
   expect(trailOf(['home', 'stats'])).toEqual(['home', 'stats'])
+  // Home → stats → its own `back` (Home): Home again, with no ← Back and no trail; a link to a mock before pops to it.
+  expect(visit(visit(['home'], 'stats', 'home'), 'home', 'home')).toEqual(['home'])
+  expect(visit(['home', 'stats', 'day'], 'stats', 'home')).toEqual(['home', 'stats'])
+  expect(visit(['home', 'stats'], 'day', 'home')).toEqual(['home', 'stats', 'day'])
   const now = new Date('2026-11-12T15:00:00')
   expect(dayOf('2026-11-12T12:01:00', now)).toBe('Nov 12')
   expect(dayOf('2025-03-04T12:01:00', now)).toBe('Mar 4, 2025')

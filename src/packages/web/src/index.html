@@ -18,10 +18,10 @@
       <button id="nameButton" class="menu-button" aria-haspopup="menu" aria-expanded="false"><span id="nameText"></span> <span class="caret"></span></button>
       <div id="dropMenu" class="menu drop-menu" role="menu" hidden>
         <div class="drop-boxes">
-      <button type="button" data-look="rules" title="Rules: what every mock must follow">📐 Rules <b></b></button>
-      <button type="button" data-look="components" title="Components: parts pasted into mocks">🧩 Components <b></b></button>
-      <button type="button" data-look="data" title="Data: the sample data">🗄️ Data <b></b></button>
-      <button type="button" data-look="notes" title="The fixer's notes">🕵️ Fixer <b></b></button>
+      <button type="button" data-look="rules" title="Rules: what every mock must follow"><i>📐</i> Rules <b></b></button>
+      <button type="button" data-look="components" title="Components: parts pasted into mocks"><i>🧩</i> Components <b></b></button>
+      <button type="button" data-look="data" title="Data: the sample data"><i>🗄️</i> Data <b></b></button>
+      <button type="button" data-look="notes" title="The fixer's notes"><i>🕵️</i> Fixer <b></b></button>
         </div>
         <p id="dropSentence" class="sentence"></p>
         <div id="dropTree" class="drop-tree"></div>
@@ -29,10 +29,10 @@
     </span>
     <button id="trailForward" class="trail" title="Forward again (⌘])" aria-label="Forward">→</button>
     <span id="barBoxes" class="bar-boxes">
-      <button type="button" data-look="rules" title="Rules: what every mock must follow">📐 Rules <b></b></button>
-      <button type="button" data-look="components" title="Components: parts pasted into mocks">🧩 Components <b></b></button>
-      <button type="button" data-look="data" title="Data: the sample data">🗄️ Data <b></b></button>
-      <button type="button" data-look="notes" title="The fixer's notes">🕵️ Fixer <b></b></button>
+      <button type="button" data-look="rules" title="Rules: what every mock must follow"><i>📐</i> Rules <b></b></button>
+      <button type="button" data-look="components" title="Components: parts pasted into mocks"><i>🧩</i> Components <b></b></button>
+      <button type="button" data-look="data" title="Data: the sample data"><i>🗄️</i> Data <b></b></button>
+      <button type="button" data-look="notes" title="The fixer's notes"><i>🕵️</i> Fixer <b></b></button>
     </span>
     <button data-zoom="out" class="wide-only" title="Zoom out (⌘−)" aria-label="Zoom out">−</button>
     <span class="pop zoom-pop">
@@ -54,23 +54,23 @@
 </header>
 <aside id="menuPanel" class="side-menu" aria-label="Menu" hidden>
   <div class="side-head"><svg class="brand wm side-wm" viewBox="0 -2 123 46" width="75" height="28"><text x="0" y="40">UX</text><polyline stroke-width="6.42" points="56.55,16.61 61.14,36.79 68.02,23.03 74.9,36.79 77.83,23.95"/><path transform="translate(80.49 12.21) scale(7.89)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/><text x="81.54" y="40">oz</text></svg><button id="menuClose" class="close" title="Close (Esc)" aria-label="Close">✕</button></div>
-  <button id="menuNew" class="item">➕ New project</button>
-  <h3 id="menuRecentHead">🕘 Recent</h3>
+  <button id="menuNew" aria-label="New project" class="item"><i>➕</i> New project</button>
+  <h3 id="menuRecentHead"><i>🕘</i> Recent</h3>
   <div id="menuRecent" class="menu-recent"></div>
-  <button id="menuTour" class="item">🎓 Tour</button>
+  <button id="menuTour" aria-label="Tour" class="item"><i>🎓</i> Tour</button>
   <div id="menuProject">
     <h3>This project</h3>
-    <button class="item" id="shareMenu" title="Make a link for a reviewer or a customer">🔗 Share…</button>
-    <button class="item" id="feedbackMenu" title="What reviewers said and where they clicked">💬 Feedback</button>
-    <button class="item" id="exportProject" title="Download the sentence, the boxes and every mock as a zip, to hand to a coding or design agent">⇩ Export project…</button>
-    <button class="item" id="exportBoxes" title="Download the Components, Rules and Data boxes as one markdown file">⇩ Export the boxes</button>
-    <button class="item" id="startOver" title="Delete every mock and the boxes, and draw Home again">↺ Start over</button>
-    <button class="item danger" id="deleteApp" title="Delete this project">✕ Delete</button>
+    <button class="item" id="shareMenu" aria-label="Share…" title="Make a link for a reviewer or a customer"><i>🔗</i> Share…</button>
+    <button class="item" id="feedbackMenu" aria-label="Feedback" title="What reviewers said and where they clicked"><i>💬</i> Feedback</button>
+    <button class="item" id="exportProject" aria-label="Export project…" title="Download the sentence, the boxes and every mock as a zip, to hand to a coding or design agent"><i>⇩</i> Export project…</button>
+    <button class="item" id="exportBoxes" aria-label="Export the boxes" title="Download the Components, Rules and Data boxes as one markdown file"><i>⇩</i> Export the boxes</button>
+    <button class="item" id="startOver" aria-label="Start over" title="Delete every mock and the boxes, and draw Home again"><i>↺</i> Start over</button>
+    <button class="item danger" id="deleteApp" aria-label="Delete" title="Delete this project"><i>✕</i> Delete</button>
   </div>
   <h3>UXWoz</h3>
-  <label class="item">🎨 Theme <select id="themeSelect"></select></label>
-  <button id="sound" class="item sound off" aria-pressed="false">🔈 Sound: <span id="soundState">off</span></button>
-  <label class="item" id="modelLine">🤖 Model <select id="model"></select></label>
+  <label class="item"><i>🎨</i> Theme <select id="themeSelect"></select></label>
+  <button id="sound" class="item sound off" aria-pressed="false"><i>🔈</i> Sound: <span id="soundState">off</span></button>
+  <label class="item" id="modelLine"><i>🤖</i> Model <select id="model"></select></label>
   <div id="accountLine" class="account-line" hidden></div>
   <a class="item" href="/privacy" target="_blank">Privacy</a>
   <section id="menuPage" class="menu-page share-pane" hidden>
@@ -99,7 +99,7 @@
     </div>
   </form>
   <form id="account" class="generate account-card" hidden>
-    <p id="accountLead" class="lead"></p>
+    <div class="gen-head"><p id="accountLead" class="lead"></p><button type="button" id="accountClose" class="close" title="Close (Esc)" aria-label="Close">✕</button></div>
     <label for="accountField" id="accountLabel" hidden></label>
     <input id="accountField" required>
     <button id="accountSend" type="submit" class="primary go"></button>

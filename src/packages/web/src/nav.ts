@@ -7,7 +7,7 @@ import type { CacheEntry } from '@uxwoz/core'
 import type { Box } from './boxes.ts'
 import { addStep as addStepTo, addressOf, addressStep, landing, readAddress, stepTo, type Trail } from './address.ts'
 import { canvas, openLast, openTour, side, start } from './app.ts'
-import { focusBox, lookAt } from './cards.ts'
+import { focusBox, lookAt, seenSoon } from './cards.ts'
 import { hint, mapOf, post, showError } from './net.ts'
 import { shareToken } from './sharing.ts'
 import { loadMe } from './account-ui.ts'
@@ -110,6 +110,8 @@ export function applyMap(map: { entries: CacheEntry[]; boxes?: typeof state.boxe
   if ((state.filing || state.visiting) && state.waiting !== state.app && !state.tour) filed()
   if (state.current && !state.entries.has(state.current)) state.current = null
   draw()
+  // New entries in the box being looked at count as seen after a moment, as at a look.
+  if (state.box && !side.el.hidden) seenSoon(state.box)
 }
 
 /** After a settle, an Edit or a visit: fetch the project once filing is done; a map that crosses a change made here
@@ -153,11 +155,6 @@ export function syncAddress(inPlace = false) {
   const want = addressOf(state.app, state.entries, state.current, state.box, state.tour)
   const how = addressStep(location.pathname, want, inPlace)
   if (how) history[how === 'push' ? 'pushState' : 'replaceState'](null, '', want)
-}
-
-/** A new project, or Start over: the address is `/` at once, until the project's own ID arrives. */
-export function toStart(inPlace: boolean) {
-  if (!shareToken && location.pathname !== '/') history[inPlace ? 'replaceState' : 'pushState'](null, '', '/')
 }
 
 /** An address that names nothing here (deleted, or another person's): `/`, a word why, and what `/` opens. */

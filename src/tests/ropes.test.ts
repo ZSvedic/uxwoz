@@ -1,6 +1,6 @@
 // The canvas worked out with no page: rows of equal height, the 100% scale, where a glide ends, and the ropes.
 import { describe, expect, test } from 'bun:test'
-import { BUTTONS_H, NAME_H, ROPE_SHOW, curve, frameOf, glideAt, headH, hundred, landing, placeTree, rope, sizeOf, touchStep } from '../packages/web/src/canvas.ts'
+import { BUTTONS_H, NAME_H, ROPE_SHOW, boxHundred, curve, frameOf, glideAt, headH, hundred, landing, placeTree, rope, sizeOf, touchStep } from '../packages/web/src/canvas.ts'
 
 const small = sizeOf('small-phone'), laptop = sizeOf('laptop')
 
@@ -59,9 +59,32 @@ describe('100%', () => {
   test('a laptop mock on a laptop is about its real size; on a phone it is scaled down to fit', () => {
     const z = hundred(1440, 780, laptop)
     expect(z).toBeGreaterThan(0.9)
-    expect(z).toBeLessThanOrEqual(1)
+    expect(z).toBeLessThanOrEqual(1.1)
     expect(fits(z, 1440, 780, laptop)).toBe(true)
     expect(hundred(375, 700, laptop)).toBeLessThan(0.3)
+  })
+
+  test('100% is the largest scale at which the name, the mock, its buttons and a little rope fit, at most 1.5×', () => {
+    // Canvases (the window less the bar) of a phone, a laptop and a large screen, for both sizes of project.
+    for (const [w, h] of [[390, 708], [1280, 668], [1700, 848]] as const) for (const mock of [small, laptop]) {
+      const z = hundred(w, h, mock), f = frameOf({ x: 0, y: 0, ...mock }, z)
+      expect(f.w * z).toBeLessThanOrEqual(w - 2 * (w < 720 ? 8 : 24))
+      expect(f.h * z).toBeLessThanOrEqual(h - 2 * (w < 720 ? 8 : 24) + 1)
+      // One step larger no longer fits, unless 1.5× is reached.
+      const up = z + 0.02, g = frameOf({ x: 0, y: 0, ...mock }, up)
+      expect(z >= 1.5 || g.w * up > w - 2 * (w < 720 ? 8 : 24) || g.h * up > h - 2 * (w < 720 ? 8 : 24)).toBe(true)
+    }
+    // A small phone on a 1280 × 720 window uses nearly all of the canvas's height.
+    expect(hundred(1280, 668, small) * (small.h + BUTTONS_H + 2 * ROPE_SHOW) + NAME_H).toBeGreaterThan(600)
+  })
+
+  test('a box wider than a phone fits it at its 100%, with its buttons; on a laptop it is the mocks\' 100%', () => {
+    const box = { w: 520, h: small.h + BUTTONS_H }, base = hundred(390, 708, small)
+    const z = boxHundred(390, 708, box, base)
+    expect(z * box.w).toBeLessThanOrEqual(390 - 16)
+    expect(z * box.h).toBeLessThanOrEqual(708 - 16)
+    expect(z).toBeLessThan(base)
+    expect(boxHundred(1440, 900, box, hundred(1440, 900, small))).toBe(hundred(1440, 900, small))
   })
 
   test('a phone mock in a roomy window is larger, at most 1.5 times its real size', () => {

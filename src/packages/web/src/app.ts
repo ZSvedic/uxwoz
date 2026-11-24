@@ -12,7 +12,7 @@ import { Canvas } from './canvas.ts'
 import { focusBox, focusComponent, onTool, unseen } from './cards.ts'
 import { hint, mapOf, post, showError, themeCss } from './net.ts'
 import { landing, readAddress } from './address.ts'
-import { address, applyMap, boxShown, currentKey, followAddress, goTo, notHere, resetTrail, setCurrent, showBox, syncAddress, toStart, trailStep, walkTrail } from './nav.ts'
+import { address, applyMap, boxShown, currentKey, followAddress, goTo, notHere, resetTrail, setCurrent, showBox, syncAddress, trailStep, walkTrail } from './nav.ts'
 import { again, all, cardClosed, components, draw, labelOf, onAction, openScreen, stopMaking, treeParent } from './screens.ts'
 import { closeMenus, initBar } from './bar.ts'
 import { closeMenu, initMenu, loadRecent, openMenu, recent, warmUp } from './menu.ts'
@@ -86,7 +86,8 @@ async function openProject(app: string, make: boolean, sid: string | null | unde
   const saved = named?.key ?? store.get(currentKey(app))
   state.current = saved && state.entries.get(saved)?.versions.length ? saved : state.entries.get(root)?.versions.length ? root : null
   resetTrail()
-  if (!state.entries.has(root)) { toStart(inPlace); return openScreen(null, null, null, device) }
+  // A first Home: the address stays as it is until Home is stored (`start` writes it then).
+  if (!state.entries.has(root)) return openScreen(null, null, null, device)
   await draw()
   loadShared()
   // The current mock at 100%.
@@ -173,12 +174,12 @@ async function init() {
     go: goTo,
     make: (e) => { if (state.tour) return; if (state.busy) return hint(); openScreen(`@${e.name}`, e.parent!.key, e.parent!.label) },
     view: () => ({
-      app: state.app, current: state.current, box: state.box, hasBoxes: !!state.boxes && !side.el.hidden,
+      app: state.app, current: state.current, box: state.box, making: state.making && (state.making.version?.name || state.making.name), hasBoxes: !!state.boxes && !side.el.hidden,
       mocks: [...all(), ...plannedScreens(all()).map((e) => ({ ...e, planned: true }))],
     }),
     parentOf: treeParent,
     nameOf: labelOf,
-    unseen: (box) => unseen(box).length,
+    unseen: (box) => (state.tour ? 0 : unseen(box).length), // the tour counts nothing new
     openMenu,
     closeMenu,
   })

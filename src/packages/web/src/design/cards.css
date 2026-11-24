@@ -15,6 +15,8 @@
 .pane textarea { width: 100%; resize: vertical; padding: 6px 8px; border: 2px solid var(--border); border-radius: 10px; background: var(--field); }
 .flip .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .flip .row > button { flex: 1; min-height: 36px; border-radius: 99px; }
+/* A button that waits is grey, as the grey buttons under a mock. */
+.flip button:disabled { color: var(--disabled); border-color: var(--border); background: var(--surface); box-shadow: none; opacity: .55; }
 /* Make the change and Draw again: the ember button, as Draw it. */
 .flip .row > .primary { flex: 2; box-shadow: var(--pick-shadow); }
 .flip .primary:focus-visible { box-shadow: 0 0 0 2px var(--focus-in), var(--pick-shadow); }

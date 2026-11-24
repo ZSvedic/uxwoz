@@ -32,7 +32,9 @@
   font: 600 13px ui-monospace, monospace; }
 /* A component card sits on the box, not the sky: its name and idea in ink. */
 .box .card .name { color: var(--text); }
-.box .card .idea { color: var(--muted); }
+.box .card .idea { color: var(--muted); font-size: .8em; }
+/* A component's ID over its line (where it belongs), both cut at the card's width. */
+.box-components .card .head { flex-direction: column; align-items: flex-start; }
 .box .card.current .name { font-weight: 700; }
 .box .card .head.open { background: var(--surface-2); }
 .box .card :is(.more, .note) { color: var(--mark); }

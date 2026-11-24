@@ -57,7 +57,7 @@ export interface BarDeps {
   go(key: string): void
   make(e: CacheEntry): void
   /** What the bar shows: the open project (the tour's too), its drawn and planned mocks, the parent of each, a mock's name. */
-  view(): { app: string | null; current: string | null; box: Box | null; hasBoxes: boolean; mocks: (CacheEntry & { planned?: boolean })[] }
+  view(): { app: string | null; current: string | null; box: Box | null; making: string | null; hasBoxes: boolean; mocks: (CacheEntry & { planned?: boolean })[] }
   parentOf(key: string): string | null
   nameOf(e: CacheEntry): string
   /** The entries of a box new since the user last looked. */
@@ -146,7 +146,8 @@ export function renderToolbar() {
   if (!d) return
   const v = d.view()
   const cur = v.current ? v.mocks.find((e) => e.key === v.current) : undefined
-  const name = v.box ? boxName(v.box) : cur ? d.nameOf(cur) : v.app ? 'Home' : 'UXWoz'
+  // A new mock is current while it is drawn: its name at once.
+  const name = v.making ?? (v.box ? boxName(v.box) : cur ? d.nameOf(cur) : v.app ? 'Home' : 'UXWoz')
   $('nameText').textContent = name
   $('nameButton').title = `${name}: the boxes and every mock`
   $<HTMLButtonElement>('nameButton').disabled = !v.app

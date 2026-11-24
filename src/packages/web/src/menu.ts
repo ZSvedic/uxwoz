@@ -12,7 +12,7 @@ import { talkButton } from './voice.ts'
 import { shareToken, showPage } from './sharing.ts'
 import { beginHint, hint, post, showError, themeCss } from './net.ts'
 import { draw } from './screens.ts'
-import { needsAccount, renderAccountLine } from './account-ui.ts'
+import { isOwnerMe, needsAccount, renderAccountLine } from './account-ui.ts'
 import { $, deviceSelect, enterSubmits, generate, modelSelect, promptInput, state, store } from './state.ts'
 
 // ---- The panel
@@ -40,6 +40,7 @@ $('menuTour').addEventListener('click', () => { closeMenus(); openTour().catch((
 /** This project only with a project open (not the tour); Model only in the private app; the sound's word. */
 function renderMenu() {
   $('menuProject').hidden = !state.app || state.tour
+  $('modelLine').hidden = !isOwnerMe()
   $('soundState').textContent = $('sound').getAttribute('aria-pressed') === 'true' ? 'on' : 'off'
   $<HTMLSelectElement>('themeSelect').value = state.theme
 }
@@ -121,7 +122,6 @@ export function initMenu(cfg: { public?: boolean; models: { id: string; label: s
   for (const m of cfg.models) modelSelect.add(new Option(m.label, m.id))
   const saved = store.get('uxwoz:model')
   modelSelect.value = cfg.models.some((m) => m.id === saved) ? saved! : cfg.defaultModel
-  $('modelLine').hidden = !!cfg.public
   for (const s of cfg.devices) deviceSelect.add(new Option(s.label, s.id))
   sizeHere(cfg.defaultDevice)
 }
@@ -187,13 +187,16 @@ function placeStarters(first: boolean) {
 export function openGenerate() {
   closeMenus()
   if (shareToken) return // an edit link has no New project
-  if (generate.classList.contains('open')) return promptInput.focus()
+  if (generate.classList.contains('open')) return focusPrompt()
   sizeHere()
   generate.classList.add('open')
   promptInput.value = ''
   draw()
-  promptInput.focus()
+  focusPrompt()
 }
+
+/** The prompt box takes the focus only where the device can hover: on a touch screen the keyboard would cover the examples. */
+const focusPrompt = () => { if (matchMedia('(hover: hover)').matches) promptInput.focus() }
 
 /** Closed with nothing open under it: what `/` opens. */
 export function closeGenerate() {

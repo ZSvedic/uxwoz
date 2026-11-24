@@ -99,7 +99,8 @@ src/packages/web/src/
                  address kept in step and followed (Back and Forward, a pasted one, *That project is not here.*),
                  the map after filing, the step `toured` when the tour's last mock is current
   address.ts     browser: the address `/m/<project>/<mock>`, `/m/<project>/box-rules` (and -components, -data,
-                 -fixer), `/tour/<mock>`: read and written, which mock it names, push or replace (no DOM, tested)
+                 -fixer), `/tour/<mock>`: read and written, which mock it names, push or replace, the ← → steps (`addStep`,
+                 `stepTo`: one browser history entry each) (no DOM, tested)
   cards.ts       browser: the cards a mock, a box or a component flips to in place (Edit with Delete asked in the card,
                  History with Undo, Redo and a tap on a version, Info, Describe it differently behind `hooks.describe`),
                  the buttons under the current box, a component current in its box (`focusComponent`), `boxOp`,
@@ -108,7 +109,7 @@ src/packages/web/src/
                  words, Info's fields (mock, component, box), each box's buttons
   bar.ts         browser: the top bar (logo, ← name →, the boxes while they fit, − zoom + ⛶), the name's dropdown
                  (the boxes, the sentence, the tree), the zoom menu and its keys, `closeMenus`, `renderToolbar`;
-                 `treeRows`, `sizeFor` (Design for's start), `boxesFit` with no DOM (tested); the page's parts come in at `initBar`
+                 `treeRows`, `sizeFor` (Design for's start), `boxesFit`, `keyOf` (none in a text field) with no DOM (tested); the page's parts come in at `initBar`
   menu.ts        browser: the menu panel from the logo (New project, Recent, Tour, This project, Theme, Sound, the
                  account's line, Model in the private app, Privacy; Share and Feedback pages are sharing.ts's), Export project with its hint; New project (the
                  examples first for a newcomer, the prompt box, Design for, Draw it; also on `uxwoz:new-project`)
@@ -124,8 +125,8 @@ src/packages/web/src/
                  fields and New project's prompt box; none without speech)
   canvas.ts      browser: the boxes right of Home, the tree layout (`placeTree`: rows of equal height, ropes that bend in
                  the gap), cards of the project's size with name tags and scroll corners, frames scaled not zoomed, the
-                 four buttons under the current mock, 100% (`hundred`) and zoom levels relative to it, Fit all, the glide
-                 (`glideEnd`, `glideAt`), a tap on the sky, links out (`open`), touch: two fingers pan and pinch
+                 four buttons under the current mock, 100% (`hundred`; a box's `boxHundred`) and zoom levels relative to it, Fit all, the glide
+                 (`glideAt`), a resize redoes the last fit, a tap on the sky, links out (`open`), touch: two fingers pan and pinch
   boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes (pages of the pad, as tall as Home, a place
                  for their buttons), editing and adding in place (`addEmpty`), the notes' last line (`nextVisit`), Export
   people.ts      the public's people and money over bun:sqlite (spec/public.md): visitors, sessions, the meter
@@ -152,7 +153,7 @@ src/packages/web/src/
   pins.ts        browser: a comment's anchor, the pin numbers of a screen's comments, the layer of pins over a frame
                  (the player's and the app's), the rows of the owner's Comments tab, a part's label, the player's
                  trail, a link's day, the Share page's refresh, `inLayer` (a pin scrolled out of view hides),
-                 `playerFit` (the player's frame size) (no DOM, tested)
+                 `playerFit` (the player's frame size), a comment's number (`numbered`, `numbers`), the player's visits (`visit`) (no DOM, tested)
   index.html     the page around the canvas; links design/index.css
   design/        the look: tokens.css (every colour), base.css (shared by parts), one file per part (bar,
                  canvas, boxes, cards, panel), motion.css; index.css imports them all; fx.ts (the speaker and the whoosh);

@@ -5,10 +5,9 @@
 import type { Feedback, Share, Trip } from '@uxwoz/core'
 import { button, el } from './boxes.ts'
 import { jump, relocate } from './comments.ts'
-import { renderCards } from './cards.ts'
 import { setCurrent } from './nav.ts'
 import { hint, post, showError } from './net.ts'
-import { labelOf } from './screens.ts'
+import { draw, labelOf } from './screens.ts'
 import { closeMenus } from './bar.ts'
 import { needsAccount } from './account-ui.ts'
 import { $, state } from './state.ts'
@@ -50,7 +49,7 @@ export async function loadShared() {
   if (JSON.stringify(got) === JSON.stringify(shared)) return
   shared = got
   renderPage()
-  renderCards()
+  draw() // the counts on ℹ️ and a flipped card
   relocate()
 }
 const mine = () => (shared && shared.app === state.app ? shared : null)
@@ -118,8 +117,13 @@ function renderPage() {
 function sharePage(): HTMLElement[] {
   const s = mine()
   const role = el('select')
-  for (const [id, label] of Object.entries(ROLE_NAMES)) role.add(new Option(label, id))
+  // The role's word in the picker, what it lets the reviewer do under it: the whole of it fits a phone.
+  for (const [id, label] of Object.entries(ROLE_NAMES)) role.add(new Option(label.split(':')[0]!, id))
   role.value = making.role
+  const what = el('small', '')
+  const say = () => { what.textContent = ROLE_NAMES[role.value as keyof typeof ROLE_NAMES]?.split(': ')[1] ?? '' }
+  say()
+  role.addEventListener('change', say)
   const cap = el('input')
   Object.assign(cap, { type: 'number', min: '1', max: '1000', value: making.cap, title: 'How many new mocks and changes this link may ask for: they cost your credits' })
   const capRow = el('label', 'share-cap', 'Budget: ', cap, ' new mocks and changes')
@@ -131,7 +135,7 @@ function sharePage(): HTMLElement[] {
     el('b', '', x.role), ` · made ${dayOf(x.createdAt)} · opened ${x.opens}×${x.cap ? ` · ${x.used} of ${x.cap} used` : ''}`,
     el('input', 'share-url'), button('Copy', 'Copy the link', () => copy(x.url)), button('Revoke', 'This link stops working', () => revoke(x.token))))
   links.forEach((li, i) => Object.assign(li.querySelector('input')!, { value: s!.shares[i]!.url, readOnly: true }))
-  return [role, capRow, make, el('ul', 'share-links', ...links.length ? links : [el('li', 'none', 'No links yet')])]
+  return [role, what, capRow, make, el('ul', 'share-links', ...links.length ? links : [el('li', 'none', 'No links yet')])]
 }
 
 /** Feedback: by mock, the mock with the newest first; the closing answers and the trips after. */

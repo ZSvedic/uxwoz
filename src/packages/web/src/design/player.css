@@ -13,6 +13,9 @@ body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-even
 /* The top strip: a parchment plate with the hat, Back, the screen's name and the trail. */
 .bar { position: sticky; top: 8px; z-index: 2; display: flex; align-items: center; gap: 10px; margin: 8px; padding: 6px 12px;
   background: var(--surface); border: 2px solid var(--border); border-radius: 14px; box-shadow: var(--halo), var(--lift); }
+/* On a narrow window a card opens under the mock and the page scrolls to it: the strip scrolls away with the page,
+   so it never covers the mock's top. */
+@media (max-width: 719px) { .bar { position: relative; top: 0; } html { scroll-padding-top: 8px; } }
 .hat { flex: none; display: block; }
 .where { flex: 1; min-width: 0; }
 .where b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -28,6 +31,11 @@ body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-even
 .device { position: absolute; top: 0; left: 0; transform-origin: top left; overflow: hidden; background: var(--screen);
   border-radius: 10px; box-shadow: 0 0 0 7px var(--frame), 0 0 0 8px var(--frame-edge), var(--halo), var(--lift); }
 .device iframe { display: block; width: 100%; border: 0; }
+/* Scroll corners, as on the canvas: an edge with more beyond it has flat corners and fades into the sky. */
+.device.above { border-top-left-radius: 0; border-top-right-radius: 0; mask-image: linear-gradient(transparent 20px, black 46px); }
+.device.below { border-bottom-left-radius: 0; border-bottom-right-radius: 0; mask-image: linear-gradient(black calc(100% - 46px), transparent calc(100% - 20px)); }
+.device.above.below { mask-image: linear-gradient(transparent 20px, black 46px, black calc(100% - 46px), transparent calc(100% - 20px)); }
+:is(.device.above, .device.below) { mask-position: 0 -20px; mask-size: 100% calc(100% + 40px); mask-repeat: repeat-x; mask-clip: no-clip; }
 
 /* The dock at the bottom: a toast sits on top of the feedback bar, however many rows the bar wraps to. */
 .dock { position: fixed; bottom: 10px; left: 8px; right: 8px; z-index: 2; display: flex; flex-direction: column;

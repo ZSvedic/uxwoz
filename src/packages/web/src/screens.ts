@@ -55,7 +55,7 @@ export function views(): ScreenView[] {
     const v = e.versions.at(-1)
     if (!v) continue
     const view = { key: e.key, device: v.device, current: current === e.key, streaming: state.revising?.key === e.key, tour: state.tour }
-    if (isComponent(e)) out.push({ ...view, current: state.box === 'components' && state.component === e.key, parent: null, name: e.name!, component: true, fresh: !e.seen })
+    if (isComponent(e)) out.push({ ...view, current: state.box === 'components' && state.component === e.key, parent: null, name: e.name!, component: true, fresh: !e.seen && !state.tour, line: e.action ?? undefined })
     else out.push({ ...view, parent: treeParent(e.key), name: labelOf(e), pressed: view.current ? pressed : null, comments: view.current ? commentCount(e.key) : 0 })
   }
   if (m && !state.entries.has(m.key)) out.push({ key: m.key, parent: m.parent, name: m.version?.name || m.name, device: m.device, current: true, streaming: !m.version, tour: state.tour })
