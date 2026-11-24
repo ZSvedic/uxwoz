@@ -5,7 +5,7 @@ import { normalizePrompt } from '@uxwoz/core/keys'
 import { isComponent } from '@uxwoz/core/tree'
 import type { CacheEntry } from '@uxwoz/core'
 import type { Box } from './boxes.ts'
-import { addressOf, addressStep, landing, readAddress } from './address.ts'
+import { addStep as addStepTo, addressOf, addressStep, landing, readAddress, stepTo, type Trail } from './address.ts'
 import { canvas, openLast, openTour, side, start } from './app.ts'
 import { focusBox, lookAt } from './cards.ts'
 import { hint, mapOf, post, showError } from './net.ts'
@@ -14,9 +14,6 @@ import { loadMe } from './account-ui.ts'
 import { all, draw } from './screens.ts'
 import { renderToolbar } from './bar.ts'
 import { state, store } from './state.ts'
-
-/** The current box's element, else the current mock's key. */
-export const currentAt = () => (state.box ? side.sections[state.box] : state.current ?? undefined)
 
 export function setCurrent(key: string | null) {
   if (state.current === key && !state.box) return
@@ -34,42 +31,42 @@ export function saveCurrent() {
   addStep()
 }
 
-// ---- ← and →: every mock or box that became current is a step (`box:<name>` for a box)
+// ---- ← and →: every mock or box that became current is a step (address.ts), and an entry of the browser's history
 
-const trail = { steps: [] as string[], at: -1, moving: false }
+let trail: Trail = { steps: [], at: -1 }
+/** A step is being taken by ← →, Back or Forward: it adds none. `pending`: the step ← or → went to, until the
+ *  address of it arrives. */
+const walk = { moving: false, pending: null as number | null }
 const stepNow = () => (state.box ? `box:${state.box}` : state.current)
 
 /** Reaching a mock or box any way but ← and → ends the steps here, as a browser's history does. */
 function addStep() {
   const s = stepNow()
-  if (!s || trail.moving || trail.steps[trail.at] === s) return
-  trail.steps = [...trail.steps.slice(0, trail.at + 1), s]
-  trail.at = trail.steps.length - 1
+  if (s && !walk.moving) trail = addStepTo(trail, s)
 }
 
 export function resetTrail() {
-  trail.steps = stepNow() ? [stepNow()!] : []
-  trail.at = trail.steps.length - 1
+  trail = { steps: stepNow() ? [stepNow()!] : [], at: stepNow() ? 0 : -1 }
+  walk.pending = null
 }
 
 const there = (s: string) => (s.startsWith('box:') ? !!state.boxes && !side.el.hidden : !!state.entries.get(s)?.versions.length)
 
 /** The index of the nearest step in a direction that is still there (mocks deleted since are skipped). */
-export function trailStep(dir: 1 | -1): number | null {
-  for (let i = trail.at + dir; i >= 0 && i < trail.steps.length; i += dir) {
-    const s = trail.steps[i]!
-    if (s !== stepNow() && there(s)) return i
-  }
-  return null
-}
+export const trailStep = (dir: 1 | -1) => stepTo(trail, dir, stepNow(), there)
 
-/** ← and →: the mock or box looked at before, or after. */
+/** ← and →: the mock or box looked at before, or after. The browser's history moves along, so its Back and Forward
+ *  stay the same steps (an edit link writes no address, so it goes there at once). */
 export function walkTrail(dir: 1 | -1) {
   const i = trailStep(dir)
   if (i == null) return
-  trail.at = i
-  trail.moving = true
-  try { goTo(trail.steps[i]!) } finally { trail.moving = false }
+  if (!shareToken && !address.hold) {
+    walk.pending = i
+    return history.go(i - trail.at)
+  }
+  trail = { ...trail, at: i }
+  walk.moving = true
+  try { goTo(trail.steps[i]!) } finally { walk.moving = false }
 }
 
 /** A box became current (the bar, the dropdown, a press in it, ← →): a step, and its address. */
@@ -110,31 +107,35 @@ export function applyMap(map: { entries: CacheEntry[]; boxes?: typeof state.boxe
   Object.assign(state, { entries: new Map(map.entries.map((e) => [e.key, e])), boxes: map.boxes ?? state.boxes, past: map.past ?? state.past, filing: !!map.filing, visiting: !!map.visiting })
   state.edits++
   // Filing or a visit runs (after a reload, say) and nothing waits for it yet.
-  if ((state.filing || state.visiting) && !state.waiting && !state.tour) filed()
+  if ((state.filing || state.visiting) && state.waiting !== state.app && !state.tour) filed()
   if (state.current && !state.entries.has(state.current)) state.current = null
   draw()
 }
 
-/** After a pick, an Edit or a visit: fetch the project once filing is done; a map that crosses a change made here is fetched again. */
+/** After a settle, an Edit or a visit: fetch the project once filing is done; a map that crosses a change made here
+ *  is fetched again. The wait is its project's: another one opened meanwhile ends it and is left as it is. */
 export async function filed() {
   const app = state.app
-  if (state.tour) return
-  state.waiting = true
+  if (state.tour || !app) return
+  state.waiting = app
   try {
-    for (let tries = 0, wait = true; tries < 40 && app && app === state.app; tries++, wait = false) {
+    for (let tries = 0, wait = true; tries < 40 && app === state.app; tries++, wait = false) {
       const n = state.edits
       const res = await mapOf(app, wait).catch(() => null)
       if (app !== state.app) return
       const map = res?.ok ? await res.json() : null
       if (map && n === state.edits && !state.busy) {
-        state.waiting = false
+        state.waiting = null
         return applyMap(map)
       }
       await new Promise((r) => setTimeout(r, 1500))
     }
   } finally {
-    // Given up (no answer, or changes kept crossing it): the lines say filing and visiting no more.
-    if (state.waiting) { state.waiting = state.filing = state.visiting = false; draw() }
+    if (state.waiting === app) {
+      state.waiting = null
+      // Given up (no answer, or changes kept crossing it): the lines say filing and visiting no more.
+      if (app === state.app) { state.filing = state.visiting = false; draw() }
+    }
     loadMe() // filing, a box's Edit and a visit are live calls: the free screens left
   }
 }
@@ -179,11 +180,14 @@ export async function followAddress() {
     // A mock deleted since: Home, in place of the dead address, and a word why.
     if (l?.why) { history.replaceState(null, '', addressOf(state.app, state.entries, l.entry.key, null, tour) ?? '/'); hint(l.why) }
     const s = step ?? l!.entry.key
-    // Along the steps when it is on them, so ← and → still lead where they did.
-    const i = trail.steps.lastIndexOf(s)
-    if (i >= 0) trail.at = i
-    trail.moving = i >= 0
-    try { goTo(s) } finally { trail.moving = false }
+    // Along the steps when it is on them (the one ← or → went to first), so ← and → still lead where they did.
+    const p = walk.pending
+    walk.pending = null
+    const i = p != null && trail.steps[p] === s ? p : trail.steps.lastIndexOf(s)
+    if (i >= 0) trail = { ...trail, at: i }
+    walk.moving = i >= 0
+    try { goTo(s) } finally { walk.moving = false }
+    renderToolbar()
     return
   }
   if (tour) return openTour({ at: at.at, box: at.box }, true)

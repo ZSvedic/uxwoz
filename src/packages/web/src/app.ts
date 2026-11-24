@@ -6,6 +6,7 @@
 import { screenKey } from '@uxwoz/core/keys'
 import { plannedScreens } from '@uxwoz/core/tree'
 import type { CacheEntry } from '@uxwoz/core'
+import type { Device } from '@uxwoz/core/frame'
 import { createSide, type Box } from './boxes.ts'
 import { Canvas } from './canvas.ts'
 import { focusBox, focusComponent, onTool, unseen } from './cards.ts'
@@ -45,15 +46,17 @@ export const canvas = new Canvas($('stage'), {
  * Open a project: its mocks from the cache, else (unless `make` is false) its Home. `at`: the mock (`sid`) or box its
  * address names (else the mock last looked at here), and whether the address changes in place.
  */
-export async function start(app: string, make = true, at: { sid?: string | null; box?: Box | null; inPlace?: boolean } = {}) {
+export async function start(app: string, make = true, at: { sid?: string | null; box?: Box | null; inPlace?: boolean; device?: Device } = {}) {
   // Its draws write no address until it is open: then one, as a new step unless in place.
   address.hold++
-  try { await openProject(app, make, at.sid, at.box ?? null, !!at.inPlace) } finally { address.hold--; syncAddress(at.inPlace) }
+  try { await openProject(app, make, at.sid, at.box ?? null, !!at.inPlace, at.device) } finally { address.hold--; syncAddress(at.inPlace) }
 }
 
-async function openProject(app: string, make: boolean, sid: string | null | undefined, box: Box | null, inPlace: boolean) {
+/** A project's boxes and their Undo, as none: the map of the project opened brings its own. */
+const noBoxes = () => { state.boxes = null; state.past = { components: [], rules: [], data: [] } }
+
+async function openProject(app: string, make: boolean, sid: string | null | undefined, box: Box | null, inPlace: boolean, device?: Device) {
   showError(null)
-  stopMaking()
   const n = ++state.starts
   const res = await mapOf(app)
   // 401: a first-time visitor of the public app, who has no person (and so no projects) until the first mock.
@@ -65,6 +68,9 @@ async function openProject(app: string, make: boolean, sid: string | null | unde
     if (sid !== undefined) await notHere()
     return
   }
+  // The project is there (or is to be made): a design still drawn for the one open before stops.
+  stopMaking()
+  noBoxes()
   state.app = app
   state.tour = false
   state.flip = state.box = state.component = null
@@ -80,7 +86,7 @@ async function openProject(app: string, make: boolean, sid: string | null | unde
   const saved = named?.key ?? store.get(currentKey(app))
   state.current = saved && state.entries.get(saved)?.versions.length ? saved : state.entries.get(root)?.versions.length ? root : null
   resetTrail()
-  if (!state.entries.has(root)) { toStart(inPlace); return openScreen(null, null, null) }
+  if (!state.entries.has(root)) { toStart(inPlace); return openScreen(null, null, null, device) }
   await draw()
   loadShared()
   // The current mock at 100%.
@@ -93,7 +99,6 @@ export async function openTour(at: { at?: string | null; box?: Box | null } = {}
   address.hold++
   try {
     showError(null)
-    stopMaking()
     const n = ++state.starts
     const res = await fetch('/api/tour')
     if (!res.ok) throw new Error(`could not load the tour: HTTP ${res.status}`)
@@ -101,6 +106,8 @@ export async function openTour(at: { at?: string | null; box?: Box | null } = {}
     if (n !== state.starts) return
     const app = map.entries[0]?.app
     if (!app) throw new Error('the tour is missing')
+    stopMaking()
+    noBoxes()
     Object.assign(state, { app, tour: true, flip: null, box: null, component: null })
     generate.classList.remove('open')
     applyMap(map)
@@ -126,7 +133,8 @@ export async function openLast(inPlace = false, except?: string) {
 export function closeMockup() {
   state.busy?.abort()
   store.set('uxwoz:app', '')
-  Object.assign(state, { app: null, tour: false, entries: new Map(), boxes: null, filing: false, current: null, box: null, making: null, revising: null, flip: null, component: null })
+  noBoxes()
+  Object.assign(state, { app: null, tour: false, entries: new Map(), filing: false, visiting: false, current: null, box: null, making: null, revising: null, flip: null, component: null })
   resetTrail()
   loadRecent()
   draw()
@@ -143,10 +151,12 @@ async function deleteApp(again: boolean) {
   const what = `${n === 1 ? 'the only mock of this project' : `all ${n} mocks of this project`} and its boxes (components, rules, data), with its reviewer links and their feedback`
   if (!confirm(again ? `Start over? This deletes ${what} and draws Home again.` : `Delete ${what}?`)) return
   state.busy?.abort()
+  // Start over draws Home again at the project's size, not the window's.
+  const device = state.entries.get(screenKey(app, null))?.versions[0]?.device
   const res = await post('/api/delete-app', { app }).catch(() => null)
   if (!res?.ok) return showError('Could not delete the project')
   store.set(currentKey(app), '')
-  if (again) { loadRecent(); return start(app, true, { inPlace: true }) } // the dead address leaves the history
+  if (again) { loadRecent(); return start(app, true, { inPlace: true, device }) } // the dead address leaves the history
   store.set('uxwoz:app', '')
   await openLast(true, app)
 }

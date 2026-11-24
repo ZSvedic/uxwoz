@@ -1,7 +1,7 @@
 // The address in the browser (spec/behavior.md, Navigation: The address), with no DOM.
 import { describe, expect, test } from 'bun:test'
 import type { CacheEntry } from '@uxwoz/core'
-import { addressOf, addressStep, entryAt, landing, readAddress } from '../packages/web/src/address.ts'
+import { addStep, addressOf, addressStep, entryAt, landing, readAddress, stepTo } from '../packages/web/src/address.ts'
 
 const v = { html: '', model: 'claude-haiku-5.5', servedModel: null, createdAt: '', costUsd: 0, costEstimated: false, firstChunkMs: null, totalMs: 0, finishReason: 'stop' } as const
 const entry = (key: string, sid: string, extra: Partial<CacheEntry> = {}): CacheEntry => ({ key, app: 'Sleep', action: null, parent: null, versions: [{ ...v }], sid, ...extra })
@@ -58,7 +58,7 @@ describe('the address', () => {
   })
 
   test('changes as a new step whenever what shows changes, in place for a reload or Back, not at all when it merely redraws', () => {
-    // A, B, C, then ← to B: a step of its own, so the browser's Back returns to C.
+    // A, B, Rules, then B again from the dropdown: a step of its own.
     const steps = ['/m/k3f9x2/aa']
     for (const want of ['/m/k3f9x2/bb', '/m/k3f9x2/box-rules', '/m/k3f9x2/bb', '/m/k3f9x2/bb']) if (addressStep(steps.at(-1)!, want, false) === 'push') steps.push(want)
     expect(steps).toEqual(['/m/k3f9x2/aa', '/m/k3f9x2/bb', '/m/k3f9x2/box-rules', '/m/k3f9x2/bb'])
@@ -66,5 +66,22 @@ describe('the address', () => {
     expect(addressStep('/m/k3f9x2/h1', '/m/k3f9x2/a7', true)).toBe('replace')
     expect(addressStep('/m/k3f9x2/a7', '/m/k3f9x2/a7', false)).toBeNull()
     expect(addressStep('/', null, false)).toBeNull()
+  })
+})
+
+describe('← and →', () => {
+  test('are the browser\'s steps: one per mock or box reached, the ones after cut by a new one, a deleted mock skipped', () => {
+    let t = { steps: [] as string[], at: -1 }
+    for (const s of ['home', 'a', 'box:rules', 'b', 'b']) t = addStep(t, s)
+    expect(t).toEqual({ steps: ['home', 'a', 'box:rules', 'b'], at: 3 })
+    const all = () => true
+    // ← from b: Rules, one entry of the history back.
+    expect(stepTo(t, -1, 'b', all)).toBe(2)
+    // Rules gone: a, two entries back (history.go(-2)), the same as Back twice.
+    expect(stepTo(t, -1, 'b', (s) => s !== 'box:rules')! - t.at).toBe(-2)
+    expect(stepTo(t, 1, 'b', all)).toBeNull()
+    // Back at a, then a new mock: what came after a goes.
+    t = addStep({ ...t, at: 1 }, 'c')
+    expect(t).toEqual({ steps: ['home', 'a', 'c'], at: 2 })
   })
 })

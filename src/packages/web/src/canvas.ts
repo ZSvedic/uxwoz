@@ -6,6 +6,7 @@
 
 import { DEVICES, FRAME_SANDBOX, LEGACY_WIDTH, VIEWPORT_H, framePage, type Device } from '@uxwoz/core/frame'
 import { el } from './boxes.ts'
+import { MOCK_BUTTONS } from './flip.ts'
 
 /** Gaps between columns and between a row's buttons and the next row's names, in canvas pixels. */
 const GAP_X = 120
@@ -20,8 +21,6 @@ export const BUTTONS_H = 80
 export const ROPE_SHOW = 36
 /** A component's card in its box: as wide as a mock, this tall; its content scrolls inside. */
 const COMPONENT_H = 200
-/** A box's buttons stand right of it, today (boxes.ts). */
-const RAIL_W = 60
 const SVG_NS = 'http://www.w3.org/2000/svg'
 /** Zoom levels, as the bar shows them: 100% is the current mock fitted (`hundred`). */
 const MIN_ZOOM = 0.1
@@ -68,17 +67,11 @@ export function landing(b: Box, z: number, w: number, h: number, m = margin(w)):
   return { left: axis(b.x, b.w, w), top: axis(b.y, b.h, h) }
 }
 
-/** Where the glide to a mock ends: its 100% view (`frameOf`) centred at scale z. */
-export const glideEnd = (card: Box, z: number, stageW: number, stageH: number) => landing(frameOf(card, z), z, stageW, stageH)
-
 /** A point of the glide, a fraction t of its time in: a straight line, eased at both ends. */
 export function glideAt(from: { left: number; top: number }, to: { left: number; top: number }, t: number) {
   const k = t <= 0 ? 0 : t >= 1 ? 1 : t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2
   return { left: from.left + (to.left - from.left) * k, top: from.top + (to.top - from.top) * k }
 }
-
-/** Whether a point (canvas pixels) lies on one of the boxes. */
-export const hit = (boxes: Box[], x: number, y: number) => boxes.some((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h)
 
 /** One step of two fingers: their middle and spread, before and now. The canvas follows the middle (scrolled by its
  *  way back, so the content moves with the fingers) and zooms by how the spread grew. */
@@ -177,14 +170,6 @@ interface CanvasHandlers {
   zoomed: (level: number) => void
 }
 
-/** The buttons under the current mock: name, icon, label, tooltip. */
-export const BUTTONS: [string, string, string, string][] = [
-  ['another', '🎲', 'Another', 'Another design of this mock, from the same words'],
-  ['edit', '✏️', 'Edit', 'Say what should change in this mock'],
-  ['history', '⏪', 'History', 'Undo: bring back the version before'],
-  ['info', 'ℹ️', 'Info', 'What this mock was asked for and how it was drawn'],
-]
-
 /** A screen by its key, or a box by its element. */
 type Target = string | HTMLElement
 
@@ -242,7 +227,7 @@ export class Canvas {
   constructor(private stage: HTMLElement, private on: CanvasHandlers, private side: HTMLElement, private components: HTMLElement) {
     this.lines.classList.add('lines')
     this.surface.append(this.lines, side, this.acts)
-    for (const [name, icon, label, title] of BUTTONS) {
+    for (const [name, icon, label, title] of MOCK_BUTTONS) {
       const b = el('button', 'act', el('i', '', icon), label)
       b.type = 'button'
       b.title = title
@@ -288,15 +273,17 @@ export class Canvas {
     })
     // One finger on the sky pans it as the browser scrolls; two fingers pan it too and zoom by their spread, around
     // their middle (a mock hands its two-finger touches on, see the frame).
-    let spread: { d: number; z: number } | null = null
-    const apart = (t: TouchList) => Math.hypot(t[0]!.clientX - t[1]!.clientX, t[0]!.clientY - t[1]!.clientY)
-    stage.addEventListener('touchstart', (e) => { byHand(); spread = e.touches.length === 2 ? { d: apart(e.touches), z: this.z } : null }, { passive: true })
+    let fingers: { x: number; y: number; d: number } | null = null
+    const two = (t: TouchList) => ({ x: (t[0]!.clientX + t[1]!.clientX) / 2, y: (t[0]!.clientY + t[1]!.clientY) / 2, d: Math.hypot(t[0]!.clientX - t[1]!.clientX, t[0]!.clientY - t[1]!.clientY) })
+    stage.addEventListener('touchstart', (e) => { byHand(); fingers = e.touches.length === 2 ? two(e.touches) : null }, { passive: true })
     stage.addEventListener('touchmove', (e) => {
       byHand()
-      if (!spread || e.touches.length !== 2 || !spread.d) return
+      if (!fingers || e.touches.length !== 2) return
       e.preventDefault()
-      const t = e.touches
-      this.setScale(spread.z * apart(t) / spread.d, (t[0]!.clientX + t[1]!.clientX) / 2, (t[0]!.clientY + t[1]!.clientY) / 2)
+      const now = two(e.touches), s = touchStep(fingers, now)
+      fingers = now
+      if (s.zoom !== 1) this.setScale(this.z * s.zoom, now.x, now.y)
+      stage.scrollBy(s.dx, s.dy)
     }, { passive: false })
     // Dragging the sky pans it; a press on the sky that does not drag leaves nothing current.
     stage.addEventListener('pointerdown', (e) => {
@@ -421,9 +408,9 @@ export class Canvas {
 
   /**
    * Without a key, Fit all: the whole tree and the boxes. With one, 100%: that mock (or box) with its name, buttons
-   * and ropes as large as the stage allows, at once. Options from before are taken and ignored.
+   * and ropes as large as the stage allows, at once.
    */
-  fit(key?: Target, _old?: object) {
+  fit(key?: Target) {
     if (this.queued) this.layout(false)
     const st = this.stage
     if (key === undefined) {
@@ -582,12 +569,12 @@ export class Canvas {
     const t = keep ? this.currentTarget() : undefined, was = keep && !this.gliding && this.seen(t)
     const z = this.z, mock = this.mock
     const screens = this.screens.filter((s) => !s.component)
-    // The Components box is as wide as a mock and its rail; a box is as tall as Home.
-    this.components.parentElement!.style.width = `${mock.w + 50 + RAIL_W}px`
+    // The Components box is as wide as a mock; a box is as tall as Home.
+    this.components.parentElement!.style.width = `${mock.w + 50}px`
     const side = !this.side.hidden && screens.length > 0
     if (side) this.side.style.setProperty('--box-h', `${mock.h}px`)
     const st = this.stage, pad = Math.ceil(Math.max(PAD, st.clientWidth / z / 2, st.clientHeight / z / 2))
-    const p = placeTree(screens, mock, z, side ? this.side.offsetWidth + RAIL_W : 0, pad)
+    const p = placeTree(screens, mock, z, side ? this.side.offsetWidth : 0, pad)
     this.places = p.cards
     this.extent = { ...p.extent }
     if (side && p.side) {
@@ -704,6 +691,10 @@ export class Canvas {
       this.stage.scrollBy(Number(d.dx) || 0, Number(d.dy) || 0)
     } else if (d.uxwoz === 'open' && typeof d.url === 'string' && /^https?:\/\/\S+$/i.test(d.url) && d.url.length <= 2000) {
       open(d.url, '_blank', 'noopener,noreferrer')
+    } else if (d.uxwoz === 'action' && c.view?.component) {
+      // A control in a component's card in its box only makes that component current.
+      this.setLoose(false)
+      this.on.focus(c.key)
     } else if (d.uxwoz === 'action' && typeof d.prompt === 'string' && !c.view?.streaming) {
       this.on.action(c.key, d.prompt.slice(0, 500), typeof d.label === 'string' ? d.label.slice(0, 80) : '')
     }

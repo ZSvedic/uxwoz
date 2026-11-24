@@ -56,6 +56,28 @@ export function landing(app: string, entries: Entries, at: string | null, tour =
   return root ? { entry: root, why: 'That mock is not here.' } : null
 }
 
+// ---- ← and →: every mock or box that became current is a step (`box:<name>` for a box). Each step wrote one entry
+// of the browser's history, so ← and → move through that history by as many entries as steps.
+
+export interface Trail { steps: string[]; at: number }
+
+/** Reaching a step any way but ← and →: the steps after the one showing go, as a browser's history does; the same
+ *  step again adds none. */
+export function addStep(t: Trail, s: string): Trail {
+  if (t.steps[t.at] === s) return t
+  const steps = [...t.steps.slice(0, t.at + 1), s]
+  return { steps, at: steps.length - 1 }
+}
+
+/** The index of the nearest step in a direction that is still `there` and is not the one showing (`now`); null with none. */
+export function stepTo(t: Trail, dir: 1 | -1, now: string | null, there: (s: string) => boolean): number | null {
+  for (let i = t.at + dir; i >= 0 && i < t.steps.length; i += dir) {
+    const s = t.steps[i]!
+    if (s !== now && there(s)) return i
+  }
+  return null
+}
+
 /** How the address changes: not at all, in place of this step (a reload, Back and Forward), or as a new step. */
 export function addressStep(now: string, want: string | null, inPlace: boolean): 'push' | 'replace' | null {
   if (want == null || want === now) return null

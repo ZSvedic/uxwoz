@@ -43,8 +43,8 @@ export const state = {
   past: { components: [], rules: [], data: [] } as Record<BoxName, Past[]>,
   filing: false,
   visiting: false,
-  /** A filed() loop is waiting for filing or a visit to end. */
-  waiting: false,
+  /** The project a filed() loop is waiting for, for its filing or a visit to end. */
+  waiting: null as string | null,
   /** Counts changes this page applied, so a map fetched before one of them is not applied after it. */
   edits: 0,
   css: {} as Record<string, string>,

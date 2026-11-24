@@ -9,7 +9,7 @@ import { openLast, openTour, start } from './app.ts'
 import { closeMenus, sizeFor } from './bar.ts'
 import { closeCard } from './cards.ts'
 import { talkButton } from './voice.ts'
-import { showPage } from './sharing.ts'
+import { shareToken, showPage } from './sharing.ts'
 import { beginHint, hint, post, showError, themeCss } from './net.ts'
 import { draw } from './screens.ts'
 import { needsAccount, renderAccountLine } from './account-ui.ts'
@@ -23,11 +23,15 @@ export function openMenu() {
   renderRecent()
   renderMenu()
   renderAccountLine()
+  // An edit link's menu: Export the boxes, Theme, Sound and Privacy.
+  if (shareToken) for (const id of EDIT_HIDES) $(id).hidden = true
   showPage(null)
   panel.hidden = false
   panel.querySelector<HTMLElement>('.item')?.focus({ preventScroll: true })
 }
 export const closeMenu = () => { panel.hidden = true }
+/** What an edit link's menu leaves out (Share and Feedback too, sharing.ts). */
+const EDIT_HIDES = ['menuNew', 'menuRecentHead', 'menuRecent', 'menuTour', 'exportProject', 'startOver', 'deleteApp', 'modelLine', 'accountLine']
 
 $('menuClose').addEventListener('click', closeMenus)
 $('menuNew').addEventListener('click', () => { closeMenus(); openGenerate() })
@@ -182,6 +186,7 @@ function placeStarters(first: boolean) {
 /** New project over what is open; Esc or ✕ closes it and shows what was open before. */
 export function openGenerate() {
   closeMenus()
+  if (shareToken) return // an edit link has no New project
   if (generate.classList.contains('open')) return promptInput.focus()
   sizeHere()
   generate.classList.add('open')

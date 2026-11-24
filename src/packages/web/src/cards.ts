@@ -7,8 +7,8 @@ import { screenKey } from '@uxwoz/core/keys'
 import { isComponent } from '@uxwoz/core/tree'
 import type { CacheEntry } from '@uxwoz/core'
 import { addEmpty, boxesMarkdown, button, el, markBox, type Box, type BoxOp } from './boxes.ts'
-import { canvas, side, start } from './app.ts'
-import { hint, liveDesign, post, showError } from './net.ts'
+import { canvas, side } from './app.ts'
+import { hint, post, showError } from './net.ts'
 import { loadMe, refused } from './account-ui.ts'
 import { applyMap, boxShown, setCurrent } from './nav.ts'
 import { another, components, deleteQuestion, draw, hooks, labelOf, pastedOn, removeScreen, revise, undo, views } from './screens.ts'
@@ -30,14 +30,15 @@ export async function boxOp(o: BoxOp | { op: 'seen'; box: Box; ids: string[] }):
   if (!app) return false
   // The tour is read-only: nothing is sent that would change it.
   if (state.tour) { if (o.op !== 'seen') hint('Off in the tour.'); return false }
+  // A change starts: an earlier red pill goes.
+  if (o.op !== 'seen') showError(null)
   const res = await post('/api/box', { app, ...o }).catch(() => null)
   const body = await res?.json().catch(() => null)
   // The fixer's Undo sends the map with the changes it could not undo.
   if (body?.entries && app === state.app) applyMap(body)
-  // A box's Edit and Run fixer call the models: a live design (the hint).
-  const live = o.op === 'edit' || o.op === 'visit'
-  if (live) loadMe()
-  if (res?.ok && !body?.error) { if (live) liveDesign(); return true }
+  // A box's Edit and Run fixer call the models: the free screens left.
+  if (o.op === 'edit' || o.op === 'visit') loadMe()
+  if (res?.ok && !body?.error) return true
   if (res && refused(res.status, body)) { draw(); return false }
   showError(`Could not change the box: ${body?.error ?? 'no answer'}`)
   draw()
@@ -54,8 +55,8 @@ export function lookAt(box: Box) {
   focusBox(box)
   canvas.showBox(side.sections[box])
   // Only the entries new at the look count as seen: one filed meanwhile stays marked. The tour changes nothing.
-  const ids = unseen(box)
-  if (ids.length && !state.tour) setTimeout(() => boxOp({ op: 'seen', box, ids }), 3000)
+  const ids = unseen(box), app = state.app
+  if (ids.length && !state.tour) setTimeout(() => { if (state.app === app && !state.tour) boxOp({ op: 'seen', box, ids }) }, 3000)
 }
 
 /** Export the boxes: the three boxes as a markdown file. */
@@ -279,9 +280,7 @@ function describeCard(t: Target): Node[] {
   const v = e.versions.at(-1)
   return [el('p', '', 'Neither design fits? Say what this mock should be.'), fieldForm(t, 'The mock\'s words', v?.prompt ?? e.action ?? e.app, 'Draw again', async (words) => {
     closeCard()
-    const done = await revise(e.key, null, words)
-    // Home's new words are the project's new name: every key changed, so the project opens again under it.
-    if (done && !done.action && state.app && done.app !== state.app) await start(done.app, false, { inPlace: true })
+    revise(e.key, null, words)
   })]
 }
 

@@ -81,7 +81,7 @@ function show(key: string, push = true) {
   const s = byKey.get(key)
   if (!s) return
   if (push) history.push(key)
-  frame.srcdoc = framePage(markCurrent(pasteComponents(s.html, map.components), s.name), css, true, s.device)
+  frame.srcdoc = framePage(markCurrent(pasteComponents(s.html, map.components), s.name), css, true)
   $('name').textContent = s.title
   document.title = `${s.title} · ${map.app.slice(0, 40)}`
   // Home has no Back and no trail: it would only say its name again.

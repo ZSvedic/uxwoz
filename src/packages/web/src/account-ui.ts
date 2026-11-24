@@ -199,6 +199,9 @@ export async function loadMe() {
   if (res?.ok) setMe(await res.json())
 }
 
+/** The person on this page is the public's (a visitor or a user), as /api/me last said. */
+export const isPublicMe = () => shows(me, isPublic)
+
 function setMe(m: Me) {
   me = m
   renderAccountLine()

@@ -151,12 +151,10 @@ function fakeFrame(opts: { final?: boolean; page?: Partial<El>; parts?: El[]; ac
 
 describe('a mock scrolls inside its frame', () => {
   test('the frame fills its size and scrolls: no vh fix, no size report, no one-finger pan', () => {
-    const doc = framePage('<h1>Hi</h1>', '', true, 'small-phone')
+    const doc = framePage('<h1>Hi</h1>', '', true)
     expect(doc).not.toContain('overflow: hidden')
     expect(doc).toContain('body > main { min-height: 100vh; }')
     for (const gone of ["uxwoz: 'size'", "'pan'", 'vhToPx', 'dragOwner']) expect(doc).not.toContain(gone)
-    // An old device gets the same page: its frame is its own size.
-    expect(framePage('<h1>Hi</h1>', '', true, 'phone')).toBe(framePage('<h1>Hi</h1>', '', true, 'monitor'))
     expect(DEVICES.phone.height).toBe(844)
   })
 

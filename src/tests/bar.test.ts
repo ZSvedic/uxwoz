@@ -1,7 +1,7 @@
 // The top bar (spec/behavior.md, Top bar and New project), with no DOM: the dropdown's rows, the size a window is
 // offered, when the boxes fit the bar.
 import { describe, expect, test } from 'bun:test'
-import { NAME_ROOM, boxName, boxesFit, sizeFor, treeRows } from '../packages/web/src/bar.ts'
+import { NAME_ROOM, boxName, boxesFit, keyOf, sizeFor, treeRows } from '../packages/web/src/bar.ts'
 
 describe('the dropdown\'s tree', () => {
   // Home → Monstera → Care log (planned); Home → Schedule; Home → Add a plant → Scan a label (planned).
@@ -41,5 +41,17 @@ describe('the boxes in a wide bar', () => {
     expect(boxesFit(800, 420, 420)).toBe(false)
     expect(boxesFit(420 + 420 + NAME_ROOM, 420, 420)).toBe(true)
     expect(boxesFit(420 + 420 + NAME_ROOM - 1, 420, 420)).toBe(false)
+  })
+})
+
+describe('the keys', () => {
+  const k = (key: string, more: object = {}) => ({ key, code: '', metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...more })
+  test('zoom and step on the canvas, and do nothing inside a text field', () => {
+    expect(keyOf(k('=', { metaKey: true }), false)).toBe('in')
+    expect(keyOf(k('-', { ctrlKey: true }), false)).toBe('out')
+    expect(keyOf(k('0', { metaKey: true }), false)).toBe('1')
+    expect(keyOf(k('!', { shiftKey: true, code: 'Digit1' }), false)).toBe('all')
+    expect(keyOf(k('[', { metaKey: true }), false)).toBe('back')
+    for (const e of [k('=', { metaKey: true }), k('0', { metaKey: true }), k('!', { shiftKey: true, code: 'Digit1' }), k(']', { metaKey: true })]) expect(keyOf(e, true)).toBeNull()
   })
 })

@@ -7,7 +7,7 @@ import { componentsOf, isComponent, namesOf, screenTree } from '@uxwoz/core/tree
 import type { CacheEntry, Version } from '@uxwoz/core'
 import { renderSide } from './boxes.ts'
 import type { ScreenView } from './canvas.ts'
-import { canvas, closeMockup, side } from './app.ts'
+import { canvas, closeMockup, side, start } from './app.ts'
 import { boxOp, renderCards } from './cards.ts'
 import { pressedOf } from './flip.ts'
 import { commentCount } from './comments.ts'
@@ -36,8 +36,6 @@ export const labelOf = (e: CacheEntry) => isComponent(e) ? e.name! : e.versions.
 
 /** The tree parent: the mock fewest clicks from Home that leads here. */
 export const treeParent = (key: string) => state.tree.get(key)?.parent ?? null
-
-export const ideaOf = (v: Version) => v.idea ?? ''
 
 /** Every mock and component, as the server last sent them. */
 export const all = () => [...state.entries.values()]
@@ -96,11 +94,11 @@ export async function draw() {
  * A design that fails is not kept: the red pill says why, and the canvas glides back to where the click came from;
  * a first Home that failed opens New project with the sentence still in it.
  */
-export async function openScreen(action: string | null, from: string | null, label: string | null) {
+export async function openScreen(action: string | null, from: string | null, label: string | null, size?: Device) {
   if (state.tour) return
-  // A project keeps the size its Home was drawn at; the size picked counts for a first Home only.
+  // A project keeps the size its Home was drawn at; the size picked (or the one Start over keeps) counts for a first Home only.
   const app = state.app, home = app ? state.entries.get(screenKey(app, null)) : undefined
-  const device = home ? home.versions[0]?.device : deviceSelect.value as Device
+  const device = home ? home.versions[0]?.device : size ?? deviceSelect.value as Device
   let m: Making | null = null
   refused = null
   await stream('/api/screen', { app: state.app!, action, model: modelSelect.value, ...(!home && { device }), from, label }, 'draw this mock', async (ev, css) => {
@@ -136,7 +134,7 @@ export async function openScreen(action: string | null, from: string | null, lab
     note(null)
     if (!failed) return
     stopMaking()
-    if (answered) refused = { app, run: () => openScreen(action, from, label) }
+    if (answered) refused = { app, run: () => openScreen(action, from, label, size) }
     if (action == null && !state.entries.size) {
       // A first Home: the sentence goes back into New project (after the account card, if that answered).
       if (answered) refusedFirst = app
@@ -205,6 +203,8 @@ export function onAction(from: string, action: string, label: string) {
   if (!app) return
   endHint()
   if (action.trim().toLowerCase() === 'new') return void document.dispatchEvent(new CustomEvent('uxwoz:new-project'))
+  // A new mock's controls work once it is stored.
+  if (state.making?.key === from) return
   const { to, prompt } = target(app, from, action)
   setCurrent(from)
   if (to === from) return void (screenRef(action) || isBack(action) || hint('This control leads nowhere yet: the fixer redraws it.'))
@@ -233,19 +233,20 @@ async function settle(key: string) {
 }
 
 /** What 🎲 does after two designs from the same words: the cards (cards.ts) set it to flip to *Describe it
- *  differently*; until then it draws another. */
-export const hooks = { describe: (key: string) => { revise(key, null) } }
+ *  differently*. */
+export const hooks: { describe?: (key: string) => void } = {}
 
 /** 🎲 Another: one more design from the same words; after two, the hook `describe`. */
 export function another(key: string) {
   const e = state.entries.get(key)
   if (!e?.versions.length || isComponent(e)) return
-  if ((e.draws ?? 1) >= 2) return hooks.describe(key)
+  if ((e.draws ?? 1) >= 2 && hooks.describe) return hooks.describe(key)
   revise(key, null)
 }
 
 /** One new version of a mock or a component, streamed into its own frame: an Edit with `change`, Draw again with
- *  `prompt` (new words), else Another. The stored entry once done. */
+ *  `prompt` (new words), else Another. The stored entry once done. Home's new words are the project's new name: every
+ *  key changed, so the project opens again under it (also when the request is sent again after a sign-up). */
 export async function revise(key: string, change: string | null, prompt?: string): Promise<CacheEntry | null> {
   const e = state.entries.get(key)
   if (!e?.versions.length || state.tour) return null
@@ -263,7 +264,7 @@ export async function revise(key: string, change: string | null, prompt?: string
       done = ev.entry
       if (ev.filing) { state.filing = true; filed() }
       state.revising = null
-      if (ev.entry.versions.at(-1)?.costUsd !== 0) liveDesign()
+      if (!isComponent(e) && ev.entry.versions.at(-1)?.costUsd !== 0) liveDesign()
     }
   }, (failed, answered) => {
     frame?.cancel()
@@ -272,7 +273,9 @@ export async function revise(key: string, change: string | null, prompt?: string
     // After a failure, draw() puts the mock as it was back into its frame.
     if (state.revising?.key === key) state.revising = null
   })
-  return done
+  const d = done as CacheEntry | null
+  if (d && !d.action && state.app && d.app !== state.app) await start(d.app, false, { inPlace: true })
+  return d
 }
 
 /** History: the version before the one showing, or the one shown at `at` (Redo, a tap on a version). */
