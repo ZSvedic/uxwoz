@@ -35,6 +35,6 @@ describe('fx.ts', () => {
       expect([f, read(resolve(DESIGN, f)).match(motion)?.[0] ?? null]).toEqual([f, null])
     }
     const css = read(resolve(DESIGN, 'motion.css'))
-    for (const name of ['summon', 'lift', 'hand']) expect([name, css.includes(`@keyframes ${name} `)]).toEqual([name, true])
+    for (const name of ['summon', 'hand']) expect([name, css.includes(`@keyframes ${name} `)]).toEqual([name, true])
   })
 })

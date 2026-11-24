@@ -10,7 +10,7 @@ import { lookAt } from './drawer.ts'
 import { hint, mapOf, showError } from './net.ts'
 import { shareToken } from './sharing.ts'
 import { loadMe } from './account-ui.ts'
-import { all, components, draw, fitChoice, labelOf, openScreen, treeParent } from './screens.ts'
+import { all, components, draw, labelOf, openScreen, treeParent } from './screens.ts'
 import { item } from './toolbar.ts'
 import { $, state, store } from './state.ts'
 
@@ -81,7 +81,7 @@ export async function filed() {
       const res = await mapOf(app, wait).catch(() => null)
       if (app !== state.app) return
       const map = res?.ok ? await res.json() : null
-      if (map && n === state.edits && !state.busy && !state.picking) {
+      if (map && n === state.edits && !state.busy) {
         state.waiting = false
         return applyMap(map)
       }
@@ -194,12 +194,12 @@ export async function followAddress() {
 // An edit link keeps its own address, so it has nothing to follow.
 addEventListener('popstate', () => { if (!shareToken) followAddress().catch((e) => showError(String(e))) })
 
-/** Make a screen current and bring it into view; an open A OR B is fitted instead. */
+/** Make a mock current and glide to it. */
 function goTo(key: string) {
-  const e = state.entries.get(key)
-  if (!e) return
+  if (!state.entries.get(key)?.versions.length) return
   canvas.moved = performance.now()
-  if (e.versions.length) { setCurrent(key); canvas.reveal(key) } else fitChoice(key)
+  setCurrent(key)
+  canvas.reveal(key)
 }
 
 $('trailBack').addEventListener('click', () => walkTrail(-1))

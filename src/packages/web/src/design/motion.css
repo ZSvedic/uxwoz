@@ -1,25 +1,16 @@
 /* Every transition and animation of the app. They move transform, opacity, filter and box-shadow only, on a card's
    inner .screen, so no box the canvas measures changes. fx.ts plays the whoosh on the animations named summon and hand. */
 
-/* The Pick hint and the rails fade in; a box straightens smoothly when it becomes current. */
-.pick-hint { transition: opacity .15s; }
+/* The rails fade in; a box straightens smoothly when it becomes current. */
 .rail { transition: opacity .15s; }
 .box { transition: transform .2s; }
 
-/* A or B: both designs appear out of a blur, the second a beat later. Every later animation of a side lists summon
-   first, so it does not play again. */
-.card.side .screen { animation: summon .8s ease-out both; }
-.card.side[data-id$="#1"] .screen { animation-delay: .15s; }
+/* A design that streams in appears out of a blur. */
+.card.streaming .screen { animation: summon .8s ease-out both; }
 @keyframes summon {
   0% { opacity: 0; filter: blur(10px) brightness(3); transform: scale(.85); }
   60% { opacity: 1; filter: blur(0) brightness(1.4); }
   100% { transform: none; }
-}
-/* Hovering a finished side lifts it once with a gold glow. */
-.card.side.pickable:hover .screen { animation: summon .8s ease-out both, lift .9s ease-in-out; }
-@keyframes lift {
-  50% { transform: translateY(calc(-12px / var(--z)));
-    box-shadow: 0 0 0 7px var(--frame), 0 0 0 calc(7px + 2px / var(--z)) var(--current), 0 0 calc(40px / var(--z)) var(--gold), var(--lift); }
 }
 
 /* The drawer swings in from off the right, tilted, and comes to rest level. It closes at once. */

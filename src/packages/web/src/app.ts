@@ -12,7 +12,7 @@ import { boxOp, focusBox, onTool, openDrawer } from './drawer.ts'
 import { hint, mapOf, post, showError, themeCss } from './net.ts'
 import { landing, readAddress } from './address.ts'
 import { address, applyMap, currentKey, followAddress, notHere, resetTrail, setCurrent, showsAt, syncAddress, toStart } from './nav.ts'
-import { again, all, cardClosed, components, dropChoice, draw, fitChoice, fitScreenSoon, onAction, openScreen, pick, stopMaking } from './screens.ts'
+import { again, cardClosed, components, draw, onAction, openScreen, stopMaking } from './screens.ts'
 import { PICKERS, closeMenus, loadRecent, openGenerate, warmUp } from './toolbar.ts'
 import { editLinkApp, loadShared, shareToken } from './sharing.ts'
 import { initAccount } from './account-ui.ts'
@@ -24,8 +24,6 @@ export const side = createSide(boxOp, (box, tab) => { focusBox(box); openDrawer(
 for (const [name, s] of Object.entries(side.sections)) s.addEventListener('pointerdown', (e) => { if (!(e.target as Element).closest('.card')) focusBox(name as Box) })
 export const canvas = new Canvas($('stage'), {
   action: onAction,
-  pick,
-  cancel: dropChoice,
   focus: setCurrent,
   tool: onTool,
   zoomed: (z) => { $('zoomPct').textContent = `${Math.round(z * 100)}%` },
@@ -46,7 +44,6 @@ export async function start(app: string, make = true, at: { sid?: string | null;
 async function openMockup(app: string, make: boolean, sid: string | null | undefined, inPlace: boolean) {
   showError(null)
   stopMaking()
-  state.before = null
   const n = ++state.starts
   const res = await mapOf(app)
   // 401: a first-time visitor of the public app, who has no person (and so no mockups) until the first screen.
@@ -56,7 +53,6 @@ async function openMockup(app: string, make: boolean, sid: string | null | undef
   if (!make && !map.entries.length) { store.set('uxwoz:app', ''); return sid !== undefined ? notHere() : draw() }
   state.app = app
   state.drawer = state.box = null
-  state.failed.clear()
   store.set('uxwoz:app', app)
   generate.classList.remove('open')
   applyMap(map)
@@ -71,15 +67,13 @@ async function openMockup(app: string, make: boolean, sid: string | null | undef
   resetTrail()
   // A mockup keeps the device it was made for: new screens in it, and Start over, use it too.
   const made = state.entries.get(root)
-  const device = made?.versions[0]?.device ?? made?.proposals?.find(Boolean)?.device
+  const device = made?.versions[0]?.device
   if (device) deviceSelect.value = device // for this mockup only: the saved choice stays
   if (!state.entries.has(root)) { toStart(inPlace); return openScreen(null, null, null) }
   await draw()
   loadShared()
-  // An open A OR B is fitted, unless the address named a drawn screen: then that screen, and the address stays.
-  const open = all().find((e) => !e.versions.length)
-  if (open && !named?.versions.length) fitChoice(open.key)
-  else fitScreenSoon(state.current ?? root)
+  // The current mock at 100%.
+  canvas.fit(state.current ?? root)
   if (named) showsAt(named.key)
 }
 
@@ -93,7 +87,7 @@ export function closeMockup() {
   state.busy?.abort()
   restorePickers()
   store.set('uxwoz:app', '')
-  Object.assign(state, { app: null, entries: new Map(), boxes: null, filing: false, current: null, box: null, making: null, revising: null, drawer: null, before: null })
+  Object.assign(state, { app: null, entries: new Map(), boxes: null, filing: false, current: null, box: null, making: null, revising: null, drawer: null })
   resetTrail()
   loadRecent()
   draw()

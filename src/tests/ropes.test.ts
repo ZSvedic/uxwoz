@@ -1,99 +1,120 @@
-// The rope between a screen and its parent: down to the bottom of the parent's row, then one S-curve in the gap.
+// The canvas worked out with no page: rows of equal height, the 100% scale, where a glide ends, and the ropes.
 import { describe, expect, test } from 'bun:test'
-import { READABLE, curve, firstSeen, fitOf, fitZoom, headH, hit, landing, peekZoom, rope, seenOn, sidesOf, touchStep } from '../packages/web/src/canvas.ts'
+import { BUTTONS_H, NAME_H, ROPE_SHOW, curve, frameOf, glideAt, glideEnd, headH, hit, hundred, landing, placeTree, rope, sizeOf, touchStep } from '../packages/web/src/canvas.ts'
 
-describe('where the view lands', () => {
-  const phone = { x: 600, y: 600, w: 450, h: 930 }
+const small = sizeOf('small-phone'), laptop = sizeOf('laptop')
 
-  test('after a zoom, a screen that fits is centred; a taller one shows its top, a wider one its left edge', () => {
-    // At 50% on a 1280 × 900 stage the phone fits: its middle is the stage's middle.
-    const a = landing(phone, 0.5, 1280, 900)
-    expect(a.left + 640).toBeCloseTo((600 + 225) * 0.5)
-    expect(a.top + 450).toBeCloseTo((600 + 465) * 0.5)
-    // At 100% it is taller than the stage: its top shows, 24 px down; across it still fits, so it is centred.
-    const b = landing(phone, 1, 1280, 900)
-    expect(b.top).toBe(600 - 24)
-    expect(b.left).toBe(825 - 640)
-    // At 200% on a narrow stage its left edge shows, never cut off.
-    expect(landing(phone, 2, 700, 900).left).toBe(1200 - 24)
+describe('rows', () => {
+  // Home, two children, one of them with two children of its own, and a mock whose parent is not here.
+  const nodes = [
+    { key: 'home', parent: null }, { key: 'a', parent: 'home' }, { key: 'b', parent: 'home' },
+    { key: 'a1', parent: 'a' }, { key: 'a2', parent: 'a' }, { key: 'lost', parent: 'gone' },
+  ]
+
+  for (const z of [0.3, 1, 1.5]) {
+    test(`every row is as tall as the others, every mock the project's size, at ${z * 100}%`, () => {
+      const p = placeTree(nodes, small, z)
+      const ys = p.rows.map((row) => p.cards.get(row[0]!)!.y)
+      for (const [k, b] of p.cards) expect([k, b.w, b.h]).toEqual([k, small.w, small.h])
+      p.rows.forEach((row, d) => { for (const k of row) expect(p.cards.get(k)!.y).toBe(ys[d]!) })
+      const pitch = ys[1]! - ys[0]!
+      for (let d = 1; d < ys.length; d++) expect(ys[d]! - ys[d - 1]!).toBeCloseTo(pitch)
+      // The names and the buttons fit in a row's room, the next row's names below them.
+      expect(pitch).toBeGreaterThan(headH(z) + small.h + BUTTONS_H)
+    })
+  }
+
+  test('a first child hangs below its parent, a second beside it; a parent never moves for its children', () => {
+    const p = placeTree(nodes, small, 1)
+    const at = (k: string) => p.cards.get(k)!
+    expect(at('a').x).toBe(at('home').x)
+    expect(at('a1').x).toBe(at('a').x)
+    expect(at('b').x).toBeGreaterThan(at('a').x + small.w)
+    expect(at('a2').x).toBeGreaterThan(at('a1').x)
+    // A mock whose parent is not here is a root of its own, in the top row.
+    expect(p.rows[0]).toEqual(['home', 'lost'])
   })
 
-  test('a screen is seen when all of it shows, or its start when it is longer, or it covers the view', () => {
-    expect(seenOn(100, 500, 0, 1000)).toBe(true)
-    expect(seenOn(100, 1500, 0, 1000)).toBe(true) // its start shows, it is longer than the view
-    expect(seenOn(-200, 1500, 0, 1000)).toBe(true) // it covers the view
-    expect(seenOn(700, 1100, 0, 1000)).toBe(false) // it fits, but its end is cut off
-    expect(seenOn(-200, 300, 0, 1000)).toBe(false) // its start is cut off
-    expect(seenOn(1200, 2600, 0, 1000)).toBe(false) // out of view
-  })
-
-  test('a snug fit keeps a tall screen readable unless its width needs less', () => {
-    // A pair on a small window: the height alone gives 42%, the width allows 77%.
-    expect(fitZoom(0.77, 0.42, { snug: true })).toBe(READABLE)
-    // A narrow window: the width's fit is the floor.
-    expect(fitZoom(0.5, 0.3, { snug: true })).toBe(0.5)
-    // A phone screen on a laptop still fits at 100%, as before.
-    expect(fitZoom(2.7, 0.6, { snug: true })).toBe(1)
-    expect(fitZoom(0.77, 0.42)).toBe(0.42)
+  test('the boxes stand right of Home in its row, and a child of Home that does not fit below it goes right, under them', () => {
+    const p = placeTree(nodes, small, 1, 900)
+    expect(p.side!.y).toBe(p.cards.get('home')!.y)
+    expect(p.side!.x).toBeGreaterThan(p.cards.get('home')!.x + small.w)
+    expect(p.cards.get('lost')!.x).toBeGreaterThan(p.side!.x + 900)
   })
 })
 
-describe('on a phone', () => {
-  const phone = { w: 390, h: 900 }
+describe('100%', () => {
+  const fits = (z: number, stageW: number, stageH: number, mock: { w: number; h: number }) => {
+    const f = frameOf({ x: 0, y: 0, ...mock }, z), e = glideEnd({ x: 0, y: 0, ...mock }, z, stageW, stageH)
+    return f.w * z <= stageW && f.h * z <= stageH && e.left <= f.x * z && e.top <= f.y * z
+  }
 
-  test('an A OR B stands one above the other, each as wide as the window allows, the OR between', () => {
-    const wide = sidesOf([phone, phone], false, 160, 130, 90)
-    expect(wide.at).toEqual([{ x: 0, y: 0 }, { x: 550, y: 0 }])
-    expect(wide.w).toBe(940)
-    const narrow = sidesOf([phone, phone], true, 160, 130, 90)
-    expect(narrow.at).toEqual([{ x: 0, y: 0 }, { x: 0, y: 900 + 130 + 90 }])
-    expect(narrow.w).toBe(390)
-    expect(narrow.or).toEqual({ x: 0, y: 900, w: 390, h: 130 })
-    // A 375 px window: the pair fits at 92% (was about 30% side by side), the height ignored.
-    const z = fitOf(375, 700, { w: narrow.w, h: narrow.h + 100 }, true, true, { top: true })
-    expect(z).toBe(0.92)
-    expect(fitOf(375, 700, { w: wide.w, h: wide.h }, false, true, { top: true })).toBeLessThan(0.3)
+  test('a small phone mock on a phone fills its width, its name, buttons and ropes in view', () => {
+    const z = hundred(375, 700, small)
+    expect(z).toBeGreaterThan(0.95)
+    expect(z * small.w).toBeLessThanOrEqual(375 - 16)
+    expect(fits(z, 375, 700, small)).toBe(true)
   })
 
-  test('a stacked A OR B opens zoomed so the top of B shows under A, never below 70%, never wider than the window', () => {
-    // A tall window: A, the OR and 80 px of B fit at the width's zoom.
-    expect(peekZoom(1400, 800, 0.92)).toBe(0.92)
-    // A shorter one: the zoom by height, so B's top is at the bottom of the window.
-    const z = peekZoom(1100, 800, 0.92)
-    expect(z).toBeLessThan(0.92)
-    expect(z).toBeGreaterThan(0.7)
-    expect(z * 816 + 2 * 136 + 130 + 80).toBeLessThanOrEqual(1100)
-    // A phone: the height would need 33%, so it stays readable at 70%.
-    expect(peekZoom(688, 791, 0.92)).toBe(0.7)
-  })
-
-  test('a picked screen fits the window by its width, with its rail under it, never cut off at the right', () => {
-    const z = fitOf(375, 700, { w: 390, h: 1000 }, true, true, { snug: true })
-    expect(390 * z).toBeLessThanOrEqual(375)
+  test('a laptop mock on a laptop is about its real size; on a phone it is scaled down to fit', () => {
+    const z = hundred(1440, 780, laptop)
     expect(z).toBeGreaterThan(0.9)
-    // A wide window is as before: the snug fit keeps its height rule.
-    expect(fitOf(1280, 900, { w: 450, h: 1000 }, false, true, { snug: true })).toBe(fitZoom((1280 - 96) / 450, (900 - 96) / 1000, { snug: true }))
+    expect(z).toBeLessThanOrEqual(1)
+    expect(fits(z, 1440, 780, laptop)).toBe(true)
+    expect(hundred(375, 700, laptop)).toBeLessThan(0.3)
   })
 
-  test('a finger moves the canvas by its own way, back; two fingers zoom by their spread', () => {
-    expect(touchStep({ x: 100, y: 300, d: 0 }, { x: 110, y: 250, d: 0 }, false)).toEqual({ zoom: 1, dx: -10, dy: 50 })
-    expect(touchStep({ x: 0, y: 0, d: 100 }, { x: 0, y: 0, d: 150 }, true).zoom).toBe(1.5)
+  test('a phone mock in a roomy window is larger, at most 1.5 times its real size', () => {
+    expect(hundred(2560, 1400, small)).toBe(1.5)
+    const z = hundred(1440, 900, small)
+    expect(z).toBeGreaterThan(1)
+    expect(z * (small.h + BUTTONS_H + 2 * ROPE_SHOW + NAME_H)).toBeLessThanOrEqual(900 - 48)
   })
 })
 
-describe('what the view keeps', () => {
-  test('a zoom without a pointer stays put over a screen or a box, and lands only from the empty sky', () => {
+describe('the glide', () => {
+  test('ends with the mock, its name and its buttons centred in the view', () => {
+    const card = { x: 2000, y: 1500, ...small }, z = hundred(390, 760, small)
+    const end = glideEnd(card, z, 390, 760), f = frameOf(card, z)
+    expect(end.left + 390 / 2).toBeCloseTo((f.x + f.w / 2) * z)
+    expect(end.top + 760 / 2).toBeCloseTo((f.y + f.h / 2) * z)
+    // The name is above the card, the buttons under it.
+    expect(f.y).toBeLessThan(card.y - headH(z))
+    expect(f.y + f.h).toBeGreaterThan(card.y + card.h + BUTTONS_H)
+  })
+
+  test('zoomed in past the view, it shows the start of the mock, never cuts it off at the left or the top', () => {
+    const card = { x: 2000, y: 1500, ...small }, end = glideEnd(card, 3, 390, 760), f = frameOf(card, 3)
+    expect(end).toEqual({ left: f.x * 3 - 8, top: f.y * 3 - 8 })
+  })
+
+  test('runs in a straight line, from where it starts to where it ends', () => {
+    const a = { left: 100, top: 900 }, b = { left: 700, top: 300 }
+    expect(glideAt(a, b, 0)).toEqual(a)
+    expect(glideAt(a, b, 1)).toEqual(b)
+    for (const t of [0.2, 0.5, 0.8]) {
+      const p = glideAt(a, b, t)
+      expect((p.left - a.left) / (b.left - a.left)).toBeCloseTo((p.top - a.top) / (b.top - a.top))
+    }
+  })
+
+  test('a view lands centred when the box fits, else at its start', () => {
+    const box = { x: 600, y: 600, w: 450, h: 930 }
+    expect(landing(box, 0.5, 1280, 900).top + 450).toBeCloseTo((600 + 465) * 0.5)
+    expect(landing(box, 1, 1280, 900).top).toBe(600 - 24)
+  })
+})
+
+describe('touch and the pointer', () => {
+  test('two fingers move the canvas with their middle and zoom by their spread', () => {
+    expect(touchStep({ x: 100, y: 300, d: 100 }, { x: 110, y: 250, d: 100 })).toEqual({ zoom: 1, dx: -10, dy: 50 })
+    expect(touchStep({ x: 0, y: 0, d: 100 }, { x: 0, y: 0, d: 150 }).zoom).toBe(1.5)
+  })
+
+  test('a zoom without a pointer stays put over a mock or a box', () => {
     const boxes = [{ x: 600, y: 600, w: 450, h: 930 }]
     expect(hit(boxes, 800, 1400)).toBe(true)
     expect(hit(boxes, 1200, 1400)).toBe(false)
-  })
-
-  test('a resize fits again the first target that showed, any of it, else nothing', () => {
-    const view = { left: 0, top: 0, w: 1000, h: 800 }
-    const off = { x: 3000, y: 0, w: 400, h: 400 }, on = { x: 900, y: 700, w: 400, h: 400 }
-    expect(firstSeen([['choice', undefined], ['box', off], ['screen', on]], 1, view)).toBe('screen')
-    expect(firstSeen([['choice', on], ['screen', on]], 1, view)).toBe('choice')
-    expect(firstSeen([['screen', off]], 1, view)).toBeUndefined()
   })
 })
 
@@ -132,30 +153,26 @@ describe('curve', () => {
 
   test('straight down when the child is in the parent column', () => {
     expect(curve(40, 600, 40, 750, 880)).toBe('M40 600 V880')
-    expect(curve(40, 600, 40.6, 750, 880)).toBe('M40 600 V880')
   })
 })
 
 describe('rope', () => {
-  // Two parents side by side; below them one row with an A OR B (a tall idea above it) and a plain screen (a short name).
-  // The ropes overlap across: the left parent's goes to the A OR B, the right parent's to the plain screen beyond it.
-  for (const z of [0.1, 0.25]) {
-    for (const [name, common] of [['the row', true], ['each child (as before)', false]] as const) {
-      test(`ropes ending at ${name}'s height at ${z * 100}%: ${common ? 'no crossing, no head entered' : 'the test sees the fault'}`, () => {
-        const p1 = { x: 600, y: 600, w: 400, h: 800 }, p2 = { x: 1120, y: 600, w: 400, h: 800 }, rowBottom = 1400
-        const y = rowBottom + 150 + headH(true, z), end = common ? y - headH(true, z) - 6 / z : Infinity
-        const choice = { x: 1700, y, w: 1000, h: 800 }, plain = { x: 2800, y, w: 400, h: 800 }
-        const a = sample(rope(p1, choice, z, true, rowBottom, end)), b = sample(rope(p2, plain, z, false, rowBottom, end))
-        // At every height both pass, the rope that starts left stays left.
-        let crossed = false
-        for (const p of a) for (const q of b) if (Math.abs(p.y - q.y) < 0.5 && p.x > q.x) crossed = true
-        // Neither enters the other's head band.
-        const band = (c: typeof choice, isChoice: boolean) => (p: { x: number; y: number }) =>
-          p.x >= c.x && p.x <= c.x + c.w && p.y > c.y - headH(isChoice, z) - 1e-9
-        const entered = a.some(band(plain, false)) || b.some(band(choice, true))
-        expect(crossed || entered).toBe(!common)
-        if (common) expect([crossed, entered]).toEqual([false, false])
-      })
-    }
+  for (const z of [0.25, 1]) {
+    test(`ropes into one row do not cross and bend below the buttons, above the names, at ${z * 100}%`, () => {
+      const p = placeTree([{ key: 'h', parent: null }, { key: 'x', parent: null }, { key: 'h1', parent: 'h' }, { key: 'h2', parent: 'h' },
+        { key: 'x1', parent: 'x' }], small, z)
+      const c = (k: string) => p.cards.get(k)!
+      const a = sample(rope(c('h'), c('h2'), z)), b = sample(rope(c('x'), c('x1'), z))
+      let crossed = false
+      for (const q of a) for (const r of b) if (Math.abs(q.y - r.y) < 0.5 && q.x > r.x) crossed = true
+      expect(crossed).toBe(false)
+      // The bend: every point off both ends' columns.
+      for (const q of a) if (q.x !== a[0]!.x && q.x !== a.at(-1)!.x) {
+        expect(q.y).toBeGreaterThanOrEqual(c('h').y + small.h + BUTTONS_H - 1e-9)
+        expect(q.y).toBeLessThanOrEqual(c('h2').y - headH(z) + 1e-9)
+      }
+      // A first child below its parent: straight down.
+      expect(rope(c('h'), c('h1'), z)).toMatch(/^M[\d.]+ [\d.]+ V[\d.]+$/)
+    })
   }
 })

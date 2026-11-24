@@ -79,7 +79,7 @@ src/packages/web/src/
                  /api/revise (Edit, Another, Draw again: Home's renames, 409 when taken), /api/undo (by `at` too),
                  /api/tour, /api/map (wait=1 for filing and a visit), /api/apps, /api/delete, /api/delete-app,
                  /api/box (also undo, a box's Undo and Edit, Visit now), /api/warmup, /api/backup, /api/me, /api/step,
-                 themes; request checks; the old A OR B `ScreenEvent` type the page reads until its rework;
+                 themes; request checks;
                  every route takes its cache from the request's desk; in public mode the account's and the
                  admin's routes, the owner's mail of requests, idle visitors swept each day, the backup as a zip
   drawing.ts     the work behind the routes: filing and visits in one chain per mockup (a click waits for it),
@@ -89,9 +89,10 @@ src/packages/web/src/
   tour.ts        the tour read from tour/ at each request (mocks, rules.md, data.md, components/, notes.md) as
                  /api/map sends a mockup; `isTour`, which share.ts's `guard` refuses on every other route (404)
   app.ts         browser entry: builds the canvas and the boxes, opens, closes and deletes a mockup, init
-  state.ts       browser: the shared state, local storage, elements by id, Enter sends a form
-  screens.ts     browser: views (a card's name) and draw, A OR B streaming, refit and pick, clicks (@names, back), Regenerate, Edit,
-                 Undo, delete
+  state.ts       browser: the shared state (`tour` for the read-only tour), local storage, elements by id, Enter sends a form
+  screens.ts     browser: views (a card's name) and draw, a new mock streamed where it lands (glide there, back on a
+                 failure), clicks (@names, back, `new` as the event `uxwoz:new-project`, `/api/settle` for a drawn one),
+                 🎲 Another (`hooks.describe` after two designs), Edit, Undo, delete
   nav.ts         browser: the current screen, ← → trail, the address kept in step and followed (Back and Forward,
                  a pasted one, *That mockup is not here.*), the map after filing, Nav
   address.ts     browser: the address `/m/<mockup>/<screen>` read and written, which screen it names, push or
@@ -100,8 +101,8 @@ src/packages/web/src/
   toolbar.ts     browser: generate panel (the starters, above the prompt box for a first-time visitor) and
                  pickers, toolbar menus (Theme too), Recent, zoom and its keys; the bar's fit (`fitBar`: tight,
                  then fold the boxes, by measuring), Export project with its hint
-  net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill, the brief hint
-                 and the one that stays (after a live design, until the next click or key)
+  net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill, the brief hint,
+                 the note while a design is drawn (`note`), and the hint that stays (after a live design, until the next click or key)
   account-ui.ts  browser: the public's account button, its menu and the account card (sign in by code, Ask for
                  more, Delete my account), a refused live design (402, or a refused side of an A OR B) or a thing
                  that needs an account; what each shows from
@@ -109,10 +110,10 @@ src/packages/web/src/
                  its record in this browser (`liveHint`)
   voice.ts       browser: hold to talk: the words after the typed text, kept on release, the four problems (`Talk`,
                  no DOM, tested) and the speech recognition behind it (`HoldToTalk`); no button wired in yet
-  canvas.ts      browser: the boxes right of Home, the tree layout (packed rows, ropes that bend in the gap), cards and frames, A OR B sides,
-                 rails at the canvas's scale, pan and zoom, fits (and again on a window resize), frames scaled
-                 not zoomed, where a zoom lands (`landing`), the current screen kept in view; a narrow window
-                 (`PHONE`: A OR B stacked by `sidesOf`, width fits by `fitOf`, the rail a row), touch pan and pinch
+  canvas.ts      browser: the boxes right of Home, the tree layout (`placeTree`: rows of equal height, ropes that bend in
+                 the gap), cards of the project's size with name tags and scroll corners, frames scaled not zoomed, the
+                 four buttons under the current mock, 100% (`hundred`) and zoom levels relative to it, Fit all, the glide
+                 (`glideEnd`, `glideAt`), a tap on the sky, links out (`open`), touch: two fingers pan and pinch
   boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes and their rails, editing and adding in
                  place, Export
   people.ts      the public's people and money over bun:sqlite (spec/public.md): visitors, sessions, the meter

@@ -4,7 +4,6 @@ import type { Device } from '@uxwoz/core/frame'
 import type { TreeNode } from '@uxwoz/core/tree'
 import type { BoxName, Boxes, CacheEntry, Past, Version } from '@uxwoz/core'
 import type { Box } from './boxes.ts'
-import type { View } from './canvas.ts'
 import type { StreamRenderer } from './net.ts'
 
 export const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -15,31 +14,25 @@ export const deviceSelect = $<HTMLSelectElement>('device')
 export const drawer = $('drawer')
 export const changeInput = $<HTMLTextAreaElement>('change')
 
-/** One side of a new screen's A OR B while it streams. */
-export interface Side { stream: StreamRenderer | null; version: Version | null; error: string | null }
-/** A new screen whose A OR B streams in before it is stored. */
-export interface Making { key: string; parent: string | null; device: Device; sides: Side[] }
+/** A new mock while its one design streams in, before it is stored: where it hangs, its name until it has its own. */
+export interface Making { key: string; parent: string | null; device?: Device; name: string; stream: StreamRenderer | null; version: Version | null }
 
 export const state = {
   app: null as string | null,
   entries: new Map<string, CacheEntry>(),
   /** Each screen's level and parent, worked out on every draw. */
   tree: new Map<string, TreeNode>(),
-  /** The screen the user last picked, clicked in, or chose in Nav. */
+  /** The mock the user last opened, tapped, or chose in the dropdown. */
   current: null as string | null,
   /** The box clicked or shown since: it is current instead of that screen (its rail, the drawer). */
   box: null as Box | null,
   making: null as Making | null,
-  /** Why a side of an A OR B failed, by card id, so it still shows once the screen is stored. */
-  failed: new Map<string, string>(),
-  /** A pick on its way to the server, so a second click does not pick again. */
-  picking: false,
-  /** A picked screen getting a new version: an Edit with `change`, else a Regenerate. */
+  /** A drawn mock getting a new version: an Edit with `change`, else Another. */
   revising: null as { key: string; change: string | null } | null,
   drawer: null as 'edit' | 'info' | 'comments' | 'share' | null,
   busy: null as AbortController | null,
-  /** The view before an A OR B was fitted, to go back to after the pick. */
-  before: null as View | null,
+  /** The tour is open: read-only, so the buttons under a mock are grey and say *Off in the tour.* */
+  tour: false,
   /** Counts mockups opened, so a slower earlier open gives way to a newer one. */
   starts: 0,
   /** Rules and Data (components are entries); the changes of each box that Undo can take back, oldest first. */

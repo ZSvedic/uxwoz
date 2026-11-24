@@ -1,7 +1,7 @@
 // Talking to the server: fetches, the NDJSON screen streams, a streaming frame, and the red pill and the hint.
 
 import { REBUILD_MS, extractFragment, hasVisibleText } from '@uxwoz/core/frame'
-import type { ScreenEvent } from './server.ts'
+import type { DrawEvent as ScreenEvent } from './server.ts'
 import { canvas } from './app.ts'
 import { draw, page } from './screens.ts'
 import { LIVE_HINT, liveHint, loadMe, refused, sideAct } from './account-ui.ts'
@@ -56,8 +56,8 @@ export function showError(msg: string | null) {
 $('errorClose').addEventListener('click', () => showError(null))
 
 let hintTimer: ReturnType<typeof setTimeout> | undefined
-/** Briefly say why a click does nothing: a screen is being made, or the control leads nowhere. */
-export function hint(text = 'One screen at a time: wait until this one is made.') {
+/** Briefly say why a click does nothing: a mock is being drawn, or the control leads nowhere. */
+export function hint(text = 'One mock at a time: wait until this one is drawn.') {
   const h = $('hint')
   h.textContent = text
   h.hidden = !$('error').hidden
@@ -85,10 +85,18 @@ export const beginHint = (hasMockups: boolean) => { if (hasMockups) liveEvent('v
 export const endHint = () => { if (liveOn) liveEvent('act') }
 export function showLasting() {
   if (hintTimer) return
-  const h = $('hint'), on = liveOn && !!state.app && !!$('error').hidden
-  h.textContent = on ? LIVE_HINT : ''
+  const h = $('hint'), live = !noteText && liveOn && !!state.app, on = (!!noteText || live) && !!$('error').hidden
+  h.textContent = on ? noteText || LIVE_HINT : ''
   h.hidden = !on
-  h.classList.toggle('press', on)
+  h.classList.toggle('press', on && live)
+}
+
+/** The note at the bottom of the canvas while a design is drawn (*Drawing Care log…*, *Making the change…*), until it
+ *  is done; a brief hint shows over it, the red pill hides it. */
+let noteText = ''
+export function note(text: string | null) {
+  noteText = text ?? ''
+  showLasting()
 }
 addEventListener('pointerdown', endHint, true)
 addEventListener('keydown', endHint, true)

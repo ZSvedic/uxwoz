@@ -7,10 +7,10 @@ import type { Boxes } from '@uxwoz/core'
 import { boxesMarkdown, countLabel, countOf, el, markBox, visitToUndo, type Box, type BoxOp } from './boxes.ts'
 import { canvas, side } from './app.ts'
 import { PHONE } from './canvas.ts'
-import { fmtS, fmtUsd, liveDesign, post, showError } from './net.ts'
+import { fmtS, fmtUsd, hint, liveDesign, post, showError } from './net.ts'
 import { loadMe, refused } from './account-ui.ts'
 import { applyMap, currentAt, setCurrent } from './nav.ts'
-import { components, draw, ideaOf, labelOf, pastedOn, removeScreen, revise, undo, views } from './screens.ts'
+import { another, components, draw, ideaOf, labelOf, pastedOn, removeScreen, revise, undo, views } from './screens.ts'
 import { closeMenus } from './toolbar.ts'
 import { isShared, loadShared, renderShare, screenFeedback, shareToken } from './sharing.ts'
 import { commentsTab, renderComments } from './comments.ts'
@@ -72,12 +72,16 @@ export function focusBox(box: Box) {
   renderDrawer()
 }
 
+/** A button under the current mock (canvas.ts): Edit and Info open the drawer (the same one again closes it), 🎲 draws
+ *  another design, ⏪ is Undo for now. None in the tour; only Info while a design is drawn. */
 export function onTool(key: string, tool: string) {
+  if (state.tour) return hint('Off in the tour.')
   if (!state.entries.get(key)?.versions.length) return
   setCurrent(key)
-  if (tool === 'edit' || tool === 'info') return openDrawer(tool)
-  if (tool === 'regenerate' && !isComponent(state.entries.get(key)!)) return revise(key, null)
-  if (tool === 'undo') return undo(key)
+  if (tool === 'edit' || tool === 'info') return state.drawer === tool ? closeDrawer() : openDrawer(tool)
+  if (state.busy) return hint()
+  if (tool === 'another') return another(key)
+  if (tool === 'history') return undo(key)
   if (tool === 'delete') return removeScreen(key)
 }
 
@@ -86,6 +90,7 @@ const modelLabel = (id: string) => [...modelSelect.options].find((o) => o.value 
 
 export function openDrawer(tab: NonNullable<typeof state.drawer>) {
   state.drawer = tab
+  canvas.render(views(), !!state.busy) // the pressed button under the mock
   if (tab === 'share' || tab === 'comments' || (tab === 'info' && !state.box)) loadShared()
   renderDrawer()
   // The drawer swings in from off the window: a focus that scrolled to the field would carry the page along.
@@ -94,7 +99,7 @@ export function openDrawer(tab: NonNullable<typeof state.drawer>) {
   requestAnimationFrame(() => { const at = currentAt(); if (at) canvas.reveal(at) })
 }
 
-export const closeDrawer = () => { state.drawer = null; renderDrawer() }
+export const closeDrawer = () => { state.drawer = null; canvas.render(views(), !!state.busy); renderDrawer() }
 
 /** The drawer shows the current box or screen: Edit (the change box and the past changes) or Info. */
 export function renderDrawer() {

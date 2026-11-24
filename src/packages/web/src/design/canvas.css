@@ -14,80 +14,60 @@
 .error-pill { max-width: calc(100% - 32px); display: flex; gap: 8px; align-items: center; padding-right: 8px; border-color: var(--err); color: var(--err); }
 .error-pill button { padding: 0 6px; border: 0; background: none; color: inherit; }
 
-/* The canvas: screens at fixed places, in canvas pixels; CSS zoom scales it. Names, ideas, rings and the OR divide by
-   --z, so they keep their size on screen. The stars are a layer behind the screens, so they zoom too. */
+/* The canvas: mocks at fixed places, in canvas pixels; CSS zoom scales it. Names and rings divide by --z zoomed out,
+   so they keep a readable size on screen. The stars are a layer behind the mocks, so they zoom too. */
 .surface { position: relative; overflow: clip; }
 .surface::before { content: ''; position: absolute; inset: 0; pointer-events: none;
   background: url("./brand/stars-1.svg") 0 0 / 547px 547px, url("./brand/stars-2.svg") 131px 71px / 443px 443px,
     url("./brand/stars-3.svg") 257px 193px / 389px 389px; }
-/* Ropes: a tan strand and a dark twist on the same route, in canvas pixels, so they zoom with the screens; far out at
+/* Ropes: a tan strand and a dark twist on the same route, in canvas pixels, so they zoom with the mocks; far out at
    least 1.5 px on screen, the twist's dash growing with them. */
 .lines { --rope-w: max(4px, 1.5px / var(--z)); position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
 .lines .line { fill: none; stroke: var(--rope); stroke-width: var(--rope-w); stroke-linecap: round; }
 .lines .line.twist { stroke: var(--rope-twist); stroke-dasharray: calc(var(--rope-w) / 4) calc(var(--rope-w) * .75); stroke-linecap: butt; }
 .card { position: absolute; }
-/* A screen in a 7 px ivory frame with a soft halo, drawn as shadows so no size changes. */
+/* A mock: a frame of fixed size in a 7 px ivory frame with a soft halo, drawn as shadows so no size changes. */
 .card .screen { position: relative; overflow: hidden; background: var(--screen); border: calc(1px / var(--z)) solid var(--frame-line);
   border-radius: 10px; box-shadow: 0 0 0 7px var(--frame), 0 0 0 8px var(--frame-edge), var(--halo), var(--lift); }
-/* The current screen, and a side that can be picked under the pointer: a gold ring around the frame and a gold glow. */
-:is(.card.current, .card.side.pickable:hover) .screen { box-shadow: 0 0 0 7px var(--frame), 0 0 0 calc(7px + 2px / var(--z)) var(--current),
+/* The current mock: a gold ring around the frame and a gold glow; none after a tap on the sky. */
+.surface:not(.loose) .card.current .screen { box-shadow: 0 0 0 7px var(--frame), 0 0 0 calc(7px + 2px / var(--z)) var(--current),
   0 0 calc(30px / var(--z)) var(--gold-glow), var(--lift); }
+/* Scroll corners: an edge with more beyond it has flat corners and fades into the sky. */
+.card.above .screen { border-top-left-radius: 0; border-top-right-radius: 0; mask-image: linear-gradient(transparent 20px, black 46px); }
+.card.below .screen { border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+  mask-image: linear-gradient(black calc(100% - 46px), transparent calc(100% - 20px)); }
+.card.above.below .screen { mask-image: linear-gradient(transparent 20px, black 46px, black calc(100% - 46px), transparent calc(100% - 20px)); }
+/* The mask reaches 20 px past the top and bottom, and out to the sides, so the frame and the ring still show there. */
+:is(.card.above, .card.below) .screen { mask-position: 0 -20px; mask-size: 100% calc(100% + 40px); mask-repeat: repeat-x; mask-clip: no-clip; }
 .card iframe { display: block; border: 0; background: var(--screen); }
-.card .head { position: absolute; left: 0; bottom: 100%; width: 100%; padding-bottom: calc(6px / var(--z) + 8px);
-  display: flex; flex-direction: column; font-size: calc(13px / var(--z)); line-height: 1.3; }
-/* A name is a parchment chip; the idea under it is light text on the sky, and on an indigo plate when opened with "more". */
-.card .name { align-self: flex-start; max-width: 100%; padding: 0 calc(8px / var(--z)); border: calc(1px / var(--z)) solid var(--border);
-  border-radius: calc(8px / var(--z)); background: var(--surface); color: var(--text); font-weight: 600; }
-.card.current .name { border-color: var(--current); box-shadow: 0 0 calc(8px / var(--z)) var(--current); }
-/* The idea under a name takes up to two lines; "more" shows the rest, over the space above. */
-.card .head > .idea-row { display: flex; align-items: flex-end; gap: calc(6px / var(--z)); white-space: normal; }
-.card .idea { flex: 1; min-width: 0; color: var(--sky-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.card .head.open { background: var(--plate); z-index: 3; }
-.card .head.open .idea { display: block; }
-/* Zoomed far out, a screen shows only its name. */
-.surface.far .card:not(.side) .idea-row { display: none; }
-.card .more { flex: none; padding: 0; border: 0; background: none; color: var(--sky-mark); }
-.card .more:hover { text-decoration: underline; }
-.card .note { color: var(--sky-mark); font-weight: 600; }
+/* The name: a parchment tag above the mock, at the canvas's scale from 100% up, a readable size zoomed out. */
+.card .head { position: absolute; left: 0; bottom: 100%; width: 100%; padding-bottom: calc(8px / min(1, var(--z)));
+  display: flex; font-size: calc(15px / min(1, var(--z))); line-height: 1.3; }
+.card .name { max-width: 100%; padding: 0 .55em; border: calc(1px / min(1, var(--z))) solid var(--border);
+  border-radius: .5em; background: var(--surface); color: var(--text); font-weight: 600; }
+.surface:not(.loose) .card.current .name { border-color: var(--current); box-shadow: 0 0 calc(8px / var(--z)) var(--current); }
 .card.streaming .screen { opacity: .8; }
-/* A side of an A OR B: its idea above in larger type, and a shield over the frame that takes the click. */
-.card.side .head > * { white-space: normal; }
-.card.side .idea { color: var(--sky-text); font-size: calc(16px / var(--z)); font-weight: 600; -webkit-line-clamp: 3; }
-.card .shield, .card:not(.side) .pick-hint { display: none; }
-.card.side .shield { display: block; position: absolute; inset: 0; cursor: progress; }
-.card.side.pickable :is(.shield, .head) { cursor: pointer; }
-/* Pick this design: the ember pill under a side's idea, above the design: on the side under the pointer, or on every
-   side where nothing hovers. */
-.pick-hint { align-self: flex-start; margin-top: calc(4px / var(--z)); opacity: 0; padding: calc(5px / var(--z)) calc(18px / var(--z)); border-radius: 99px;
-  background: var(--pick); color: var(--on-pick); font-weight: 600; font-size: calc(14px / var(--z)); box-shadow: var(--pick-shadow); }
-.card.side.pickable:hover .pick-hint { opacity: 1; }
-@media (hover: none) { .card.side.pickable .pick-hint { opacity: 1; } }
-.error-box { height: 100%; padding: calc(16px / var(--z)); border: calc(1px / var(--z)) dashed var(--err); border-radius: 10px;
-  color: var(--err); font-size: calc(13px / var(--z)); overflow: auto; background: var(--surface); }
-/* The OR: a gold coin, and under it the ✕ that drops both designs as a round parchment button. */
-.or { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(14px / var(--z));
-  pointer-events: none; }
-.or b { display: grid; place-items: center; width: calc(72px / var(--z)); height: calc(72px / var(--z)); border-radius: 50%;
-  background: var(--coin); box-shadow: var(--coin-shadow); color: var(--on-badge); font-size: calc(26px / var(--z)); font-weight: 700; }
-.or .drop { pointer-events: auto; width: calc(32px / var(--z)); height: calc(32px / var(--z)); padding: 0; border-radius: 50%;
-  font-size: calc(14px / var(--z)); color: var(--muted); border-width: calc(1px / var(--z)); box-shadow: var(--lift); }
 
-/* The rail: round parchment buttons right of a screen or a box, at the canvas's scale (60 px wide), full strength on
-   the current screen or box, else on hover. */
+/* The four buttons under the current mock, centred, at the canvas's scale: narrow parchment cards, an icon over the
+   word, room between them. The pressed one is dark; grey while a design is drawn, and in the tour. */
+.acts { position: absolute; display: flex; justify-content: center; align-items: flex-end; gap: 22px; padding-bottom: 6px; pointer-events: none; }
+.acts .act { pointer-events: auto; width: 62px; padding: 5px 0; border-radius: 10px; font-size: 12px; line-height: 1.25; color: var(--text);
+  background: var(--surface); border: 1.5px solid var(--border); box-shadow: var(--lift); }
+.acts .act i { display: block; font-style: normal; font-size: 19px; }
+.acts .act.on { background: var(--text); color: var(--surface); }
+.acts .act.off { color: var(--disabled); cursor: default; }
+.acts .act.off i { opacity: .35; }
+.acts .act:focus-visible { box-shadow: 0 0 0 2px var(--focus-in), var(--lift); }
+
+/* The rail: round parchment buttons right of a box, at the canvas's scale (60 px wide), full strength on the current
+   box, else on hover. */
 .rail { position: absolute; left: 100%; top: 0; padding-left: 10px; display: flex; flex-direction: column;
   gap: 6px; opacity: 0; }
-.card:hover .rail, .card.current .rail, .box:hover > .rail, .box.current > .rail, .rail:focus-within { opacity: 1; }
+.box:hover > .rail, .box.current > .rail, .rail:focus-within { opacity: 1; }
 .rail .tool { width: 40px; height: 40px; padding: 0; border-radius: 50%; font-size: 18px; line-height: 1; color: var(--muted);
   background: var(--surface); box-shadow: var(--lift); }
 .rail .tool:focus-visible { box-shadow: 0 0 0 2px var(--focus-in), var(--lift); }
 .rail .tool:disabled { color: var(--disabled); }
 .rail .tool:hover:not(:disabled) { color: var(--text); border-color: var(--current); }
-/* A narrow window: nothing widens the page; the current screen's rail is a row under it that stays in the window
-   while the screen shows (the others' take no taps); a side's idea has a fourth line. */
-@media (max-width: 720px) {
-  .workspace { overflow: clip; }
-  .error-pill, .hint-pill { bottom: 82px; } /* above the rail's row */
-  .surface > .card .rail { position: sticky; top: auto; bottom: calc(24px / var(--z)); flex-direction: row; justify-content: center; padding: 10px 0 0; }
-  .surface > .card:not(.current) .rail { visibility: hidden; }
-  .card.side .idea { -webkit-line-clamp: 4; }
-}
+/* Nothing widens the page. */
+.workspace { overflow: clip; }

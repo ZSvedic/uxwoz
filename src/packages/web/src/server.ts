@@ -26,17 +26,6 @@ const THEME_FILES = new Set(['pico', 'mockup'])
 
 /** One line of a /api/screen or /api/revise stream: one design. */
 export type { ScreenEvent as DrawEvent, Revise } from './drawing.ts'
-/**
- * The old A OR B stream's events, which the page still reads until its rework (wave 4); the server now sends
- * drawing.ts's `ScreenEvent`, one design a stream.
- */
-export type ScreenEvent =
-  | { type: 'meta'; key: string; cached: boolean; variants: number }
-  | { type: 'chunk'; variant: number; text: string }
-  | { type: 'version'; variant: number; version: import('@uxwoz/core').Version }
-  | { type: 'failed'; variant: number; message: string }
-  | { type: 'done'; entry: import('@uxwoz/core').CacheEntry; filing?: boolean }
-  | { type: 'error'; message: string }
 
 interface ServerOptions extends Io {
   port?: number
