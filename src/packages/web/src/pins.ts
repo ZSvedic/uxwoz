@@ -1,8 +1,10 @@
 // Comments pinned to parts of a screen, for the player and the app: the anchor a comment sends its frame, the pin
 // numbers of a screen's comments, and the layer of gold pins over a frame. The frame finds the parts (`locate`).
-// Also the labels and lines the player and the Share pane show, kept here since they need no DOM.
+// Pins follow their part: a frame that scrolls is asked again, and a part outside the frame's view has no pin.
+// Also the labels and lines the player and the Share page show, and the player's frame size, kept here since they need no DOM.
 
 import type { Feedback } from '@uxwoz/core'
+import { DEVICES, LEGACY_WIDTH, VIEWPORT_H, type Device } from '@uxwoz/core/frame'
 
 /** What a frame looks for: the part's words, its tag and its place among the parts with the same tag and words. */
 export interface Anchor { id: string; text: string; tag: string; nth: number }
@@ -40,7 +42,7 @@ export const dayOf = (at: string, now = new Date()) => {
 
 /** A handler that loads only while `isOpen` says the pane is open (for a timer and the tab's focus). */
 export const whileOpen = (isOpen: () => boolean, load: () => void) => () => { if (isOpen()) load() }
-/** How often an open Share and feedback pane reads its list again. */
+/** How often an open Share or Feedback page reads its list again. */
 export const SHARE_REFRESH_MS = 10_000
 
 /** A comment as the owner's Comments tab shows it: its pin number (open ones), whether its pin is drawn, where it is,
@@ -61,6 +63,16 @@ export function commentRows(all: Feedback[], screen: string, located: Set<string
 /** The open comments of a screen, for the tab's count. */
 export const openCount = (all: Feedback[], screen: string, editLink = false) => commentRows(all, screen, null, editLink).filter((r) => r.n != null).length
 
+/** Whether a spot shows within a layer W × H: a part scrolled out of the frame's view hides its pin. */
+export const inLayer = (s: Spot, W: number, H: number) => s.x + s.w > 0 && s.y + s.h > 0 && s.x < W && s.y < H
+
+/** The player's frame: the mock's own size (an old mock without one, 800 × 800), shrunk by `k` to fit `room` px across. */
+export function playerFit(device: Device | undefined, room: number) {
+  const d = device ? DEVICES[device] : { width: LEGACY_WIDTH, height: VIEWPORT_H }
+  const k = Math.min(1, Math.max(0.1, room / d.width))
+  return { w: d.width, h: d.height, k }
+}
+
 /** Draw or update the pins in `host`, a layer over a frame: one per spot with a number, at its top right corner, inside the layer. */
 export function pinLayer(host: HTMLElement, spots: Spot[], numbers: Map<string, number>, onClick: (id: string) => void) {
   const old = new Map([...host.querySelectorAll<HTMLButtonElement>('button.pin')].map((b) => [b.dataset.id!, b]))
@@ -68,7 +80,7 @@ export function pinLayer(host: HTMLElement, spots: Spot[], numbers: Map<string, 
   const W = host.clientWidth, H = host.clientHeight
   for (const s of spots) {
     const n = numbers.get(s.id)
-    if (n == null || keep.has(s.id)) continue
+    if (n == null || keep.has(s.id) || (W && H && !inLayer(s, W, H))) continue
     keep.add(s.id)
     let b = old.get(s.id)
     if (!b) {

@@ -245,8 +245,9 @@ only from a card's own frame.
                                      // its words (60 characters), tag, place among the parts with the same
                                      // tag and words, and its rectangle in the frame's own pixels; while
                                      // picking, the part under the pointer has an outline
-{ uxwoz: 'located', n, spots: [{ id, x, y, w, h }] } // the answer to locate (n echoed): an anchor not found, or
-                                     // outside the frame's view, is left out
+{ uxwoz: 'located', n, spots: [{ id, x, y, w, h }], away: [id] } // the answer to locate (n echoed): an anchor
+                                     // not found, or outside the frame's view, has no spot; `away` names the ones
+                                     // found outside the view (their part is still there, its pin hides)
 ```
 
 A frame has its device's size and scrolls inside, so it reports no size, and one finger on it never

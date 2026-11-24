@@ -8,6 +8,7 @@ import { el } from './boxes.ts'
 import { openLast, openTour, start } from './app.ts'
 import { closeMenus, sizeFor } from './bar.ts'
 import { closeDrawer } from './drawer.ts'
+import { showPage } from './sharing.ts'
 import { beginHint, hint, post, showError, themeCss } from './net.ts'
 import { draw } from './screens.ts'
 import { needsAccount, renderAccountLine } from './account-ui.ts'
@@ -21,6 +22,7 @@ export function openMenu() {
   renderRecent()
   renderMenu()
   renderAccountLine()
+  showPage(null)
   panel.hidden = false
   panel.querySelector<HTMLElement>('.item')?.focus({ preventScroll: true })
 }
