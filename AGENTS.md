@@ -58,8 +58,9 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
                  the address IDs (a mockup's `mid`, an entry's `sid`, stamped at load and save)
   cache-boxes.ts screen cache, the boxes (ScreenCache extends the base): components as entries, rules, tables,
                  limits, IDs, a box's states, Past and Undo, the fixer's notes and their Undo, markSeen, the paper
-  frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll and `scrollsFirst`, touch and `dragOwner`, vh fix, picking and locating
-                 a part for a comment); the sizes (four offered, two read from before), each with its Device line;
+  frame.ts       srcdoc page for a screen + our in-frame script (clicks, links out as `open`, the page scrolling inside
+                 the frame and its `scroll` edges, the wheel by `scrollsFirst`, two-finger pinch, picking and locating
+                 a part in view for a comment); the sizes (four offered, two read from before), each with its Device line;
                  name, idea; paste by ID and the current link
   zip.ts         a zip of stored entries (CRC-32, central directory), for Export project
 src/packages/web/src/
