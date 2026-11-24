@@ -1,0 +1,189 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UXWoz rework mocks</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; padding: 20px 16px 80px; font: 14px/1.4 system-ui, sans-serif; background: #fff; color: #111; }
+h1 { font-size: 24px; margin: 0 0 6px; } h2 { font-size: 19px; margin: 44px 0 4px; border-top: 2px solid #111; padding-top: 14px; }
+.lead { max-width: 820px; color: #333; } .lead li { margin: 3px 0; }
+.grid { display: flex; flex-wrap: wrap; gap: 28px 24px; align-items: flex-start; margin-top: 14px; }
+figure { margin: 0; width: 360px; } figure.wide { width: 800px; }
+figcaption { font-size: 13px; color: #333; margin-bottom: 8px; min-height: 76px; } figcaption b { font-size: 15px; color: #000; }
+
+/* A phone: the top bar, the canvas, the bar of four buttons. */
+.ph { width: 360px; height: 640px; position: relative; display: flex; flex-direction: column; border: 2px solid #111; border-radius: 20px; overflow: hidden;
+  background: #2b2b2b radial-gradient(#fff9 1px, transparent 1.4px) 0 0 / 46px 38px; }
+.tb { flex: none; height: 48px; display: flex; align-items: center; gap: 5px; padding: 0 6px; background: #d8d8d8; border-bottom: 2px solid #111; }
+.tb button, .ab button, .btn { font: 600 13px system-ui; background: #fff; color: #111; border: 1.5px solid #111; border-radius: 9px; height: 36px; padding: 0 9px; white-space: nowrap; }
+.tb .lg { padding: 0 5px; display: grid; place-items: center; } .tb .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.tb .sep { width: 1.5px; height: 24px; background: #111; margin: 0 3px; } .tb .n { background: #111; color: #fff; border-radius: 9px; padding: 0 5px; font-size: 11px; margin-left: 3px; }
+.cv { flex: 1; min-height: 0; position: relative; padding: 8px; display: flex; flex-direction: column; align-items: center; }
+.chip { flex: none; align-self: flex-start; font: 600 12px system-ui; background: #eee; border: 1.5px solid #111; border-radius: 7px; padding: 1px 8px; margin: 0 0 5px 2px; }
+.ab { flex: none; height: 66px; display: flex; gap: 6px; padding: 7px 6px; background: #d8d8d8; border-top: 2px solid #111; }
+.ab button { flex: 1; height: auto; padding: 0; font-size: 12px; line-height: 1.25; } .ab button i { display: block; font-style: normal; font-size: 19px; }
+.ab .on { background: #111; color: #fff; } .ab .off, .tb .off { color: #aaa; border-color: #aaa; } .ab .off i { opacity: .35; } .ab .none { visibility: hidden; }
+
+/* A mock: white paper in the sketch look. Its content scrolls inside; what is pinned stays at its bottom. */
+.mock { flex: 1; min-height: 0; width: 100%; background: #fff; border: 2px solid #111; border-radius: 10px; display: flex; flex-direction: column; overflow: hidden;
+  font: 14px/1.4 "Chalkboard SE", "Comic Sans MS", "Segoe Print", cursive; }
+.mock.cur { box-shadow: 0 0 0 3px #fff; }
+.mock .in { flex: 1; overflow: auto; padding: 12px 14px; } .mock .pin { flex: none; border-top: 1.5px solid #111; padding: 8px 10px; display: flex; gap: 6px; background: #fff; }
+.mock h3 { margin: 0 0 8px; font-size: 19px; } .mock p { margin: 0 0 11px; } .mock ul { margin: 0 0 11px; padding-left: 20px; }
+.mock .cta { flex: 1; font: 700 15px inherit; font-family: inherit; background: #111; color: #fff; border: 0; border-radius: 9px; padding: 11px 8px; }
+.mock .lk { text-decoration: underline; font-weight: 700; } .mock .rowi { display: flex; justify-content: space-between; border: 1.5px solid #111; border-radius: 8px; padding: 8px 10px; margin-bottom: 7px; }
+.mock .tab { flex: 1; text-align: center; font-size: 12px; } .mock .pic { border: 1.5px dashed #111; border-radius: 8px; height: 74px; display: grid; place-items: center; color: #555; margin-bottom: 10px; font-size: 12px; }
+.sk { height: 12px; background: #ddd; border-radius: 6px; margin: 0 0 10px; }
+
+/* A card: what a mock or a box flips to (Edit, History, Info, the prompt). Plain app type, a double line. */
+.card { flex: 1; min-height: 0; width: 100%; background: #f2f2f2; border: 2px solid #111; outline: 2px solid #111; outline-offset: -7px; border-radius: 10px; padding: 16px 18px; overflow: auto; display: flex; flex-direction: column; gap: 9px; }
+.card h4 { margin: 0; font-size: 16px; display: flex; justify-content: space-between; } .card label { font-weight: 600; }
+.card .ta { background: #fff; border: 1.5px solid #111; border-radius: 8px; padding: 8px; min-height: 96px; color: #666; }
+.card .go { background: #111; color: #fff; flex: 1; } .card .r { display: flex; gap: 8px; align-items: center; } .card .dim { color: #666; font-size: 12.5px; }
+.card .li { background: #fff; border: 1.5px solid #111; border-radius: 8px; padding: 7px 9px; } .card .li.now { border-width: 3px; }
+.card dl { margin: 0; } .card dt { font-weight: 700; font-size: 12px; margin-top: 7px; } .card dd { margin: 0; }
+.card .del { margin-top: auto; align-self: flex-start; background: none; border: 0; text-decoration: underline; color: #111; font: 13px system-ui; padding: 6px 0 0; }
+
+/* Things that lie over the canvas: the dropdown, the left panel, the new project panel. */
+.dim-bg { position: absolute; inset: 0; background: #0009; }
+.drop { position: absolute; left: 6px; right: 6px; top: 46px; background: #fff; border: 2px solid #111; border-radius: 10px; padding: 8px; max-height: 480px; overflow: auto; }
+.drop .boxes { display: flex; gap: 5px; margin-bottom: 8px; } .drop .boxes .btn { flex: 1; padding: 0 2px; font-size: 12px; }
+.drop .t { padding: 7px 8px; border-radius: 7px; } .drop .t.now { background: #111; color: #fff; font-weight: 700; } .drop .t.plan { color: #999; } .drop .pn { font-size: 12px; color: #666; padding: 2px 8px 6px; border-bottom: 1.5px solid #111; margin-bottom: 4px; }
+.side { position: absolute; left: 0; top: 0; bottom: 0; width: 284px; background: #fff; border-right: 2px solid #111; padding: 12px 12px; overflow: auto; }
+.side .it { padding: 8px 6px; border-radius: 7px; font-weight: 600; } .side .h { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: .05em; margin: 10px 6px 2px; border-top: 1.5px solid #ccc; padding-top: 9px; }
+.side .sub { font-weight: 400; padding-left: 26px; } .sheet { position: absolute; inset: 0; background: #f2f2f2; padding: 14px; overflow: auto; display: flex; flex-direction: column; gap: 9px; }
+.ex { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; } .ex div { background: #fff; border: 1.5px solid #111; border-radius: 8px; padding: 9px 8px; font-weight: 600; font-size: 13px; }
+.toast { position: absolute; left: 50%; bottom: 76px; transform: translateX(-50%); background: #111; color: #fff; border-radius: 16px; padding: 6px 14px; font-size: 13px; white-space: nowrap; border: 1.5px solid #fff; }
+
+/* A laptop, drawn at 62%. */
+.lp { width: 800px; height: 450px; position: relative; display: flex; flex-direction: column; border: 2px solid #111; border-radius: 12px; overflow: hidden; background: #2b2b2b radial-gradient(#fff9 1px, transparent 1.4px) 0 0 / 46px 38px; }
+.lp .tb { height: 40px; gap: 4px; } .lp .tb button { height: 28px; font-size: 11.5px; padding: 0 6px; } .lp .ab { height: 54px; justify-content: center; } .lp .ab button { flex: none; width: 92px; font-size: 11px; } .lp .ab button i { font-size: 15px; }
+.lp .cv { display: block; padding: 0; overflow: hidden; } .lp .mock, .lp .box { position: absolute; font-size: 8px; line-height: 1.3; } .lp .mock .in { padding: 6px 8px; } .lp .mock h3 { font-size: 11px; margin-bottom: 4px; } .lp .mock .rowi { padding: 3px 5px; margin-bottom: 3px; border-width: 1px; border-radius: 4px; }
+.lp .chip { position: absolute; font-size: 10px; margin: 0; } .lp .box { background: #f2f2f2; border: 2px solid #111; border-radius: 6px; padding: 6px 8px; font-size: 8px; } .lp .box b { font-size: 10px; display: block; margin-bottom: 4px; }
+.lp svg.ropes { position: absolute; inset: 0; width: 100%; height: 100%; } .lp svg.ropes path { stroke: #fff; stroke-width: 2; fill: none; stroke-dasharray: 5 3; }
+</style>
+
+<h1>UXWoz rework: black-and-white mocks</h1>
+<div class="lead">
+<p>These show where things are and what they say. Colour, wood, parchment and the stars' real look come from today's app and are not shown.
+Each picture has a number: answer with the number and what to change. A mock's content here scrolls, as it will in the app.</p>
+<p><b>Three things I had to decide while drawing. Say if you want them otherwise:</b></p>
+<ul>
+<li><b>a.</b> A mock keeps a small name above it. The line with the model's idea leaves the canvas and is in Info (<i>Drawn as</i>).</li>
+<li><b>b.</b> In the tour the big button is pinned to the mock's bottom, so it shows without scrolling.</li>
+<li><b>c.</b> The tour's first and last mocks have a small drawing of Bill (a stick figure, as in the meme). Your copy has none.</li>
+</ul>
+</div>
+
+<h2>The app on a phone</h2>
+<div class="grid" id="app"></div>
+<h2>The boxes on a phone</h2>
+<div class="grid" id="boxes"></div>
+<h2>The tour</h2>
+<div class="grid" id="tour"></div>
+<h2>A laptop</h2>
+<div class="grid" id="wide"></div>
+
+<script>
+const logo = (px) => `<svg width="${px}" height="${px}" viewBox="0 0 50 48"><polyline points="8.5,17 13.5,39 21,24 28.5,39 33.5,17" fill="none" stroke="#111" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/><path transform="translate(40.5 10.5) scale(6.6)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/></svg>`
+const bar = (name, zoom = '100%') => `<div class="tb"><button class="lg">${logo(26)}</button><button>←</button><button class="nm">${name} ▾</button><button>→</button><button>${zoom} ▾</button></div>`
+const MOCK = [['🎲', 'Another'], ['✏️', 'Edit'], ['⏪', 'History'], ['ℹ️', 'Info']]
+const acts = (list = MOCK, on = '', off = []) => `<div class="ab">${list.map(([i, l]) => l ? `<button class="${l === on ? 'on' : ''} ${off.includes(l) ? 'off' : ''}"><i>${i}</i>${l}</button>` : '<button class="none"></button>').join('')}</div>`
+const phone = (id, title, note, o) => `<figure><figcaption><b>${id}. ${title}</b><br>${note}</figcaption>
+  <div class="ph">${bar(o.name, o.zoom)}<div class="cv">${o.body}</div>${acts(o.acts, o.on, o.off)}${o.over ?? ''}</div></figure>`
+const chip = (t) => `<div class="chip">${t}</div>`
+const mock = (inner, pin = '') => `<div class="mock cur"><div class="in">${inner}</div>${pin ? `<div class="pin">${pin}</div>` : ''}</div>`
+const tabs = `<span class="tab lk">Plants</span><span class="tab">Schedule</span><span class="tab">Add</span>`
+const plants = mock(`<h3>My plants</h3>
+  <div class="rowi"><span class="lk">Monstera</span><span>water in 2 days</span></div>
+  <div class="rowi"><span class="lk">Basil</span><span>water today</span></div>
+  <div class="rowi"><span class="lk">Fern</span><span>water in 5 days</span></div>
+  <div class="rowi"><span class="lk">Aloe</span><span>water in 9 days</span></div>
+  <div class="rowi"><span class="lk">Orchid</span><span>water in 3 days</span></div>
+  <div class="rowi"><span class="lk">Cactus</span><span>water in 20 days</span></div>
+  <div class="rowi"><span class="lk">Ivy</span><span>water in 4 days</span></div>
+  <p>Summary: Basil is thirsty today.</p>`, tabs)
+const page = mock(`<p class="lk">← Back</p><h3>Monstera</h3><div class="pic">photo</div><p>Light: bright, no direct sun.</p><p><b>Care log</b></p>
+  <div class="rowi"><span>Watered</span><span>Nov 21</span></div><div class="rowi"><span>Fed</span><span>Nov 14</span></div><div class="rowi"><span>Watered</span><span>Nov 12</span></div>
+  <p class="lk">Full care log</p>`, tabs)
+
+const app = [
+  phone(1, 'The canvas', 'One mock fills the room between the two bars. Its list scrolls inside; its tab bar stays. The top bar names the mock. Two fingers move the canvas to the boxes (right) and the next mocks (below).',
+    { name: 'Home', zoom: '96%', body: chip('Home') + plants }),
+  phone(2, 'The dropdown', 'The four boxes are one row at the top, with what is new. Under it the project\'s name, then the tree: a step in is a level down. Grey is planned, not drawn yet.',
+    { name: 'Monstera', zoom: '96%', body: chip('Monstera') + page, over: `<div class="drop"><div class="boxes"><span class="btn" style="display:flex;align-items:center;justify-content:center">📐 Rules<span class="n">2</span></span><span class="btn" style="display:flex;align-items:center;justify-content:center">🧩 Comp.</span><span class="btn" style="display:flex;align-items:center;justify-content:center">🗄️ Data</span><span class="btn" style="display:flex;align-items:center;justify-content:center">🕵️ Fixer<span class="n">1</span></span></div>
+      <div class="pn">A plant care app: my plants with the next…</div>
+      <div class="t">Home</div><div class="t now" style="margin-left:18px">Monstera</div><div class="t plan" style="margin-left:36px">Care log · not made yet</div>
+      <div class="t" style="margin-left:18px">Schedule</div><div class="t" style="margin-left:18px">Add a plant</div><div class="t plan" style="margin-left:36px">Scan a label · not made yet</div></div>` }),
+  phone(3, 'A tap on a link: the glide', 'The canvas glides to where the new mock goes (0.6 s) while the model draws. The mock fills in as it arrives. 🎲 ✏️ ⏪ wait until it is done.',
+    { name: 'Care log', zoom: '96%', off: ['Another', 'Edit', 'History'], body: chip('Care log') + mock(`<h3>Care log</h3><div class="rowi"><span>Watered</span><span>Nov 21</span></div><div class="rowi"><span>Fed</span><span>Nov 14</span></div><div class="sk" style="width:80%"></div><div class="sk" style="width:55%"></div><div class="sk" style="width:70%"></div><div class="sk" style="width:40%"></div>`), over: '<div class="toast">Drawing Care log…</div>' }),
+  phone(4, '✏️ Edit', 'The mock flips to this card, the same size. Hold 🎙️ and talk, or type. Make the change flips back to the changed mock. Delete lives at the bottom. A tap on ✏️ again flips back with no change.',
+    { name: 'Monstera', zoom: '96%', on: 'Edit', body: chip('Monstera') + `<div class="card"><h4>Edit Monstera <span>✕</span></h4><label>What should change?</label><div class="ta">show the light as three sun icons</div>
+      <div class="r"><button class="btn">🎙️ Hold to talk</button><button class="btn go">Make the change</button></div><button class="del">Delete this mock…</button></div>` }),
+  phone(5, '⏪ History', 'Undo and Redo at the top, then every version, the one showing marked. A tap on a version shows it. The design 🎲 replaced is here too.',
+    { name: 'Monstera', zoom: '96%', on: 'History', body: chip('Monstera') + `<div class="card"><h4>History of Monstera <span>✕</span></h4><div class="r"><button class="btn" style="flex:1">↶ Undo</button><button class="btn off" style="flex:1;color:#aaa;border-color:#aaa">↷ Redo</button></div>
+      <div class="li now"><b>Edit:</b> show the light as three sun icons<div class="dim">showing · 2 min ago</div></div><div class="li"><b>Edit:</b> put the care log under the photo<div class="dim">6 min ago</div></div>
+      <div class="li"><b>Another design</b><div class="dim">9 min ago</div></div><div class="li"><b>First design</b><div class="dim">10 min ago</div></div></div>` }),
+  phone(6, 'ℹ️ Info', 'Less than today. Asked for is what the model was told. Drawn as is the model\'s own line about what it drew. Comments from reviewers are at the end, and the button counts them (ℹ️ 2).',
+    { name: 'Monstera', zoom: '96%', on: 'Info', acts: [MOCK[0], MOCK[1], MOCK[2], ['ℹ️', 'Info']], body: chip('Monstera') + `<div class="card"><h4>Info on Monstera <span>✕</span></h4><dl>
+      <dt>Asked for</dt><dd>A plant's page with a care log and its light needs</dd><dt>Drawn as</dt><dd>Photo on top, light in one line, the log as a list</dd>
+      <dt>Link ID</dt><dd>@plant-page</dd><dt>Reached by</dt><dd>A plant's row in Home</dd><dt>Model</dt><dd>Claude Haiku 5.5 in 2.9 s for $0.0010</dd>
+      <dt>Added to the boxes</dt><dd>Rule light-needs, component tab-bar</dd><dt>Comments (2)</dt><dd><div class="li" style="margin-top:4px"><b>1 · Ana</b> at "Full care log": where is feeding?<div class="dim">Resolve</div></div></dd></dl></div>` }),
+  phone(7, '🎲 Another, pressed a third time', 'The first press drew a second design. Both are in History. The next press asks for better words, then draws two more.',
+    { name: 'Monstera', zoom: '96%', on: 'Another', body: chip('Monstera') + `<div class="card"><h4>Describe it differently <span>✕</span></h4><div>Neither design fits? Say what this mock should be.</div><div class="ta" style="color:#111">A plant's page with a care log and its light needs</div>
+      <div class="r"><button class="btn">🎙️ Hold to talk</button><button class="btn go">Draw again</button></div></div>` }),
+  phone(8, 'The W+ menu', 'A tap on the logo opens the left panel. It holds what the old toolbar had and the new bar has no room for.',
+    { name: 'Home', zoom: '96%', body: chip('Home') + plants, over: `<div class="dim-bg"></div><div class="side"><div style="display:flex;justify-content:space-between;align-items:center;font:800 20px system-ui">UXW✦oz <span>✕</span></div>
+      <div class="it">➕ New project</div><div class="it">🕘 Recent</div><div class="it sub">✓ A plant care app…</div><div class="it sub">Split a bill with friends…</div><div class="it">🎓 Tour</div>
+      <div class="h">This project</div><div class="it">🔗 Share…</div><div class="it">💬 Feedback</div><div class="it">⇩ Export project…</div><div class="it">⇩ Export the boxes</div><div class="it">↺ Start over</div><div class="it">✕ Delete</div>
+      <div class="h">UXWoz</div><div class="it">🎨 Theme: Mockup ▾</div><div class="it">🔈 Sound: off</div><div class="it">👤 25 free screens · Register</div><div class="it">Privacy</div></div>` }),
+  phone(9, 'New project', 'From the menu, and from the tour\'s last button. The examples come first for a newcomer; a person with projects sees the box first. Design for starts at this device\'s size.',
+    { name: 'Home', zoom: '96%', body: '', over: `<div class="sheet"><h4 style="margin:0;font-size:18px;display:flex;justify-content:space-between">Turn one sentence into a clickable mock <span>✕</span></h4><div>Pick an example, or describe your own.</div>
+      <div class="ex"><div>Plant care</div><div>Split a bill</div><div>Recipe box</div><div>Clinic front desk</div><div>Freelancer invoices</div><div>Podcast editor</div><div>Daily word puzzle</div></div>
+      <label style="font-weight:600">or describe your own</label><div class="card" style="padding:0;outline:0;border:0;background:none;flex:none"><div class="ta">a cat litter box app…</div></div>
+      <div class="r"><button class="btn">🎙️ Hold to talk</button><button class="btn" style="flex:1;text-align:left">Design for: Small phone ▾</button></div><button class="btn" style="background:#111;color:#fff;height:44px">Draw it</button></div>` }),
+]
+
+const BOX = (first) => [first, ['✏️', 'Edit'], ['⏪', 'History'], ['ℹ️', 'Info']]
+const boxes = [
+  phone(10, '📐 Rules', 'A box is on the canvas like a mock, and the bar under it is the box\'s. Its first button is its own: Add rule. Tap a sentence to change it in place, as today.',
+    { name: '📐 Rules', zoom: '96%', acts: BOX(['➕', 'Add rule']), body: chip('📐 Rules') + `<div class="card" style="outline:0"><div class="li"><b>water-days</b><br>Watering shows as days from today.</div><div class="li"><b>light-needs</b> · new<br>Light is one line under the photo.</div><div class="li"><b>one-summary</b> · yours<br>Each mock ends with one summary line.</div></div>` }),
+  phone(11, '🧩 Components', 'A tap on a component makes it current (the thick line), and the bar is that component\'s. There is no first button. Its Edit card has Delete this component.',
+    { name: '🧩 Components', zoom: '96%', acts: BOX(['', '']), body: chip('🧩 Components') + `<div class="card" style="outline:0"><div class="li now"><b>tab-bar</b> · at the bottom of every mock<div style="display:flex;border:1.5px solid #111;border-radius:6px;padding:6px;margin-top:6px;font-family:'Chalkboard SE','Comic Sans MS',cursive"><span class="tab" style="flex:1;text-align:center">Plants</span><span style="flex:1;text-align:center">Schedule</span><span style="flex:1;text-align:center">Add</span></div></div>
+      <div class="li"><b>plant-row</b> · a plant in a list<div style="display:flex;justify-content:space-between;border:1.5px solid #111;border-radius:6px;padding:6px;margin-top:6px;font-family:'Chalkboard SE','Comic Sans MS',cursive"><span>Monstera</span><span>water in 2 days</span></div></div></div>` }),
+  phone(12, '🗄️ Data', 'Its first button is Add table. Tap a cell to change it, as today.',
+    { name: '🗄️ Data', zoom: '96%', acts: BOX(['➕', 'Add table']), body: chip('🗄️ Data') + `<div class="card" style="outline:0"><div class="li"><b>plants</b><table style="width:100%;border-collapse:collapse;margin-top:5px;font-size:13px" border="1" cellpadding="4"><tr><th>name</th><th>water every</th><th>light</th></tr><tr><td>Monstera</td><td>7 days</td><td>bright</td></tr><tr><td>Basil</td><td>2 days</td><td>sun</td></tr><tr><td>Fern</td><td>5 days</td><td>shade</td></tr></table><div class="dim" style="margin-top:5px">+ row · + column · ✕</div></div></div>` }),
+  phone(13, '🕵️ Fixer', 'Its first button is Run fixer (Visit now today). Each change keeps its own Undo.',
+    { name: '🕵️ Fixer', zoom: '96%', acts: BOX(['▶️', 'Run fixer']), body: chip('🕵️ Fixer\'s notes') + `<div class="card" style="outline:0"><div class="li"><b>Visit, 14:02</b> · read 5 mocks · 3.1 s · ~$0.008<br>merged <b>water-day</b> into <b>water-days</b>: they said one thing <u>Undo</u><br>redrew <b>Schedule</b>: paste tab-bar <u>Undo</u></div><div class="dim">The next visit comes after 3 more mocks.</div></div>` }),
+]
+
+const bill = `<div class="pic" style="height:64px">Bill, a stick figure</div>`
+const TOUR = { off: ['Another', 'Edit', 'History'], zoom: '96%' }
+const tour = [
+  phone(14, 'Tour 1: This is Bill.', 'A first visit opens here. 🎲 ✏️ ⏪ are grey in the tour; a tap on one says Off in the tour. The big button stays at the mock\'s bottom.',
+    { ...TOUR, name: 'This is Bill', body: chip('This is Bill') + mock(`<h3>This is Bill.</h3>${bill}<p>Bill has an awesome app idea. He types it into Claude Code.<br>20 min and 2 million tokens later, the app works!</p><p>The menu is wrong. Change. 10 min.</p><p>The dialogs are wrong. Change. 15 min.</p><p>Now the dialogs are wrong in a different way. Change. 20 min.</p><p>Bill worked 40h.<br>4h making decisions.<br>The other 36h waiting and reading walls of text.</p><p>Now he has a working app, 670 tests, Supabase, Railway, CI/CD.<br>A change takes 1h.<br>He still doesn't like the app.</p>`, `<button class="cta">Poor Bill. What went wrong?</button>`) }),
+  phone(15, 'Tour 2: Meet Woz.', 'The Wikipedia link opens in a new tab.',
+    { ...TOUR, name: 'Meet Woz', body: chip('Meet Woz') + mock(`<h3>Meet Woz.</h3><p>The bottleneck is <i>human decisions about what to build</i>.</p><p>To show Bill a different menu, Claude rebuilt a real app with 670 tests.<br>Hundreds of millions of tokens later, Anthropic is happy, but Bill is not.</p><p>(Bill was me, by the way.)</p><p>The solution is already in the models. The magic phrase is "<span class="lk">Wizard of Oz experiment</span>". A person behind the curtain makes a system appear to work.</p><p>Now the model hides behind the curtain and pretends to be your app.</p><p>UXWoz (<b>U</b>ser e<b>X</b>perience <b>W</b>izard of <b>Oz</b>), Woz for short, turns your idea into a clickable and editable mock before a coding agent builds it.</p><p>Woz draws the next mock on every click, keeps shared rules and components, and exports the result for your coding agent.</p>`, `<button class="cta">Summon the Wizard!</button>`) }),
+  phone(16, 'Tour 3: How Woz works', 'The time in the first line is the real time Haiku took to draw this mock. Rules in the dropdown and ← work here, so the visitor can try them.',
+    { ...TOUR, name: 'How Woz works', body: chip('How Woz works') + mock(`<h3>How Woz works</h3><p>A cheap model generated this mock in 2.4 sec.</p><p>The buttons under the mock (off in this tour):</p><ul><li>🎲 Don't like it? Roll again.</li><li>✏️ Say or type what to change.</li><li>⏪ Changed your mind? Undo.</li></ul><p>Four boxes to the right of the home mock hold what all mocks share:</p><ul><li>📐 <b>Rules</b> every mock follows.</li><li>🧩 <b>Components</b> the mocks reuse.</li><li>🗄️ <b>Data</b>, made up, that the mocks reuse.</li><li>🕵️ <b>Fixer's notes</b>: every 5 mocks, the fixer makes mocks and boxes agree and notes what it changed.</li></ul><p>Like mocks, boxes have edit and undo, so you can edit and revert changes.</p><p>Get around by moving the canvas (two fingers / mouse scroll), or with the navigation dropdown at the top and its ← → arrows. Try it now: pick Rules in the dropdown, then press ←.</p>`, `<button class="cta">Done. But what happened to Bill?</button>`) }),
+  phone(17, 'Tour 4: Be like Bill', 'The last button opens New project (picture 9).',
+    { ...TOUR, name: 'Be like Bill', body: chip('Be like Bill') + mock(`<h3>Be like Bill</h3>${bill}<p>Bill types his new idea into Woz.<br>3 sec later, there is a mock.</p><p>The menu is wrong. Change. 3 sec.</p><p>The dialogs are wrong. Change. 3 sec.</p><p>The model already knows the usual app patterns. Bill just states the <i>differences</i> from the standard mockup: "Same checkout, but pay without an account." The app spec stays short.</p><p>Bill shows the mocks to target users and fixes what confuses them. Then he exports the mocks and specs for his coding agent.</p><p>Prototyping apps is fun again.<br>Bill is smart. Be like Bill.</p>`, `<button class="cta">Try another example</button>`) }),
+]
+
+const wbar = (name, zoom) => `<div class="tb"><button class="lg" style="font:800 14px system-ui;padding:0 8px">UXW✦oz</button><button>←</button><button class="nm" style="flex:none;width:120px">${name} ▾</button><button>→</button><span class="sep"></span>
+  <button>📐 Rules<span class="n">2</span></button><button>🧩 Components</button><button>🗄️ Data</button><button>🕵️ Fixer<span class="n">1</span></button><span style="flex:1"></span><button>−</button><button>${zoom} ▾</button><button>+</button><button>⛶</button></div>`
+const small = (l, t, w, h, name, cur = '') => `<div class="chip" style="left:${l}px;top:${t - 19}px">${name}</div><div class="mock ${cur}" style="left:${l}px;top:${t}px;width:${w}px;height:${h}px"><div class="in"><h3>${name}</h3><div class="rowi"><span>…</span><span>…</span></div><div class="rowi"><span>…</span><span>…</span></div><div class="sk" style="height:5px;width:70%"></div><div class="sk" style="height:5px;width:50%"></div></div></div>`
+const box = (l, t, name) => `<div class="box" style="left:${l}px;top:${t}px;width:104px;height:140px"><b>${name}</b><div class="sk" style="height:5px"></div><div class="sk" style="height:5px;width:70%"></div><div class="sk" style="height:5px;width:85%"></div></div>`
+const wide = [
+  `<figure class="wide"><figcaption><b>18. A laptop, a phone-size project</b><br>The same three bands. The top bar has room for the word UXWoz, the four boxes, − + and ⛶ (fit). The canvas shows the tree: Home on top, its boxes to the right, the next mocks below on ropes. The current mock has the ring, and the bar at the bottom is its bar.</figcaption>
+    <div class="lp">${wbar('Monstera', '60%')}<div class="cv"><svg class="ropes"><path d="M152 168 C152 184 97 176 97 192"/><path d="M152 168 C152 184 217 176 217 192"/><path d="M152 168 C152 184 337 176 337 192"/></svg>
+      ${small(110, 28, 84, 140, 'Home')}${box(226, 28, '📐 Rules')}${box(340, 28, '🕵️ Fixer\'s notes')}${box(454, 28, '🧩 Components')}${box(568, 28, '🗄️ Data')}
+      ${small(55, 211, 84, 140, 'Monstera', 'cur')}${small(175, 211, 84, 140, 'Schedule')}${small(295, 211, 84, 140, 'Add a plant')}</div>${acts()}</div></figure>`,
+  `<figure class="wide"><figcaption><b>19. A laptop, a laptop-size project, Edit open</b><br>A project made on a laptop has laptop-size mocks, so one mock fills most of the canvas, as on a phone. Edit flips the mock to the card here too. There is no drawer at the side any more.</figcaption>
+    <div class="lp">${wbar('Today', '74%')}<div class="cv"><div class="chip" style="left:74px;top:8px">Today</div>
+      <div class="card" style="position:absolute;left:74px;top:28px;width:652px;height:316px;flex:none"><h4>Edit Today <span>✕</span></h4><label>What should change?</label><div class="ta" style="min-height:110px">group the appointments by doctor</div>
+      <div class="r"><button class="btn">🎙️ Hold to talk</button><button class="btn go">Make the change</button></div><button class="del">Delete this mock…</button></div>
+      <div class="box" style="left:746px;top:28px;width:104px;height:316px"><b>📐 Rules</b><div class="sk" style="height:5px"></div></div></div>${acts(MOCK, 'Edit')}</div></figure>`,
+]
+for (const [id, list] of [['app', app], ['boxes', boxes], ['tour', tour], ['wide', wide]]) document.getElementById(id).innerHTML = list.join('')
+</script>
