@@ -143,6 +143,19 @@ describe('a starter replays its recording', () => {
     expect(d.calls).toEqual([])
   })
 
+  test('a settle that `may` stops leaves the screen unsettled, so a later click files it', async () => {
+    let ok = false
+    const d = desk(() => ok)
+    const home = d.cache.addScreen('A habit tracker', null, { html: '<h1>Habits</h1>', model: 'claude-haiku-5.5', servedModel: null, createdAt: '2026-11-24T00:00:00Z', costUsd: 0.001, costEstimated: false, firstChunkMs: 1, totalMs: 2, finishReason: 'stop', device: 'small-phone' })!
+    expect(d.settle(home.key)).toMatchObject({ filing: false })
+    expect(d.cache.get(home.key)!.settled).toBeUndefined()
+    expect(d.cache.boxesOf('A habit tracker').settled).toBeUndefined()
+    ok = true
+    expect(d.settle(home.key)).toMatchObject({ filing: true })
+    expect(d.cache.get(home.key)!.settled).toBe('2026-11-24T00:00:00Z')
+    await d.idle('A habit tracker')
+  })
+
   test('`replayed` is false at a size with no recording, for another mockup, a component, an unknown key or path', async () => {
     const d = desk()
     expect(d.replayed('/api/screen', { app: APP, device: 'laptop' })).toBe(false)

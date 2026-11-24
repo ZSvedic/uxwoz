@@ -23,7 +23,6 @@
   .sheet-colours em { color: var(--muted); font-style: normal; }
   .sheet-sw { display: inline-block; width: 22px; height: 16px; margin-right: 5px; vertical-align: middle; border: 1px solid var(--border); border-radius: 4px; }
   .sheet-card .toolbar { position: static; height: auto; display: block; padding: 0; }
-  .sheet-card .toolbar .box-nav { position: static; flex-direction: row; min-width: 0; padding: 0; border: 0; box-shadow: none; background: none; color: inherit; font: inherit; }
   .sheet-card .sheet-menu.bar { justify-content: flex-start; padding: 0; background: none; box-shadow: none; }
   .sheet-card .sheet-menu .menu { position: static; }
   .sheet-card .pick-hint { opacity: 1; }
@@ -55,7 +54,6 @@
   <figure class="sheet-fig"><img src="./brand/favicon.svg" alt="" width="16" height="16"><br>16</figure>
   <figure class="sheet-fig"><svg class="brand wm" viewBox="0 -2 123 46" width="118" height="44" role="img" aria-label="UXWoz"><text x="0" y="40">UX</text><polyline stroke-width="6.42" points="56.55,16.61 61.14,36.79 68.02,23.03 74.9,36.79 77.83,23.95"/><path transform="translate(80.49 12.21) scale(7.89)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/><text x="81.54" y="40">oz</text></svg>wordmark: UX and oz in Fredoka 700, the drawn W</figure>
   <figure class="sheet-fig"><nav class="bar"><div class="logo"><svg class="brand wm" viewBox="0 -2 123 46" width="75" height="28"><text x="0" y="40">UX</text><polyline stroke-width="6.42" points="56.55,16.61 61.14,36.79 68.02,23.03 74.9,36.79 77.83,23.95"/><path transform="translate(80.49 12.21) scale(7.89)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/><text x="81.54" y="40">oz</text></svg><svg class="brand mark" viewBox="0 0 50 48" width="36" height="36"><polyline stroke-width="7" points="11.5,19 16.5,41 24,26 31.5,41 34.7,27"/><path transform="translate(37.6 14.2) scale(8.6)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/></svg></div></nav><br>in the bar</figure>
-  <figure class="sheet-fig"><nav class="bar tight"><div class="logo"><svg class="brand wm" viewBox="0 -2 123 46" width="75" height="28"><text x="0" y="40">UX</text><polyline stroke-width="6.42" points="56.55,16.61 61.14,36.79 68.02,23.03 74.9,36.79 77.83,23.95"/><path transform="translate(80.49 12.21) scale(7.89)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/><text x="81.54" y="40">oz</text></svg><svg class="brand mark" viewBox="0 0 50 48" width="36" height="36"><polyline stroke-width="7" points="11.5,19 16.5,41 24,26 31.5,41 34.7,27"/><path transform="translate(37.6 14.2) scale(8.6)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/></svg></div></nav><br>the mark alone when the bar is short</figure>
 </div></section>
 
 <section><h2>Colours</h2><p>Every custom property on <code>:root</code>: the palette first, then the roles and the token each one plays.</p>
@@ -70,11 +68,10 @@
   <div class="sheet-row"><button class="primary">Make the change</button><button>Plain</button><button disabled>Disabled</button>
     <span class="pick-hint">Pick this design</span><select aria-label="Model"><option>Haiku</option><option>Luna</option></select>
     <div class="sheet-hold"><div class="or"><b>OR</b><button class="drop" title="Drop both designs">✕</button></div></div></div>
-  <div class="toolbar has-boxes"><nav class="bar" aria-label="A piece of the bar">
-    <div class="tb-left"><button class="deck" title="New mockup">+</button><i class="sep"></i>
-      <span class="pop nav-pop"><button class="trail">←</button><button class="menu-button"><span>Home</span> <span class="caret"></span></button><button class="trail" disabled>→</button></span></div>
-    <div class="tb-mid"><i class="sep"></i><span class="box-nav menu"><button>Rules <b>2</b></button><i class="sep"></i><button>Data <b></b></button></span></div>
-    <div class="tb-right"><i class="sep"></i><button id="sound" class="sound off" title="Sounds off" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></button></div>
+  <div class="toolbar"><nav class="bar has-boxes" aria-label="A piece of the bar">
+    <button class="trail">←</button><span class="pop name-pop"><button class="menu-button"><span>Home</span> <span class="caret"></span></button></span><button class="trail" disabled>→</button>
+    <span class="bar-boxes"><button>📐 Rules <b>2</b></button><button>🗄️ Data <b></b></button></span>
+    <button class="wide-only">−</button><span class="pop"><button class="menu-button">100% <span class="caret"></span></button></span><button class="wide-only">+</button>
   </nav></div>
   <div class="sheet-row sheet-rail"><div class="rail"><button class="tool" data-tool="edit" title="Edit">✎</button><button class="tool" disabled title="Regenerate, disabled">↻</button>
     <button class="tool" data-tool="info" title="Info">ⓘ</button><button class="tool" data-tool="delete" title="Delete: red on hover">✕</button></div></div></section>
@@ -100,12 +97,13 @@
       <table><tr><th>night</th><th>sleep</th><th>snores</th></tr><tr><td>Mon</td><td>7:12</td><td>14</td></tr><tr><td>Tue</td><td>6:40</td><td>22</td></tr></table></div></div></section>
   </div>
   <div class="sheet-row sheet-top">
-    <div class="toolbar"><div class="bar sheet-menu"><span class="pop"><div class="menu nav-menu" role="menu">
-      <h3>Every screen</h3><button class="item path"><span>Home</span><small></small></button>
-      <button class="item path current" style="--depth: 1"><span>Nights</span><small>via Nights</small></button>
-      <button class="item planned" style="--depth: 1"><span>Settings</span><small>not made yet</small></button><hr>
-      <button class="item"><span>Zoom in</span> <kbd>⌘+</kbd></button>
-      <div class="menu-foot"><button>↺ Start over</button><button class="danger">✕ Delete</button></div></div></span></div></div>
+    <div class="toolbar"><div class="bar sheet-menu"><span class="pop"><div class="menu drop-menu" role="menu">
+      <div class="drop-boxes"><button>📐 Rules <b>2</b></button><button>🧩 Components <b></b></button><button>🗄️ Data <b></b></button><button>🕵️ Fixer <b>1</b></button></div>
+      <p class="sentence">A sleep tracker that counts snores</p>
+      <div class="drop-tree"><button class="item"><span>Home</span></button>
+      <button class="item current" style="--depth: 1"><span>Nights</span></button>
+      <button class="item planned" style="--depth: 1"><span>Settings</span><small>not made yet</small></button></div><hr>
+      <button class="item"><span>Zoom in</span> <kbd>⌘+</kbd></button></div></span></div></div>
     <aside class="drawer sheet-drawer"><div class="drawer-head"><div class="tabs" role="tablist"><button role="tab" aria-selected="true">✎ Edit</button><button role="tab" aria-selected="false">ⓘ Info</button></div><button class="close">✕</button></div>
       <p class="drawer-name">Home</p><div class="pane"><label for="change">What should change?</label><textarea id="change" rows="2">Show a moon next to quiet nights</textarea>
       <button class="primary">Make the change</button><h3>Past changes</h3><ol class="history" reversed><li class="now">Edit: one level indicator</li><li class="undone">Edit: a red alarm</li><li>Drawn</li></ol></div></aside>

@@ -11,7 +11,8 @@ import { canvas, closeMockup, side } from './app.ts'
 import { boxOp, renderDrawer } from './drawer.ts'
 import { endHint, liveDesign, showLasting, post, showError, hint, note, stream, streamInto, themeCss, type StreamRenderer } from './net.ts'
 import { applyMap, filed, saveCurrent, setCurrent, syncAddress } from './nav.ts'
-import { loadRecent, openGenerate, renderToolbar } from './toolbar.ts'
+import { renderToolbar } from './bar.ts'
+import { loadRecent, openGenerate } from './menu.ts'
 import { changeInput, deviceSelect, generate, modelSelect, promptInput, state, type Making } from './state.ts'
 
 // ---- Views
@@ -94,6 +95,7 @@ export async function draw() {
  * a first Home that failed opens New project with the sentence still in it.
  */
 export async function openScreen(action: string | null, from: string | null, label: string | null) {
+  if (state.tour) return
   // A project keeps the size its Home was drawn at; the size picked counts for a first Home only.
   const app = state.app, home = app ? state.entries.get(screenKey(app, null)) : undefined
   const device = home ? home.versions[0]?.device : deviceSelect.value as Device
@@ -212,6 +214,8 @@ export function onAction(from: string, action: string, label: string) {
     if (!state.tour) settle(from)
     return
   }
+  // The tour is read-only: a click walks only to its drawn mocks.
+  if (state.tour) return
   if (state.busy || state.making) return void hint()
   openScreen(prompt, from, label)
 }
@@ -241,7 +245,7 @@ export function another(key: string) {
 /** One new version of a mock, streamed into its own frame: an Edit with `change`, else Another. */
 export async function revise(key: string, change: string | null) {
   const e = state.entries.get(key)
-  if (!e?.versions.length) return
+  if (!e?.versions.length || state.tour) return
   if (state.busy) return hint()
   state.revising = { key, change }
   refused = null
@@ -268,6 +272,7 @@ export async function revise(key: string, change: string | null) {
 
 /** ⏪ for now: the version before the one showing. */
 export async function undo(key: string) {
+  if (state.tour) return
   if (state.busy) return hint()
   const res = await post('/api/undo', { key }).catch(() => null)
   if (!res?.ok) return showError('Nothing to undo')
@@ -278,7 +283,7 @@ export async function undo(key: string) {
 /** Delete a mock, after asking. Mocks only it leads to go too; Home takes the project. */
 export async function removeScreen(key: string) {
   const e = state.entries.get(key)
-  if (!e || state.busy || !state.app) return
+  if (!e || state.busy || !state.app || state.tour) return
   const root = screenKey(state.app, null) === key
   // The mocks that paste a component, or the mocks Home would no longer reach.
   const rest = screenTree(all().filter((x) => x.key !== key))

@@ -11,7 +11,7 @@ import { fmtS, fmtUsd, hint, liveDesign, post, showError } from './net.ts'
 import { loadMe, refused } from './account-ui.ts'
 import { applyMap, currentAt, setCurrent } from './nav.ts'
 import { another, components, draw, ideaOf, labelOf, pastedOn, removeScreen, revise, undo, views } from './screens.ts'
-import { closeMenus } from './toolbar.ts'
+import { closeMenus } from './bar.ts'
 import { isShared, loadShared, renderShare, screenFeedback, shareToken } from './sharing.ts'
 import { commentsTab, renderComments } from './comments.ts'
 import { $, changeInput, drawer, enterSubmits, modelSelect, state } from './state.ts'
@@ -20,6 +20,8 @@ import { $, changeInput, drawer, enterSubmits, modelSelect, state } from './stat
 export async function boxOp(o: BoxOp | { op: 'seen'; box: Box; ids: string[] }): Promise<boolean> {
   const app = state.app
   if (!app) return false
+  // The tour is read-only: nothing is sent that would change it.
+  if (state.tour) { if (o.op !== 'seen') hint('Off in the tour.'); return false }
   const res = await post('/api/box', { app, ...o }).catch(() => null)
   const body = await res?.json().catch(() => null)
   // The fixer's Undo sends the map with the changes it could not undo.
@@ -43,9 +45,9 @@ export function lookAt(box: Box) {
   if (side.el.hidden) return
   focusBox(box)
   canvas.showBox(side.sections[box])
-  // Only the entries new at the look count as seen: one filed meanwhile stays marked.
+  // Only the entries new at the look count as seen: one filed meanwhile stays marked. The tour changes nothing.
   const ids = unseen(box)
-  if (ids.length) setTimeout(() => boxOp({ op: 'seen', box, ids }), 3000)
+  if (ids.length && !state.tour) setTimeout(() => boxOp({ op: 'seen', box, ids }), 3000)
 }
 
 for (const b of document.querySelectorAll<HTMLButtonElement>('[data-box]')) b.addEventListener('click', () => { closeMenus(); lookAt(b.dataset.box as Box) })

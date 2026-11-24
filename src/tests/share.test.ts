@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, readFileSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ScreenCache, linkTarget, type Fetch, type Version } from '@uxwoz/core'
+import { STARTERS, ScreenCache, linkTarget, recordedHtml, recordingFor, type Fetch, type Version } from '@uxwoz/core'
 import { createServer } from '@uxwoz/web/src/server.ts'
 
 const env = { OPENROUTER_API_KEY: 'fake', OPENAI_API_KEY: 'fake' }
@@ -163,6 +163,12 @@ describe('sharing', () => {
     expect((await fetch(url(`/m/${id}`))).status).toBe(403)
     expect((await fetch(url(`/m/${id}/ab`), { headers: { cookie } })).status).toBe(200)
     expect((await fetch(url(`/m/${id}/ab?owner=sesame`), { redirect: 'manual' })).headers.get('location')).toBe(`/m/${id}/ab`)
+    // The tour's pages too.
+    for (const p of ['/tour', '/tour/meet-woz']) {
+      expect((await fetch(url(p))).status).toBe(403)
+      expect((await fetch(url(p), { headers: { cookie } })).status).toBe(200)
+    }
+    expect((await fetch(url('/api/tour'))).status).toBe(401)
     expect((await fetch(url('/api/apps'), { headers: { cookie } })).status).toBe(200)
     expect((await fetch(url(`/api/s/${token}/map`))).status).toBe(200)
     expect((await fetch(url(`/s/${token}`))).status).toBe(200)
@@ -228,6 +234,50 @@ describe('sharing', () => {
     // Settled already: nothing to file, so free even past the cap.
     expect((await post('/api/settle', { key: nights }, h)).status).toBe(200)
     expect((await post('/api/box', { app: APP, op: 'visit' }, h)).status).toBe(429)
+  })
+
+  test('a click into a drawn screen pays when its `from` files, once: an Undo between brings no new filing', async () => {
+    const { cache, home, nights } = mockup()
+    cache.addVersion(home, { ...ver('<h1>Home 2</h1><button data-action="@nights: Last nights">Nights</button>', 'Home'), createdAt: '2026-11-10T00:00:00Z' })
+    start(cache)
+    const edit = await share('edit', 2), h = { 'x-uxwoz-share': edit.token }
+    const click = () => post('/api/screen', { app: APP, action: '@nights', from: home, label: 'Nights' }, h).then((r) => r.text())
+    await click()
+    expect(cache.share(edit.token)!.share.used).toBe(1)
+    expect(cache.get(home)!.settled).toBeDefined()
+    // Undo, then Redo: the version showing was filed already or is older, so the clicks are free.
+    for (const at of [undefined, cache.get(home)!.versions[1]!.createdAt]) {
+      expect((await post('/api/undo', { key: home, ...(at && { at }) }, h)).status).toBe(200)
+      await click()
+    }
+    expect(cache.share(edit.token)!.share.used).toBe(1)
+    expect(cache.get(nights)!.versions).toHaveLength(1)
+  })
+
+  test('a click\'s `from` must be a screen of the same mockup: an edit link gets 403, the owner\'s click counts as none', async () => {
+    const { cache, home } = mockup()
+    const other = cache.addScreen('Another app', null, ver('<h1>Other</h1>', 'Other'))!
+    start(cache)
+    const h = { 'x-uxwoz-share': (await share('edit')).token }
+    expect((await post('/api/screen', { app: APP, action: '@nights', from: other.key, label: 'x' }, h)).status).toBe(403)
+    expect((await post('/api/screen', { app: APP, action: '@nights', from: 7, label: 'x' }, h)).status).toBe(403)
+    await (await post('/api/screen', { app: APP, action: '@settings: Settings', from: other.key, label: 'x' })).text()
+    expect(cache.get(other.key)!.settled).toBeUndefined()
+    expect(cache.find(APP, '@settings')!.parent).toBeNull()
+    expect(cache.get(home)!.settled).toBeUndefined()
+  })
+
+  test('a request a recording answers takes no unit of an edit link\'s budget', async () => {
+    const plants = STARTERS.find((s) => s.id === 'plants')!.prompt, rec = recordingFor(plants, 'small-phone')!
+    const cache = new ScreenCache()
+    const home = cache.addScreen(plants, null, { ...ver(recordedHtml(rec.screens.home!.designs[0]!), 'Home'), device: 'small-phone', costUsd: 0 })!
+    start(cache)
+    const edit = await (await post('/api/share', { app: plants, role: 'edit', cap: 1 })).json()
+    const h = { 'x-uxwoz-share': edit.token }
+    const evs = (await (await post('/api/revise', { key: home.key }, h)).text()).trim().split('\n').map((l) => JSON.parse(l))
+    expect(evs.at(-1).type).toBe('done')
+    expect(cache.get(home.key)!.versions.at(-1)!.costUsd).toBe(0)
+    expect(cache.share(edit.token)!.share.used).toBe(0)
   })
 
   test('3. a page is fetched from this server, whatever Host the request names', async () => {

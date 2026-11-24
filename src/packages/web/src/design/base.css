@@ -4,10 +4,9 @@
 [hidden] { display: none !important; }
 /* The night sky fills the window, behind the canvas and the bar's strip; the workspace ends above the strip. */
 body { margin: 0; color: var(--text); font: 14px/1.4 system-ui, -apple-system, sans-serif;
-  height: 100vh; display: flex; flex-direction: column; overflow: hidden; padding-bottom: var(--bar-h);
-  --bar-h: 74px; background: radial-gradient(40% 40% at 85% 5%, var(--violet-glow), transparent),
+  height: 100vh; display: flex; flex-direction: column; overflow: hidden; padding-top: var(--bar-h);
+  --bar-h: 52px; background: radial-gradient(40% 40% at 85% 5%, var(--violet-glow), transparent),
   radial-gradient(40% 35% at 5% 95%, var(--green-glow), transparent), linear-gradient(var(--sky1), var(--sky2)); }
-@media (max-width: 720px) { body { --bar-h: 108px; } }
 input, select, button, textarea { font: inherit; color: inherit; }
 button, select { padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); cursor: pointer; }
 button:disabled { color: var(--disabled); cursor: default; }

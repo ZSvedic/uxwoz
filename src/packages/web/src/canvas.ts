@@ -348,6 +348,9 @@ export class Canvas {
   setZoom(level: number, x?: number, y?: number) {
     const b = this.base()
     level = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(level * 100) / 100))
+    // 100% from the menu or ⌘0 is the starting view: the current mock or box with its name, buttons and ropes.
+    const t = x == null && level === 1 ? this.currentTarget() : undefined
+    if (t && this.frame(t)) return this.fit(t)
     if (x == null || y == null) {
       const st = this.stage, r = st.getBoundingClientRect(), t = this.currentTarget(), f = t && this.frame(t)
       const cx = f ? (f.x + f.w / 2) * this.z - st.scrollLeft : NaN, cy = f ? (f.y + f.h / 2) * this.z - st.scrollTop : NaN

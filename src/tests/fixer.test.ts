@@ -277,10 +277,14 @@ const env = { OPENROUTER_API_KEY: 'fake', OPENAI_API_KEY: 'fake' }
 const terra = (text: string) => new Response(sse({ type: 'response.output_text.delta', delta: text },
   { type: 'response.completed', response: { model: 'gpt-6.1-terra', usage: { input_tokens: 1000, output_tokens: 100 } } }))
 
-/** Screens come at once; filings file nothing; a visit waits for `open()`, then replies `reply`. Every Terra request is kept, in order. */
+/**
+ * Screens come at once, but a redraw asked to go `slowly` waits for `release()` (`held` says it is waiting); filings
+ * file nothing; a visit waits for `open()`, then replies `reply`. Every Terra request is kept, in order.
+ */
 function provider(reply: string) {
-  let open = () => {}
-  const gate = new Promise<void>((r) => { open = r })
+  let open = () => {}, release = () => {}
+  const gate = new Promise<void>((r) => { open = r }), slow = new Promise<void>((r) => { release = r })
+  const state = { held: false }
   const asked: string[] = [], inputs: string[] = []
   const fetch: Fetch = async (_url, init) => {
     const body = JSON.parse(String(init?.body))
@@ -292,9 +296,11 @@ function provider(reply: string) {
       if (visit) await gate
       return terra(visit ? reply : 'nothing')
     }
-    return new Response(sse({ model: 'anthropic/claude-haiku-5.5', choices: [{ delta: { content: `<title>S</title><h1>${body.messages[1].content.includes('add a Back') ? 'redrawn' : 'S'}</h1>` }, finish_reason: 'stop' }], usage: { cost: 0.001 } }))
+    const user: string = body.messages[1].content
+    if (user.includes('The change: slowly')) { state.held = true; await slow }
+    return new Response(sse({ model: 'anthropic/claude-haiku-5.5', choices: [{ delta: { content: `<title>S</title><h1>${user.includes('add a Back') || user.includes('slowly') ? 'redrawn' : 'S'}</h1>` }, finish_reason: 'stop' }], usage: { cost: 0.001 } }))
   }
-  return { fetch, open, asked, inputs }
+  return { fetch, open, release, state, asked, inputs }
 }
 
 async function withServer(reply: string, run: (s: { post: (p: string, b: object) => Promise<Response>; map: (wait?: boolean) => Promise<any>; p: ReturnType<typeof provider>; cache: ScreenCache }) => Promise<void>) {
@@ -302,7 +308,7 @@ async function withServer(reply: string, run: (s: { post: (p: string, b: object)
   const server = createServer({ port: 0, cache, fetch: p.fetch, env, log: () => {}, fileWaitMs: 100 })
   const post = (path: string, body: object) => fetch(new URL(path, server.url), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   const map = async (wait = false) => (await fetch(new URL(`/api/map?app=Snore${wait ? '&wait=1' : ''}`, server.url))).json()
-  try { await run({ post, map, p, cache }) } finally { p.open(); server.stop(true) }
+  try { await run({ post, map, p, cache }) } finally { p.open(); p.release(); server.stop(true) }
 }
 
 /** Make and settle the first screen and `n - 1` more. */
@@ -411,6 +417,34 @@ describe('the visit in the server', () => {
       await map(true)
       await Bun.sleep(50)
       expect(p.asked.filter((x) => x === 'visit')).toHaveLength(2)
+    })
+  })
+
+  test('while the fixer redraws a screen, the user\'s Edit of it is refused (409), not buried under the redraw', () => {
+    return withServer('redraw home: slowly', async ({ post, map, p }) => {
+      await picks(post, 2)
+      await map(true)
+      await post('/api/box', { app: 'Snore', op: 'visit' })
+      p.open()
+      while (!p.state.held) await Bun.sleep(5)
+      expect((await post('/api/revise', { key: 'snore', change: 'mine' })).status).toBe(409)
+      p.release()
+      const m = await map(true)
+      expect(m.entries[0].versions.at(-1)).toMatchObject({ feedback: 'slowly', by: 'fixer' })
+    })
+  })
+
+  test('an Undo during the visit counts as a change: the screen is not redrawn', () => {
+    return withServer('redraw home: add a Back', async ({ post, map, p, cache }) => {
+      await picks(post, 2)
+      await (await post('/api/revise', { key: 'snore', change: 'Bigger title' })).text()
+      await map(true)
+      await post('/api/box', { app: 'Snore', op: 'visit' })
+      expect((await post('/api/undo', { key: 'snore' })).status).toBe(200)
+      p.open()
+      const m = await map(true)
+      expect(m.boxes.visits[0].changes).toEqual([{ text: 'did not redraw home: it changed during the visit' }])
+      expect(cache.get('snore')!.versions).toHaveLength(1)
     })
   })
 

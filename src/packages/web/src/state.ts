@@ -19,6 +19,9 @@ export interface Making { key: string; parent: string | null; device?: Device; n
 
 export const state = {
   app: null as string | null,
+  /** The open project is the tour: read-only, so nothing sends a request that changes it, and the buttons under a
+   *  mock are grey and say *Off in the tour.* */
+  tour: false,
   entries: new Map<string, CacheEntry>(),
   /** Each screen's level and parent, worked out on every draw. */
   tree: new Map<string, TreeNode>(),
@@ -31,8 +34,6 @@ export const state = {
   revising: null as { key: string; change: string | null } | null,
   drawer: null as 'edit' | 'info' | 'comments' | 'share' | null,
   busy: null as AbortController | null,
-  /** The tour is open: read-only, so the buttons under a mock are grey and say *Off in the tour.* */
-  tour: false,
   /** Counts mockups opened, so a slower earlier open gives way to a newer one. */
   starts: 0,
   /** Rules and Data (components are entries); the changes of each box that Undo can take back, oldest first. */

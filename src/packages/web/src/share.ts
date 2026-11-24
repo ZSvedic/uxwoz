@@ -196,18 +196,18 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
     if ((has('app') && typeof b.app !== 'string') || (has('key') && typeof b.key !== 'string')) return 'refuse'
     const root = has('app') ? normalizePrompt(b.app) : has('key') ? (b.key as string).split(' » ')[0]! : null
     if (q != null && normalizePrompt(q) !== root) return 'refuse'
+    // A click's `from` is a screen of the same mockup, or nothing.
+    if (has('from') && b.from != null && (typeof b.from !== 'string' || b.from.split(' » ')[0] !== root)) return 'refuse'
     return { root, b }
   }
 
   /** Whether a request makes a model work: a new screen (not a cache hit), a revise, a settle that starts a filing, an Edit of a box or a visit. */
   function costs(path: string, b: any, cache: ScreenCache): boolean {
     if (path === '/api/box') return b?.op === 'edit' || b?.op === 'visit'
+    // A new screen calls a model; a cache hit is free unless the click's `from` files when it is settled.
     if (path === '/api/screen') return !cache.find(String(b?.app ?? ''), canonicalAction(typeof b?.action === 'string' ? b.action : null))
-    if (path === '/api/settle') {
-      // As cache.settle decides: the version showing was not filed yet, and is no Edit (which filed itself).
-      const e = cache.get(String(b?.key ?? '')), v = e?.versions.at(-1)
-      return !!e && !!v && !isComponent(e) && e.settled !== v.createdAt && !(e.settled && v.feedback)
-    }
+      || (typeof b?.from === 'string' && !!cache.wouldSettle(b.from))
+    if (path === '/api/settle') return !!cache.wouldSettle(String(b?.key ?? ''))
     return PAID.has(path)
   }
 
@@ -232,7 +232,8 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
     if (scope === 'refuse' || (scope.root != null && scope.root !== f.root)) return fail('This link opens one mockup only.', 403)
     // Deleting the first screen deletes the mockup, its links and its feedback: only the owner may.
     if (path === '/api/delete' && scope.b?.key === f.root) return fail('Only the owner can delete the whole mockup.', 403)
-    const paid = costs(path, scope.b, cache)
+    // A request a recording answers calls no model: it takes no unit.
+    const paid = costs(path, scope.b, cache) && !f.desk.draw.replayed(path, scope.b)
     if (paid && f.share.used >= (f.share.cap ?? EDIT_CAP)) return fail('This link\'s budget is used up.', 429)
     // Counted before the call, so two at once cannot both pass the cap; given back when refused.
     if (paid) f.share.used++
@@ -251,7 +252,7 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
       out[path] = typeof r === 'function' ? wrap(path, r) : Object.fromEntries(Object.entries(r).map(([m, f]) => [m, wrap(path, f as any)]))
     }
     // The app's page at `/` and at a mockup's address (`/m/…`): the secret's redirect keeps the path.
-    if (owner) for (const p of Object.keys(out).filter((p) => p === '/' || p.startsWith('/m/'))) out[p] = (req: Request, server: { port?: number }) => {
+    if (owner) for (const p of Object.keys(out).filter((p) => p === '/' || p.startsWith('/m/') || p === '/tour' || p.startsWith('/tour/'))) out[p] = (req: Request, server: { port?: number }) => {
       const u = new URL(req.url), secret = u.searchParams.get('owner')
       const https = publicOrigin(req).startsWith('https:')
       if (secret === owner) return new Response(null, { status: 302, headers: { Location: u.pathname, 'Set-Cookie': `uxwoz_owner=${owner}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${https ? '; Secure' : ''}` } })
