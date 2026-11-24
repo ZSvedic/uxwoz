@@ -29,7 +29,7 @@ export function screenIdea(html: string): string {
   return decode(s).replace(/\s+/g, ' ').trim().slice(0, 140)
 }
 
-/** The window height of a screen made before devices; our script turns vh units into pixels of it, as a frame grows with its screen. */
+/** The window height of a screen made before devices; the export turns vh units into pixels of it. */
 export const VIEWPORT_H = 800
 
 /** The sizes a mockup can have: the frame of every screen, and how the model is told of it. 'phone' and 'desktop' are read from mockups made before, never offered. */
@@ -72,20 +72,9 @@ export function scrollsFirst(chain: Scrollable[], dx: number, dy: number): boole
   return false
 }
 
-/**
- * Who takes a one-finger drag that has moved (fx, fy) since it started: null while it is still a tap (under 6 px);
- * 'screen' when a part under the finger can scroll that way (the content follows the finger, so it scrolls the other
- * way: `takes`, the wheel rule, asked with that scroll); else 'canvas'. Copied into the frame as source, so it uses
- * nothing from outside.
- */
-export function dragOwner(fx: number, fy: number, takes: (dx: number, dy: number) => boolean): 'screen' | 'canvas' | null {
-  if (Math.hypot(fx, fy) < 6) return null
-  return takes(-fx, -fy) ? 'screen' : 'canvas'
-}
-
 // Our script, before the model's markup: clicks on data-action controls become messages to the app,
 // and the frame never navigates. While the screen streams (`final` false), controls do nothing.
-const bootstrap = (final: boolean, vh: number) => `(() => {
+const bootstrap = (final: boolean) => `(() => {
   const final = ${final}
   // Only a real click opens a screen: a script cannot start paid generations.
   const go = (prompt, label, part) => {
@@ -96,7 +85,7 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
   const labelOf = (el) => { const w = (n) => n.nodeType === 8 ? '' : n.childNodes?.length ? [...n.childNodes].map(w).join(' ') : n.textContent || ''; return el ? (el.getAttribute('aria-label') || w(el).trim() || el.value || '').trim().replace(/\\s+/g, ' ') : '' }
   addEventListener('pointerdown', () => parent.postMessage({ uxwoz: 'touch' }, '*'), true)
   // A part of the screen, as the page pins a comment to it: its words, its tag, its place among the elements with the
-  // same tag and words, and where it is. The frame never scrolls, so its rectangle is in the page's own pixels.
+  // same tag and words, and where it is in the frame's view (the page scrolls inside the frame).
   const PARTS = '[data-action],[aria-label],button,a,label,h1,h2,h3,h4,li,td,th,p,input,select'
   const all = (sel) => [...document.querySelectorAll(sel)]
   const textOf = (el) => { const t = labelOf(el) || el.tagName.toLowerCase(); return t.length > 60 ? t.slice(0, 57) + '…' : t }
@@ -113,6 +102,8 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     const same = /^[a-z][a-z0-9]*$/.test(a.tag) ? q(a.tag).filter(is) : []
     return same[a.nth] || same[0] || q(PARTS).find(is) || null
   }
+  // A part scrolled out of the frame's view has no pin.
+  const inView = (el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth }
   // The page's comment mode: after { uxwoz: 'name-part' }, the part under the pointer has an outline and the next
   // click names it instead of using it; { uxwoz: 'name-part', off: true } stops it. Until then this does nothing.
   let naming = false, lit = null, litStyle = ''
@@ -131,7 +122,7 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
       for (const a of d.anchors.slice(0, 200)) {
         if (!a || typeof a.text !== 'string') continue
         const el = find(all, { id: a.id, text: a.text, tag: String(a.tag || ''), nth: Math.max(0, Number(a.nth) || 0) })
-        if (el) { const p = describe(el); spots.push({ id: a.id, x: p.x, y: p.y, w: p.w, h: p.h }) }
+        if (el && inView(el)) { const p = describe(el); spots.push({ id: a.id, x: p.x, y: p.y, w: p.w, h: p.h }) }
       }
       parent.postMessage({ uxwoz: 'located', n: d.n, spots }, '*')
     }
@@ -150,7 +141,7 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     const mod = e.metaKey || e.ctrlKey
     const field = e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)
     const zoom = mod && ['=', '+', '-', '0', '[', ']'].includes(e.key)
-    const fit = !mod && !e.altKey && e.shiftKey && !field && /^Digit[123]$/.test(e.code)
+    const fit = !mod && !e.altKey && e.shiftKey && !field && /^Digit1$/.test(e.code)
     if (!zoom && !fit && e.key !== 'Escape') return
     if (zoom) e.preventDefault()
     parent.postMessage({ uxwoz: 'key', key: e.key, code: e.code, shift: e.shiftKey, mod }, '*')
@@ -168,8 +159,18 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     const prompt = el.getAttribute('data-action')
     if (prompt) { e.preventDefault(); go(prompt, labelOf(el), describe(el)) }
   }, true)
-  // A followed link would show another page in the frame.
-  window.addEventListener('click', (e) => { if (e.target instanceof Element && e.target.closest('a[href]')) e.preventDefault() })
+  // A followed link would show another page in the frame. A link to a full web address asks the app to open it
+  // (a real click only); one the screen's own script or a data-action took, or with no address, does nothing here.
+  window.addEventListener('click', (e) => {
+    const a = e.target instanceof Element && e.target.closest('a[href]')
+    if (!a) return
+    const taken = e.defaultPrevented
+    e.preventDefault()
+    if (taken || !final || a.hasAttribute('data-action')) return
+    if (navigator.userActivation && !navigator.userActivation.isActive) return
+    const url = (a.getAttribute('href') || '').trim()
+    if (/^https?:\\/\\/\\S+$/i.test(url) && url.length <= 2000) parent.postMessage({ uxwoz: 'open', url }, '*')
+  })
   document.addEventListener('submit', (e) => {
     const p = e.target.getAttribute('data-action') || e.submitter?.getAttribute('data-action')
     const by = e.submitter || e.target.querySelector('button,[type=submit]') || e.target
@@ -177,31 +178,27 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
   }, true)
   // A sandboxed submit would blank the frame; the model's handlers run first.
   window.addEventListener('submit', (e) => e.preventDefault())
-  // vh units become pixels of the device's height, again before each measure.
-  const vhToPx = (css) => css.replace(/(-?\\d*\\.?\\d+)[dsl]?vh\\b/g, (m, n) => (parseFloat(n) * ${vh / 100}) + 'px')
-  const fixVh = () => {
-    for (const el of document.querySelectorAll('main [style*="vh"], main[style*="vh"]')) {
-      const before = el.getAttribute('style'), after = vhToPx(before)
-      if (after !== before) el.setAttribute('style', after)
-    }
-    for (const st of document.querySelectorAll('main style')) {
-      const after = vhToPx(st.textContent)
-      if (after !== st.textContent) st.textContent = after
-    }
+  // The page scrolls inside the frame: the app learns, at load and as it scrolls or grows, whether content lies
+  // beyond the top or bottom edge (at most once a frame).
+  const page = () => document.scrollingElement || document.documentElement
+  let edges = '', queued = false
+  const edgesNow = () => {
+    queued = false
+    const p = page(), above = p.scrollTop > 1, below = p.scrollTop + p.clientHeight < p.scrollHeight - 1
+    const key = above + ',' + below + ',' + Math.round(p.scrollTop) + ',' + p.scrollHeight
+    if (key !== edges) { edges = key; parent.postMessage({ uxwoz: 'scroll', above, below }, '*') }
   }
-  addEventListener('DOMContentLoaded', fixVh)
-  // The frame never scrolls: it reports the screen's size and hands scroll gestures on.
-  let last = ''
-  const report = () => {
-    fixVh()
+  const edgesSoon = () => { if (!queued) { queued = true; requestAnimationFrame(edgesNow) } }
+  addEventListener('scroll', edgesSoon, { passive: true })
+  addEventListener('resize', edgesSoon)
+  addEventListener('load', () => {
+    edgesNow()
+    const seen = new ResizeObserver(edgesSoon)
+    seen.observe(document.body)
     const main = document.querySelector('main')
-    const r = main ? main.getBoundingClientRect() : null
-    const h = Math.ceil(r ? r.bottom + 16 : document.body.scrollHeight)
-    const w = Math.ceil(r ? r.right : document.body.scrollWidth)
-    if (h + 'x' + w !== last) { last = h + 'x' + w; parent.postMessage({ uxwoz: 'size', height: h, width: w }, '*') }
-  }
-  addEventListener('load', () => { report(); new ResizeObserver(report).observe(document.body) })
-  // A part under the pointer that can scroll that way (a card rail) takes the gesture; else it scrolls the canvas.
+    if (main) seen.observe(main)
+  })
+  // A part under the pointer that can scroll that way (a card rail, or the page itself) takes the wheel; else the canvas moves.
   const scrollsFirst = ${scrollsFirst}
   const chain = (t) => {
     const out = []
@@ -210,6 +207,11 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
       out.push({ overflowX: s.overflowX, overflowY: s.overflowY, scrollLeft: el.scrollLeft, scrollTop: el.scrollTop,
         scrollWidth: el.scrollWidth, scrollHeight: el.scrollHeight, clientWidth: el.clientWidth, clientHeight: el.clientHeight })
     }
+    const h = getComputedStyle(document.documentElement), b = document.body ? getComputedStyle(document.body) : h
+    const flow = (x, y) => { const f = x !== 'visible' ? x : y; return f === 'hidden' || f === 'clip' ? 'hidden' : 'auto' }
+    const p = page()
+    out.push({ overflowX: flow(h.overflowX, b.overflowX), overflowY: flow(h.overflowY, b.overflowY), scrollLeft: p.scrollLeft, scrollTop: p.scrollTop,
+      scrollWidth: p.scrollWidth, scrollHeight: p.scrollHeight, clientWidth: p.clientWidth, clientHeight: p.clientHeight })
     return out
   }
   addEventListener('wheel', (e) => {
@@ -218,24 +220,18 @@ const bootstrap = (final: boolean, vh: number) => `(() => {
     e.preventDefault()
     parent.postMessage({ uxwoz: 'wheel', dx: e.deltaX, dy: e.deltaY }, '*')
   }, { passive: false })
-  // Touch: one finger on a part that can scroll that way scrolls it, else the drag pans the canvas; two fingers zoom it.
-  // A tap stays a click. Points go out in the frame's pixels; \`start\` begins a gesture (or a new count of fingers).
-  const dragOwner = ${dragOwner}
-  let drag = null
-  const at = (ts) => { const a = ts[0], b = ts[1] || a; return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2, d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) } }
-  const begin = (e) => {
-    const n = e.touches.length, p = n && at(e.touches)
-    drag = n ? { x: p.x, y: p.y, by: n > 1 ? 'pinch' : null, t: drag ? drag.t : e.target, start: true } : null
-  }
+  // Touch: one finger belongs to the screen (the page scrolls natively, a tap clicks); two fingers move and zoom the
+  // canvas. Points go out in the frame's pixels; \`start\` begins a gesture (or a new count of fingers).
+  let pinch = null
+  const at = (ts) => { const a = ts[0], b = ts[1]; return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2, d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) } }
+  const begin = (e) => { pinch = e.touches.length > 1 ? { start: true } : null }
   for (const n of ['touchstart', 'touchend', 'touchcancel']) addEventListener(n, begin, { passive: true })
   addEventListener('touchmove', (e) => {
-    if (!drag || drag.by === 'screen') return
-    const p = at(e.touches)
-    if (!drag.by) drag.by = dragOwner(p.x - drag.x, p.y - drag.y, (dx, dy) => scrollsFirst(chain(drag.t), dx, dy))
-    if (!drag.by || drag.by === 'screen') return
+    if (!pinch || e.touches.length < 2) return
     e.preventDefault()
-    parent.postMessage({ uxwoz: drag.by === 'pinch' ? 'pinch' : 'pan', x: p.x, y: p.y, d: p.d, start: drag.start }, '*')
-    drag.start = false
+    const p = at(e.touches)
+    parent.postMessage({ uxwoz: 'pinch', x: p.x, y: p.y, d: p.d, start: pinch.start }, '*')
+    pinch.start = false
   }, { passive: false })
   addEventListener('gesturestart', (e) => e.preventDefault()) // Safari's own pinch would zoom the page
 })()`
@@ -255,21 +251,25 @@ main a:is(${GO}):hover { text-decoration-line: underline !important; }
 main [aria-current="page"] { font-weight: 700 !important; text-decoration-line: underline !important; text-underline-offset: .25em; }`
 
 // Our layout rules, after the theme. Pico grows its text with the window; a fixed 16 px keeps
-// screens in scale with the app around them. The export uses them too, without the frame's no-scroll.
+// screens in scale with the app around them. The export uses them too, without the frame's own rules.
 export const SCREEN_CSS = `body > main { width: 100%; margin: 0; padding: 20px 24px; box-sizing: border-box; }
 @media (max-width: 600px) { body > main { padding: 16px; } }
 :root { --pico-font-size: 100%; --pico-spacing: .75rem; --pico-typography-spacing-vertical: .75rem;
   --pico-block-spacing-vertical: .75rem; --pico-block-spacing-horizontal: 1rem;
   --pico-form-element-spacing-vertical: .5rem; --pico-form-element-spacing-horizontal: .75rem; }`
-const FRAME_CSS = `html, body { overflow: hidden; }\n${SCREEN_CSS}`
+// In the frame the page scrolls inside the device's size and fills it at least, so a bar pinned to the bottom sits
+// at the frame's bottom; vh units are the frame's own.
+const FRAME_CSS = `html { overscroll-behavior: contain; }\nhtml, body { margin: 0; }\nbody > main { min-height: 100vh; }\n${SCREEN_CSS}`
 
-/** The iframe's srcdoc: theme CSS inlined, our script, the fragment in <main>, one `device` screen tall unless `fit`. */
-export function framePage(fragment: string, css: string, final: boolean, device?: Device, fit = false): string {
-  const h = device && !fit ? DEVICES[device].height : 0
+/**
+ * The iframe's srcdoc: theme CSS inlined, our script, the fragment in <main>. The frame has its device's size (the
+ * caller sets it) and the page scrolls inside, so `device` and `fit` change nothing here; they stay for old callers.
+ */
+export function framePage(fragment: string, css: string, final: boolean, _device?: Device, _fit = false): string {
   const style = css.replace(/<\/style/gi, '<\\/style')
   return `<!doctype html><html data-theme="light"><head><meta charset="utf-8">`
     + `<meta name="viewport" content="width=device-width, initial-scale=1">`
-    + `<style>${style}</style><style>${FRAME_CSS}\n${NAV_CSS}${h ? `\nbody > main { min-height: ${h}px; }` : ''}</style><script>${bootstrap(final, device ? DEVICES[device].height : VIEWPORT_H)}</script></head>`
+    + `<style>${style}</style><style>${FRAME_CSS}\n${NAV_CSS}</style><script>${bootstrap(final)}</script></head>`
     + `<body${final ? '' : ' style="cursor:progress"'}><main>${fragment}</main></body></html>`
 }
 
