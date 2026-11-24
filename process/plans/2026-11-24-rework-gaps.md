@@ -50,7 +50,18 @@ OK all. 2: keep the long sheet. 6: keep "hey Woz" too. 18: call it Reroll.
    every visitor sees the saved ones, free, with no model call. Two ways to make them once: I write
    them by hand, or I paste your words into Haiku and save what it draws. Suggest Haiku, because the
    third mock says *A cheap model generated this mock in 2.4 sec*, which is false for a mock I wrote.
-   I correct any word Haiku changed, and a test keeps the saved words equal to the tour file.
+   I correct any word Haiku changed. Zel wants to change a tour mock in VS Code without asking, so
+   the saved tour is plain files in `tour/`, in the format the app already uses for a mock:
+
+   ```
+   tour/home.html            <title>This is Bill.</title>, then the mock's HTML; the file's name is its link ID
+   tour/meet-woz.html        a button with data-action="@how-woz-works" leads to that file
+   tour/rules.md  data.md    the boxes, as Export writes them
+   tour/components/<id>.html
+   ```
+
+   The app reads the folder when the tour opens, so an edit shows on reload. The files are the source
+   from then on: `spec/zel-tour-compilation-v4.md` is the draft they came from, and no test ties them.
 5. **Edit, History, Delete.** Suggest: Edit holds the field, 🎙️, **Make the change**, and a small
    **Delete this mock…** at its bottom. History holds Undo, Redo and the list of versions; a tap on one
    shows it. So Past changes moves from Edit to History and exists once, and four buttons stay four.
@@ -78,8 +89,9 @@ OK all. 2: keep the long sheet. 6: keep "hey Woz" too. 18: call it Reroll.
     first line.
 11. In the tour all four buttons are grey (Zel: Info too), and a tap says *Off in the tour.* Its
     boxes are read-only. A tour mock never scrolls: all of its text and its button, which comes after
-    the text, fit a small phone (the longest at 12 px type); a smaller window shows it scaled down.
-    Bill, a stick figure, stands in the right third of the first and last mocks, the text beside him.
+    the text, fit a small phone (the longest at 13 px type); a smaller window shows it scaled down.
+    Bill, a stick figure, stands at the right of the first and last mocks (a quarter of the width),
+    the text beside him. A tour mock has no title inside: its name is on the tag above it.
 12. *Try it now: pick Rules…* is text. The app does not check that you did it.
 13. The tour's boxes need content. I write it: three rules, the big button as a component, Bill's hours
     as a table, one fixer's note.
@@ -93,7 +105,7 @@ OK all. 2: keep the long sheet. 6: keep "hey Woz" too. 18: call it Reroll.
 **The buttons under a mock**
 
 17. Decided by Zel: the four buttons are on the canvas, under the current mock or box only, and zoom
-    with it. With nothing current there are none. The rail beside each mock goes.
+    with it. They are narrow, with room between them. With nothing current there are none. The rail beside each mock goes.
 18. *New* reads as a new project. Suggest 🎲 **Another**.
 19. 🎲 draws the second design when pressed, not ahead: half of today's cost. It is asked to differ
     clearly from the first. Both stay in History.
@@ -106,7 +118,8 @@ OK all. 2: keep the long sheet. 6: keep "hey Woz" too. 18: call it Reroll.
 22. A box's bar keeps the four places: its own action first (📐 ➕ **Add rule**, 🗄️ ➕ **Add table**,
     🕵️ ▶️ **Run fixer**, 🧩 none), then ✏️ **Edit**, ⏪ **History**, ℹ️ **Info**. A tap on a component
     makes it current, and the bar is that component's.
-23. In the dropdown the four boxes are one row at the top, always, with their *new* counts. The tree
+23. In the dropdown the four boxes are one row at the top, always, each with its full name and, on its
+    corner, the count of what is new in it since the last look. The tree
     scrolls under it. Planned mocks stay, grey. Components leave the list.
 
 **The canvas**
