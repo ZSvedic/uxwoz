@@ -181,6 +181,7 @@ export function initAccount(d: AccountDeps, cfg: { public?: boolean }) {
   const form = $<HTMLFormElement>('account')
   form.addEventListener('submit', (e) => { e.preventDefault(); send() })
   $('accountField').addEventListener('input', (e) => { const v = (e.target as HTMLInputElement).value; if (fieldKind()) card[fieldKind()!] = v })
+  $('accountClose').addEventListener('click', () => dismiss())
   $('accountAgain').addEventListener('click', () => { if (card.step === 'delete') dismiss(); else signIn() })
   // The free screens left, read again when the tab comes back (the owner may have given more).
   addEventListener('focus', () => loadMe())
@@ -198,6 +199,11 @@ export async function loadMe() {
   const res = await fetch('/api/me').catch(() => null)
   if (res?.ok) setMe(await res.json())
 }
+
+/** The person on this page is the public's (a visitor or a user), as /api/me last said. */
+export const isPublicMe = () => shows(me, isPublic)
+/** The owner: always in the private app; in public mode when /api/me says so. */
+export const isOwnerMe = () => !isPublic || me?.role === 'owner'
 
 function setMe(m: Me) {
   me = m

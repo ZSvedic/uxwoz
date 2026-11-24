@@ -6,13 +6,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { LIMITS, ScreenCache, applyFiling, elementEnd, markCurrent, numberParts, parseFiling, pasteComponents, type Fetch, type Version } from '@uxwoz/core'
 import { createServer } from '@uxwoz/web/src/server.ts'
-import { boxesMarkdown, nextVisit } from '../packages/web/src/boxes.ts'
+import { boxesMarkdown, nextVisit, visitLine } from '../packages/web/src/boxes.ts'
 
 describe('the boxes on the canvas', () => {
   test('the fixer\'s notes end with the mocks left before the next visit', () => {
     const b = { rules: [], data: [], gone: { components: [], rules: [], data: [] } }
     expect([nextVisit({ ...b, settled: 2 }), nextVisit({ ...b, settled: 9 }), nextVisit(b)])
       .toEqual(['The next visit comes after 3 more mocks.', 'The next visit comes after 1 more mock.', 'The next visit comes after 5 more mocks.'])
+  })
+
+  test('a visit\'s line counts its changes in words, and leaves out a time and a cost it does not have', () => {
+    expect(visitLine({ screens: 5, changes: [1], ms: 2400, costUsd: 0.0012 })).toBe('Read 5 mocks, made 1 change · 2.4 s · ~$0.0012')
+    expect(visitLine({ screens: 1, changes: [1, 2] })).toBe('Read 1 mock, made 2 changes')
+    expect(visitLine({ screens: 4, changes: [], ms: 0, costUsd: 0 })).toBe('Read 4 mocks, changed nothing')
   })
 
   test('Export the boxes writes the rules and the tables as markdown', () => {

@@ -90,7 +90,7 @@ the bar has no room for. Esc, ✕ or a press outside closes it.
     the project, then opens the newest other project, or the tour when there is none. Both ask
     first.
 - **UXWoz**: **🎨 Theme** (see Choices), **🔈 Sound** (on or off), the account (the public's, see
-  The public), **Privacy**. The owner's private app has **Model** here too.
+  The public), **Privacy**. The owner has **Model** here too.
 
 ### Export
 
@@ -478,7 +478,7 @@ newer app is left as it is: the app says so in the red pill and saves nothing.
   font and wobbly borders, so a mock reads as a sketch; even the model's chart colours turn grey,
   except the blue of controls that open a mock. Clean is plain Pico with neutral buttons and
   links. Switching restyles the mocks at once; the model never sees the theme.
-- **Model** (the menu, the owner's private app only): Claude Haiku 5.5 (default), GPT-6 Luna
+- **Model** (the menu, the owner only): Claude Haiku 5.5 (default), GPT-6 Luna
   (fast), GPT-6.1 Sol Ultrafast. It applies to the next design made; stored mocks stay as they
   are, with their maker in Info. The public always gets Claude Haiku.
 
@@ -553,8 +553,11 @@ the browser and says what they think. Nothing is real-time and nobody signs in: 
   none; a comment about the whole screen, or whose part is gone, has no pin. A pin takes only its
   own tap: it makes its mock current and flips it to Info at its comment, which gets a gold ring
   for a moment. The comments load when a project opens and when Share, Feedback or Info opens.
-- **Comments in Info** lists the mock's comments from every reviewer: the open ones by pin number,
-  then the resolved ones, muted. Each shows its pin number in a gold dot (when it has a pin), the
+- **A comment's number** is its place by time among all of its mock's comments, on a part or the
+  whole screen, resolved or not, so Resolve and Reopen change no number; it is the same in the
+  player and the app. A comment on the whole screen has its number in both lists, and no pin.
+- **Comments in Info** lists the mock's comments from every reviewer: the open ones by number,
+  then the resolved ones, muted. Each shows its number in a gold dot, the
   reviewer's name, the part's words (*The whole screen*; *At "Pair watch", not designed yet* for a
   dead control), the text, when it was sent, *About an earlier version* when its part is not in
   the mock any more, and **Resolve** (or **Reopen**). The reviewer sees *Resolved* on reload. An

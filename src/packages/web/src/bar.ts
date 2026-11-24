@@ -57,7 +57,7 @@ export interface BarDeps {
   go(key: string): void
   make(e: CacheEntry): void
   /** What the bar shows: the open project (the tour's too), its drawn and planned mocks, the parent of each, a mock's name. */
-  view(): { app: string | null; current: string | null; box: Box | null; hasBoxes: boolean; mocks: (CacheEntry & { planned?: boolean })[] }
+  view(): { app: string | null; current: string | null; box: Box | null; making: string | null; hasBoxes: boolean; mocks: (CacheEntry & { planned?: boolean })[] }
   parentOf(key: string): string | null
   nameOf(e: CacheEntry): string
   /** The entries of a box new since the user last looked. */
@@ -91,6 +91,17 @@ function zoomTo(z: string) {
 const ZOOM_KEYS: Record<string, string> = { '=': 'in', '+': 'in', '-': 'out', 0: '1', Digit1: 'all' }
 const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))
 
+/** What a key does: a zoom (in, out, 100%, Fit all) or a step (⌘[ ⌘]); nothing inside a text field, where the keys
+ *  are the field's. */
+export function keyOf(e: Pick<KeyboardEvent, 'key' | 'code' | 'metaKey' | 'ctrlKey' | 'shiftKey' | 'altKey'>, inField: boolean): string | null {
+  if (inField) return null
+  const mod = e.metaKey || e.ctrlKey
+  if (mod && ZOOM_KEYS[e.key] && ZOOM_KEYS[e.key] !== 'all') return ZOOM_KEYS[e.key]!
+  if (mod && (e.key === '[' || e.key === ']')) return e.key === '[' ? 'back' : 'forward'
+  if (!mod && !e.altKey && e.shiftKey && ZOOM_KEYS[e.code] === 'all') return 'all'
+  return null
+}
+
 export function initBar(deps: BarDeps) {
   d = deps
   for (const [b, m] of MENUS) $(b).addEventListener('click', () => {
@@ -108,10 +119,11 @@ export function initBar(deps: BarDeps) {
   for (const b of document.querySelectorAll<HTMLButtonElement>('[data-look]')) b.addEventListener('click', () => { closeMenus(); d!.look(b.dataset.look as Box) })
   for (const b of document.querySelectorAll<HTMLButtonElement>('[data-zoom]')) b.addEventListener('click', () => { closeMenus(); zoomTo(b.dataset.zoom!) })
   addEventListener('keydown', (e: KeyboardEvent) => {
-    const mod = e.metaKey || e.ctrlKey
-    if (mod && ZOOM_KEYS[e.key] && ZOOM_KEYS[e.key] !== 'all') { e.preventDefault(); zoomTo(ZOOM_KEYS[e.key]!) }
-    else if (mod && (e.key === '[' || e.key === ']') && !editable(e.target)) { e.preventDefault(); d!.walk(e.key === '[' ? -1 : 1) }
-    else if (!editable(e.target) && !mod && !e.altKey && e.shiftKey && ZOOM_KEYS[e.code] === 'all') zoomTo('all')
+    const k = keyOf(e, editable(e.target))
+    if (!k) return
+    if (k !== 'all') e.preventDefault()
+    if (k === 'back' || k === 'forward') d!.walk(k === 'back' ? -1 : 1)
+    else zoomTo(k)
   })
   // A press outside a menu closes it; so does a click into a mock (the page loses focus to the frame).
   document.addEventListener('pointerdown', (e) => {
@@ -134,7 +146,8 @@ export function renderToolbar() {
   if (!d) return
   const v = d.view()
   const cur = v.current ? v.mocks.find((e) => e.key === v.current) : undefined
-  const name = v.box ? boxName(v.box) : cur ? d.nameOf(cur) : v.app ? 'Home' : 'UXWoz'
+  // A new mock is current while it is drawn: its name at once.
+  const name = v.making ?? (v.box ? boxName(v.box) : cur ? d.nameOf(cur) : v.app ? 'Home' : 'UXWoz')
   $('nameText').textContent = name
   $('nameButton').title = `${name}: the boxes and every mock`
   $<HTMLButtonElement>('nameButton').disabled = !v.app

@@ -17,12 +17,20 @@ export const PIN = 22
 /** The anchor to locate for a feedback entry; null for one about the whole screen. Old entries have words only. */
 export const anchorOf = (f: Feedback): Anchor | null => (f.about ? { id: f.id, text: f.about, tag: f.tag ?? '', nth: f.nth ?? 0 } : null)
 
-/** A screen's comments (of the list given) by time, each with its pin number; a resolved one has none, and the open ones count 1, 2, 3. */
-export function numbered(list: Feedback[]): { f: Feedback; n: number | null }[] {
-  let n = 0
+/** A screen's comments (of the list given) by time, each with its number: its place by time among all of the mock's
+ *  comments, resolved or not, on a part or the whole screen, so Resolve changes no number. A comment the server sent with
+ *  its number (`n`: the player gets only the visitor's own) keeps it. `open`: not resolved. */
+export function numbered(list: Feedback[]): { f: Feedback; n: number; open: boolean }[] {
   return list.filter((f) => f.kind === 'comment' || f.kind === 'dead')
     .sort((a, b) => a.at.localeCompare(b.at))
-    .map((f) => ({ f, n: f.resolved ? null : ++n }))
+    .map((f, i) => ({ f, n: (f as Feedback & { n?: number }).n ?? i + 1, open: !f.resolved }))
+}
+
+/** Every comment's number by its id, each mock's counted on its own (the server sends them with the player's). */
+export function numbers(all: Feedback[]): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const screen of new Set(all.map((f) => f.screen))) for (const { f, n } of numbered(all.filter((x) => x.screen === screen))) out.set(f.id, n)
+  return out
 }
 
 /** A part's words as a label: one space between words, cut at about 40 characters with an ellipsis. */
@@ -33,6 +41,14 @@ export const whereOf = (f: Feedback) => (f.kind === 'dead' || f.label ? `At "${p
 
 /** The player's trail under the screen's name: none while it would only say the name again (the first screen). */
 export const trailOf = (titles: string[]) => (titles.length > 1 ? titles : [])
+
+/** The player's visits after opening `key`: a mock already on them (`back`, a link to one before) takes them back to
+ *  it; Home starts them again; any other is one more. */
+export const visit = (visits: string[], key: string, root: string) => {
+  if (key === root) return [key]
+  const i = visits.indexOf(key)
+  return i >= 0 ? visits.slice(0, i + 1) : [...visits, key]
+}
 
 /** A day as "Nov 12", with the year when it is not this year's. */
 export const dayOf = (at: string, now = new Date()) => {
@@ -45,23 +61,23 @@ export const whileOpen = (isOpen: () => boolean, load: () => void) => () => { if
 /** How often an open Share or Feedback page reads its list again. */
 export const SHARE_REFRESH_MS = 10_000
 
-/** A comment as the owner's Comments tab shows it: its pin number (open ones), whether its pin is drawn, where it is,
- * and whether its part was not found in the newest version. */
-export interface CommentRow { f: Feedback; n: number | null; pin: boolean; where: string; earlier: boolean }
+/** A comment as the owner's Comments shows it: its number, open or not, whether its pin is drawn, where it is, and
+ * whether its part was not found in the newest version. */
+export interface CommentRow { f: Feedback; n: number; open: boolean; pin: boolean; where: string; earlier: boolean }
 
-/** A screen's comments for the owner, the open ones by pin number, then the resolved ones. `located` is the ids its
+/** A screen's comments for the owner, the open ones by number, then the resolved ones. `located` is the ids its
  * frame found (null until it answers). An edit link sees none. */
 export function commentRows(all: Feedback[], screen: string, located: Set<string> | null, editLink = false): CommentRow[] {
   if (editLink) return []
-  const rows = numbered(all.filter((f) => f.screen === screen)).map(({ f, n }) => {
-    const live = n != null && !!anchorOf(f), found = !!located?.has(f.id)
-    return { f, n, pin: live && found, where: whereOf(f), earlier: live && !!located && !found }
+  const rows = numbered(all.filter((f) => f.screen === screen)).map(({ f, n, open }) => {
+    const live = open && !!anchorOf(f), found = !!located?.has(f.id)
+    return { f, n, open, pin: live && found, where: whereOf(f), earlier: live && !!located && !found }
   })
-  return [...rows.filter((r) => r.n != null), ...rows.filter((r) => r.n == null)]
+  return [...rows.filter((r) => r.open), ...rows.filter((r) => !r.open)]
 }
 
 /** The open comments of a screen, for the tab's count. */
-export const openCount = (all: Feedback[], screen: string, editLink = false) => commentRows(all, screen, null, editLink).filter((r) => r.n != null).length
+export const openCount = (all: Feedback[], screen: string, editLink = false) => commentRows(all, screen, null, editLink).filter((r) => r.open).length
 
 /** Whether a spot shows within a layer W × H: a part scrolled out of the frame's view hides its pin. */
 export const inLayer = (s: Spot, W: number, H: number) => s.x + s.w > 0 && s.y + s.h > 0 && s.x < W && s.y < H

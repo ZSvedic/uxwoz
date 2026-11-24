@@ -9,7 +9,8 @@
 /* Errors (until closed) and hints show in a pill at the bottom of the canvas. */
 .error-pill, .hint-pill { position: absolute; z-index: 12; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 6px 14px;
   border: 1px solid var(--border); border-radius: 18px; background: var(--surface); color: var(--muted); box-shadow: var(--shadow); font-size: 13px; }
-.hint-pill { --z: 1; }
+/* A hint or a note is one line, cut short with …, below the buttons under a mock. */
+.hint-pill { --z: 1; max-width: calc(100% - 32px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hint-pill.press { cursor: pointer; }
 .error-pill { max-width: calc(100% - 32px); display: flex; gap: 8px; align-items: center; padding-right: 8px; border-color: var(--err); color: var(--err); }
 .error-pill button { padding: 0 6px; border: 0; background: none; color: inherit; }
@@ -45,6 +46,9 @@
   display: flex; font-size: calc(15px / min(1, var(--z))); line-height: 1.3; }
 .card .name { max-width: 100%; padding: 0 .55em; border: calc(1px / min(1, var(--z))) solid var(--border);
   border-radius: .5em; background: var(--surface); color: var(--text); font-weight: 600; }
+/* Far out a card is narrow on screen: the tag's type is smaller but readable, and its name fills the card's width. */
+.surface.far .card .head { font-size: calc(11px / var(--z)); }
+.surface.far .card .name { padding: 0 .3em; }
 .surface:not(.loose) .card.current .name { border-color: var(--current); box-shadow: 0 0 calc(8px / var(--z)) var(--current); }
 .card.streaming .screen { opacity: .8; }
 

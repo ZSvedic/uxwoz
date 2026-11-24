@@ -25,13 +25,13 @@ let openedAt = -1
 let ring = { id: '', until: 0, scroll: false }
 
 const rowsOf = (key: string) => commentRows(feedbackOf(), key, found.get(key) ?? null, !!shareToken)
-const numbers = (key: string) => new Map(rowsOf(key).filter((r) => r.n != null).map((r) => [r.f.id, r.n!] as [string, number]))
+const numbers = (key: string) => new Map(rowsOf(key).map((r) => [r.f.id, r.n] as [string, number]))
 
 /** Ask a mock's frame where its open, anchored comments are; the pins follow the answer. */
 function locate(key: string) {
   const t = canvas.pinTarget(key)
   if (!t || shareToken) return
-  const anchors = rowsOf(key).filter((r) => r.n != null).map((r) => anchorOf(r.f)).filter((a) => a != null)
+  const anchors = rowsOf(key).filter((r) => r.open).map((r) => anchorOf(r.f)).filter((a) => a != null)
   asked.set(key, ++count)
   t.win?.postMessage({ uxwoz: 'locate', n: count, anchors }, '*')
 }
@@ -92,8 +92,8 @@ export function commentsList(key: string): HTMLElement[] {
   const rows = rowsOf(key)
   if (!rows.length) return []
   const items = rows.map((r) => {
-    const li = el('li', r.n == null ? 'resolved' : '',
-      el('div', 'head', r.pin ? el('span', 'dot', String(r.n)) : '', el('b', '', r.f.name), el('small', '', r.where)),
+    const li = el('li', r.open ? '' : 'resolved',
+      el('div', 'head', el('span', 'dot', String(r.n)), el('b', '', r.f.name), el('small', '', r.where)),
       el('p', '', r.f.text ?? ''),
       el('small', '', `${when(r.f.at)}${r.earlier ? ' · About an earlier version' : ''}`),
       r.f.resolved ? button('Reopen', 'Open this comment again: its pin comes back', () => resolve(r.f, false))
@@ -104,18 +104,22 @@ export function commentsList(key: string): HTMLElement[] {
     for (const [ev, on] of [['pointerenter', true], ['pointerleave', false], ['focusin', true], ['focusout', false]] as const) li.addEventListener(ev, () => lightPin(key, r.f.id, on))
     return li
   })
-  const open = rows.filter((r) => r.n != null).length
+  const open = rows.filter((r) => r.open).length
   return [el('h5', '', `Comments${open ? ` (${open})` : ''}`), el('ul', 'comments', ...items)]
 }
 
-/** After Info drew its comments: the ringed one scrolls into view once. */
+/** After Info drew its comments: the card scrolls once so the ringed one is in view near its top (the card only, not
+ *  the canvas around it; both are zoomed, so screen pixels are turned into the card's). */
 export function showRing(card: HTMLElement) {
   const target = ring.scroll && card.querySelector<HTMLElement>(`[data-id="${ring.id}"]`)
-  if (target) { ring.scroll = false; target.scrollIntoView({ block: 'nearest' }) }
+  if (!target) return
+  ring.scroll = false
+  const c = card.getBoundingClientRect(), k = c.height ? card.clientHeight / c.height : 1
+  card.scrollTop += (target.getBoundingClientRect().top - c.top) * k - 48
 }
 
 async function resolve(f: Feedback, resolved: boolean) {
   const res = await post('/api/feedback', { app: state.app, id: f.id, resolved }).catch(() => null)
   if (!res?.ok) return showError(`Could not change the comment: ${(await res?.json().catch(() => null))?.error ?? 'no answer'}`)
-  await loadShared()
+  await loadShared() // the count on ℹ️ follows (sharing.ts draws)
 }

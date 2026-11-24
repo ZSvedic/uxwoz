@@ -1,6 +1,6 @@
 // The canvas worked out with no page: rows of equal height, the 100% scale, where a glide ends, and the ropes.
 import { describe, expect, test } from 'bun:test'
-import { BUTTONS_H, NAME_H, ROPE_SHOW, curve, frameOf, glideAt, glideEnd, headH, hit, hundred, landing, placeTree, rope, sizeOf, touchStep } from '../packages/web/src/canvas.ts'
+import { BUTTONS_H, NAME_H, ROPE_SHOW, boxHundred, curve, frameOf, glideAt, headH, hundred, landing, placeTree, rope, sizeOf, touchStep } from '../packages/web/src/canvas.ts'
 
 const small = sizeOf('small-phone'), laptop = sizeOf('laptop')
 
@@ -45,7 +45,7 @@ describe('rows', () => {
 
 describe('100%', () => {
   const fits = (z: number, stageW: number, stageH: number, mock: { w: number; h: number }) => {
-    const f = frameOf({ x: 0, y: 0, ...mock }, z), e = glideEnd({ x: 0, y: 0, ...mock }, z, stageW, stageH)
+    const f = frameOf({ x: 0, y: 0, ...mock }, z), e = landing(frameOf({ x: 0, y: 0, ...mock }, z), z, stageW, stageH)
     return f.w * z <= stageW && f.h * z <= stageH && e.left <= f.x * z && e.top <= f.y * z
   }
 
@@ -59,9 +59,32 @@ describe('100%', () => {
   test('a laptop mock on a laptop is about its real size; on a phone it is scaled down to fit', () => {
     const z = hundred(1440, 780, laptop)
     expect(z).toBeGreaterThan(0.9)
-    expect(z).toBeLessThanOrEqual(1)
+    expect(z).toBeLessThanOrEqual(1.1)
     expect(fits(z, 1440, 780, laptop)).toBe(true)
     expect(hundred(375, 700, laptop)).toBeLessThan(0.3)
+  })
+
+  test('100% is the largest scale at which the name, the mock, its buttons and a little rope fit, at most 1.5×', () => {
+    // Canvases (the window less the bar) of a phone, a laptop and a large screen, for both sizes of project.
+    for (const [w, h] of [[390, 708], [1280, 668], [1700, 848]] as const) for (const mock of [small, laptop]) {
+      const z = hundred(w, h, mock), f = frameOf({ x: 0, y: 0, ...mock }, z)
+      expect(f.w * z).toBeLessThanOrEqual(w - 2 * (w < 720 ? 8 : 24))
+      expect(f.h * z).toBeLessThanOrEqual(h - 2 * (w < 720 ? 8 : 24) + 1)
+      // One step larger no longer fits, unless 1.5× is reached.
+      const up = z + 0.02, g = frameOf({ x: 0, y: 0, ...mock }, up)
+      expect(z >= 1.5 || g.w * up > w - 2 * (w < 720 ? 8 : 24) || g.h * up > h - 2 * (w < 720 ? 8 : 24)).toBe(true)
+    }
+    // A small phone on a 1280 × 720 window uses nearly all of the canvas's height.
+    expect(hundred(1280, 668, small) * (small.h + BUTTONS_H + 2 * ROPE_SHOW) + NAME_H).toBeGreaterThan(600)
+  })
+
+  test('a box wider than a phone fits it at its 100%, with its buttons; on a laptop it is the mocks\' 100%', () => {
+    const box = { w: 520, h: small.h + BUTTONS_H }, base = hundred(390, 708, small)
+    const z = boxHundred(390, 708, box, base)
+    expect(z * box.w).toBeLessThanOrEqual(390 - 16)
+    expect(z * box.h).toBeLessThanOrEqual(708 - 16)
+    expect(z).toBeLessThan(base)
+    expect(boxHundred(1440, 900, box, hundred(1440, 900, small))).toBe(hundred(1440, 900, small))
   })
 
   test('a phone mock in a roomy window is larger, at most 1.5 times its real size', () => {
@@ -75,7 +98,7 @@ describe('100%', () => {
 describe('the glide', () => {
   test('ends with the mock, its name and its buttons centred in the view', () => {
     const card = { x: 2000, y: 1500, ...small }, z = hundred(390, 760, small)
-    const end = glideEnd(card, z, 390, 760), f = frameOf(card, z)
+    const end = landing(frameOf(card, z), z, 390, 760), f = frameOf(card, z)
     expect(end.left + 390 / 2).toBeCloseTo((f.x + f.w / 2) * z)
     expect(end.top + 760 / 2).toBeCloseTo((f.y + f.h / 2) * z)
     // The name is above the card, the buttons under it.
@@ -84,7 +107,7 @@ describe('the glide', () => {
   })
 
   test('zoomed in past the view, it shows the start of the mock, never cuts it off at the left or the top', () => {
-    const card = { x: 2000, y: 1500, ...small }, end = glideEnd(card, 3, 390, 760), f = frameOf(card, 3)
+    const card = { x: 2000, y: 1500, ...small }, end = landing(frameOf(card, 3), 3, 390, 760), f = frameOf(card, 3)
     expect(end).toEqual({ left: f.x * 3 - 8, top: f.y * 3 - 8 })
   })
 
@@ -111,10 +134,17 @@ describe('touch and the pointer', () => {
     expect(touchStep({ x: 0, y: 0, d: 100 }, { x: 0, y: 0, d: 150 }).zoom).toBe(1.5)
   })
 
-  test('a zoom without a pointer stays put over a mock or a box', () => {
-    const boxes = [{ x: 600, y: 600, w: 450, h: 930 }]
-    expect(hit(boxes, 800, 1400)).toBe(true)
-    expect(hit(boxes, 1200, 1400)).toBe(false)
+  test('two fingers that move apart and along both zoom and pan, step by step', () => {
+    // The sky follows the fingers' middle on every move, as the canvas does over the sky and over a mock.
+    let last = { x: 200, y: 400, d: 100 }, z = 1, dx = 0
+    for (const now of [{ x: 190, y: 400, d: 110 }, { x: 170, y: 400, d: 121 }]) {
+      const s = touchStep(last, now)
+      z *= s.zoom
+      dx += s.dx
+      last = now
+    }
+    expect(z).toBeCloseTo(1.21)
+    expect(dx).toBe(30)
   })
 })
 

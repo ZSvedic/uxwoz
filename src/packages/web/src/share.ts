@@ -5,6 +5,7 @@ import { HOME_NAME, canonicalAction, componentsOf, isComponent, normalizePrompt,
 import type { Desks } from './desks.ts'
 import type { Gate } from './public.ts'
 import { isTour } from './tour.ts'
+import { numbers } from './pins.ts'
 
 /** How many of each kind a mockup keeps (comments, thumbs, answers, trips; the oldest go), the most screens and dead clicks
  * a trip keeps, the longest text, an edit link's default cap. */
@@ -126,14 +127,17 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
       list.push(f)
       capped(list, (x) => groupOf(x.kind) === groupOf(kind))
       saveSoon(cache)
-      return json({ ok: true, id: f.id })
+      // A comment's number: its place by time among all of its mock's comments, the same as the owner's.
+      return json({ ok: true, id: f.id, ...(kind === 'comment' && { n: numbers(list).get(f.id) }) })
     }),
     // A visitor's own feedback, to show again on reload; never another visitor's.
     GET: (req: Request) => {
       const f = linkFor(req)
       if (f instanceof Response) return f
       const v = new URL(req.url).searchParams.get('visitor') ?? ''
-      return json({ feedback: VISITOR.test(v) ? f.desk.cache.sharedOf(f.root).feedback.filter((x) => x.visitor === v) : [] })
+      const all = f.desk.cache.sharedOf(f.root).feedback, n = numbers(all)
+      // Each with its number among every visitor's comments on its mock, so the player shows the owner's numbers.
+      return json({ feedback: VISITOR.test(v) ? all.filter((x) => x.visitor === v).map((x) => (n.has(x.id) ? { ...x, n: n.get(x.id) } : x)) : [] })
     } },
     '/api/s/:token/trip': { POST: visitor((b, root, who, cache) => {
       const id = VISITOR.test(String(b?.id)) ? String(b.id) : null

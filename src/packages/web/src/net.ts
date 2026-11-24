@@ -4,7 +4,7 @@ import { REBUILD_MS, extractFragment, hasVisibleText } from '@uxwoz/core/frame'
 import type { DrawEvent as ScreenEvent } from './server.ts'
 import { canvas } from './app.ts'
 import { draw, page } from './screens.ts'
-import { LIVE_HINT, liveHint, loadMe, refused, sideAct } from './account-ui.ts'
+import { LIVE_HINT, isPublicMe, liveHint, loadMe, refused, sideAct } from './account-ui.ts'
 import { $, state, store } from './state.ts'
 
 async function fetchText(url: string): Promise<string> {
@@ -43,9 +43,6 @@ export type StreamRenderer = ReturnType<typeof streamInto>
 
 // ---- Errors
 
-export const fmtS = (ms: number) => `${(ms / 1000).toFixed(ms < 1000 ? 2 : 1)} s`
-export const fmtUsd = (v: number) => `$${v < 0.01 ? v.toFixed(4) : v.toFixed(3)}`
-
 /** A red pill at the bottom of the canvas, until closed or replaced; it takes the hint's place while it shows. */
 export function showError(msg: string | null) {
   $('errorText').textContent = msg ?? ''
@@ -77,8 +74,8 @@ function liveEvent(event: 'live' | 'act' | 'veteran') {
   liveOn = now === 'due' && (event === 'live' || liveOn)
   showLasting()
 }
-/** A model drew a design (it cost more than 0). */
-export const liveDesign = () => liveEvent('live')
+/** A model drew a mock's design (it cost more than 0): the hint is the public's only (a visitor or a user). */
+export const liveDesign = () => { if (isPublicMe()) liveEvent('live') }
 /** Recent is known: a browser first seen with mockups never shows the hint. */
 export const beginHint = (hasMockups: boolean) => { if (hasMockups) liveEvent('veteran') }
 /** The visitor did something (a click in a screen too): the hint goes. */

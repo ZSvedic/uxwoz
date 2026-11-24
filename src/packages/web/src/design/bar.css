@@ -6,6 +6,7 @@
 .bar button { flex: none; display: inline-flex; gap: 5px; align-items: center; min-height: 36px; padding: 4px 9px; border-radius: 12px; white-space: nowrap; }
 .bar button:hover:not(:disabled) { background: var(--wood-hover); }
 .bar button:disabled { color: var(--bar-disabled); }
+.bar .trail:disabled { opacity: .45; }
 .bar .trail { width: 38px; padding: 0; justify-content: center; font-size: 19px; line-height: 1; }
 /* The logo: the mark on a phone, the wordmark from 720 px. */
 .logo { padding: 0 6px; --sparkle: var(--bar-sparkle); }
@@ -51,7 +52,7 @@
 @media (hover: none) { .menu kbd { display: none; } }
 /* The dropdown: the four boxes in one row, the sentence on one line, the tree by indent; planned mocks grey. */
 .drop-boxes { display: flex; gap: 6px; margin: 4px 2px 8px; }
-.drop-boxes button { flex: 1 1 0; min-width: 0; min-height: 36px; padding: 4px 2px; justify-content: center; font-size: 12.5px; white-space: nowrap;
+.drop-boxes button { flex: auto; min-width: 0; min-height: 36px; padding: 4px 6px; justify-content: center; font-size: 12.5px; white-space: nowrap;
   border: 1px solid var(--border); border-radius: 8px; background: var(--field); }
 .drop-boxes button.current { border-color: var(--current); box-shadow: inset 0 0 0 1px var(--current); }
 .sentence { margin: 0 4px 6px; padding: 0 4px 6px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 13px;
@@ -70,6 +71,9 @@
 .side-menu h3 { margin: 10px 6px 2px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .side-menu #menuRecentHead { border: 0; padding: 0; text-transform: none; letter-spacing: 0; font-size: 15px; color: var(--text); font-weight: 400; margin: 2px 8px; }
 .menu-recent .item { padding-left: 30px; } .menu-recent .item.current { font-weight: 700; }
+/* An icon before its word, apart from it. */
+:is(.side-menu, .drop-boxes, .bar-boxes) i { font-style: normal; }
+.side-menu #menuRecentHead { display: flex; gap: 8px; }
 .side-menu .item > span, .account-line .line { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .side-menu select { margin-left: auto; }
 .side-menu .danger:hover { color: var(--err); }

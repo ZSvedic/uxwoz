@@ -265,9 +265,9 @@ const FRAME_CSS = `html { overscroll-behavior: contain; }\nhtml, body { margin: 
 
 /**
  * The iframe's srcdoc: theme CSS inlined, our script, the fragment in <main>. The frame has its device's size (the
- * caller sets it) and the page scrolls inside, so `device` and `fit` change nothing here; they stay for old callers.
+ * caller sets it) and the page scrolls inside.
  */
-export function framePage(fragment: string, css: string, final: boolean, _device?: Device, _fit = false): string {
+export function framePage(fragment: string, css: string, final: boolean): string {
   const style = css.replace(/<\/style/gi, '<\\/style')
   return `<!doctype html><html data-theme="light"><head><meta charset="utf-8">`
     + `<meta name="viewport" content="width=device-width, initial-scale=1">`

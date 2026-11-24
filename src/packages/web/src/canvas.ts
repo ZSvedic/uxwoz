@@ -6,6 +6,7 @@
 
 import { DEVICES, FRAME_SANDBOX, LEGACY_WIDTH, VIEWPORT_H, framePage, type Device } from '@uxwoz/core/frame'
 import { el } from './boxes.ts'
+import { MOCK_BUTTONS } from './flip.ts'
 
 /** Gaps between columns and between a row's buttons and the next row's names, in canvas pixels. */
 const GAP_X = 120
@@ -17,11 +18,9 @@ export const NAME_H = 34
 /** The buttons' row under a mock, in canvas pixels: they zoom with it. */
 export const BUTTONS_H = 80
 /** How much of the ropes 100% shows above a mock's name and below its buttons, in canvas pixels. */
-export const ROPE_SHOW = 36
+export const ROPE_SHOW = 12
 /** A component's card in its box: as wide as a mock, this tall; its content scrolls inside. */
 const COMPONENT_H = 200
-/** A box's buttons stand right of it, today (boxes.ts). */
-const RAIL_W = 60
 const SVG_NS = 'http://www.w3.org/2000/svg'
 /** Zoom levels, as the bar shows them: 100% is the current mock fitted (`hundred`). */
 const MIN_ZOOM = 0.1
@@ -56,6 +55,13 @@ export function hundred(stageW: number, stageH: number, mock: { w: number; h: nu
   return Math.max(0.05, Math.floor(Math.min(MAX_REAL, W / mock.w, zh) * 100) / 100)
 }
 
+/** The scale of 100% for a box (`frame`: the box with its buttons) on a stage w × h: the mocks' 100% (`base`), smaller
+ *  when the box would not fit at it. */
+export const boxHundred = (stageW: number, stageH: number, frame: { w: number; h: number }, base: number) => {
+  const m = margin(stageW)
+  return Math.max(MIN_ZOOM * base, Math.min(base, Math.floor(Math.min((stageW - 2 * m) / frame.w, (stageH - 2 * m) / frame.h) * 100) / 100))
+}
+
 /** What 100% shows of a mock whose card is `card`: its name, the card, its buttons, and ropes above and below. */
 export const frameOf = (card: Box, z: number): Box => {
   const top = headH(z) + ROPE_SHOW
@@ -68,17 +74,11 @@ export function landing(b: Box, z: number, w: number, h: number, m = margin(w)):
   return { left: axis(b.x, b.w, w), top: axis(b.y, b.h, h) }
 }
 
-/** Where the glide to a mock ends: its 100% view (`frameOf`) centred at scale z. */
-export const glideEnd = (card: Box, z: number, stageW: number, stageH: number) => landing(frameOf(card, z), z, stageW, stageH)
-
 /** A point of the glide, a fraction t of its time in: a straight line, eased at both ends. */
 export function glideAt(from: { left: number; top: number }, to: { left: number; top: number }, t: number) {
   const k = t <= 0 ? 0 : t >= 1 ? 1 : t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2
   return { left: from.left + (to.left - from.left) * k, top: from.top + (to.top - from.top) * k }
 }
-
-/** Whether a point (canvas pixels) lies on one of the boxes. */
-export const hit = (boxes: Box[], x: number, y: number) => boxes.some((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h)
 
 /** One step of two fingers: their middle and spread, before and now. The canvas follows the middle (scrolled by its
  *  way back, so the content moves with the fingers) and zooms by how the spread grew. */
@@ -158,6 +158,8 @@ export interface ScreenView {
   component?: boolean
   /** Changed since the user last looked at its box. */
   fresh?: boolean
+  /** A component's line under its ID: where it belongs. */
+  line?: string
   /** The tour: every button grey. */
   tour?: boolean
   /** The button whose card shows (cards.ts): dark. */
@@ -177,14 +179,6 @@ interface CanvasHandlers {
   zoomed: (level: number) => void
 }
 
-/** The buttons under the current mock: name, icon, label, tooltip. */
-export const BUTTONS: [string, string, string, string][] = [
-  ['another', '🎲', 'Another', 'Another design of this mock, from the same words'],
-  ['edit', '✏️', 'Edit', 'Say what should change in this mock'],
-  ['history', '⏪', 'History', 'Undo: bring back the version before'],
-  ['info', 'ℹ️', 'Info', 'What this mock was asked for and how it was drawn'],
-]
-
 /** A screen by its key, or a box by its element. */
 type Target = string | HTMLElement
 
@@ -193,7 +187,7 @@ export const pinHook = { rebuilt: (_key: string) => {}, size: (_key: string) => 
 
 /** A card: its name tag and its mock's frame, positioned and never moved in the DOM (that reloads the frame). */
 function newCard(key: string) {
-  const name = el('b', 'name')
+  const name = el('b', 'name'), idea = el('small', 'idea')
   const frame = el('iframe')
   frame.setAttribute('sandbox', FRAME_SANDBOX)
   frame.title = 'Generated mock'
@@ -201,7 +195,7 @@ function newCard(key: string) {
   Object.assign(frame.style, { position: 'absolute', left: '0', top: '0', transformOrigin: '0 0' })
   const pins = el('div', 'pins')
   const screen = el('div', 'screen', frame, pins)
-  return { el: el('article', 'card', el('div', 'head', name), screen), name, screen, frame, pins, key, view: null as ScreenView | null,
+  return { el: el('article', 'card', el('div', 'head', name, idea), screen), name, idea, screen, frame, pins, key, view: null as ScreenView | null,
     w: 0, h: 0, shown: null as { html: string; final: boolean; css: string } | null }
 }
 type Card = ReturnType<typeof newCard>
@@ -237,15 +231,18 @@ export class Canvas {
   moved = 0
   /** The last view was 100% of the current mock or box, and nothing moved by hand since: a resize shows it so again. */
   private fitted = false
+  /** The last view was Fit all, and nothing moved by hand since: a resize fits all again. */
+  private whole = false
 
   /** `stage` scrolls (its content is replaced on first render); `side` holds the boxes; component cards go in `components`. */
   constructor(private stage: HTMLElement, private on: CanvasHandlers, private side: HTMLElement, private components: HTMLElement) {
     this.lines.classList.add('lines')
     this.surface.append(this.lines, side, this.acts)
-    for (const [name, icon, label, title] of BUTTONS) {
+    for (const [name, icon, label, title] of MOCK_BUTTONS) {
       const b = el('button', 'act', el('i', '', icon), label)
       b.type = 'button'
       b.title = title
+      b.setAttribute('aria-label', label) // its name is its word; the tooltip describes it
       b.dataset.act = name
       b.addEventListener('click', () => { const k = this.acts.dataset.key; if (k) this.on.tool(k, name) })
       this.acts.append(b)
@@ -270,7 +267,7 @@ export class Canvas {
     })
     const watchDpr = () => matchMedia(`(resolution: ${devicePixelRatio}dppx)`).addEventListener('change', () => { resized(); watchDpr() }, { once: true })
     watchDpr()
-    const byHand = () => { this.moved = performance.now(); this.fitted = false; this.stopGlide() }
+    const byHand = () => { this.moved = performance.now(); this.fitted = this.whole = false; this.stopGlide() }
     // Pinch (a wheel with ctrlKey in Chrome and Firefox) and Ctrl/Cmd + scroll zoom around the pointer.
     stage.addEventListener('wheel', (e) => {
       byHand()
@@ -288,15 +285,17 @@ export class Canvas {
     })
     // One finger on the sky pans it as the browser scrolls; two fingers pan it too and zoom by their spread, around
     // their middle (a mock hands its two-finger touches on, see the frame).
-    let spread: { d: number; z: number } | null = null
-    const apart = (t: TouchList) => Math.hypot(t[0]!.clientX - t[1]!.clientX, t[0]!.clientY - t[1]!.clientY)
-    stage.addEventListener('touchstart', (e) => { byHand(); spread = e.touches.length === 2 ? { d: apart(e.touches), z: this.z } : null }, { passive: true })
+    let fingers: { x: number; y: number; d: number } | null = null
+    const two = (t: TouchList) => ({ x: (t[0]!.clientX + t[1]!.clientX) / 2, y: (t[0]!.clientY + t[1]!.clientY) / 2, d: Math.hypot(t[0]!.clientX - t[1]!.clientX, t[0]!.clientY - t[1]!.clientY) })
+    stage.addEventListener('touchstart', (e) => { byHand(); fingers = e.touches.length === 2 ? two(e.touches) : null }, { passive: true })
     stage.addEventListener('touchmove', (e) => {
       byHand()
-      if (!spread || e.touches.length !== 2 || !spread.d) return
+      if (!fingers || e.touches.length !== 2) return
       e.preventDefault()
-      const t = e.touches
-      this.setScale(spread.z * apart(t) / spread.d, (t[0]!.clientX + t[1]!.clientX) / 2, (t[0]!.clientY + t[1]!.clientY) / 2)
+      const now = two(e.touches), s = touchStep(fingers, now)
+      fingers = now
+      if (s.zoom !== 1) this.setScale(this.z * s.zoom, now.x, now.y)
+      stage.scrollBy(s.dx, s.dy)
     }, { passive: false })
     // Dragging the sky pans it; a press on the sky that does not drag leaves nothing current.
     stage.addEventListener('pointerdown', (e) => {
@@ -330,6 +329,13 @@ export class Canvas {
 
   /** The scale of 100% on this stage for this project's mocks. */
   private base = () => hundred(this.stage.clientWidth || innerWidth, this.stage.clientHeight || innerHeight, this.mock)
+
+  /** The scale of a target's 100%: a mock's (`base`); a box with its buttons is also made to fit the stage, as wide as it is. */
+  private hundredOf(t: Target): number {
+    const b = this.base(), f = t instanceof HTMLElement ? this.frame(t) : undefined
+    if (!f) return b
+    return boxHundred(this.stage.clientWidth || innerWidth, this.stage.clientHeight || innerHeight, f, b)
+  }
 
   /** The current box's element, else the current mock's key. */
   private currentTarget(): Target | undefined {
@@ -366,7 +372,7 @@ export class Canvas {
   /** Zoom to a real scale, around a point on the window: that point stays in place. */
   private setScale(z: number, x: number, y: number) {
     this.moved = performance.now()
-    this.fitted = false
+    this.fitted = this.whole = false
     this.stopGlide()
     const b = this.base()
     z = Math.min(MAX_ZOOM * b, Math.max(MIN_ZOOM * b, z))
@@ -421,9 +427,9 @@ export class Canvas {
 
   /**
    * Without a key, Fit all: the whole tree and the boxes. With one, 100%: that mock (or box) with its name, buttons
-   * and ropes as large as the stage allows, at once. Options from before are taken and ignored.
+   * and ropes as large as the stage allows, at once.
    */
-  fit(key?: Target, _old?: object) {
+  fit(key?: Target) {
     if (this.queued) this.layout(false)
     const st = this.stage
     if (key === undefined) {
@@ -440,11 +446,12 @@ export class Canvas {
       this.stopGlide()
       st.scrollTo({ left: to.left, top: to.top })
       this.fitted = false
+      this.whole = true
       return
     }
-    const b = this.base()
+    const b = this.hundredOf(key)
     if (Math.abs(b - this.z) >= 0.001) this.applyZoom(b)
-    else this.on.zoomed(1)
+    else this.on.zoomed(this.z / this.base())
     this.setLoose(false)
     const f = this.frame(key)
     if (!f) return
@@ -452,13 +459,17 @@ export class Canvas {
     this.stopGlide()
     st.scrollTo({ left: to.left, top: to.top })
     this.fitted = true
+    this.whole = false
   }
 
-  /** After the window changed size: 100% of the current mock or box again, unless the user moved the canvas since. */
+  /** After the window changed size: the last fit (100% of the current mock or box, or Fit all) again for the new size;
+   *  after a zoom or a move by hand the zoom stays, and the current mock or box comes back into view. */
   private refit() {
     const t = this.currentTarget()
+    if (this.whole) return this.fit()
     if (this.fitted && t) return this.fit(t)
     this.on.zoomed(this.z / this.base())
+    if (t && !this.seen(t)) this.reveal(t, false)
   }
 
   /** Where an element inside the surface sits, in canvas pixels. */
@@ -478,9 +489,20 @@ export class Canvas {
   reveal(key: Target, smooth = true) {
     if (this.queued) this.layout(false)
     this.setLoose(false)
+    this.whole = false
+    const st = this.stage
+    // At 100% still (nothing zoomed by hand), the target's own 100%: a wide box on a phone fits too, and a mock after it
+    // is its size again. The middle of the view stays put while the zoom changes.
+    const h = this.fitted ? this.hundredOf(key) : this.z
+    if (Math.abs(h - this.z) >= 0.001) {
+      const cx = (st.scrollLeft + st.clientWidth / 2) / this.z, cy = (st.scrollTop + st.clientHeight / 2) / this.z
+      this.applyZoom(h)
+      st.scrollLeft = cx * h - st.clientWidth / 2
+      st.scrollTop = cy * h - st.clientHeight / 2
+    }
     const f = this.frame(key)
     if (!f) return
-    const st = this.stage, to = landing(f, this.z, st.clientWidth, st.clientHeight)
+    const to = landing(f, this.z, st.clientWidth, st.clientHeight)
     // The canvas can show no more than its own size: the glide ends where the scroll can go.
     to.left = Math.max(0, Math.min(to.left, st.scrollWidth - st.clientWidth))
     to.top = Math.max(0, Math.min(to.top, st.scrollHeight - st.clientHeight))
@@ -533,6 +555,8 @@ export class Canvas {
       c.name.textContent = s.name
       c.name.title = s.name
       c.name.hidden = !s.name
+      c.idea.textContent = c.idea.title = s.line ?? ''
+      c.idea.hidden = !s.line
       c.pins.hidden = s.streaming
     }
     // Something else became current: the sky's tap is forgotten.
@@ -582,12 +606,12 @@ export class Canvas {
     const t = keep ? this.currentTarget() : undefined, was = keep && !this.gliding && this.seen(t)
     const z = this.z, mock = this.mock
     const screens = this.screens.filter((s) => !s.component)
-    // The Components box is as wide as a mock and its rail; a box is as tall as Home.
-    this.components.parentElement!.style.width = `${mock.w + 50 + RAIL_W}px`
+    // The Components box is as wide as a mock; a box is as tall as Home.
+    this.components.parentElement!.style.width = `${mock.w + 50}px`
     const side = !this.side.hidden && screens.length > 0
     if (side) this.side.style.setProperty('--box-h', `${mock.h}px`)
     const st = this.stage, pad = Math.ceil(Math.max(PAD, st.clientWidth / z / 2, st.clientHeight / z / 2))
-    const p = placeTree(screens, mock, z, side ? this.side.offsetWidth + RAIL_W : 0, pad)
+    const p = placeTree(screens, mock, z, side ? this.side.offsetWidth : 0, pad)
     this.places = p.cards
     this.extent = { ...p.extent }
     if (side && p.side) {
@@ -620,7 +644,7 @@ export class Canvas {
       btn.classList.toggle('off', off)
       btn.setAttribute('aria-disabled', String(off))
       btn.classList.toggle('on', s.pressed === name)
-      if (name === 'info') btn.lastChild!.textContent = s.comments ? `Info ${s.comments}` : 'Info'
+      if (name === 'info') btn.setAttribute('aria-label', btn.lastChild!.textContent = s.comments ? `Info ${s.comments}` : 'Info')
     }
   }
 
@@ -690,7 +714,7 @@ export class Canvas {
       const last = d.start ? null : this.touch
       this.touch = now
       this.moved = performance.now()
-      this.fitted = false
+      this.fitted = this.whole = false
       this.stopGlide()
       if (!last) return
       const s = touchStep(last, now)
@@ -699,11 +723,15 @@ export class Canvas {
     } else if (d.uxwoz === 'wheel') {
       // Nothing under the pointer in the mock could scroll that way: the gesture scrolls the canvas.
       this.moved = performance.now()
-      this.fitted = false
+      this.fitted = this.whole = false
       this.stopGlide()
       this.stage.scrollBy(Number(d.dx) || 0, Number(d.dy) || 0)
     } else if (d.uxwoz === 'open' && typeof d.url === 'string' && /^https?:\/\/\S+$/i.test(d.url) && d.url.length <= 2000) {
       open(d.url, '_blank', 'noopener,noreferrer')
+    } else if (d.uxwoz === 'action' && c.view?.component) {
+      // A control in a component's card in its box only makes that component current.
+      this.setLoose(false)
+      this.on.focus(c.key)
     } else if (d.uxwoz === 'action' && typeof d.prompt === 'string' && !c.view?.streaming) {
       this.on.action(c.key, d.prompt.slice(0, 500), typeof d.label === 'string' ? d.label.slice(0, 80) : '')
     }

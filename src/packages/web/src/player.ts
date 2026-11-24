@@ -7,7 +7,7 @@ import type { Feedback } from '@uxwoz/core'
 import { FRAME_SANDBOX, framePage, markCurrent, pasteComponents, type Device } from '@uxwoz/core/frame'
 import { linkTarget } from '@uxwoz/core/keys'
 import { el } from './boxes.ts'
-import { anchorOf, numbered, partLabel, pinLayer, playerFit, trailOf, type Spot } from './pins.ts'
+import { anchorOf, numbered, partLabel, pinLayer, playerFit, trailOf, visit, type Spot } from './pins.ts'
 
 interface Screen { key: string; name: string; title: string; html: string; device?: Device; parent: string | null }
 interface PlayerMap { role: 'view' | 'comment'; app: string; root: string; components: Record<string, string>; screens: Screen[] }
@@ -80,8 +80,8 @@ addEventListener('resize', layout)
 function show(key: string, push = true) {
   const s = byKey.get(key)
   if (!s) return
-  if (push) history.push(key)
-  frame.srcdoc = framePage(markCurrent(pasteComponents(s.html, map.components), s.name), css, true, s.device)
+  if (push) history = visit(history, key, map.root)
+  frame.srcdoc = framePage(markCurrent(pasteComponents(s.html, map.components), s.name), css, true)
   $('name').textContent = s.title
   document.title = `${s.title} · ${map.app.slice(0, 40)}`
   // Home has no Back and no trail: it would only say its name again.
@@ -134,8 +134,13 @@ function go(action: string, label: string, part: Part | null) {
 addEventListener('message', (e) => {
   const d = e.data
   if (e.source !== frame.contentWindow || typeof d?.uxwoz !== 'string') return
-  // The mock scrolled inside its frame (or grew): its pins are asked for again, and follow.
-  if (d.uxwoz === 'scroll') locate()
+  // The mock scrolled inside its frame (or grew): its pins are asked for again, and follow; an edge with more beyond
+  // it has flat corners and fades, as on the canvas.
+  if (d.uxwoz === 'scroll') {
+    $('device').classList.toggle('above', !!d.above)
+    $('device').classList.toggle('below', !!d.below)
+    locate()
+  }
   else if (d.uxwoz === 'open' && typeof d.url === 'string' && /^https?:\/\/\S+$/i.test(d.url) && d.url.length <= 2000) open(d.url, '_blank', 'noopener,noreferrer')
   else if (d.uxwoz === 'wheel') scrollBy(Number(d.dx) || 0, Number(d.dy) || 0)
   else if (d.uxwoz === 'action' && typeof d.prompt === 'string') go(d.prompt, typeof d.label === 'string' ? d.label.slice(0, 80) : '', partOf(d.part))
@@ -183,7 +188,9 @@ const typing = () => !!draft && !!$<HTMLTextAreaElement>('composerText').value.t
 const leave = () => !typing() || confirm('Drop the comment you are writing?')
 
 const thisScreen = () => mine.filter((f) => f.screen === current()?.key)
-const pinned = () => numbered(thisScreen()).filter((x) => x.n != null)
+const pinned = () => numbered(thisScreen()).filter((x) => x.open)
+/** The number a new comment on this mock gets: after the last one this visitor knows of. */
+const nextNumber = () => Math.max(0, ...numbered(thisScreen()).map((x) => x.n)) + 1
 
 /** Run `then` now if the visitor has a name, else after the name card. */
 function withName(then: () => void) {
@@ -226,11 +233,14 @@ addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape' && pi
 /** Open the card beside the mock: the part's words and its pin to come, a question or a placeholder. */
 function openDraft(d: NonNullable<typeof draft>, question: string, placeholder: string) {
   pick(false)
+  // The card is open: *Click the part you mean* has done its work.
+  clearTimeout(toastTimer)
+  $('toast').hidden = true
   draft = d
   draftFound = false
   $('composerQ').textContent = question
   $('composerQ').hidden = !question
-  $('composerPin').textContent = String(pinned().length + 1)
+  $('composerPin').textContent = String(nextNumber())
   $('composerAbout').textContent = d.part ? partLabel(d.part.text) : 'The whole screen'
   $('composer').querySelector('.head')!.toggleAttribute('hidden', d.kind === 'done')
   Object.assign($<HTMLTextAreaElement>('composerText'), { value: '', placeholder })
@@ -257,16 +267,19 @@ $('composer').addEventListener('submit', async (e) => {
   const f = { kind: d.kind, screen: s.key, title: s.title, text, ...d.label && { label: d.label }, ...d.part && { about: d.part.text, tag: d.part.tag, nth: d.part.nth } }
   const id = await send(f)
   if (id == null) return
-  mine.push({ id, at: new Date().toISOString(), visitor, name: nameNow(), ...f })
+  mine.push({ id, at: new Date().toISOString(), visitor, name: nameNow(), ...f, ...sentN != null && { n: sentN } } as Feedback)
   toast('Thanks, sent.')
   if (draft === d) closeDraft()
   locate()
 })
 
 /** Send one feedback; its id, or null after saying why it failed. */
+/** The number the server gave the comment sent last (its place among all of its mock's comments). */
+let sentN: number | undefined
 async function send(body: object): Promise<string | null> {
   const res = await post('feedback', body).catch(() => null)
   const b = await res?.json().catch(() => null)
+  sentN = Number.isInteger(b?.n) ? b.n : undefined
   if (res?.ok) return String(b?.id ?? '')
   toast(`Could not send: ${b?.error ?? 'no answer'}`)
   return null
@@ -323,12 +336,12 @@ function locate() {
 
 /** The pins over the mock: one per located comment, and the one of the card being written. */
 function drawPins() {
-  const numbers = new Map(pinned().map((x) => [x.f.id, x.n!] as [string, number]))
+  const numbers = new Map(pinned().map((x) => [x.f.id, x.n] as [string, number]))
   const all = [...spots]
   // The new card's pin: where the part was clicked, until the frame says where it is now.
   if (draft?.kind === 'comment' && draft.part) {
     if (!draftFound) all.push({ ...draft.part, id: 'new' })
-    numbers.set('new', numbers.size + 1)
+    numbers.set('new', nextNumber())
   }
   pinLayer($('pins'), all, numbers, (id) => {
     const card = id === 'new' ? $('composer') : $('slips').querySelector<HTMLElement>(`[data-id="${id}"]`)

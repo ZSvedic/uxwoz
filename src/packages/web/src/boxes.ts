@@ -28,6 +28,12 @@ export function button(text: string, title: string, run: () => void, cls = 'box-
 /** The boxes shown are the tour's: nothing in them can be typed into. */
 let readOnly = false
 
+/** An entry new since the user looked: marked (` fresh`); nothing is new in the tour. */
+const fresh = (x: { seen?: boolean }) => (readOnly || x.seen ? '' : ' fresh')
+
+/** Buttons that change a box (✕, + row, + column, the fixer's Undo): none in the tour. */
+const changes = <T,>(kids: T[]): T[] => (readOnly ? [] : kids)
+
 /** Text the user types in place: Enter or leaving the field saves it, Esc puts it back. Plain text in the tour. */
 function editable<E extends HTMLElement>(e: E, save: (text: string) => void): E {
   if (readOnly) return e
@@ -104,19 +110,27 @@ export function renderSide(side: ReturnType<typeof createSide>, v: { boxes: Boxe
     if (!typing(s)) s.querySelector<HTMLElement>('.box-hint')!.hidden = n > 0
   }
   const rules = side.sections.rules.querySelector<HTMLElement>('.box-body')!
-  if (!typing(rules)) rules.replaceChildren(...v.boxes.rules.map((r) => el('div', `rule${r.seen ? '' : ' fresh'}`, el('b', '', `${r.id}:`), ' ',
+  if (!typing(rules)) rules.replaceChildren(...v.boxes.rules.map((r) => el('div', `rule${fresh(r)}`, el('b', '', `${r.id}:`), ' ',
     editable(el('span', 'rule-text', r.text), (t) => op(t ? { op: 'set', box: 'rules', id: r.id, text: t } : { op: 'delete', box: 'rules', id: r.id })),
-    yours(r), button('✕', `Delete rule ${r.id}`, () => op({ op: 'delete', box: 'rules', id: r.id })))))
+    yours(r), ...changes([button('✕', `Delete rule ${r.id}`, () => op({ op: 'delete', box: 'rules', id: r.id }))]))))
   const data = side.sections.data.querySelector<HTMLElement>('.box-body')!
   if (!typing(data)) data.replaceChildren(...v.boxes.data.map((t) => tableView(t, op)))
   // The fixer's notes, newest visit first: what it changed, each with an Undo, and what code refused.
-  side.sections.notes.querySelector('.box-body')!.replaceChildren(...visits.map((x) => el('div', `visit${x.seen ? '' : ' fresh'}`,
+  side.sections.notes.querySelector('.box-body')!.replaceChildren(...visits.map((x) => el('div', `visit${fresh(x)}`,
     el('b', '', new Date(x.at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })), x.ask ? ` You asked: "${x.ask}".` : '',
-    el('span', '', x.error ? ` The visit failed: ${x.error}` : ` Read ${x.screens} mock${x.screens === 1 ? '' : 's'}, ${x.changes.length ? `made ${x.changes.length} changes` : 'changed nothing'} · ${(x.ms / 1000).toFixed(1)} s${x.costUsd == null ? '' : ` · ~$${x.costUsd.toFixed(4)}`}`),
+    el('span', '', ` ${visitLine(x)}`),
     el('ul', '', ...x.changes.map((c, i) => el('li', c.undone ? 'undone' : '', c.text, c.note ? el('small', '', ` ${c.note}`) : '',
-      ...c.undo && !c.undone ? [' ', button('Undo', 'Undo this change', () => op({ op: 'undo', at: x.at, i }))] : [])),
+      ...c.undo && !c.undone ? changes([' ', button('Undo', 'Undo this change', () => op({ op: 'undo', at: x.at, i }))]) : [])),
     ...x.refused.map((r) => el('li', 'refused', `Refused ${r}`))))),
     ...visits.length ? [el('p', 'box-hint', nextVisit(v.boxes))] : [])
+}
+
+/** A visit's line: what it read and changed, its time and cost when it had them (the tour's has neither). */
+export function visitLine(x: { error?: string; screens: number; changes: unknown[]; ms?: number; costUsd?: number | null }): string {
+  if (x.error) return `The visit failed: ${x.error}`
+  const n = x.changes.length
+  return [`Read ${x.screens} mock${x.screens === 1 ? '' : 's'}, ${n ? `made ${n} change${n === 1 ? '' : 's'}` : 'changed nothing'}`,
+    ...x.ms ? [`${(x.ms / 1000).toFixed(1)} s`] : [], ...x.costUsd ? [`~$${x.costUsd.toFixed(4)}`] : []].join(' · ')
 }
 
 /** The fixer's notes end with when it comes next. */
@@ -130,10 +144,10 @@ const yours = (x: { by: string }) => el('small', 'yours', x.by === 'user' ? ' yo
 
 function tableView(t: Table, op: (o: BoxOp) => void): HTMLElement {
   const set = (columns: string[], rows: string[][]) => op({ op: 'set', box: 'data', id: t.id, columns, rows })
-  const head = el('div', 'table-head', el('b', '', t.id), yours(t),
+  const head = el('div', 'table-head', el('b', '', t.id), yours(t), ...changes([
     button('+ row', 'Add a row', () => set(t.columns, [...t.rows, t.columns.map(() => '')])),
     button('+ column', 'Add a column', () => set([...t.columns, `column ${t.columns.length + 1}`], t.rows.map((r) => [...r, '']))),
-    button('✕', `Delete table ${t.id}`, () => op({ op: 'delete', box: 'data', id: t.id })))
+    button('✕', `Delete table ${t.id}`, () => op({ op: 'delete', box: 'data', id: t.id }))]))
   // Each cell saves the whole table: rows left empty and columns without a name go.
   const save = () => {
     const read = (tr: Element) => [...tr.children].map((c) => (c.textContent ?? '').trim())
@@ -143,7 +157,7 @@ function tableView(t: Table, op: (o: BoxOp) => void): HTMLElement {
     set(keep.map((i) => cols[i]!), rows.map((r) => keep.map((i) => r[i] ?? '')).filter((r) => r.some(Boolean)))
   }
   const table = el('table', '', ...[t.columns, ...t.rows].map((r, i) => el('tr', '', ...r.map((c) => editable(el(i ? 'td' : 'th', '', c), save)))))
-  return el('div', `data-table${t.seen ? '' : ' fresh'}`, head, table)
+  return el('div', `data-table${fresh(t)}`, head, table)
 }
 
 /** The three boxes as markdown, for Export. */
