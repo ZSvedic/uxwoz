@@ -1,5 +1,5 @@
-// The public's account (spec/behavior.md, The public): the account button, last in the toolbar, its menu, and the
-// account card over the dimmed canvas. What the button, the menu and the card show follows from `me` (GET /api/me)
+// The public's account (spec/behavior.md, The public): a line in the menu, and the account card over the dimmed
+// canvas. What the line and the card show follows from `me` (GET /api/me)
 // and why the card opened, in functions with no DOM (bun test runs them). The page hands in what it needs from the
 // other modules at `initAccount`, so nothing here imports them; the DOM is touched only inside functions.
 
@@ -31,7 +31,7 @@ const LEADS: Record<Why, (more: number) => string> = {
   address: () => 'This network has used today\'s free screens. Register to carry on.',
   guests: () => 'Today\'s free screens for guests are used up. Register to carry on.',
   register: (n) => `Register to get about ${n} more free screens.`,
-  share: () => 'Register to share a mockup.',
+  share: () => 'Register to share a project.',
   export: () => 'Register to export it.',
   ask: (n) => `Register to get about ${n} more free screens.`,
 }
@@ -56,7 +56,7 @@ const view = (lead: string, rest: Partial<CardView> = {}): CardView => ({ lead, 
 
 /** What the card shows for `me`, given why it opened and where the sign-in is; `promised`, the screens it promised. */
 export function cardOf(me: Me, why: Why, step: CardStep, email: string, promised = me.more ?? MORE): CardView {
-  if (step === 'delete') return view('Delete your account? Its mockups and its links go at once, for good. Type your email once more.', { field: { kind: 'confirm', placeholder: 'Your email' }, send: 'Delete', cancel: true })
+  if (step === 'delete') return view('Delete your account? Its projects and its links go at once, for good. Type your email once more.', { field: { kind: 'confirm', placeholder: 'Your email' }, send: 'Delete', cancel: true })
   if (step === 'thanks') return view(`Thanks. You have about ${plural(promised, 'more free screen')}.`)
   if (me.role === 'user') {
     if (step === 'asked' || (me.request && !me.request.answer)) return view('Asked. The answer comes by email.')
@@ -67,27 +67,25 @@ export function cardOf(me: Me, why: Why, step: CardStep, email: string, promised
   return view(LEADS[why](me.more ?? MORE), { field: { kind: 'email', placeholder: 'you@example.com' }, send: 'Send the code', note: 'No password: we email you a six-digit code.', privacy: true })
 }
 
-/** The account button shows at all: the public app, for anyone but the owner. */
+/** The account's line shows at all: the public app, for anyone but the owner. */
 export const shows = (me: Me | null, isPublic: boolean) => isPublic && !!me && me.role !== 'owner'
 
-/** The button: a visitor's free screens left once they made a live design, a registered user's first letter, else the icon (''). */
-export function buttonOf(me: Me): { text: string; letter: boolean } {
-  if (me.role === 'user' && me.email) return { text: me.email[0]!.toUpperCase(), letter: true }
-  const made = me.role === 'visitor' && (me.left ?? 0) < (me.allowance ?? 0)
-  return { text: made ? `${me.screensLeft ?? 0} free` : '', letter: false }
-}
+export type Row = { kind: 'text' | 'email' | 'register' | 'ask' | 'signout' | 'delete'; text: string }
 
-export type Row = { kind: 'text' | 'email' | 'register' | 'ask' | 'signout' | 'delete' | 'privacy'; text: string }
-
-/** The menu, top to bottom; Ask for more only while no request waits for its answer. */
-export function menuOf(me: Me): Row[] {
-  const n = me.screensLeft ?? 0, user = me.role === 'user'
+/**
+ * The account in the menu, top to bottom: a visitor's one line (the free screens and Register); a registered user's
+ * email, the screens left, Ask for more (at none, while no request waits for its answer), Sign out and Delete.
+ */
+export function lineOf(me: Me): Row[] {
+  const n = me.screensLeft ?? 0
+  const left = n > 0 ? plural(n, 'free screen') : 'No free screens left'
+  if (me.role !== 'user') return [{ kind: 'register', text: `👤 ${left} · Register` }]
   return [
-    { kind: 'text', text: n > 0 ? `About ${plural(n, 'free screen')} left` : 'No free screens left' },
-    user ? { kind: 'email', text: me.email ?? '' } : { kind: 'register', text: 'Register' },
-    ...user && n === 0 && !(me.request && !me.request.answer) ? [{ kind: 'ask', text: 'Ask for more' } as Row] : [],
-    ...user ? [{ kind: 'signout', text: 'Sign out' }, { kind: 'delete', text: 'Delete my account…' }] as Row[] : [],
-    { kind: 'privacy', text: 'Privacy' },
+    { kind: 'email', text: `👤 ${me.email ?? ''}` },
+    { kind: 'text', text: n > 0 ? `${left} left` : left },
+    ...n === 0 && !(me.request && !me.request.answer) ? [{ kind: 'ask', text: 'Ask for more' } as Row] : [],
+    { kind: 'signout', text: 'Sign out' },
+    { kind: 'delete', text: 'Delete my account…' },
   ]
 }
 
@@ -95,7 +93,7 @@ export function menuOf(me: Me): Row[] {
 export function refusalOf(status: number, body: { error?: string; reason?: string } | null): { card: Why } | { pill: string } | null {
   const r = body?.reason
   if (status === 402 && (r === 'allowance' || r === 'address' || r === 'guests')) return { card: r }
-  if (status === 402 && (r === 'paused' || r === 'blocked')) return { pill: body!.error ?? 'Live designs are paused for now. The starters still work.' }
+  if (status === 402 && (r === 'paused' || r === 'blocked')) return { pill: body!.error ?? 'Live designs are paused for now. The examples still work.' }
   if (status === 403 && r === 'register') return { card: 'register' }
   return null
 }
@@ -159,7 +157,7 @@ function keep() {
   try { sessionStorage.setItem(KEPT, JSON.stringify({ email: card.email, code: card.step === 'code' })) } catch { /* private mode */ }
 }
 
-/** Start once the config is known: the button goes last in the toolbar, `me` loads; private mode shows none of it. */
+/** Start once the config is known: `me` loads; private mode shows none of it. */
 export function initAccount(d: AccountDeps, cfg: { public?: boolean }) {
   deps = d
   isPublic = !!cfg.public
@@ -180,7 +178,6 @@ export function initAccount(d: AccountDeps, cfg: { public?: boolean }) {
     const k = JSON.parse(sessionStorage.getItem(KEPT) ?? 'null')
     if (typeof k?.email === 'string') Object.assign(card, { email: k.email, step: k.code ? 'code' : 'email' })
   } catch { /* none kept */ }
-  $('toolbar').querySelector('.tb-right')!.append($('accountPop'))
   const form = $<HTMLFormElement>('account')
   form.addEventListener('submit', (e) => { e.preventDefault(); send() })
   $('accountField').addEventListener('input', (e) => { const v = (e.target as HTMLInputElement).value; if (fieldKind()) card[fieldKind()!] = v })
@@ -190,12 +187,12 @@ export function initAccount(d: AccountDeps, cfg: { public?: boolean }) {
   addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape' && !form.hidden) dismiss() })
   document.addEventListener('pointerdown', (e) => {
     const t = e.target as Node
-    if (!form.hidden && !form.contains(t) && !$('accountPop').contains(t)) dismiss()
+    if (!form.hidden && !form.contains(t) && !$('accountLine').contains(t)) dismiss()
   })
   loadMe()
 }
 
-/** GET /api/me again, then the button; the owner sees the Model picker, the public does not. */
+/** GET /api/me again, then the line. */
 export async function loadMe() {
   if (!isPublic) return
   const res = await fetch('/api/me').catch(() => null)
@@ -204,31 +201,23 @@ export async function loadMe() {
 
 function setMe(m: Me) {
   me = m
-  const on = shows(me, isPublic)
-  $('accountPop').hidden = !on
-  ;($('model').closest('label') as HTMLElement).hidden = on
-  if (!on) return
-  const b = buttonOf(me)
-  $('accountName').textContent = b.letter ? '' : b.text
-  $('accountLetter').textContent = b.letter ? b.text : ''
-  $('accountLetter').hidden = !b.letter
-  $('accountIcon').toggleAttribute('hidden', !!b.text)
-  $('accountButton').title = me.role === 'user' ? `${me.email}: your account` : 'Your free screens, Register, Privacy'
-  if (!$('account').hidden) renderCard()
+  renderAccountLine()
+  if (shows(me, isPublic) && !$('account').hidden) renderCard()
 }
 
-/** The menu, built when it opens (toolbar.ts). */
-export function renderAccountMenu() {
-  if (!me) return
+/** The account's line in the menu (menu.ts), built again whenever `me` changes. */
+export function renderAccountLine() {
+  const box = $('accountLine')
+  box.hidden = !shows(me, isPublic)
+  if (box.hidden) return box.replaceChildren()
   const run: Partial<Record<Row['kind'], () => void>> = {
     register: () => openCard('register'),
-    privacy: () => open('/privacy', '_blank'),
     ask: () => openCard('ask'),
     signout: () => leave('/api/signout', {}),
     delete: () => { card.confirm = ''; openCard('ask', 'delete') },
   }
-  $('accountMenu').replaceChildren(...menuOf(me).map((r) => {
-    if (r.kind === 'text' || r.kind === 'email') return Object.assign(document.createElement('h3'), { textContent: r.text, className: r.kind === 'email' ? 'plain' : '' })
+  box.replaceChildren(...lineOf(me!).map((r) => {
+    if (!run[r.kind]) return Object.assign(document.createElement('p'), { textContent: r.text, title: r.text, className: `line ${r.kind}` })
     const b = Object.assign(document.createElement('button'), { className: 'item', type: 'button', textContent: r.text })
     b.addEventListener('click', () => { deps!.closeMenus(); run[r.kind]!() })
     return b

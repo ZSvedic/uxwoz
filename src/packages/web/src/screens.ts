@@ -11,7 +11,8 @@ import { boxOp, renderDrawer } from './drawer.ts'
 import { endHint, liveDesign, mapOf, showLasting, post, showError, hint, stream, streamInto, themeCss, type StreamRenderer } from './net.ts'
 import { sideAct } from './account-ui.ts'
 import { applyMap, filed, saveCurrent, setCurrent, syncAddress } from './nav.ts'
-import { loadRecent, openGenerate, renderToolbar } from './toolbar.ts'
+import { renderToolbar } from './bar.ts'
+import { loadRecent, openGenerate } from './menu.ts'
 import { changeInput, deviceSelect, generate, modelSelect, promptInput, state, type Making, type Side } from './state.ts'
 
 // ---- Views

@@ -1,27 +1,32 @@
-// The browser side: builds the canvas and the boxes beside it, opens and closes mockups, and starts the page.
-// screens.ts, nav.ts, drawer.ts, toolbar.ts and net.ts do the rest; state.ts holds what they share.
+// The browser side: builds the canvas and the boxes beside it, opens and closes projects and the tour, and starts the
+// page. screens.ts, nav.ts, drawer.ts, bar.ts, menu.ts and net.ts do the rest; state.ts holds what they share.
 // Those modules import each other in a circle, so the code at their top level (listeners, loops) may use only
 // its own module and state.ts; anything else waits inside a function. Bun's dev server fails the page otherwise.
 
-import { isDevice } from '@uxwoz/core/frame'
 import { screenKey } from '@uxwoz/core/keys'
+import { plannedScreens } from '@uxwoz/core/tree'
 import type { CacheEntry } from '@uxwoz/core'
 import { createSide, type Box } from './boxes.ts'
 import { Canvas } from './canvas.ts'
-import { boxOp, focusBox, onTool, openDrawer } from './drawer.ts'
+import { boxOp, focusBox, onTool, openDrawer, unseen } from './drawer.ts'
 import { hint, mapOf, post, showError, themeCss } from './net.ts'
 import { landing, readAddress } from './address.ts'
-import { address, applyMap, currentKey, followAddress, notHere, resetTrail, setCurrent, showsAt, syncAddress, toStart } from './nav.ts'
-import { again, all, cardClosed, components, dropChoice, draw, fitChoice, fitScreenSoon, onAction, openScreen, pick, stopMaking } from './screens.ts'
-import { PICKERS, closeMenus, loadRecent, openGenerate, warmUp } from './toolbar.ts'
+import { address, applyMap, boxShown, currentKey, followAddress, goTo, notHere, resetTrail, setCurrent, showBox, syncAddress, toStart, trailStep, walkTrail } from './nav.ts'
+import { again, all, cardClosed, components, dropChoice, draw, fitScreenSoon, labelOf, onAction, openScreen, pick, stopMaking, treeParent } from './screens.ts'
+import { closeMenus, initBar } from './bar.ts'
+import { closeMenu, initMenu, loadRecent, openMenu, recent, warmUp } from './menu.ts'
 import { editLinkApp, loadShared, shareToken } from './sharing.ts'
 import { initAccount } from './account-ui.ts'
-import { $, deviceSelect, generate, modelSelect, promptInput, state, store } from './state.ts'
+import { $, generate, modelSelect, state, store } from './state.ts'
 import './design/fx.ts' // the speaker and the whoosh
 
-export const side = createSide(boxOp, (box, tab) => { focusBox(box); openDrawer(tab) })
-// A press in a box makes it current; one in a component card makes that card current instead.
-for (const [name, s] of Object.entries(side.sections)) s.addEventListener('pointerdown', (e) => { if (!(e.target as Element).closest('.card')) focusBox(name as Box) })
+export const side = createSide(boxOp, (box, tab) => { focusBox(box); boxShown(); openDrawer(tab) })
+// A press in a box makes it current (a step); one in a component card makes that card current instead.
+for (const [name, s] of Object.entries(side.sections)) s.addEventListener('pointerdown', (e) => {
+  if ((e.target as Element).closest('.card')) return
+  focusBox(name as Box)
+  boxShown()
+})
 export const canvas = new Canvas($('stage'), {
   action: onAction,
   pick,
@@ -31,118 +36,159 @@ export const canvas = new Canvas($('stage'), {
   zoomed: (z) => { $('zoomPct').textContent = `${Math.round(z * 100)}%` },
 }, side.el, side.components)
 
-// ---- Mockups
+// ---- Projects
 
 /**
- * Open a mockup: its screens from the cache, else (unless `make` is false) its first screen as A OR B. `at`: the
- * screen its address names (else the one last looked at here), and whether the address changes in place.
+ * Open a project: its mocks from the cache, else (unless `make` is false) its Home. `at`: the mock (`sid`) or box its
+ * address names (else the mock last looked at here), and whether the address changes in place.
  */
-export async function start(app: string, make = true, at: { sid?: string | null; inPlace?: boolean } = {}) {
+export async function start(app: string, make = true, at: { sid?: string | null; box?: Box | null; inPlace?: boolean } = {}) {
   // Its draws write no address until it is open: then one, as a new step unless in place.
   address.hold++
-  try { await openMockup(app, make, at.sid, !!at.inPlace) } finally { address.hold--; syncAddress(at.inPlace) }
+  try { await openProject(app, make, at.sid, at.box ?? null, !!at.inPlace) } finally { address.hold--; syncAddress(at.inPlace) }
 }
 
-async function openMockup(app: string, make: boolean, sid: string | null | undefined, inPlace: boolean) {
+async function openProject(app: string, make: boolean, sid: string | null | undefined, box: Box | null, inPlace: boolean) {
   showError(null)
   stopMaking()
   state.before = null
   const n = ++state.starts
   const res = await mapOf(app)
-  // 401: a first-time visitor of the public app, who has no person (and so no mockups) until the first screen.
-  if (!res.ok && res.status !== 401) throw new Error(`could not load the mockup: HTTP ${res.status}`)
+  // 401: a first-time visitor of the public app, who has no person (and so no projects) until the first mock.
+  if (!res.ok && res.status !== 401) throw new Error(`could not load the project: HTTP ${res.status}`)
   const map = res.ok ? await res.json() as { entries: CacheEntry[] } : { entries: [] }
-  if (n !== state.starts) return // a newer mockup was opened meanwhile
-  if (!make && !map.entries.length) { store.set('uxwoz:app', ''); return sid !== undefined ? notHere() : draw() }
+  if (n !== state.starts) return // a newer project was opened meanwhile
+  if (!make && !map.entries.length) {
+    store.set('uxwoz:app', '')
+    if (sid !== undefined) await notHere()
+    return
+  }
   state.app = app
+  state.tour = false
   state.drawer = state.box = null
   state.failed.clear()
   store.set('uxwoz:app', app)
   generate.classList.remove('open')
   applyMap(map)
   const root = screenKey(app, null)
-  // The screen the address names; one deleted since lands on the first screen, with a word why.
-  const l = sid !== undefined ? landing(app, state.entries, sid) : null
-  if (sid !== undefined && !l) return notHere()
+  // The mock the address names; one deleted since lands on Home, with a word why.
+  const l = sid !== undefined && !box ? landing(app, state.entries, sid) : null
+  if (sid !== undefined && !box && !l) return notHere()
   const named = l?.entry
   if (l?.why) hint(l.why)
   const saved = named?.key ?? store.get(currentKey(app))
   state.current = saved && state.entries.get(saved)?.versions.length ? saved : state.entries.get(root)?.versions.length ? root : null
   resetTrail()
-  // A mockup keeps the device it was made for: new screens in it, and Start over, use it too.
-  const made = state.entries.get(root)
-  const device = made?.versions[0]?.device ?? made?.proposals?.find(Boolean)?.device
-  if (device) deviceSelect.value = device // for this mockup only: the saved choice stays
   if (!state.entries.has(root)) { toStart(inPlace); return openScreen(null, null, null) }
   await draw()
   loadShared()
-  // An open A OR B is fitted, unless the address named a drawn screen: then that screen, and the address stays.
-  const open = all().find((e) => !e.versions.length)
-  if (open && !named?.versions.length) fitChoice(open.key)
-  else fitScreenSoon(state.current ?? root)
-  if (named) showsAt(named.key)
+  fitScreenSoon(state.current ?? root)
+  if (box) showBox(box)
 }
 
-/** The pickers as last chosen in this browser. */
-export function restorePickers() {
-  const d = store.get('uxwoz:device')
-  if (isDevice(d)) deviceSelect.value = d
+/** The tour: a read-only project from /api/tour, at the mock (by name) or box its address names, else its first mock. */
+export async function openTour(at: { at?: string | null; box?: Box | null } = {}, inPlace = false) {
+  address.hold++
+  try {
+    showError(null)
+    stopMaking()
+    state.before = null
+    const n = ++state.starts
+    const res = await fetch('/api/tour')
+    if (!res.ok) throw new Error(`could not load the tour: HTTP ${res.status}`)
+    const map = await res.json() as { entries: CacheEntry[] }
+    if (n !== state.starts) return
+    const app = map.entries[0]?.app
+    if (!app) throw new Error('the tour is missing')
+    Object.assign(state, { app, tour: true, drawer: null, box: null })
+    state.failed.clear()
+    generate.classList.remove('open')
+    applyMap(map)
+    const l = landing(app, state.entries, at.at ?? null, true)
+    if (l?.why) hint(l.why)
+    state.current = null
+    resetTrail()
+    if (l) { setCurrent(l.entry.key); fitScreenSoon(l.entry.key) } else await draw()
+    if (at.box) showBox(at.box)
+  } finally { address.hold--; syncAddress(inPlace) }
+}
+
+/** What `/` opens: the project open last here, else the newest in Recent (`except` one just deleted), else the tour. */
+export async function openLast(inPlace = false, except?: string) {
+  const last = store.get('uxwoz:app')
+  if (last && last !== except) { await start(last, false, { inPlace }); if (state.app) return }
+  await loadRecent()
+  const newest = recent().find((a) => a.app !== except)
+  if (newest) { await start(newest.app, false, { inPlace }); if (state.app) return }
+  await openTour({}, inPlace)
 }
 
 export function closeMockup() {
   state.busy?.abort()
-  restorePickers()
   store.set('uxwoz:app', '')
-  Object.assign(state, { app: null, entries: new Map(), boxes: null, filing: false, current: null, box: null, making: null, revising: null, drawer: null, before: null })
+  Object.assign(state, { app: null, tour: false, entries: new Map(), boxes: null, filing: false, current: null, box: null, making: null, revising: null, drawer: null, before: null })
   resetTrail()
   loadRecent()
   draw()
 }
 
-$('menuNew').addEventListener('click', () => { closeMenus(); openGenerate() })
 $('startOver').addEventListener('click', () => { closeMenus(); deleteApp(true).catch((e) => showError(String(e))) })
 $('deleteApp').addEventListener('click', () => { closeMenus(); deleteApp(false).catch((e) => showError(String(e))) })
 
-/** Delete every screen of the open mockup, after asking; then make its first screen again, or close it. */
+/** Delete every mock of the open project, after asking; then draw Home again, or open the newest other project, or the tour. */
 async function deleteApp(again: boolean) {
   const app = state.app
-  if (!app) return
+  if (!app || state.tour) return
   const n = state.entries.size - components().length
-  const what = `${n === 1 ? 'the only screen of this mockup' : `all ${n} screens of this mockup`} and its boxes (components, rules, data), with its reviewer links and their feedback`
-  if (!confirm(again ? `Start over? This deletes ${what} and makes its first screen again.` : `Delete ${what}?`)) return
+  const what = `${n === 1 ? 'the only mock of this project' : `all ${n} mocks of this project`} and its boxes (components, rules, data), with its reviewer links and their feedback`
+  if (!confirm(again ? `Start over? This deletes ${what} and draws Home again.` : `Delete ${what}?`)) return
   state.busy?.abort()
   const res = await post('/api/delete-app', { app }).catch(() => null)
-  if (!res?.ok) return showError('Could not delete the mockup')
+  if (!res?.ok) return showError('Could not delete the project')
   store.set(currentKey(app), '')
-  loadRecent()
-  if (again) return start(app, true, { inPlace: true }) // the dead address leaves the history
-  closeMockup()
+  if (again) { loadRecent(); return start(app, true, { inPlace: true }) } // the dead address leaves the history
+  store.set('uxwoz:app', '')
+  await openLast(true, app)
 }
+
+/** The name in the bar and the dropdown: a mock's own, with no level. */
+const nameOf = (e: CacheEntry) => labelOf(e).replace(/^L[\d?]+ /, '')
 
 async function init() {
   const cfg = await (await fetch('/api/config')).json()
   if (cfg.warning) showError(cfg.warning)
+  initBar({
+    canvas,
+    canStep: (dir) => trailStep(dir) != null,
+    walk: walkTrail,
+    look: showBox,
+    go: goTo,
+    make: (e) => { if (state.tour) return; if (state.busy) return hint(); openScreen(`@${e.name}`, e.parent!.key, e.parent!.label) },
+    view: () => ({
+      app: state.app, current: state.current, box: state.box, hasBoxes: !!state.boxes && !side.el.hidden,
+      mocks: [...all(), ...plannedScreens(all()).map((e) => ({ ...e, planned: true }))],
+    }),
+    parentOf: treeParent,
+    nameOf,
+    unseen: (box) => unseen(box).length,
+    openMenu,
+    closeMenu,
+  })
+  initMenu(cfg)
   initAccount({ post, showError, loadRecent, closeMenus, signedUp: again, dismissed: cardClosed, say: (t) => hint(t) }, cfg)
-  for (const [s, name] of PICKERS) {
-    const list: { id: string; label: string }[] = cfg[`${name}s`], saved = store.get(`uxwoz:${name}`)
-    for (const x of list) s.add(new Option(x.label, x.id))
-    s.value = list.some((x) => x.id === saved) ? saved! : cfg[`default${name[0]!.toUpperCase()}${name.slice(1)}`]
-  }
   state.themes = cfg.themes
   const theme = store.get('uxwoz:theme')
   state.theme = state.themes.some((t) => t.id === theme) ? theme! : cfg.defaultTheme
   warmUp(modelSelect.value)
-  loadRecent()
+  await loadRecent()
   await themeCss(state.theme)
-  // An address opens its mockup at its screen; else a reload opens the mockup that was open, with its A OR B if
-  // one was waiting for a pick. An edit link keeps its own address.
-  // Until then no draw writes an address (one with no mockup yet would add `/` as a step); then it replaces this one.
+  // An address opens its project or the tour at its mock or box; else `/` opens the project open last, the newest,
+  // or the tour. An edit link keeps its own address. Until then no draw writes an address; then it replaces this one.
   try {
     if (!shareToken && readAddress(location.pathname)) return await followAddress()
-    const last = shareToken ? await editLinkApp() : store.get('uxwoz:app')
-    if (last) return await start(last, false, { inPlace: true })
+    if (shareToken) { const last = await editLinkApp(); if (last) return await start(last, false, { inPlace: true }) }
+    else return await openLast(true)
     draw()
-    promptInput.focus()
   } finally { address.hold--; syncAddress(true) }
 }
 

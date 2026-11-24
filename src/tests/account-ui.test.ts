@@ -1,13 +1,13 @@
 // The public's account button, menu and card (spec/behavior.md, The public): what each shows, given `me` and why
 // the card opened, and what a refused request leads to. No DOM.
 import { describe, expect, test } from 'bun:test'
-import { LIVE_HINT, buttonOf, cardOf, forget, liveHint, menuOf, refusalOf, shows, sideOf, type Me } from '../packages/web/src/account-ui.ts'
+import { LIVE_HINT, cardOf, forget, liveHint, lineOf, refusalOf, shows, sideOf, type Me } from '../packages/web/src/account-ui.ts'
 
 const fresh: Me = { role: 'new', left: 0.1, allowance: 0.1, screensLeft: 14 }
 const visitor: Me = { role: 'visitor', left: 0.0984, allowance: 0.1, screensLeft: 14, more: 30, may: { share: false, exportZip: false } }
 const user: Me = { role: 'user', email: 'ana@example.com', left: 0, allowance: 0.25, screensLeft: 0, may: { share: true, exportZip: true } }
 
-describe('the account button', () => {
+describe('the account\'s line in the menu', () => {
   test('only in the public app, and never for the owner', () => {
     expect(shows({ role: 'owner' }, true)).toBe(false)
     expect(shows(visitor, false)).toBe(false)
@@ -15,19 +15,17 @@ describe('the account button', () => {
     expect(shows(fresh, true)).toBe(true)
   })
 
-  test('a visitor\'s free screens once they made a live design, a user\'s first letter, else the icon', () => {
-    expect(buttonOf(fresh)).toEqual({ text: '', letter: false })
-    expect(buttonOf({ ...visitor, left: 0.1 })).toEqual({ text: '', letter: false })
-    expect(buttonOf(visitor)).toEqual({ text: '14 free', letter: false })
-    expect(buttonOf(user)).toEqual({ text: 'A', letter: true })
+  test('a visitor: the free screens and Register on one line; at none, no free screens left', () => {
+    expect(lineOf(visitor)).toEqual([{ kind: 'register', text: '👤 14 free screens · Register' }])
+    expect(lineOf({ ...visitor, screensLeft: 1 })[0]!.text).toBe('👤 1 free screen · Register')
+    expect(lineOf({ ...visitor, screensLeft: 0 })[0]!.text).toBe('👤 No free screens left · Register')
   })
 
-  test('its menu', () => {
-    expect(menuOf(visitor).map((r) => r.text)).toEqual(['About 14 free screens left', 'Register', 'Privacy'])
-    expect(menuOf({ ...visitor, screensLeft: 1 })[0]!.text).toBe('About 1 free screen left')
-    expect(menuOf(user).map((r) => r.text)).toEqual(['No free screens left', 'ana@example.com', 'Ask for more', 'Sign out', 'Delete my account…', 'Privacy'])
-    expect(menuOf({ ...user, screensLeft: 5 }).some((r) => r.kind === 'ask')).toBe(false)
-    expect(menuOf({ ...user, request: { at: 1 } }).some((r) => r.kind === 'ask')).toBe(false)
+  test('a registered user: the email, the screens left, Ask for more at none, Sign out and Delete my account…', () => {
+    expect(lineOf(user).map((r) => r.text)).toEqual(['👤 ana@example.com', 'No free screens left', 'Ask for more', 'Sign out', 'Delete my account…'])
+    expect(lineOf({ ...user, screensLeft: 5 }).map((r) => r.text)).toEqual(['👤 ana@example.com', '5 free screens left', 'Sign out', 'Delete my account…'])
+    expect(lineOf({ ...user, request: { at: 1 } }).some((r) => r.kind === 'ask')).toBe(false)
+    expect(lineOf({ ...user, request: { at: 1, answer: 'refused' } }).some((r) => r.kind === 'ask')).toBe(true)
   })
 })
 
@@ -39,7 +37,7 @@ describe('the account card', () => {
     expect(cardOf(fresh, 'allowance', 'email', '').lead).toBe('You have used your free screens. Register to get about 21 more.')
     expect(cardOf(visitor, 'guests', 'email', '').lead).toBe('Today\'s free screens for guests are used up. Register to carry on.')
     expect([c.field?.kind, c.send, c.note, c.privacy, c.again]).toEqual(['email', 'Send the code', 'No password: we email you a six-digit code.', true, false])
-    expect(cardOf(visitor, 'share', 'email', '').lead).toBe('Register to share a mockup.')
+    expect(cardOf(visitor, 'share', 'email', '').lead).toBe('Register to share a project.')
     expect(cardOf(visitor, 'export', 'email', '').lead).toBe('Register to export it.')
     expect(cardOf(visitor, 'address', 'email', '').lead).toBe('This network has used today\'s free screens. Register to carry on.')
     expect(cardOf(fresh, 'register', 'email', '').field?.kind).toBe('email')
@@ -59,7 +57,7 @@ describe('the account card', () => {
 
   test('Delete my account: the words, the email once more, Delete and Cancel', () => {
     const c = cardOf(user, 'ask', 'delete', '')
-    expect(c.lead).toBe('Delete your account? Its mockups and its links go at once, for good. Type your email once more.')
+    expect(c.lead).toBe('Delete your account? Its projects and its links go at once, for good. Type your email once more.')
     expect([c.field?.kind, c.send, c.cancel, c.again]).toEqual(['confirm', 'Delete', true, false])
   })
 
