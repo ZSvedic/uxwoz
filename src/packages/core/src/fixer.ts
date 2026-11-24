@@ -96,7 +96,7 @@ function visitLines(cache: ScreenCache, app: string, reply: string, sent: Map<st
     } else {
       // A redraw of a screen, or of a component (one the user wrote only in an Edit of Components).
       const s = screens.get(l.a) ?? cache.component(app, l.a)
-      const why = !s ? `no screen ${l.a}` : s.by === 'user' && asked !== 'components' ? `${l.a} was written by the user` : !s.versions.length ? `${l.a} is waiting for a pick` : out.redraws.some((r) => r.key === s.key) ? `${l.a} is redrawn once a visit` : out.redraws.length >= MAX_REDRAWS ? `a visit redraws at most ${MAX_REDRAWS} screens` : refuseLine(l.text)
+      const why = !s ? `no screen ${l.a}` : s.by === 'user' && asked !== 'components' ? `${l.a} was written by the user` : out.redraws.some((r) => r.key === s.key) ? `${l.a} is redrawn once a visit` : out.redraws.length >= MAX_REDRAWS ? `a visit redraws at most ${MAX_REDRAWS} screens` : refuseLine(l.text)
       if (why) refuse(l.line, why)
       else out.redraws.push({ key: s!.key, sentence: l.text, change: did({ text: `redrawing ${l.a}: ${l.text}` }) })
     }

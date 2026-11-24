@@ -207,11 +207,11 @@ export function gate(o: GateOptions) {
     if (REGISTER.has(path) && !person.email) return answer(fail(path === '/api/export' ? 'Register to export it.' : 'Register to share a mockup.', 403, { reason: 'register' }))
     if (b?.model != null && b.model !== PUBLIC_MODEL) return answer(fail('Only Claude Haiku is open to the public.', 403))
 
-    // A pick calls no model itself: its filing and visit start only while `may` says so.
+    // A settle is never refused (the click may lead to a stored screen): its filing and visit start only while `may` says so.
     const warm = path === '/api/warmup'
     // A warm-up is checked for coming from another site here, before it can take the public's slot.
     if (warm) { const foreign = o.refuse(req); if (foreign) return answer(foreign) }
-    const paid = warm || (path !== '/api/pick' && paidOf(b, desk.cache) && !desk.draw.replayed(path, b))
+    const paid = warm || (path !== '/api/settle' && paidOf(b, desk.cache) && !desk.draw.replayed(path, b))
     if (warm && Date.now() - Math.max(store.lastCall(PUBLIC_MODEL) ?? 0, warmClaim) < WARM_MS) return answer(new Response(null, { status: 204 }))
     if (paid && (path === '/api/screen' || path === '/api/revise') && Buffer.byteLength(desk.cache.serialize()) > FILE_CAP)
       return answer(fail('This account is full: delete a mockup first.', 413))
@@ -234,15 +234,16 @@ export function gate(o: GateOptions) {
       step(id, STARTERS.some((s) => normalizePrompt(s.prompt) === normalizePrompt(b.app)) ? 'starter' : 'own', req)
     let res: Response
     try { res = await run(req) } catch (err) { release?.(); throw err }
-    if (path === '/api/pick' && res.ok) step(id, 'picked', req)
+    // `picked` (the admin's *clicked on from a mock*) at the person's first settled screen: a settle, or a click into a new screen.
+    if (res.ok && (path === '/api/settle' || (path === '/api/screen' && typeof b?.from === 'string' && b.from))) step(id, 'picked', req)
     return answer(res, release)
   }
 
-  /** POST /api/step {step: "arrived"}: the one step the page sends; the server counts the others. */
+  /** POST /api/step {step}: `arrived` and `toured` (the tour's last mock came into view), the steps the page sends; the server counts the others. */
   function arrived(req: Request, b: any): Response {
-    if (b?.step !== 'arrived') return fail('only arrived is sent; the server counts the other steps')
+    if (b?.step !== 'arrived' && b?.step !== 'toured') return fail('only arrived and toured are sent; the server counts the other steps')
     const w = who(req)
-    step(w.role === 'visitor' || w.role === 'user' ? w.person.id : null, 'arrived', req)
+    step(w.role === 'visitor' || w.role === 'user' ? w.person.id : null, b.step, req)
     return new Response(null, { status: 204 })
   }
 

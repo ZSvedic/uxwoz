@@ -8,8 +8,7 @@ const ver = (html: string): Version => ({
 })
 
 function screen(cache: ScreenCache, action: string | null, html: string, from: string | null = null, label = '') {
-  const e = cache.propose('Sleep app', action, 0, ver(html), from ? { key: from, label } : null)!
-  return cache.pick(e.key, 0)!
+  return cache.addScreen('Sleep app', action, ver(html), from ? { key: from, label } : null)!
 }
 
 /** Home → Record → Report, and Home → Settings. */
@@ -116,20 +115,19 @@ test('a link names its screen: one not made yet is planned, in the tree, and goe
 
 test('a screen opened by name keeps that name, and every link with the name finds it', () => {
   const { cache, home } = sleepApp()
-  const e = cache.propose('Sleep app', '@remedies-log: Remedies tried', 0, ver('<title>Remedy history</title>'), { key: home.key, label: 'Remedies' })!
+  const e = cache.addScreen('Sleep app', '@remedies-log: Remedies tried', ver('<title>Remedy history</title>'), { key: home.key, label: 'Remedies' })!
   expect(e).toMatchObject({ key: 'sleep app » @remedies-log', name: 'remedies-log', action: 'Remedies tried' })
-  expect(cache.pick(e.key, 0)!.name).toBe('remedies-log')
   expect(cache.find('Sleep app', '@Remedies-Log: other words')?.key).toBe(e.key)
   expect(cache.find('Sleep app', '@sleep-report')?.name).toBe('sleep-report')
   expect(cache.find('sleep app', '@home: start')?.key).toBe('sleep app')
-  expect(cache.propose('Sleep app', '@remedies-log', 1, ver('<h1>x</h1>'))).toBeUndefined() // picked already
+  expect(cache.addScreen('Sleep app', '@remedies-log', ver('<h1>x</h1>'))).toBeUndefined() // drawn already
 })
 
 test('deleting a named screen that is still linked takes the screens only it leads to; it is planned again', () => {
   const cache = new ScreenCache()
   const home = screen(cache, null, '<title>Shop</title><button data-action="@settings: Settings">Settings</button>')
-  const settings = cache.pick(cache.propose('Sleep app', '@settings: Settings', 0, ver('<title>Settings</title><button data-action="@privacy: Privacy">Privacy</button>'), { key: home.key, label: 'Settings' })!.key, 0)!
-  const privacy = cache.pick(cache.propose('Sleep app', '@privacy: Privacy', 0, ver('<title>Privacy</title>'), { key: settings.key, label: 'Privacy' })!.key, 0)!
+  const settings = cache.addScreen('Sleep app', '@settings: Settings', ver('<title>Settings</title><button data-action="@privacy: Privacy">Privacy</button>'), { key: home.key, label: 'Settings' })!
+  const privacy = cache.addScreen('Sleep app', '@privacy: Privacy', ver('<title>Privacy</title>'), { key: settings.key, label: 'Privacy' })!
   expect(cache.delete(settings.key)).toEqual([settings.key, privacy.key])
   expect(plannedScreens(cache.map('Sleep app').entries).map((p) => p.name)).toEqual(['settings'])
 })

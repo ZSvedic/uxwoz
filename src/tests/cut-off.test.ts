@@ -1,8 +1,8 @@
 // A stream that stops early must fail and never reach the cache, and a reply that holds the screen
 // twice, or prose before it, is cleaned before it is stored (no cassette: a fake provider).
 import { expect, test } from 'bun:test'
-import { ALTERNATIVE_REQUEST, ScreenCache, generateScreen, screenKey, type Fetch } from '@uxwoz/core'
-import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
+import { ScreenCache, generateScreen, screenKey, type Fetch } from '@uxwoz/core'
+import { createServer, type DrawEvent } from '@uxwoz/web/src/server.ts'
 
 const sse = (...events: object[]) => events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('')
 const fakeFetch = (body: string): Fetch => async () => new Response(body, { headers: { 'Content-Type': 'text/event-stream' } })
@@ -31,7 +31,7 @@ test('the server reports a cut-off screen and caches nothing', async () => {
     const res = await fetch(new URL('/api/screen', server.url), {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app: 'Shop' }),
     })
-    const evs: ScreenEvent[] = (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
+    const evs: DrawEvent[] = (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
     expect(evs.at(-1)?.type).toBe('error')
     expect(cache.get(screenKey('Shop', null))).toBeUndefined()
   } finally {
@@ -39,22 +39,17 @@ test('the server reports a cut-off screen and caches nothing', async () => {
   }
 })
 
-test('when one side of the A OR B fails, the other is still cached and shown', async () => {
-  const whole = sse({ model: 'anthropic/claude-haiku-5.5', choices: [{ delta: { content: '<h1>Whole</h1>' }, finish_reason: 'stop' }], usage: { cost: 0.001 } })
-  // The side asked for a different design (the second, here) stops early; the other finishes.
-  const fetch: Fetch = async (_url, init) => new Response(String(init?.body).includes(ALTERNATIVE_REQUEST) ? halfScreen : whole)
+test('a failed Another or Edit leaves the mock as it was', async () => {
   const cache = new ScreenCache()
-  const server = createServer({ port: 0, cache, fetch, env, log: () => {}, random: () => 0.9 })
+  cache.addScreen('Shop', null, { html: '<h1>Shop</h1>', model: 'claude-haiku-5.5', servedModel: null, createdAt: '2026-11-24T00:00:00Z', costUsd: 0.001, costEstimated: false, firstChunkMs: 1, totalMs: 2, finishReason: 'stop', device: 'small-phone' })
+  const server = createServer({ port: 0, cache, fetch: fakeFetch(halfScreen), env, log: () => {} })
   try {
-    const res = await globalThis.fetch(new URL('/api/screen', server.url), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app: 'Shop' }),
-    })
-    const evs: ScreenEvent[] = (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
-    expect(evs.find((e) => e.type === 'failed')).toMatchObject({ variant: 1, message: expect.stringContaining('ended before the screen was complete') })
-    expect(evs.find((e) => e.type === 'version')).toMatchObject({ variant: 0 })
-    const done = evs.at(-1) as Extract<ScreenEvent, { type: 'done' }>
-    expect(done.type).toBe('done')
-    expect(cache.get(screenKey('Shop', null))?.proposals?.map((v) => v?.html ?? null)).toEqual(['<h1>Whole</h1>', null])
+    for (const body of [{ key: 'shop' }, { key: 'shop', change: 'Bigger' }]) {
+      const res = await fetch(new URL('/api/revise', server.url), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const evs: DrawEvent[] = (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
+      expect(evs.map((e) => e.type)).toEqual(['meta', 'chunk', 'error'])
+    }
+    expect(cache.get('shop')).toMatchObject({ versions: [{ html: '<h1>Shop</h1>' }], draws: 1 })
   } finally {
     server.stop(true)
   }

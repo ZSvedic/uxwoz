@@ -56,8 +56,8 @@ describe('export project', () => {
   let server: ReturnType<typeof createServer>
   beforeAll(() => {
     const cache = new ScreenCache()
-    const home = cache.pick(cache.propose(APP, null, 0, ver('<title>Tonight</title><div data-component="tab-bar"></div><h1>Tonight</h1><section style="height:50vh">Sleep well</section><button data-action="@report: The sleep report">Report</button><a data-action="@alarm: Set an alarm">Alarm</a>'))!.key, 0)!
-    cache.pick(cache.propose(APP, '@report: The sleep report', 0, ver('<title>Sleep report</title><div data-component="tab-bar"></div><h1>Report</h1>'), { key: home.key, label: 'Report' })!.key, 0)
+    const home = cache.addScreen(APP, null, ver('<title>Tonight</title><div data-component="tab-bar"></div><h1>Tonight</h1><section style="height:50vh">Sleep well</section><button data-action="@report: The sleep report">Report</button><a data-action="@alarm: Set an alarm">Alarm</a>'))!
+    cache.addScreen(APP, '@report: The sleep report', ver('<title>Sleep report</title><div data-component="tab-bar"></div><h1>Report</h1>'), { key: home.key, label: 'Report' })
     cache.addComponent(APP, 'tab-bar', 'bottom of every screen', ver('<nav class="tabs"><a data-action="@home">Home</a></nav>'), 'filing')
     cache.setBox(APP, 'add', 'rules', { id: 'calm', text: 'Use calm colors.' }, 'user')
     cache.setBox(APP, 'add', 'data', { id: 'nights', columns: ['date', 'hours'], rows: [['Mon', '7.5']] }, 'user')

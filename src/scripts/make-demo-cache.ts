@@ -76,9 +76,9 @@ export function makeDemoCache(file: string): ScreenCache {
   const cache = new ScreenCache(file)
   const app = DEMO_APP
   const draw = (action: string | null, html: string, parent: { key: string; label: string } | null) => {
-    const e = cache.propose(app, action, 0, ver(html), parent)!
-    cache.propose(app, action, 1, ver(html))
-    return cache.pick(e.key, 0)!
+    const e = cache.addScreen(app, action, ver(html), parent)!
+    cache.settle(e.key)
+    return e
   }
 
   const home = draw(null, HOME, null)

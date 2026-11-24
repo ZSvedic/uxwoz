@@ -85,23 +85,23 @@ describe('a person\'s journey', () => {
     const home = await screen(ana, PLANTS)
     expect(home.status).toBe(200)
     expect(ana.cookie).toMatch(/^uxwoz_who=[a-f0-9]{32}$/)
-    const pick = await ana.post('/api/pick', { key: home.key, index: 0 })
-    expect(pick.status).toBe(200)
+    const settled = await ana.post('/api/settle', { key: home.key })
+    expect(settled.status).toBe(200)
     await ana.get(`/api/map?app=${encodeURIComponent(PLANTS)}&wait=1`)
     expect(calls).toEqual({ haiku: 0, terra: 0 })
     expect(callRows()).toBe(0)
     expect(personOf(ana)).toMatchObject({ spent: 0, steps: ['starter', 'picked'] })
 
     // An own prompt is live and paid, down to zero; then 402.
-    for (const app of ['Dog walks', 'Cat sits', 'Bird feeds']) expect((await screen(ana, app)).status).toBe(200)
-    expect(personOf(ana).spent).toBeCloseTo(0.12, 6)
+    for (const app of ['Dog walks', 'Cat sits', 'Bird feeds', 'Horse rides', 'Goat milks']) expect((await screen(ana, app)).status).toBe(200)
+    expect(personOf(ana).spent).toBeCloseTo(0.1, 6)
     expect(await ana.me()).toMatchObject({ role: 'visitor', left: 0, screensLeft: 0 })
     expect(await screen(ana, 'Fish tanks')).toMatchObject({ status: 402, body: { reason: 'allowance' } })
     expect(personOf(ana).steps).toEqual(['starter', 'picked', 'own', 'limit'])
 
     // Sign up: the top-up arrives with the code, and the next screen draws at once.
     const me = await signUp(ana, 'ana@example.com')
-    expect(me).toMatchObject({ role: 'user', email: 'ana@example.com', left: 0.13, allowance: 0.25, screensLeft: 32 })
+    expect(me).toMatchObject({ role: 'user', email: 'ana@example.com', left: 0.15, allowance: 0.25, screensLeft: 37 })
     expect(me).not.toHaveProperty('more')
     expect(mails.filter((m) => m.to[0] === 'ana@example.com').map((m) => m.subject)).toEqual([expect.stringMatching(/^Your UXWoz code/)])
     expect((await screen(ana, 'Fish tanks')).status).toBe(200)
@@ -138,15 +138,15 @@ describe('a person\'s journey', () => {
     expect((await ana.get(`/api/shares?app=${encodeURIComponent(PLANTS)}`)).status).toBe(403)
   })
 
-  test('at zero a pick starts no filing, and Visit now is refused', async () => {
+  test('at zero a settle starts no filing, and Visit now is refused', async () => {
     start()
-    store.setCaps({ visitor: 0.03 })
+    store.setCaps({ visitor: 0.02 })
     const ana = browser()
     const s = await screen(ana, 'Dog walks')
     expect(s.status).toBe(200)
-    expect(personOf(ana).spent).toBeCloseTo(0.04, 6)
-    const pick = await ana.post('/api/pick', { key: s.key, index: 0 })
-    expect(await pick.json()).toMatchObject({ filing: false, visiting: false })
+    expect(personOf(ana).spent).toBeCloseTo(0.02, 6)
+    const settled = await ana.post('/api/settle', { key: s.key })
+    expect(await settled.json()).toMatchObject({ filing: false, visiting: false })
     expect((await ana.post('/api/box', { app: 'Dog walks', box: 'rules', op: 'visit' })).status).toBe(402)
     expect(calls.terra).toBe(0)
   })
@@ -196,7 +196,7 @@ describe('a person\'s journey', () => {
     const tables = store.db.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string }[]
     for (const { name } of tables) expect(JSON.stringify(store.db.query(`SELECT * FROM ${name}`).all())).not.toContain(id)
     // Its calls stay, with no person, so the day's sums hold.
-    expect(callRows()).toBe(2)
+    expect(callRows()).toBe(1)
     expect((await ana.me()).role).toBe('new')
   })
 

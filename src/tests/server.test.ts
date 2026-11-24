@@ -1,17 +1,19 @@
-// Feature: the web server streams a new screen's A OR B, keeps the pick, files it, and revises screens (cassette: server).
+// Feature: the web server streams one design a mock, settles a mock at a click and files it, and makes new versions:
+// Edit, Another, Draw again, Undo and Redo (cassette: server).
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { ScreenCache, linksIn, plannedScreens, screenRef, type CacheEntry } from '@uxwoz/core'
-import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
+import { ALTERNATIVE_REQUEST, ScreenCache, linksIn, plannedScreens, screenRef, type CacheEntry } from '@uxwoz/core'
+import { createServer, type DrawEvent } from '@uxwoz/web/src/server.ts'
 import { cassette } from './cassette.ts'
 
 const tape = cassette('server')
 let server: ReturnType<typeof createServer>
+const cache = new ScreenCache()
 const APP = 'A tiny bakery website'
+const RENAMED = 'A tiny bakery website with online orders'
 const post = (path: string, body: object, headers: Record<string, string> = {}) =>
   fetch(new URL(path, server.url), { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) })
 
-// The second side always asks for the different design, and every click waits for filing to end, so
-// each request holds the same paper when recorded and when replayed.
+// Every click waits for filing to end, so each request holds the same paper when recorded and when replayed.
 /** The user message of every model call, as the server sent it. */
 const sent: string[] = []
 const fetchAndKeep: typeof tape.fetch = (url, init) => {
@@ -19,75 +21,70 @@ const fetchAndKeep: typeof tape.fetch = (url, init) => {
   sent.push(b.input ?? b.messages?.[1]?.content ?? '')
   return tape.fetch(url, init)
 }
-beforeAll(() => { server = createServer({ port: 0, cache: new ScreenCache(), fetch: fetchAndKeep, env: tape.env, log: () => {}, random: () => 0.9, fileWaitMs: 60_000 }) })
+beforeAll(() => { server = createServer({ port: 0, cache, fetch: fetchAndKeep, env: tape.env, log: () => {}, fileWaitMs: 60_000 }) })
 afterAll(async () => {
-  await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}&wait=1`, server.url))
+  await fetch(new URL(`/api/map?app=${encodeURIComponent(RENAMED)}&wait=1`, server.url))
   server.stop(true)
   tape.save()
 })
 
-async function stream(path: string, body: object): Promise<ScreenEvent[]> {
+async function stream(path: string, body: object): Promise<DrawEvent[]> {
   const res = await post(path, body)
   expect(res.headers.get('content-type')).toContain('application/x-ndjson')
   return (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
 }
 const screen = (body: object) => stream('/api/screen', body)
+const map = async (app = APP, wait = false) => (await fetch(new URL(`/api/map?app=${encodeURIComponent(app)}${wait ? '&wait=1' : ''}`, server.url))).json() as Promise<{ entries: CacheEntry[]; filing: boolean } & Record<string, any>>
 /** The links to new screens in a screen (`@name: prompt`), in page order. */
 const actions = (html: string) => linksIn(html).map((l) => l.action).filter((a) => screenRef(a)?.prompt && screenRef(a)!.name !== 'home')
 const nameOf = (action: string) => screenRef(action)!.name
-const done = (evs: ScreenEvent[]) => evs.find((e) => e.type === 'done') as Extract<ScreenEvent, { type: 'done' }>
-const pick = async (key: string, index: number) => (await (await post('/api/pick', { key, index })).json()).entry as CacheEntry
+const done = (evs: DrawEvent[]) => evs.find((e) => e.type === 'done') as Extract<DrawEvent, { type: 'done' }>
 const shown = (e: CacheEntry) => e.versions.at(-1)!.html
 
 describe('web server', () => {
-  test('a new prompt streams two designs at once, each stored as it finishes, with its idea', async () => {
+  test('a new prompt streams one design, stored as it finishes and shown at once, with its idea', async () => {
     const evs = await screen({ app: APP })
-    expect(evs[0]).toEqual({ type: 'meta', key: 'a tiny bakery website', cached: false, variants: 2 })
-    const chunks = evs.filter((e) => e.type === 'chunk')
-    for (const v of [0, 1]) expect(chunks.filter((c) => c.variant === v).length).toBeGreaterThan(5)
-    expect(evs.filter((e) => e.type === 'version').map((e) => e.variant).sort()).toEqual([0, 1])
+    expect(evs[0]).toEqual({ type: 'meta', key: 'a tiny bakery website', cached: false })
+    expect(evs.filter((e) => e.type === 'chunk').length).toBeGreaterThan(5)
+    expect(evs.filter((e) => e.type === 'version')).toHaveLength(1)
     const { entry } = done(evs)
-    expect(entry.versions).toEqual([])
-    expect(entry.proposals!.map((p) => p!.device)).toEqual(['small-phone', 'small-phone'])
-    expect(entry.proposals![0]!.html).not.toBe(entry.proposals![1]!.html)
-    for (const p of entry.proposals!) expect(p!.idea!.length).toBeGreaterThan(8)
+    expect(entry).toMatchObject({ name: 'home', draws: 1 })
+    expect(entry.versions).toHaveLength(1)
+    expect(entry.versions[0]!.device).toBe('small-phone')
+    expect(entry.versions[0]!.idea!.length).toBeGreaterThan(8)
+    expect(entry.settled).toBeUndefined()
   }, 30_000)
 
-  test('while the A OR B is open, the same prompt, written differently, shows it again at no cost', async () => {
+  test('the same prompt, written differently, shows it again at no cost', async () => {
     const evs = await screen({ app: '  a tiny BAKERY website. ' })
     expect(evs.map((e) => e.type)).toEqual(['meta', 'done'])
-    expect(evs[0]).toMatchObject({ cached: true, variants: 0 })
-    expect(done(evs).entry.proposals).toHaveLength(2)
+    expect(evs[0]).toMatchObject({ cached: true })
   })
 
-  test('a pick keeps one design as the first version and drops the other, and starts filing', async () => {
-    const before = done(await screen({ app: APP })).entry
-    const res = await (await post('/api/pick', { key: before.key, index: 1 })).json()
-    expect(res.entry.versions).toEqual([before.proposals![1]!])
-    expect(res.entry.proposals).toBeUndefined()
-    expect(res.filing).toBe(true)
-    expect((await post('/api/pick', { key: before.key, index: 0 })).status).toBe(404)
-  })
-
-  test('filing runs on Terra in the background; the map with wait=1 holds what it filed', async () => {
-    const map = await (await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}&wait=1`, server.url))).json()
-    expect(map.filing).toBe(false)
-    const filed = map.entries.find((e: { name: string }) => e.name === 'home').filed
-    expect(filed).toMatchObject({ screen: 'home' })
-    expect(filed.error).toBeUndefined()
-    expect(filed.costUsd).toBeGreaterThan(0)
-  }, 60_000)
-
-  test('a click opens a new screen under its name, with the prompt of its link and the click as its parent', async () => {
+  test('a click opens a new screen under its name, with its link\'s prompt and the click as its parent; it settles Home, which files on Terra', async () => {
     const first = done(await screen({ app: APP })).entry
-    expect(first.name).toBe('home')
     const action = actions(shown(first))[0]!
-    const evs = await screen({ app: APP, action, from: first.key, label: 'Our breads' })
-    const { entry } = done(evs)
+    const { entry } = done(await screen({ app: APP, action, from: first.key, label: 'Our breads' }))
     expect(entry.key).toBe(`a tiny bakery website » @${nameOf(action)}`)
     expect(entry).toMatchObject({ name: nameOf(action), action: screenRef(action)!.prompt, parent: { key: first.key, label: 'Our breads' } })
-    expect((await pick(entry.key, 0)).name).toBe(nameOf(action))
-  }, 30_000)
+    const m = await map(APP, true)
+    expect(m.filing).toBe(false)
+    const home = m.entries.find((e) => e.name === 'home')!
+    expect(home.settled).toBe(home.versions[0]!.createdAt)
+    expect(home.filed).toMatchObject({ screen: 'home' })
+    expect(home.filed!.error).toBeUndefined()
+    expect(home.filed!.costUsd).toBeGreaterThan(0)
+    expect(m.boxes.settled).toBe(1)
+  }, 60_000)
+
+  test('a click to a drawn screen settles the screen it came from at /api/settle; once settled, nothing more is filed', async () => {
+    const second = (await map()).entries.find((e) => e.name !== 'home' && !e.kind)!
+    const res = await (await post('/api/settle', { key: second.key })).json()
+    expect(res).toMatchObject({ filing: true, visiting: false, entry: { key: second.key } })
+    await map(APP, true)
+    expect(await (await post('/api/settle', { key: second.key })).json()).toMatchObject({ filing: false })
+    expect((await post('/api/settle', { key: 'no such screen' })).status).toBe(404)
+  }, 60_000)
 
   test('another link with the same name, worded differently, opens the same screen with no model call', async () => {
     const first = done(await screen({ app: APP })).entry
@@ -106,77 +103,98 @@ describe('web server', () => {
   })
 
   test('a planned screen opened by its name alone is made from the prompt of the link that planned it', async () => {
-    const first = done(await screen({ app: APP })).entry
-    const planned = plannedScreens([first]).at(-1)!
-    expect(planned.action).toBe(screenRef(actions(shown(first)).find((a) => nameOf(a) === planned.name)!)!.prompt)
-    const second = done(await screen({ app: APP, action: `@${planned.name}`, from: first.key, label: 'More' })).entry
+    const { entries } = await map()
+    const planned = plannedScreens(entries).at(-1)!
+    const from = entries.find((e) => !e.kind && actions(shown(e)).some((a) => nameOf(a) === planned.name))!
+    expect(planned.action).toBe(screenRef(actions(shown(from)).find((a) => nameOf(a) === planned.name)!)!.prompt)
+    const second = done(await screen({ app: APP, action: `@${planned.name}`, from: from.key, label: 'More' })).entry
     expect(second).toMatchObject({ key: `a tiny bakery website » @${planned.name}`, name: planned.name, action: planned.action })
-    await pick(second.key, 0)
   }, 30_000)
 
   test('a later screen gets the paper, and links to the screens on it by their IDs', async () => {
     const first = done(await screen({ app: APP })).entry
     const third = done(await screen({ app: APP, action: '@opening-hours: Opening hours of the bakery, by day', from: first.key, label: 'Hours' })).entry
-    const map = await (await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}`, server.url))).json() as { entries: CacheEntry[] }
-    const known = new Set([...map.entries, ...plannedScreens(map.entries)].map((e) => e.name).filter(Boolean))
-    const asked = sent.filter((m) => m.includes('Draw this screen: opening-hours: Opening hours of the bakery, by day'))
-    expect(asked).toHaveLength(2)
-    for (const m of asked) {
-      expect(m).toStartWith(`App: ${APP}\nDevice: a phone screen, 360 × 500 px; the screen scrolls inside it, and a bar pinned to its bottom stays in view.\n\nScreens, the first screen first (id: what it is for):\nhome: the first screen\n`)
-      expect(m).toContain(`The screen the click came from, home (the first screen):\n${shown(first)}`)
-    }
-    // A link by ID alone names a screen on the paper (made or planned).
-    for (const p of third.proposals!) for (const l of linksIn(p!.html)) {
+    const m = await map()
+    const known = new Set([...m.entries, ...plannedScreens(m.entries)].map((e) => e.name).filter(Boolean))
+    const asked = sent.filter((x) => x.includes('Draw this screen: opening-hours: Opening hours of the bakery, by day'))
+    expect(asked).toHaveLength(1)
+    expect(asked[0]).toStartWith(`App: ${APP}\nDevice: a phone screen, 360 × 500 px; the screen scrolls inside it, and a bar pinned to its bottom stays in view.\n\nScreens, the first screen first (id: what it is for):\nhome: the first screen\n`)
+    expect(asked[0]).toContain(`The screen the click came from, home (the first screen):\n${shown(first)}`)
+    expect(asked[0]).not.toContain(ALTERNATIVE_REQUEST)
+    // A link by ID alone names a screen on the paper (made or planned); a new name never comes with two prompts.
+    const prompts = new Map<string, Set<string>>()
+    for (const l of linksIn(shown(third))) {
       const r = screenRef(l.action)
       if (r && !r.prompt) expect(known.has(r.name)).toBe(true)
+      if (r?.prompt && !known.has(r.name)) prompts.set(r.name, new Set([...prompts.get(r.name) ?? [], r.prompt]))
     }
-    // One name is one screen: in one design, a new name never comes with two different prompts.
-    for (const p of third.proposals!) {
-      const prompts = new Map<string, Set<string>>()
-      for (const l of linksIn(p!.html)) {
-        const r = screenRef(l.action)
-        if (r?.prompt && !known.has(r.name)) prompts.set(r.name, new Set([...prompts.get(r.name) ?? [], r.prompt]))
-      }
-      for (const [, set] of prompts) expect(set.size).toBe(1)
-    }
-    await pick(third.key, 0)
+    for (const [, set] of prompts) expect(set.size).toBe(1)
   }, 60_000)
 
   test('the map lists one mockup, and the apps list every mockup', async () => {
-    const map = await (await fetch(new URL(`/api/map?app=${encodeURIComponent(APP)}`, server.url))).json()
-    expect(map.root).toBe('a tiny bakery website')
-    expect(map.links).toBeUndefined()
+    const m = await map()
+    expect(m.root).toBe('a tiny bakery website')
+    expect(m.links).toBeUndefined()
     const { apps } = await (await fetch(new URL('/api/apps', server.url))).json()
     expect(apps.map((a: { app: string }) => a.app)).toEqual([APP])
   })
 
-  test('an Edit makes a new version from the screen and the change, for its device; Regenerate one from its prompt; Undo drops them', async () => {
+  test('Edit makes a version from the screen and the change, for its device; Another one from its prompt, asked to differ; Undo and Redo walk them', async () => {
     const first = done(await screen({ app: APP })).entry
     const change = 'Make the main heading say "Fresh bread daily"'
     const edited = await stream('/api/revise', { key: first.key, change, device: 'laptop' })
-    expect(edited[0]).toEqual({ type: 'meta', key: first.key, cached: false, variants: 1 })
+    expect(edited[0]).toEqual({ type: 'meta', key: first.key, cached: false })
     expect(edited.filter((e) => e.type === 'chunk').length).toBeGreaterThan(5)
     const e1 = done(edited).entry
+    expect(done(edited).filing).toBe(true)
     expect(e1.versions).toHaveLength(2)
     expect(e1.versions[1]).toMatchObject({ feedback: change, device: 'small-phone' })
+    expect(e1.draws).toBe(1)
     expect(shown(e1)).toContain('Fresh bread daily')
+    await map(APP, true)
     const e2 = done(await stream('/api/revise', { key: first.key })).entry
+    expect(sent.at(-1)).toEndWith(ALTERNATIVE_REQUEST)
     expect(e2.versions).toHaveLength(3)
     expect(e2.versions[2]!.feedback).toBeUndefined()
+    expect(e2.draws).toBe(2)
     expect(shown(e2)).not.toBe(shown(e1))
-    expect((await (await post('/api/undo', { key: first.key })).json()).entry.versions).toHaveLength(2)
-    expect((await (await post('/api/undo', { key: first.key })).json()).entry.versions).toHaveLength(1)
+    // Undo shows the one before; Redo sends the next one's time; Undo by a time jumps there.
+    const back = (await (await post('/api/undo', { key: first.key })).json()).entry as CacheEntry
+    expect([back.versions.length, back.redo!.length]).toEqual([2, 1])
+    const fwd = (await (await post('/api/undo', { key: first.key, at: back.redo![0]!.createdAt })).json()).entry as CacheEntry
+    expect([fwd.versions.length, fwd.redo]).toEqual([3, undefined])
+    const oldest = (await (await post('/api/undo', { key: first.key, at: e2.versions[0]!.createdAt })).json()).entry as CacheEntry
+    expect([oldest.versions.length, oldest.redo!.length]).toEqual([1, 2])
     expect((await post('/api/undo', { key: first.key })).status).toBe(404)
+    expect((await post('/api/undo', { key: first.key, at: 'never' })).status).toBe(404)
+    await post('/api/undo', { key: first.key, at: e2.versions[2]!.createdAt })
     expect((await post('/api/revise', { key: first.key, change: ' ' })).status).toBe(400)
+    expect((await post('/api/revise', { key: first.key, prompt: 'x'.repeat(501) })).status).toBe(400)
+    expect((await post('/api/revise', { key: first.key, change: 'a', prompt: 'b' })).status).toBe(400)
     expect((await post('/api/revise', { key: 'no such screen' })).status).toBe(404)
-  }, 60_000)
+  }, 90_000)
 
-  test('a screen whose A OR B is still open cannot be revised', async () => {
-    const first = done(await screen({ app: APP })).entry
-    const open = done(await screen({ app: APP, action: '@bakers: A page about the bakers of a tiny bakery', from: first.key, label: 'Our bakers' })).entry
-    expect(open.versions).toEqual([])
-    expect((await post('/api/revise', { key: open.key })).status).toBe(409)
-    expect((await post('/api/undo', { key: open.key })).status).toBe(404)
+  test('Draw again draws from new words, which become the screen\'s prompt; draws starts again at 1', async () => {
+    const hours = cache.find(APP, '@opening-hours')!
+    const words = 'The opening hours as a week calendar, today marked'
+    const { entry } = done(await stream('/api/revise', { key: hours.key, prompt: words }))
+    expect(sent.at(-1)).toContain(`Draw this screen: opening-hours: ${words}`)
+    expect(entry).toMatchObject({ action: words, draws: 1 })
+    expect(entry.versions.at(-1)).toMatchObject({ prompt: words })
+  }, 30_000)
+
+  test('Draw again of Home renames the project, every key with it; a name another project has is refused', async () => {
+    cache.addScreen('A tiny cafe', null, { ...cache.get('a tiny bakery website')!.versions[0]!, html: '<h1>Cafe</h1>' })
+    expect((await post('/api/revise', { key: 'a tiny bakery website', prompt: 'A TINY cafe.' })).status).toBe(409)
+    const ids = (await map()).entries.map((e) => e.sid).sort()
+    const { entry } = done(await stream('/api/revise', { key: 'a tiny bakery website', prompt: RENAMED }))
+    expect(entry).toMatchObject({ key: 'a tiny bakery website with online orders', app: RENAMED, action: null })
+    expect(sent.at(-1)).toStartWith(`App: ${RENAMED}\n`)
+    const m = await map(RENAMED)
+    expect(m.entries.map((e) => e.sid).sort()).toEqual(ids)
+    expect(m.entries.every((e) => e.key.startsWith('a tiny bakery website with online orders'))).toBe(true)
+    expect((await map()).entries).toEqual([])
+    cache.deleteApp('A tiny cafe')
   }, 30_000)
 
   test('bad input is refused', async () => {
@@ -187,7 +205,7 @@ describe('web server', () => {
     expect((await post('/api/screen', { app: 'x', action: 'x'.repeat(501) })).status).toBe(400)
     expect((await post('/api/screen', { app: 'x', action: 'Words with no name' })).status).toBe(400)
     expect((await post('/api/delete', { key: 'no such screen' })).status).toBe(404)
-    expect((await post('/api/pick', { key: 'no such screen', index: 0 })).status).toBe(404)
+    expect((await post('/api/pick', { key: 'a tiny bakery website', index: 0 })).status).toBe(404)
   })
 
   test('the mockup theme and the small phone are the defaults, and the stylesheet is served', async () => {
@@ -210,15 +228,15 @@ describe('web server', () => {
   })
 
   test('a screen, then the whole mockup, can be deleted', async () => {
-    const first = done(await screen({ app: APP })).entry
-    const second = done(await screen({ app: APP, action: actions(shown(first))[0]! })).entry
+    const m = await map(RENAMED)
+    const second = m.entries.find((e) => e.key.includes('» @') && !e.kind)!
     const del = await (await post('/api/delete', { key: second.key })).json()
     expect(del.removed).toContain(second.key)
-    expect(del.entries.map((e: { key: string }) => e.key)).toContain(first.key) // the whole mockup, as /api/map sends it
-    expect((await (await post('/api/delete-app', { app: APP })).json()).removed).toBeGreaterThan(1) // the first screen and the bakers' A OR B
+    expect(del.entries.map((e: { key: string }) => e.key)).toContain('a tiny bakery website with online orders') // the whole mockup, as /api/map sends it
+    expect((await (await post('/api/delete-app', { app: RENAMED })).json()).removed).toBeGreaterThan(0)
     expect((await (await fetch(new URL('/api/apps', server.url))).json()).apps).toEqual([])
     // A later screen of the deleted mockup is refused before any model call.
-    const late = await screen({ app: APP, action: '@breads: Our breads' })
+    const late = await screen({ app: RENAMED, action: '@breads: Our breads' })
     expect(late.map((e) => e.type)).toEqual(['error'])
   })
 })

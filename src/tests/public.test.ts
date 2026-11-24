@@ -48,7 +48,7 @@ function browser(ip = '10.0.0.1') {
 }
 type Browser = ReturnType<typeof browser>
 const lines = async (res: Response) => (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
-/** A new screen's two designs; returns its key, or the status when refused. */
+/** A new screen's design; returns its key, or the status when refused. */
 async function screen(b: Browser, app: string, extra: object = {}) {
   const res = await b.post('/api/screen', { app, ...extra })
   if (res.status !== 200) return { status: res.status, body: await res.json() }
@@ -80,10 +80,10 @@ describe('public mode', () => {
     expect(res.status).toBe(200)
     expect(res.headers.get('set-cookie')).toMatch(/^uxwoz_who=[a-f0-9]{32}; Path=\/; HttpOnly; SameSite=Lax; Max-Age=31536000$/)
     expect((await lines(res)).at(-1).type).toBe('done')
-    expect(calls.haiku).toBe(2)
+    expect(calls.haiku).toBe(1)
     const me = await ana.me()
-    expect(me).toMatchObject({ role: 'visitor', allowance: 0.1, screensLeft: 20, more: 37 })
-    expect(me.left).toBeCloseTo(0.08, 6)
+    expect(me).toMatchObject({ role: 'visitor', allowance: 0.1, screensLeft: 22, more: 37 })
+    expect(me.left).toBeCloseTo(0.09, 6)
     expect(me.email).toBeUndefined()
     // `arrived` came before there was a person: counted for the day only.
     expect(personOf(ana).steps).toEqual(['own'])
@@ -101,47 +101,28 @@ describe('public mode', () => {
     expect(evil.cookie).toBe('')
   })
 
-  test('a side refused at the limit is drawn alone when asked again: the side that worked is not paid twice', async () => {
+  test('the page sends arrived and toured, nothing else; a click from a mock counts picked once', async () => {
     start()
-    store.setCaps({ visitor: 0.003 }) // one call's hold is $0.004: the first side passes, the second is refused
     const ana = browser()
-    const first = await ana.post('/api/screen', { app: 'App one' })
-    const evs = await lines(first)
-    const failed = evs.filter((e) => e.type === 'failed')
-    expect(failed.map((e) => e.message)).toEqual(['Your free screens are used up.'])
-    expect(calls.haiku).toBe(1)
-    const key = evs[0].key as string, refused = failed[0].variant as number, kept = 1 - refused
-    const sides = async () => ((await (await ana.get('/api/map?app=App%20one')).json()).entries as any[]).find((e) => e.key === key).proposals
-    const a = (await sides())[kept]
-    expect(a).not.toBeNull()
-    expect((await sides())[refused]).toBeNull()
-    // Not asked again: the free cache hit it always was, at the limit too, the side there and the missing one as they were.
-    const hit = await lines(await ana.post('/api/screen', { app: 'App one' }))
-    expect(hit.map((e) => e.type)).toEqual(['meta', 'done'])
-    expect(hit[0].cached).toBe(true)
-    expect(calls.haiku).toBe(1)
-    // Asked again at the limit: refused at the door, as any paid request.
-    expect((await ana.post('/api/screen', { app: 'App one', again: true })).status).toBe(402)
-    expect(calls.haiku).toBe(1)
-    store.give(personOf(ana).id, 1)
-    const again = await lines(await ana.post('/api/screen', { app: 'App one', again: true }))
-    expect(calls.haiku).toBe(2)
-    expect(again.filter((e) => e.type === 'version').map((e) => e.variant).sort()).toEqual([0, 1])
-    expect(again.at(-1).type).toBe('done')
-    expect((await sides())[kept]).toEqual(a)
-    expect((await sides())[refused]).not.toBeNull()
-    // Both sides there: a cache hit, free, asked again or not.
-    await lines(await ana.post('/api/screen', { app: 'App one', again: true }))
-    expect(calls.haiku).toBe(2)
+    expect((await ana.post('/api/step', { step: 'toured' })).status).toBe(204)
+    expect((await ana.post('/api/step', { step: 'picked' })).status).toBe(400)
+    expect(store.steps(1)[0]).toMatchObject({ toured: 1 })
+    expect((await screen(ana, 'Dog walks')).status).toBe(200)
+    expect((await ana.post('/api/step', { step: 'toured' })).status).toBe(204)
+    // A click into a new screen settles the one it came from: picked, once.
+    expect((await screen(ana, 'Dog walks', { action: '@walks: the walks', from: 'dog walks', label: 'Walks' })).status).toBe(200)
+    expect((await ana.post('/api/settle', { key: 'dog walks » @walks' })).status).toBe(200)
+    expect(personOf(ana).steps).toEqual(['own', 'toured', 'picked'])
+    expect(store.steps(1)[0]).toMatchObject({ toured: 2, picked: 1 })
   })
 
   test('the meter runs to zero, then each 402 reason in its order', async () => {
     start()
-    store.setCaps({ visitor: 0.03 })
+    store.setCaps({ visitor: 0.02 })
     const ana = browser()
     expect((await screen(ana, 'App one')).status).toBe(200)
     expect((await screen(ana, 'App two')).status).toBe(200)
-    expect(personOf(ana).spent).toBeCloseTo(0.04, 6)
+    expect(personOf(ana).spent).toBeCloseTo(0.02, 6)
     expect((await ana.me()).left).toBe(0)
     const r = await screen(ana, 'App three')
     expect(r).toMatchObject({ status: 402, body: { reason: 'allowance', error: 'Your free screens are used up.' } })
@@ -158,7 +139,7 @@ describe('public mode', () => {
     expect((await screen(ana, 'App three')).body).toMatchObject({ reason: 'blocked', error: 'This account is closed.' })
     store.setMode('open')
     // Visitors from one address share its day's dollars: a new visitor there is refused at once.
-    store.setCaps({ visitor: 1, addressUsd: 0.04 })
+    store.setCaps({ visitor: 1, addressUsd: 0.02 })
     const bo = browser()
     expect((await screen(bo, 'Bo\'s app')).body).toMatchObject({ reason: 'address' })
     expect(bo.cookie).toMatch(/^uxwoz_who=/)
@@ -168,7 +149,7 @@ describe('public mode', () => {
     store.setCaps({ dayUsd: store.spent().today / 0.8 })
     expect((await screen(browser('10.0.0.4'), 'Ed\'s app')).body).toEqual({ reason: 'guests', error: 'Today\'s free screens for guests are used up. Register to carry on.' })
     // The day's cap pauses everyone.
-    store.setCaps({ dayUsd: 0.05 })
+    store.setCaps({ dayUsd: store.spent().today })
     expect((await screen(browser('10.0.0.3'), 'Di\'s app')).body).toMatchObject({ reason: 'paused' })
   })
 
@@ -196,24 +177,24 @@ describe('public mode', () => {
     release()
     await (await slow).text()
     expect((await screen(ana, 'Third')).status).toBe(200)
-    // A pick files in the background while the balance is above zero...
-    const first = await ana.post('/api/pick', { key: 'first', index: 0 })
+    // A settle files in the background while the balance is above zero...
+    const first = await ana.post('/api/settle', { key: 'first' })
     expect(first.status).toBe(200)
     await ana.get('/api/map?app=First&wait=1')
     expect(calls.terra).toBe(1)
     expect(personOf(ana).steps).toContain('picked')
-    // The failed filing's cost never arrived: it is charged $0.002. With none left, the pick itself still works
+    // The failed filing's cost never arrived: it is charged $0.002. With none left, the settle itself still works
     // (drawing's `may` keeps its filing from starting: tested with drawing).
-    expect(personOf(ana).spent).toBeCloseTo(6 * COST + 0.002, 6)
+    expect(personOf(ana).spent).toBeCloseTo(3 * COST + 0.002, 6)
     store.give(personOf(ana).id, -1)
-    expect((await ana.post('/api/pick', { key: 'second', index: 0 })).status).toBe(200)
+    expect((await ana.post('/api/settle', { key: 'second' })).status).toBe(200)
   })
 
   test('two visitors never see each other\'s mockups', async () => {
     start()
     const ana = browser('10.0.1.1'), bo = browser('10.0.1.2')
     await screen(ana, 'A sleep tracker')
-    await ana.post('/api/pick', { key: 'a sleep tracker', index: 0 })
+    await ana.post('/api/settle', { key: 'a sleep tracker' })
     expect((await (await bo.get('/api/apps')).json()).apps).toEqual([])
     await screen(bo, 'Bo alone')
     expect((await (await bo.get('/api/apps')).json()).apps.map((a: any) => a.app)).toEqual(['Bo alone'])
@@ -232,7 +213,7 @@ describe('public mode', () => {
     start()
     const ana = browser()
     await screen(ana, 'Mine')
-    await ana.post('/api/pick', { key: 'mine', index: 0 })
+    await ana.post('/api/settle', { key: 'mine' })
     const register = { status: 403, reason: 'register' }
     const status = async (p: Promise<Response>) => { const r = await p; return { status: r.status, reason: (await r.json().catch(() => ({}))).reason } }
     expect(await status(ana.post('/api/share', { app: 'Mine', role: 'view' }))).toEqual(register)
@@ -279,7 +260,7 @@ describe('public mode', () => {
     const ana = browser()
     await screen(ana, 'Big')
     const cache = server!.desks.desk(personOf(ana).id)!.cache
-    cache.propose('Big', null, 0, { html: 'x'.repeat(5_300_000), createdAt: new Date().toISOString(), model: 'claude-haiku-5.5', costUsd: 0, name: 'Home' } as any)
+    cache.addVersion('big', { html: 'x'.repeat(5_300_000), createdAt: new Date().toISOString(), model: 'claude-haiku-5.5', costUsd: 0, name: 'Home' } as any)
     expect((await screen(ana, 'Another')).status).toBe(413)
   })
 
@@ -288,7 +269,7 @@ describe('public mode', () => {
     start({ usersDir: dir, idleMs: 10 })
     const ana = browser()
     await screen(ana, 'Shared')
-    await ana.post('/api/pick', { key: 'shared', index: 0 })
+    await ana.post('/api/settle', { key: 'shared' })
     await ana.get('/api/map?app=Shared&wait=1')
     const { code } = store.makeCode('ana@example.com', personOf(ana).id, '10.0.0.1') as { code: string }
     store.verify('ana@example.com', code, personOf(ana).id, '10.0.0.1')
@@ -311,7 +292,7 @@ describe('public mode', () => {
     // The owner's links still work, and are not in the index.
     const o = (p: string, body: object) => fetch(url(p), { method: 'POST', headers: { 'Content-Type': 'application/json', ...OWNER }, body: JSON.stringify(body) })
     const ev = await lines(await o('/api/screen', { app: 'The owner\'s' }))
-    expect((await o('/api/pick', { key: ev[0].key, index: 0 })).status).toBe(200)
+    expect((await o('/api/settle', { key: ev[0].key })).status).toBe(200)
     const link = await (await o('/api/share', { app: 'The owner\'s', role: 'edit' })).json()
     expect(store.shareOwner(link.token)).toBeNull()
     // The owner may use any model.
@@ -325,7 +306,7 @@ describe('public mode', () => {
     start()
     const ana = browser('10.0.0.1'), bo = browser('10.0.0.2')
     const made = await screen(ana, 'A dog walking app')
-    expect((await ana.post('/api/pick', { key: made.key, index: 0 })).status).toBe(200)
+    expect((await ana.post('/api/settle', { key: made.key })).status).toBe(200)
     const [mine] = (await (await ana.get('/api/apps')).json()).apps
     expect(mine.id).toMatch(/^[a-z0-9]{6}$/)
     const map = await (await ana.get(`/api/map?app=${encodeURIComponent(mine.app)}`)).json()

@@ -46,10 +46,10 @@ type Browser = ReturnType<typeof browser>
 const lines = async (res: Response) => (await res.text()).trim().split('\n').map((l) => JSON.parse(l))
 const personOf = (b: Browser) => store.byToken(b.cookie.split('=')[1]!)!
 const callRows = () => (store.db.query('SELECT COUNT(*) AS n FROM calls').get() as { n: number }).n
-/** A starter's Home drawn and its first design picked, both from the recording; its key. */
+/** A starter's Home drawn and settled, both from the recording; its key. */
 async function starterHome(b: Browser, id: string) {
   const evs = await lines(await b.post('/api/screen', { app: starter(id) }))
-  expect((await b.post('/api/pick', { key: evs[0].key, index: 0 })).status).toBe(200)
+  expect((await b.post('/api/settle', { key: evs[0].key })).status).toBe(200)
   await b.get(`/api/map?app=${encodeURIComponent(starter(id))}&wait=1`)
   return evs[0].key as string
 }
@@ -83,43 +83,40 @@ describe('bursts against the meter', () => {
     expect(calls.haiku).toBe(1)
   })
 
-  test('25 Regenerates judged replayed while a live filing runs wake to an Edit and go live: spend stays within the allowance and one reservation', async () => {
+  test('25 Anothers at once while a live filing runs: one draws (the recording\'s, free), the others get 409 and charge nothing', async () => {
     start({ fileWaitMs: 300 })
     store.setCaps({ visitor: 0.02 })
     const ana = browser()
     const key = await starterHome(ana, 'plants')
     let open!: () => void
     gate = new Promise((r) => { open = r })
-    // An Edit goes live; its filing hangs on Terra. Undo it: the newest is the recording's again.
-    expect((await lines(await ana.post('/api/revise', { key, change: 'bigger' }))).at(-1).type).toBe('done')
-    expect((await ana.post('/api/undo', { key })).status).toBe(200)
-    // A second Edit waits for the filing; 25 Regenerates sent meanwhile are judged replayed (no meter, no hold)
-    // and wait too. They wake to the second Edit as the newest version, find no recording, and go live.
-    const edit = ana.post('/api/revise', { key, change: 'greener' }).then(lines)
+    // A screen with no recording goes live; its settle's filing hangs on Terra. Home still has one design.
+    const own = await lines(await ana.post('/api/screen', { app: starter('plants'), action: '@nowhere: a page nobody recorded', from: key, label: 'x' }))
+    expect(own.at(-1).type).toBe('done')
+    expect((await (await ana.post('/api/settle', { key: own[0].key })).json()).filing).toBe(true)
+    const spent = personOf(ana).spent, haiku = calls.haiku
+    const first = ana.post('/api/revise', { key }).then(lines)
     await Bun.sleep(5)
-    const regenerates = Array.from({ length: 25 }, () => ana.post('/api/revise', { key }).then(lines))
-    expect((await edit).at(-1).type).toBe('done')
+    const rest = await Promise.all(Array.from({ length: 24 }, () => ana.post('/api/revise', { key })))
+    expect(rest.map((r) => r.status)).toEqual(Array(24).fill(409))
     open()
-    const outs = await Promise.all(regenerates)
+    expect((await first).at(-1).type).toBe('done')
     await ana.get(`/api/map?app=${encodeURIComponent(starter('plants'))}&wait=1`)
     await settle()
-    const p = personOf(ana)
-    // Some went live and some were refused when their call was about to be sent.
-    expect(calls.haiku).toBeGreaterThan(3)
-    expect(outs.some((o) => o.at(-1).type === 'error')).toBe(true)
-    expect(p.spent).toBeLessThanOrEqual(p.allowance + RESERVE_USD + 1e-9)
+    expect(calls.haiku).toBe(haiku)
+    expect(personOf(ana).spent).toBeCloseTo(spent + 0.002, 6) // the hung filing's cost never arrived
     expect(callRows()).toBe(calls.haiku + calls.terra)
-    // The race is set up with timers, so under load it can fail to form (seen once in 31 full runs): try again then.
-  }, { retry: 2 })
+  })
 
-  test('4 Visit nows at once on four starters: none at zero, one when less than a reservation is left; a refused call charges nothing', async () => {
+  test('4 Visit nows at once on four mockups: none at zero, one when less than a reservation is left; a refused call charges nothing', async () => {
     start()
     const ana = browser()
-    const ids = ['plants', 'bill', 'recipes', 'words']
-    for (const id of ids) await starterHome(ana, id)
-    const p = personOf(ana)
-    store.give(p.id, -p.allowance)
-    const visit = () => Promise.all(ids.map((id) => ana.post('/api/box', { app: starter(id), box: 'rules', op: 'visit' })))
+    const apps = [starter('plants'), 'Dog walks', 'Cat sits', 'Bird feeds']
+    await starterHome(ana, 'plants')
+    for (const app of apps.slice(1)) await lines(await ana.post('/api/screen', { app }))
+    const p = personOf(ana), before = callRows()
+    store.give(p.id, p.spent - p.allowance)
+    const visit = () => Promise.all(apps.map((app) => ana.post('/api/box', { app, box: 'rules', op: 'visit' })))
     expect((await visit()).map((r) => r.status)).toEqual([402, 402, 402, 402])
     await settle()
     expect(calls.terra).toBe(0)
@@ -132,25 +129,27 @@ describe('bursts against the meter', () => {
     expect(calls.terra).toBe(1)
     open()
     await settle()
-    expect(callRows()).toBe(1)
-    expect(personOf(ana).spent).toBeCloseTo(0.002, 6)
+    expect(callRows()).toBe(before + 1)
+    expect(personOf(ana).spent).toBeCloseTo(p.spent + 0.002, 6)
   })
 
-  test('with $0.004 left an A OR B still gets both designs; then 402', async () => {
+  test('with $0.004 left a design is drawn, and one more while something is left; then 402', async () => {
     start()
     store.setCaps({ visitor: RESERVE_USD })
     const ana = browser()
     const evs = await lines(await ana.post('/api/screen', { app: 'Dog walks' }))
-    expect(evs.filter((e) => e.type === 'version')).toHaveLength(2)
-    expect(calls.haiku).toBe(2)
-    expect((await ana.post('/api/screen', { app: 'Cat sits' })).status).toBe(402)
+    expect(evs.filter((e) => e.type === 'version')).toHaveLength(1)
+    expect(calls.haiku).toBe(1)
+    // $0.001 is left: one more call may start, and spend passes the cap by less than a reservation.
+    expect((await ana.post('/api/screen', { app: 'Cat sits' })).status).toBe(200)
+    expect((await ana.post('/api/screen', { app: 'Bird feeds' })).status).toBe(402)
   })
 
   test('a call that fails before it is sent (no key) costs nothing', async () => {
     start({ env: {} })
     const ana = browser()
     const evs = await lines(await ana.post('/api/screen', { app: 'Dog walks' }))
-    expect(evs.some((e) => e.type === 'failed')).toBe(true)
+    expect(evs.at(-1).type).toBe('error')
     expect(personOf(ana).spent).toBe(0)
     expect(callRows()).toBe(0)
   })

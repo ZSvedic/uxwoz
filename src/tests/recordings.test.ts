@@ -2,10 +2,11 @@
 // with their delays and calls nothing; a live call reports its cost once however it ends. No cassette:
 // a fake provider. And every file in recordings/ is complete.
 import { expect, test } from 'bun:test'
-import { readdirSync } from 'node:fs'
+import { mkdtempSync, readdirSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  RECORDINGS_DIR, STARTERS, askBackground, generateScreen, loadRecordings, normalizePrompt, recordedDesign, recordedFiling, recordingFor, recordingProblems,
+  RECORDINGS_DIR, STARTERS, askBackground, generateScreen, loadRecordings, normalizePrompt, recordedDesign, recordedFiling, recordingFile, recordingFor, recordingProblems,
   streamModel, type Fetch, type FinalEvent, type Recorded, type Recording,
 } from '@uxwoz/core'
 
@@ -106,37 +107,49 @@ test('a live call that is aborted, or left early, reports null once', async () =
 })
 
 const rec: Recording = {
-  starter: 'plants', prompt: STARTERS.find((s) => s.id === 'plants')!.prompt, promptHash: '0123456789abcdef', recordedAt: '2026-11-11T00:00:00Z',
-  screens: { home: { action: null, designs: ['A', 'B', 'C', 'D'].map((x) => ({ events: [[0, `<h1>${x}</h1>`]], final })) } },
+  starter: 'plants', device: 'small-phone', prompt: STARTERS.find((s) => s.id === 'plants')!.prompt, promptHash: '0123456789abcdef', recordedAt: '2026-11-11T00:00:00Z',
+  screens: { home: { action: null, designs: ['A', 'B'].map((x) => ({ events: [[0, `<h1>${x}</h1>`]], final })) } },
   filings: ['after A', 'after B'].map((x) => ({ events: [[0, x]], final })),
 }
 
-test('a screen\'s draws take A, B, then each Regenerate the next, round again; the filing follows the side picked', () => {
-  const html = (n: number) => recordedDesign(rec, 'home', n)!.events[0]![1]
-  expect([0, 1, 2, 3, 4, 5].map(html)).toEqual(['<h1>A</h1>', '<h1>B</h1>', '<h1>C</h1>', '<h1>D</h1>', '<h1>A</h1>', '<h1>B</h1>'])
+test('a screen\'s first design is 0 and Another 1, no more; the filing follows the design showing; a recording is per size', () => {
+  const html = (n: number) => recordedDesign(rec, 'home', n)?.events[0]![1] ?? null
+  expect([0, 1, 2].map(html)).toEqual(['<h1>A</h1>', '<h1>B</h1>', null])
   expect(recordedDesign(rec, null, 1)).toBe(rec.screens.home!.designs[1]!)
   expect(recordedDesign(rec, 'nowhere', 0)).toBeNull()
   expect(recordedFiling(rec, 1)!.events[0]![1]).toBe('after B')
-  const all = new Map([[normalizePrompt(rec.prompt), rec]])
-  expect(recordingFor(`  ${rec.prompt.toUpperCase()}  `, all)).toBe(rec)
-  expect(recordingFor('a dog walking app', all)).toBeNull()
+  const all = new Map([[`${normalizePrompt(rec.prompt)}\nsmall-phone`, rec]])
+  expect(recordingFor(`  ${rec.prompt.toUpperCase()}  `, 'small-phone', all)).toBe(rec)
+  expect(recordingFor(rec.prompt, 'laptop', all)).toBeNull()
+  expect(recordingFor(rec.prompt, undefined, all)).toBeNull()
+  expect(recordingFor('a dog walking app', 'small-phone', all)).toBeNull()
 })
 
-test('a recording missing a linked screen, a design or a filing is incomplete', () => {
+test('a recording missing a linked screen, a design, a filing or its size is incomplete', () => {
   const linking: Recording = { ...rec, screens: { home: { action: null, designs: rec.screens.home!.designs.map(() => ({ events: [[0, '<button data-action="@plant-page: one plant">Fern</button>']], final })) } } }
   expect(recordingProblems(linking)).toEqual(['home links to @plant-page, which has no recording'])
   expect(recordingProblems({ ...rec, filings: rec.filings.slice(0, 1) })).toEqual(['1 filings, not 2'])
-  expect(recordingProblems({ ...rec, screens: { home: { action: null, designs: rec.screens.home!.designs.slice(0, 3) } } })).toEqual(['home: 3 designs, not 4'])
+  expect(recordingProblems({ ...rec, screens: { home: { action: null, designs: rec.screens.home!.designs.slice(0, 1) } } })).toEqual(['home: 1 designs, not 2'])
+  expect(recordingProblems({ ...rec, device: 'watch' as never })).toEqual(['no device watch'])
   expect(recordingProblems(rec)).toEqual([])
 })
 
-test('every file in recordings/ is a starter\'s, and complete', () => {
+test('every file in recordings/ is a starter\'s at one size, named so, and complete', () => {
   const files = readdirSync(RECORDINGS_DIR).filter((f) => f.endsWith('.json'))
   const loaded = loadRecordings(RECORDINGS_DIR, (m) => { throw new Error(m) })
   expect(loaded.size).toBe(files.length)
+  expect(files).toContain('plants.small-phone.json')
   for (const f of files) {
-    const r = [...loaded.values()].find((x) => `${x.starter}.json` === f)
-    expect(r, `${f} is named after its starter`).toBeDefined()
+    const r = [...loaded.values()].find((x) => recordingFile(x.starter, x.device) === f)
+    expect(r, `${f} is named after its starter and size`).toBeDefined()
     expect(recordingProblems(r!), join('recordings', f)).toEqual([])
   }
+})
+
+test('a file named for another size, or with no size, is left out', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'uxwoz-rec-'))
+  for (const f of ['plants.laptop.json', 'plants.json', 'plants.small-phone.json']) writeFileSync(join(dir, f), JSON.stringify(rec))
+  const said: string[] = []
+  expect([...loadRecordings(dir, (m) => said.push(m)).values()]).toEqual([rec])
+  expect(said).toHaveLength(2)
 })

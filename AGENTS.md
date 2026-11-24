@@ -40,8 +40,8 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
                  before it is sent (`allow`), its cost once however it ends (`spent`), a live call captured (`record`), a `recorded` one replayed with its timing
   generate.ts    one design: stream, 20 s deadline, cost, name and idea, refuse cut-off replies
   starters.ts    the seven starters: id, label, prompt (data only, also in the browser)
-  recordings.ts  server only: recordings/<id>.json read, the design for a screen's nth draw, Home's filing by side,
-                 promptHash and startersCurrent, what a recording lacks
+  recordings.ts  server only: recordings/<id>.<device>.json read, a recorded screen's first design and its Another,
+                 Home's first filing by the design showing, promptHash and startersCurrent, what a recording lacks
   filing.ts      filing: number a screen's parts, ask Terra (also for the fixer), parse its lines, apply them to
                  the boxes with refusals
   fixer.ts       the fixer's visit: the paper and the screens new since the last one, parse its lines, apply them
@@ -50,8 +50,8 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
                  states and versions kept, visits kept and how often; a Data table as markdown
   tree.ts        the tree, worked out: links in each screen (components pasted), @names, planned screens,
                  shortest-path levels, the titles and lines of the paper
-  cache.ts       screen cache, the screens (ScreenCacheBase): entry and version types, find by name, proposals
-                 (the open A OR B, until the server stops using them) and pick, versions with Undo and Redo (`redo`,
+  cache.ts       screen cache, the screens (ScreenCacheBase): entry and version types, find by name, addScreen (a
+                 new screen with its first design), versions with Undo and Redo (`redo`,
                  10 kept), draws, settle, rename (every key of a mockup), parents, delete with pruning, apps, sharing
                  data, takeIn (another cache's mockups, at a sign-in), the JSON file (version 6; a version 5 A OR B
                  loads as two versions; load, format, save, detach),
@@ -70,19 +70,24 @@ src/packages/web/src/
                  takeIn), remove (desk and file gone for good), peek, people (for the backup)
   public.ts      public mode (UXWOZ_PUBLIC needs UXWOZ_OWNER), the uxwoz_who cookie, the address, who(req); the
                  gate a person's /api request passes onto their own desk: role table, Haiku only, 402 by the
-                 meter, 409 one at a time, 413 at 5 MB, the warm-up rule, the steps counted; a person's metered
+                 meter (a settle never refused), 409 one at a time, 413 at 5 MB, the warm-up rule, the steps counted
+                 (`picked` at a settle or a click into a new screen); `arrived` and `toured` from the page; a person's metered
                  Io and `may`; /api/me and the arrived step
   export.ts      GET /api/export: a mockup as a zip for a coding or design agent (handoff, README with the tree,
                  the boxes, one page per drawn screen whose links work from disk)
-  server.ts      Bun.serve: / and /m/… (the page), /api/config, /api/screen (NDJSON, A OR B at once), /api/pick, /api/revise, /api/undo,
-                 /api/map (wait=1 for filing and a visit), /api/apps, /api/delete, /api/delete-app,
+  server.ts      Bun.serve: /, /m/… and /tour/… (the page), /api/config, /api/screen (NDJSON, one design), /api/settle,
+                 /api/revise (Edit, Another, Draw again: Home's renames, 409 when taken), /api/undo (by `at` too),
+                 /api/tour, /api/map (wait=1 for filing and a visit), /api/apps, /api/delete, /api/delete-app,
                  /api/box (also undo, a box's Undo and Edit, Visit now), /api/warmup, /api/backup, /api/me, /api/step,
-                 themes; request checks; a visit every 5 picks;
+                 themes; request checks; the old A OR B `ScreenEvent` type the page reads until its rework;
                  every route takes its cache from the request's desk; in public mode the account's and the
                  admin's routes, the owner's mail of requests, idle visitors swept each day, the backup as a zip
-  drawing.ts     the work behind the routes: filing and visits in one chain per mockup (a click waits for it), a
-                 visit's redraws as Edits; a screen's stream (A OR B at once, a revise) as NDJSON; a
-                 starter's recording replayed in place of those calls, and `replayed` (would a request be)
+  drawing.ts     the work behind the routes: filing and visits in one chain per mockup (a click waits for it),
+                 `settle` (filing, a visit every 5th first settle), a visit's redraws as Edits; one design a stream (a
+                 new screen settling its `from` first, Edit, Another, Draw again) as NDJSON, 409 while a screen is
+                 drawn; a starter's recording at the mockup's size replayed in place of those calls, and `replayed`
+  tour.ts        the tour read from tour/ at each request (mocks, rules.md, data.md, components/, notes.md) as
+                 /api/map sends a mockup; `isTour`, which share.ts's `guard` refuses on every other route (404)
   app.ts         browser entry: builds the canvas and the boxes, opens, closes and deletes a mockup, init
   state.ts       browser: the shared state, local storage, elements by id, Enter sends a form
   screens.ts     browser: views (a card's name) and draw, A OR B streaming, refit and pick, clicks (@names, back), Regenerate, Edit,
@@ -120,7 +125,8 @@ src/packages/web/src/
                  /api/ask, meOf (/api/me's body), closedOf; startAsks: the owner's mail of open requests, one an hour
   admin.html, admin-page.ts   browser: the admin's page: spend and mode, caps, steps, Requests, People, each dollar amount in screens too
   share.ts       share links per role, the player's map, feedback (a name first; a visitor's own; Resolve) and
-                 trips, an edit link's scope and cap, the owner's gate (UXWOZ_OWNER); `guard` wraps server.ts's routes
+                 trips, an edit link's scope and cap (a settle that files counts), the owner's gate (UXWOZ_OWNER), the
+                 tour refused; `guard` wraps server.ts's routes
   sharing.ts     browser: the drawer's Share and feedback pane (a comment jumps to it), a screen's thumbs in Info,
                  an edit link's token on every API call
   comments.ts    browser: the owner's comments: pins over every drawn screen with open ones, the Comments tab with
@@ -141,9 +147,11 @@ src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loa
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
 src/tests/fixtures/demo-cache.json   the demo mockup (a habit tracker); made by scripts/make-demo-cache.ts
 src/scripts/make-demo-cache.ts   writes the demo mockup through ScreenCache, the same on every run
-src/scripts/record-starters.ts   `bun run starters:record [id…]`: live calls through createServer on temporary
-                             caches, writes recordings/<id>.json
+src/scripts/record-starters.ts   `bun run starters:record [id…] [--device <id>]`: live calls through createServer on
+                             temporary caches, no old recording replayed, writes recordings/<id>.<device>.json
 recordings/                  the starters' recordings (spec/public.md, Recordings); copied into the image
+tour/                        the tour: four mocks (home.html first), rules.md, data.md, components/, notes.md; a
+                             placeholder until its real content; copied into the image
 src/scripts/demo.ts          `bun run demo`: the app on a temporary copy of the demo mockup, no keys, prints the URLs
 src/scripts/backup.sh        run by hand or weekly by launchd: GET /api/backup (the cache, or the public's zip) into backups/ (git-ignored)
 ```

@@ -4,6 +4,7 @@
 import { HOME_NAME, canonicalAction, componentsOf, isComponent, normalizePrompt, screenTree, type CacheEntry, type Feedback, type ScreenCache, type Share, type Trip } from '@uxwoz/core'
 import type { Desks } from './desks.ts'
 import type { Gate } from './public.ts'
+import { isTour } from './tour.ts'
 
 /** How many of each kind a mockup keeps (comments, thumbs, answers, trips; the oldest go), the most screens and dead clicks
  * a trip keeps, the longest text, an edit link's default cap. */
@@ -14,8 +15,8 @@ export const EDIT_CAP = 20
 const ROLES = ['view', 'comment', 'edit'] as const
 /** The routes an edit link may not use: the share links themselves, resolving feedback, deleting the whole mockup, the owner's warm-up, the backup, the admin's. */
 const OWNER_ONLY = new Set(['/api/share', '/api/shares', '/api/unshare', '/api/feedback', '/api/delete-app', '/api/warmup', '/api/backup', '/api/admin'])
-/** The routes that call a model when an edit link uses them (a new screen only when it is not in the cache). */
-const PAID = new Set(['/api/screen', '/api/revise', '/api/pick'])
+/** The routes that call a model when an edit link uses them (a new screen only when it is not in the cache, a settle only when it files). */
+const PAID = new Set(['/api/screen', '/api/revise'])
 
 type Api = (run: (b: any, req: Request) => Response | Promise<Response>) => (req: Request) => Promise<Response>
 type Route = any
@@ -45,7 +46,7 @@ export function publicOrigin(req: Request) {
   return `${proto}://${hostOf(req)}`
 }
 
-/** The player's mockup: the picked screens' newest versions, their tree parents and the components; nothing else. */
+/** The player's mockup: the drawn screens' versions showing, their tree parents and the components; nothing else. */
 export function playerMap(cache: ScreenCache, root: string) {
   const all = cache.map(root).entries.filter((e) => e.versions.length)
   const tree = screenTree(all)
@@ -149,7 +150,7 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
     }) },
     '/api/share': { POST: api((b, req) => {
       const cache = cacheOf(req), app = str(b?.app, 2000), role = b?.role
-      if (!cache.get(normalizePrompt(app))?.versions.length) return fail('no such mockup, or its first screen is not picked yet', 404)
+      if (!cache.get(normalizePrompt(app))?.versions.length) return fail('no such mockup, or its first screen is not drawn yet', 404)
       if (!ROLES.includes(role)) return fail('role must be view, comment or edit')
       const cap = role === 'edit' ? Math.max(1, Math.min(1000, Math.round(Number(b?.cap) || EDIT_CAP))) : undefined
       const s: Share = { token: token(), role, createdAt: new Date().toISOString(), ...(cap && { cap }), used: 0, opens: 0 }
@@ -198,13 +199,14 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
     return { root, b }
   }
 
-  /** Whether a request makes a model work: a new screen (not a cache hit, unless an open A OR B is asked to draw its missing side again), an Edit or a Regenerate, a pick (its filing), an Edit of a box or a visit. */
+  /** Whether a request makes a model work: a new screen (not a cache hit), a revise, a settle that starts a filing, an Edit of a box or a visit. */
   function costs(path: string, b: any, cache: ScreenCache): boolean {
     if (path === '/api/box') return b?.op === 'edit' || b?.op === 'visit'
-    if (path === '/api/screen') {
-      // A cache hit is free, but an open A OR B asked `again` draws its missing side.
-      const hit = cache.find(String(b?.app ?? ''), canonicalAction(typeof b?.action === 'string' ? b.action : null))
-      return !hit || (b?.again === true && !hit.versions.length && !!hit.proposals?.some((p) => !p))
+    if (path === '/api/screen') return !cache.find(String(b?.app ?? ''), canonicalAction(typeof b?.action === 'string' ? b.action : null))
+    if (path === '/api/settle') {
+      // As cache.settle decides: the version showing was not filed yet, and is no Edit (which filed itself).
+      const e = cache.get(String(b?.key ?? '')), v = e?.versions.at(-1)
+      return !!e && !!v && !isComponent(e) && e.settled !== v.createdAt && !(e.settled && v.feedback)
     }
     return PAID.has(path)
   }
@@ -214,6 +216,9 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
    * on its desk, for its mockup, within its cap.
    */
   const wrap = (path: string, run: (req: Request) => Response | Promise<Response>) => async (req: Request) => {
+    // The tour is read through /api/tour only: no route reads or changes it as a mockup.
+    const about = await scopeOf(req)
+    if (about !== 'refuse' && isTour(about.root)) return fail('The tour cannot be changed.', 404)
     const t = req.headers.get('x-uxwoz-share')
     if (!t && pub && !pub.isOwner(req)) return pub.route(path, req, run, (b, cache) => costs(path, b, cache))
     if (!t) return !isOwner(req) ? fail('This UXWoz is private.', 401) : desks.of(req) ? run(req) : fail('Who sent this is not known.', 400)
@@ -223,7 +228,7 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
     desks.bind(req, f.desk)
     if (OWNER_ONLY.has(path)) return fail('Only the owner can do this.', 403)
     if (path === '/api/apps') return json({ apps: cache.apps().filter((a) => normalizePrompt(a.app) === f.root) })
-    const scope = await scopeOf(req)
+    const scope = about
     if (scope === 'refuse' || (scope.root != null && scope.root !== f.root)) return fail('This link opens one mockup only.', 403)
     // Deleting the first screen deletes the mockup, its links and its feedback: only the owner may.
     if (path === '/api/delete' && scope.b?.key === f.root) return fail('Only the owner can delete the whole mockup.', 403)

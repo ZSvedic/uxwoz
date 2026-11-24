@@ -16,8 +16,7 @@ const HOME = '<title>Home</title><h1>Tonight</h1><p>Ready.</p><nav><a data-actio
 
 function mockup(html = HOME) {
   const cache = new ScreenCache()
-  const key = cache.propose('Snore', null, 0, ver(html))!.key
-  cache.pick(key, 0)
+  const key = cache.addScreen('Snore', null, ver(html))!.key
   return { cache, key, file: (reply: string, filed = html) => applyFiling(cache, 'Snore', key, filed, reply, made) }
 }
 
@@ -141,7 +140,7 @@ describe('the boxes in the cache', () => {
   test('the boxes survive a restart in a format 6 file, and go with their mockup', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
     const cache = new ScreenCache(file)
-    cache.pick(cache.propose('Snore', null, 0, ver('<h1>x</h1>'))!.key, 0)
+    cache.addScreen('Snore', null, ver('<h1>x</h1>'))
     cache.setBox('Snore', 'add', 'data', { id: 'nights', columns: ['night'], rows: [['Mon']] }, 'filing')
     cache.markSeen('Snore', 'data')
     const again = new ScreenCache(file)
@@ -175,7 +174,7 @@ function provider() {
 
 async function withServer(fileWaitMs: number, run: (s: { post: (p: string, b: object) => Promise<Response>; url: URL; p: ReturnType<typeof provider>; cache: ScreenCache }) => Promise<void>) {
   const p = provider(), cache = new ScreenCache()
-  const server = createServer({ port: 0, cache, fetch: p.fetch, env, log: () => {}, random: () => 0.9, fileWaitMs })
+  const server = createServer({ port: 0, cache, fetch: p.fetch, env, log: () => {}, fileWaitMs })
   const post = (path: string, body: object) => fetch(new URL(path, server.url), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   try { await run({ post, url: server.url, p, cache }) } finally { p.open(); server.stop(true) }
 }
@@ -184,7 +183,7 @@ describe('filing in the server', () => {
   test('a click while filing runs waits for it, so the new screen reads what was filed', () => {
     return withServer(5000, async ({ post, p }) => {
       await (await post('/api/screen', { app: 'Snore' })).text()
-      expect((await (await post('/api/pick', { key: 'snore', index: 0 })).json()).filing).toBe(true)
+      expect((await (await post('/api/settle', { key: 'snore' })).json()).filing).toBe(true)
       setTimeout(p.open, 200)
       const t0 = performance.now()
       await (await post('/api/screen', { app: 'Snore', action: '@history: every night', from: 'snore', label: 'H' })).text()
@@ -196,7 +195,7 @@ describe('filing in the server', () => {
   test('a click waits at most fileWaitMs, then goes on without it; the map with wait=1 brings what was filed', () => {
     return withServer(100, async ({ post, url, p }) => {
       await (await post('/api/screen', { app: 'Snore' })).text()
-      await post('/api/pick', { key: 'snore', index: 0 })
+      await post('/api/settle', { key: 'snore' })
       const t0 = performance.now()
       await (await post('/api/screen', { app: 'Snore', action: '@history: every night', from: 'snore', label: 'H' })).text()
       expect(performance.now() - t0).toBeLessThan(1000)
@@ -212,7 +211,7 @@ describe('filing in the server', () => {
   test('Start over does not wait for the old mockup\'s filing, and drops what it files', () => {
     return withServer(5000, async ({ post, url }) => {
       await (await post('/api/screen', { app: 'Snore' })).text()
-      await post('/api/pick', { key: 'snore', index: 0 })
+      await post('/api/settle', { key: 'snore' })
       await post('/api/delete-app', { app: 'Snore' })
       const t0 = performance.now()
       await (await post('/api/screen', { app: 'Snore' })).text()
@@ -224,7 +223,7 @@ describe('filing in the server', () => {
   test('a component the user changes is the user\'s; Terra is no screen model', () => {
     return withServer(100, async ({ post, url, cache }) => {
       await (await post('/api/screen', { app: 'Snore' })).text()
-      await post('/api/pick', { key: 'snore', index: 0 })
+      await post('/api/settle', { key: 'snore' })
       const bar = cache.addComponent('Snore', 'bar', 'every screen', ver('<nav></nav>'), 'filing') as { key: string }
       await (await post('/api/revise', { key: bar.key, change: 'Bigger' })).text()
       expect(cache.get(bar.key)).toMatchObject({ by: 'user', seen: true, versions: [{}, { feedback: 'Bigger' }] })

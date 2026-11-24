@@ -6,7 +6,7 @@ import { createHash, createHmac, randomBytes } from 'node:crypto'
 
 export type Reason = 'allowance' | 'address' | 'paused' | 'guests' | 'blocked'
 export type Mode = 'open' | 'starters'
-export const STEPS = ['arrived', 'starter', 'picked', 'own', 'limit', 'asked', 'verified'] as const
+export const STEPS = ['arrived', 'toured', 'starter', 'picked', 'own', 'limit', 'asked', 'verified'] as const
 export type Step = (typeof STEPS)[number]
 
 /** The limits, each changeable on the admin's page. Money in USD. */
@@ -416,16 +416,17 @@ export function people(file: string, opts: { now?: () => Date } = {}) {
     },
 
     // ── Steps ──
-    /** Counts a step once per person (`person` null for `arrived` before there is one); `arrived` at most 50 a day per address. True when counted. */
+    /** Counts a step once per person (`person` null for `arrived` or `toured` before there is one); the two the page sends at most 50 a day per address together. True when counted. */
     step(person: string | null, step: Step, address: string): boolean {
       if (!STEPS.includes(step)) return false
       return db.transaction(() => {
         const p = person ? row(person) : null
         if (person && !p) return false
-        if (step !== 'arrived' && !p) return false
+        const sent = step === 'arrived' || step === 'toured'
+        if (!sent && !p) return false
         const done = p?.steps ? p.steps.split(',') : []
         if (done.includes(step)) return false
-        if (step === 'arrived') {
+        if (sent) {
           const a = addr(address)
           if (a.arrived >= ARRIVED_PER_ADDRESS) return false
           bump(a.hash, 'arrived')

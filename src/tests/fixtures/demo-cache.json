@@ -23,9 +23,9 @@
      "idea": "Today's habits as one checklist"
     }
    ],
+   "draws": 1,
    "mid": "t78b4c",
    "sid": "t9",
-   "draws": 1,
    "settled": "2026-11-01T09:01:00.000Z"
   },
   {
@@ -42,7 +42,7 @@
      "html": "<title>Habit detail</title><meta name=\"idea\" content=\"One habit with its streak\">\n<a data-action=\"back\">Back</a>\n<h1>Drink water</h1>\n<p>Streak: 12 days</p>\n<button>Check off today</button>\n<a data-action=\"@reminders: when to remind me of this habit\">Reminders</a>\n<div data-component=\"tab-bar\"></div>",
      "model": "claude-haiku-5.5",
      "servedModel": "anthropic/claude-haiku-5.5",
-     "createdAt": "2026-11-01T09:03:00.000Z",
+     "createdAt": "2026-11-01T09:02:00.000Z",
      "costUsd": 0.011,
      "costEstimated": false,
      "firstChunkMs": 900,
@@ -56,7 +56,7 @@
      "html": "<title>Habit detail</title><meta name=\"idea\" content=\"One habit with its streak\">\n<a data-action=\"back\">Back</a>\n<h1>Drink water</h1>\n<h2>12 days</h2><p>Current streak</p>\n<button>Check off today</button>\n<a data-action=\"@reminders: when to remind me of this habit\">Reminders</a>\n<div data-component=\"tab-bar\"></div>",
      "model": "claude-haiku-5.5",
      "servedModel": "anthropic/claude-haiku-5.5",
-     "createdAt": "2026-11-01T09:11:00.000Z",
+     "createdAt": "2026-11-01T09:06:00.000Z",
      "costUsd": 0.011,
      "costEstimated": false,
      "firstChunkMs": 900,
@@ -68,9 +68,9 @@
      "feedback": "Make the streak the biggest thing on the screen"
     }
    ],
-   "sid": "wm",
    "draws": 1,
-   "settled": "2026-11-01T09:03:00.000Z"
+   "sid": "wm",
+   "settled": "2026-11-01T09:02:00.000Z"
   },
   {
    "name": "add-habit",
@@ -86,7 +86,7 @@
      "html": "<title>Add a habit</title><meta name=\"idea\" content=\"A short form, one field per line\">\n<a data-action=\"back\">Back</a>\n<h1>Add a habit</h1>\n<form><label>Name <input value=\"Walk\"></label><label>Goal <select><option>Every day</option><option>Weekdays</option></select></label>\n<button type=\"button\" data-action=\"@home\">Save</button></form>",
      "model": "claude-haiku-5.5",
      "servedModel": "anthropic/claude-haiku-5.5",
-     "createdAt": "2026-11-01T09:05:00.000Z",
+     "createdAt": "2026-11-01T09:03:00.000Z",
      "costUsd": 0.011,
      "costEstimated": false,
      "firstChunkMs": 900,
@@ -97,9 +97,9 @@
      "idea": "A short form, one field per line"
     }
    ],
-   "sid": "q8",
    "draws": 1,
-   "settled": "2026-11-01T09:05:00.000Z"
+   "sid": "q8",
+   "settled": "2026-11-01T09:03:00.000Z"
   },
   {
    "name": "stats",
@@ -115,7 +115,7 @@
      "html": "<title>Stats</title><meta name=\"idea\" content=\"This week as bars, one per habit\">\n<h1>This week</h1>\n<p>Drink water <progress value=\"6\" max=\"7\"></progress></p>\n<p>Read 10 pages <progress value=\"3\" max=\"7\"></progress></p>\n<a data-action=\"@habit-detail\">Drink water</a>\n<a data-action=\"@history: every past week, newest first\">History</a>\n<div data-component=\"tab-bar\"></div>",
      "model": "claude-haiku-5.5",
      "servedModel": "anthropic/claude-haiku-5.5",
-     "createdAt": "2026-11-01T09:07:00.000Z",
+     "createdAt": "2026-11-01T09:04:00.000Z",
      "costUsd": 0.011,
      "costEstimated": false,
      "firstChunkMs": 900,
@@ -126,9 +126,9 @@
      "idea": "This week as bars, one per habit"
     }
    ],
-   "sid": "te",
    "draws": 1,
-   "settled": "2026-11-01T09:07:00.000Z"
+   "sid": "te",
+   "settled": "2026-11-01T09:04:00.000Z"
   },
   {
    "name": "reminders",
@@ -144,7 +144,7 @@
      "html": "<title>Reminders</title><meta name=\"idea\" content=\"One time per habit\">\n<a data-action=\"back\">Back</a>\n<h1>Reminders</h1>\n<label>Drink water <input type=\"time\" value=\"09:00\"></label>\n<label><input type=\"checkbox\" role=\"switch\" checked> Remind me</label>",
      "model": "claude-haiku-5.5",
      "servedModel": "anthropic/claude-haiku-5.5",
-     "createdAt": "2026-11-01T09:09:00.000Z",
+     "createdAt": "2026-11-01T09:05:00.000Z",
      "costUsd": 0.011,
      "costEstimated": false,
      "firstChunkMs": 900,
@@ -155,9 +155,9 @@
      "idea": "One time per habit"
     }
    ],
-   "sid": "hn",
    "draws": 1,
-   "settled": "2026-11-01T09:09:00.000Z"
+   "sid": "hn",
+   "settled": "2026-11-01T09:05:00.000Z"
   },
   {
    "name": "history",
@@ -173,7 +173,7 @@
      "html": "<title>History</title><meta name=\"idea\" content=\"Weeks as a table\">\n<a data-action=\"back\">Back</a><h1>History</h1>\n<table><tr><th>Week</th><th>Done</th></tr><tr><td>Oct 27</td><td>15 of 21</td></tr><tr><td>Oct 20</td><td>18 of 21</td></tr></table>",
      "model": "claude-haiku-5.5",
      "servedModel": "anthropic/claude-haiku-5.5",
-     "createdAt": "2026-11-01T09:12:00.000Z",
+     "createdAt": "2026-11-01T09:07:00.000Z",
      "costUsd": 0.011,
      "costEstimated": false,
      "firstChunkMs": 900,
@@ -187,7 +187,7 @@
      "html": "<title>History</title><meta name=\"idea\" content=\"Weeks as cards with a bar each\">\n<a data-action=\"back\">Back</a><h1>History</h1>\n<article>Oct 27 <progress value=\"15\" max=\"21\"></progress></article><article>Oct 20 <progress value=\"18\" max=\"21\"></progress></article>",
      "model": "claude-haiku-5.5",
      "servedModel": "anthropic/claude-haiku-5.5",
-     "createdAt": "2026-11-01T09:14:00.000Z",
+     "createdAt": "2026-11-01T09:08:00.000Z",
      "costUsd": 0.011,
      "costEstimated": false,
      "firstChunkMs": 900,
@@ -198,9 +198,9 @@
      "idea": "Weeks as cards with a bar each"
     }
    ],
-   "sid": "bz",
    "draws": 2,
-   "settled": "2026-11-01T09:12:00.000Z"
+   "sid": "bz",
+   "settled": "2026-11-01T09:07:00.000Z"
   },
   {
    "name": "tab-bar",
@@ -216,7 +216,7 @@
      "html": "<nav><ul><li><a data-action=\"@home\">Today</a></li><li><a data-action=\"@stats: this week, per habit\">Stats</a></li></ul></nav>",
      "model": "claude-haiku-5.5",
      "servedModel": "anthropic/claude-haiku-5.5",
-     "createdAt": "2026-11-01T09:15:00.000Z",
+     "createdAt": "2026-11-01T09:09:00.000Z",
      "costUsd": 0.011,
      "costEstimated": false,
      "firstChunkMs": 900,
@@ -227,7 +227,7 @@
    ],
    "kind": "component",
    "by": "filing",
-   "at": "2026-11-01T09:17:00.000Z",
+   "at": "2026-11-01T09:11:00.000Z",
    "seen": false,
    "sid": "dy"
   }
@@ -239,14 +239,14 @@
      "id": "one-tap-check",
      "text": "Checking off a habit takes one tap from Today.",
      "by": "filing",
-     "at": "2026-11-01T09:19:00.000Z",
+     "at": "2026-11-01T09:13:00.000Z",
      "seen": false
     },
     {
      "id": "streak-reset",
      "text": "A streak ends after a whole missed day.",
      "by": "fixer",
-     "at": "2026-11-01T09:24:00.000Z",
+     "at": "2026-11-01T09:18:00.000Z",
      "seen": false
     }
    ],
@@ -276,7 +276,7 @@
       ]
      ],
      "by": "filing",
-     "at": "2026-11-01T09:21:00.000Z",
+     "at": "2026-11-01T09:15:00.000Z",
      "seen": false
     }
    ],
@@ -288,7 +288,7 @@
    "settled": 6,
    "visits": [
     {
-     "at": "2026-11-01T09:22:00.000Z",
+     "at": "2026-11-01T09:16:00.000Z",
      "ms": 6200,
      "costUsd": 0.004,
      "screens": 5,
@@ -315,7 +315,7 @@
      "list": [],
      "gone": [],
      "what": "Added tab-bar",
-     "at": "2026-11-01T09:16:00.000Z"
+     "at": "2026-11-01T09:10:00.000Z"
     }
    ],
    "rules": [
@@ -323,7 +323,7 @@
      "list": [],
      "gone": [],
      "what": "Filing added one-tap-check",
-     "at": "2026-11-01T09:18:00.000Z"
+     "at": "2026-11-01T09:12:00.000Z"
     },
     {
      "list": [
@@ -331,13 +331,13 @@
        "id": "one-tap-check",
        "text": "Checking off a habit takes one tap from Today.",
        "by": "filing",
-       "at": "2026-11-01T09:19:00.000Z",
+       "at": "2026-11-01T09:13:00.000Z",
        "seen": false
       }
      ],
      "gone": [],
      "what": "The fixer added streak-reset",
-     "at": "2026-11-01T09:23:00.000Z"
+     "at": "2026-11-01T09:17:00.000Z"
     }
    ],
    "data": [
@@ -345,7 +345,7 @@
      "list": [],
      "gone": [],
      "what": "Filing added habits",
-     "at": "2026-11-01T09:20:00.000Z"
+     "at": "2026-11-01T09:14:00.000Z"
     }
    ]
   }
@@ -356,21 +356,21 @@
     {
      "token": "00000000000000000000000000000001",
      "role": "view",
-     "createdAt": "2026-11-01T09:25:00.000Z",
+     "createdAt": "2026-11-01T09:19:00.000Z",
      "used": 0,
      "opens": 0
     },
     {
      "token": "00000000000000000000000000000002",
      "role": "comment",
-     "createdAt": "2026-11-01T09:26:00.000Z",
+     "createdAt": "2026-11-01T09:20:00.000Z",
      "used": 0,
      "opens": 0
     },
     {
      "token": "00000000000000000000000000000003",
      "role": "edit",
-     "createdAt": "2026-11-01T09:27:00.000Z",
+     "createdAt": "2026-11-01T09:21:00.000Z",
      "cap": 20,
      "used": 0,
      "opens": 0
@@ -379,7 +379,7 @@
    "feedback": [
     {
      "id": "demo000000000001",
-     "at": "2026-11-01T09:28:00.000Z",
+     "at": "2026-11-01T09:22:00.000Z",
      "visitor": "dec0de0000000001",
      "name": "Demo Visitor",
      "screen": "a habit tracker for small daily habits » @habit-detail",
@@ -392,14 +392,14 @@
     },
     {
      "id": "demo000000000002",
-     "at": "2026-11-01T09:29:00.000Z",
+     "at": "2026-11-01T09:23:00.000Z",
      "visitor": "dec0de0000000002",
      "name": "Second Visitor",
      "screen": "a habit tracker for small daily habits",
      "title": "Today",
      "kind": "comment",
      "text": "Nice and short.",
-     "resolved": "2026-11-01T09:30:00.000Z"
+     "resolved": "2026-11-01T09:24:00.000Z"
     }
    ],
    "trips": [
@@ -407,7 +407,7 @@
      "id": "dec0de00000000a1",
      "visitor": "dec0de0000000001",
      "name": "Demo Visitor",
-     "at": "2026-11-01T09:31:00.000Z",
+     "at": "2026-11-01T09:25:00.000Z",
      "screens": [
       "Today",
       "Habit detail",

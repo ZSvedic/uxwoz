@@ -10,10 +10,9 @@ const ver = (html: string, createdAt = '2026-10-23T00:00:00Z'): Version => ({
   costUsd: 0.001, costEstimated: false, firstChunkMs: 900, totalMs: 4000, finishReason: 'stop',
 })
 
-/** A picked screen: one side proposed, then picked. */
+/** A drawn screen: its first design. */
 function screen(cache: ScreenCache, app: string, action: string | null, html: string, parent: { key: string; label: string } | null = null, at?: string) {
-  const e = cache.propose(app, action && `@${nameFrom(action)}: ${action}`, 0, ver(html, at), parent)!
-  return cache.pick(e.key, 0)!
+  return cache.addScreen(app, action && `@${nameFrom(action)}: ${action}`, ver(html, at), parent)!
 }
 
 describe('screen cache', () => {
@@ -23,26 +22,13 @@ describe('screen cache', () => {
     expect(screenKey('Coffee app', '@Cart')).toBe(screenKey('coffee app', '@cart: other words'))
   })
 
-  test('a new screen holds both sides until a pick keeps one as its first version', () => {
+  test('a new screen is made by its first design, shown at once; a second first design is refused', () => {
     const cache = new ScreenCache()
-    const e = cache.propose('Coffee app', null, 1, ver('<h1>B</h1>'))!
-    expect(e).toMatchObject({ versions: [], proposals: [null, { html: '<h1>B</h1>' }] })
-    expect(e.name).toBe('home')
-    cache.propose('coffee app', null, 0, ver('<h1>A</h1>'))
-    expect(cache.pick(e.key, 2)).toBeUndefined()
-    const picked = cache.pick(e.key, 1)!
-    expect(picked.versions.map((v) => v.html)).toEqual(['<h1>B</h1>'])
-    expect(picked.proposals).toBeUndefined()
-    // A side that finishes after the pick is dropped.
-    expect(cache.propose('Coffee app', null, 0, ver('<h1>late</h1>'))).toBeUndefined()
+    const e = cache.addScreen('Coffee app', null, ver('<h1>A</h1>'))!
+    expect(e).toMatchObject({ name: 'home', versions: [{ html: '<h1>A</h1>' }], draws: 1 })
+    expect(e.settled).toBeUndefined()
+    expect(cache.addScreen('coffee app', null, ver('<h1>late</h1>'))).toBeUndefined()
     expect(cache.get(e.key)!.versions).toHaveLength(1)
-  })
-
-  test('a side that has not finished cannot be picked', () => {
-    const cache = new ScreenCache()
-    const e = cache.propose('Coffee app', null, 0, ver('<h1>A</h1>'))!
-    expect(cache.pick(e.key, 1)).toBeUndefined()
-    expect(cache.pick(e.key, 0)).toBeDefined()
   })
 
   test('versions stack up; Undo shows the one before and keeps the newer for Redo, never past the first', () => {
@@ -53,15 +39,14 @@ describe('screen cache', () => {
     expect(cache.undo(key)!.versions.map((v) => v.html)).toEqual(['<h1>v1</h1>'])
     expect(cache.get(key)!.redo!.map((v) => v.html)).toEqual(['<h1>v2</h1>'])
     expect(cache.undo(key)).toBeUndefined()
-    // No versions while the A OR B is open.
-    const open = cache.propose('Cafe', '@cart', 0, ver('<h1>c</h1>'), { key, label: 'Cart' })!
-    expect(cache.addVersion(open.key, ver('<h1>x</h1>'))).toBeUndefined()
+    // No version for a screen that is not there.
+    expect(cache.addVersion('cafe » @cart', ver('<h1>x</h1>'))).toBeUndefined()
   })
 
   test('"home" and "@home" as an action mean the first screen; words with no @ open no screen', () => {
     expect(screenKey('Coffee app', 'Home')).toBe(screenKey('Coffee app', '@home: start'))
-    expect(new ScreenCache().propose('Coffee app', 'home', 0, ver('<h1>Menu</h1>'))!.action).toBeNull()
-    expect(new ScreenCache().propose('Coffee app', 'Show the cart', 0, ver('<h1>Cart</h1>'))).toBeUndefined()
+    expect(new ScreenCache().addScreen('Coffee app', 'home', ver('<h1>Menu</h1>'))!.action).toBeNull()
+    expect(new ScreenCache().addScreen('Coffee app', 'Show the cart', ver('<h1>Cart</h1>'))).toBeUndefined()
   })
 
   test('the paper lists the app, its device, the titles and lines, and the three boxes in full', () => {
@@ -108,15 +93,14 @@ describe('screen cache', () => {
     expect(screenIdea('<h1>No idea</h1>')).toBe('')
   })
 
-  test('a new screen takes its parent from the click, only from a picked screen of the same mockup', () => {
+  test('a new screen takes its parent from the click, only from a drawn screen of the same mockup', () => {
     const cache = new ScreenCache()
     const menu = screen(cache, 'Cafe', null, '<h1>Menu</h1>')
     const cart = screen(cache, 'Cafe', 'Cart', '<h1>Cart</h1>', { key: menu.key, label: 'Cart' })
     expect(cart.parent).toEqual({ key: menu.key, label: 'Cart' })
     const tea = screen(cache, 'Tea', null, '<h1>T</h1>')
-    expect(cache.propose('Cafe', '@x', 0, ver('<h1>x</h1>'), { key: tea.key, label: 'x' })!.parent).toBeNull()
-    const open = cache.propose('Cafe', '@help', 0, ver('<h1>h</h1>'), { key: menu.key, label: 'Help' })!
-    expect(cache.propose('Cafe', '@y', 0, ver('<h1>y</h1>'), { key: open.key, label: 'y' })!.parent).toBeNull()
+    expect(cache.addScreen('Cafe', '@x', ver('<h1>x</h1>'), { key: tea.key, label: 'x' })!.parent).toBeNull()
+    expect(cache.addScreen('Cafe', '@y', ver('<h1>y</h1>'), { key: 'cafe » @gone', label: 'y' })!.parent).toBeNull()
   })
 
   test('the cache serves one mockup at a time', () => {
@@ -255,14 +239,14 @@ describe('screen cache', () => {
     expect(new ScreenCache(file).map('Cafe').entries.map((e) => [e.key, e.name])).toEqual([['cafe', 'home']])
   })
 
-  test('a cache file survives a restart, open A OR B included', () => {
+  test('a cache file survives a restart', () => {
     const file = join(mkdtempSync(join(tmpdir(), 'uxwoz-')), 'cache.json')
     const cache = new ScreenCache(file)
     const menu = screen(cache, 'Coffee app', null, '<h1>Menu</h1>')
-    cache.propose('Coffee app', '@cart', 1, ver('<h1>Cart</h1>'), { key: menu.key, label: 'Cart' })
+    cache.addScreen('Coffee app', '@cart', ver('<h1>Cart</h1>'), { key: menu.key, label: 'Cart' })
     const again = new ScreenCache(file)
     expect(again.get(menu.key)?.versions[0]?.html).toBe('<h1>Menu</h1>')
-    expect(again.get(screenKey('coffee app', '@cart'))?.proposals).toEqual([null, ver('<h1>Cart</h1>')])
+    expect(again.get(screenKey('coffee app', '@cart'))?.versions).toEqual([ver('<h1>Cart</h1>')])
   })
 })
 
@@ -328,10 +312,9 @@ describe('versions, Redo, draws and settling', () => {
 
   test('settling: the first time counts in the boxes, again only after a new design, never for an Edit', () => {
     const cache = new ScreenCache()
-    const home = cache.propose('Cafe', null, 0, ver('v1', at(1)))!
-    expect(cache.settle(home.key)).toBeNull()
-    cache.pick(home.key, 0)
-    // A pick settles the screen it keeps.
+    const home = cache.addScreen('Cafe', null, ver('v1', at(1)))!
+    expect(cache.settle('cafe » @nowhere')).toBeNull()
+    expect(cache.settle(home.key)).toBe('first')
     expect([cache.get(home.key)!.settled, cache.boxesOf('Cafe').settled]).toEqual([at(1), 1])
     expect(cache.settle(home.key)).toBeNull()
     cache.addVersion(home.key, { ...ver('v2', at(2)), feedback: 'Bigger' })
@@ -339,9 +322,7 @@ describe('versions, Redo, draws and settling', () => {
     cache.addVersion(home.key, ver('v3', at(3)))
     expect(cache.settle(home.key)).toBe('again')
     expect([cache.get(home.key)!.settled, cache.boxesOf('Cafe').settled]).toEqual([at(3), 1])
-    const cart = cache.propose('Cafe', '@cart', 0, ver('c', at(4)), { key: home.key, label: 'Cart' })!
-    cart.versions = [cart.proposals![0]!]
-    delete cart.proposals
+    const cart = cache.addScreen('Cafe', '@cart', ver('c', at(4)), { key: home.key, label: 'Cart' })!
     expect(cache.settle(cart.key)).toBe('first')
     expect(cache.boxesOf('Cafe').settled).toBe(2)
   })

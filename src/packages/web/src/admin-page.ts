@@ -15,7 +15,7 @@ const CAP_LABELS: Record<string, string> = {
   addressAccounts: 'New accounts per address a day', dayUsd: 'The public\'s spend a day ($; guests stop at 70%)', monthUsd: 'The public\'s spend a month ($)',
   mailPerDay: 'Emails a day',
 }
-const STEP_LABELS: [string, string][] = [['arrived', 'Arrived'], ['starter', 'Picked a starter'], ['picked', 'Picked a design'],
+const STEP_LABELS: [string, string][] = [['arrived', 'Arrived'], ['toured', 'Finished the tour'], ['starter', 'Picked a starter'], ['picked', 'Clicked on from a mock'],
   ['own', 'Own prompt'], ['limit', 'Hit the limit'], ['asked', 'Asked for a code'], ['verified', 'Verified']]
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
