@@ -90,7 +90,7 @@ describe('public mode', () => {
     const cfg = await (await ana.get('/api/config')).json()
     expect(cfg).toMatchObject({ public: true, defaultModel: 'claude-haiku-5.5' })
     expect(cfg.models.map((m: any) => m.id)).toEqual(['claude-haiku-5.5'])
-    expect(cfg.starters.length).toBe(8)
+    expect(cfg.starters.length).toBe(7)
     // The owner sees every model, and has no meter.
     const owner = await (await fetch(url('/api/config'), { headers: OWNER })).json()
     expect(owner.models.length).toBeGreaterThan(1)

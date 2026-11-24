@@ -3,7 +3,7 @@
 
 import { dirname, join, resolve } from 'node:path'
 import {
-  BOX_TITLES, DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, ScreenCache, canonicalAction, isComponent, isDevice, isModelId, normalizePrompt,
+  BOX_TITLES, DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, OFFERED_DEVICES, ScreenCache, canonicalAction, isComponent, isDevice, isModelId, normalizePrompt,
   screenKey, screenRef, STARTERS, VISIT_EVERY, startersCurrent, warmUp, zip, type BoxName, type Io,
 } from '@uxwoz/core'
 import { accountRoutes, startAsks } from './account.ts'
@@ -194,7 +194,7 @@ export function createServer(opts: ServerOptions = {}) {
           models: Object.values(MODELS).filter((m) => !m.background && (!one || m.id === PUBLIC_MODEL)).map((m) => ({ id: m.id, label: m.label, costEstimated: m.costEstimated })),
           themes: Object.entries(THEMES).map(([id, label]) => ({ id, label })),
           defaultTheme: 'mockup',
-          devices: Object.entries(DEVICES).map(([id, d]) => ({ id, label: d.label, width: d.width })),
+          devices: OFFERED_DEVICES.map((id) => ({ id, label: DEVICES[id].label, width: DEVICES[id].width })),
           defaultDevice: DEFAULT_DEVICE,
           ...(pub && { public: true, starters: STARTERS }),
           ...(warning && { warning }),

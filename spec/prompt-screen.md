@@ -10,7 +10,7 @@ Every user message starts with the paper, then names one job. A click on *Histor
 
 ```
 App: NiceSnore: a snore app with recording as main function ...
-Device: a phone screen, 390 px wide.
+Device: a phone screen, 360 × 500 px; the screen scrolls inside it, and a bar pinned to its bottom stays in view.
 
 Screens, the first screen first (id: what it is for):
 home: the first screen
@@ -46,17 +46,24 @@ The jobs, each after the paper:
   before *Draw this screen*: in the system prompt Haiku ignored it (0 of 6 designs showed AI), here
   it followed it (6 of 6), and then put AI on nearly every screen, two on some. Its second sentence
   fixed that: 10 of 16 app designs showed AI, never two on one screen, and plain lists stayed plain.
-  Edit and File do not carry it. One side of an A OR B (a random
-  one) adds: *Design this as a clearly different alternative to the obvious layout: arrange this
-  screen's content another way, not just the wording.* Regenerate sends the screen's first request,
-  without that line.
+  Edit and File do not carry it. Another adds: *Design this as a clearly different alternative to
+  the obvious layout: arrange this screen's content another way, not just the wording.* (one side
+  of an A OR B in a mockup made before adds it too). Draw again sends the screen's request with
+  the new words, without that line.
+- **Device**: the paper's second line names the mockup's size and says the screen scrolls inside
+  it, so a model draws for a frame of fixed size: *a phone screen, 360 × 500 px* (Small phone),
+  *a phone screen, 412 × 620 px* (Large phone), *a laptop browser window, 1280 × 560 px*, *a large
+  monitor's browser window, 1920 × 780 px*, each followed by *; the screen* (or *the page*)
+  *scrolls inside it, and a bar pinned to its bottom stays in view*. A mockup made before keeps its
+  old line: *a phone screen, 390 px wide* or *a desktop browser window, 1024 px wide*.
 - **Edit**: *The screen as it is now, history (...):* and its HTML, then *Reply with the HTML of this
   screen again with one change; keep everything else as it is, including its data-action links and
   pasted components. The change: ...*
   A component's Edit says *component* in place of *screen*.
-- **File**: *The decision, on the screen history (...).* Then the chosen variant with its block
-  elements numbered (`data-part="N"`), and the other variant, or after an Edit the typed change. It
-  ends with *File what this decision settles.*
+- **File**: *The decision, on the screen history (...).* Then the design the user kept, with its
+  block elements numbered (`data-part="N"`), and after an Edit the typed change. It ends with
+  *File what this decision settles.* An open A OR B in a mockup made before also sends the other
+  variant, the one the user did not pick.
 - **Visit**: *The screens added or changed since your last visit, N of them:* and each one as
   `--- id (its line)` with its parts numbered (every screen on the first visit). It ends with
   *Visit the paper as the overnight fixer.*
@@ -73,7 +80,7 @@ The manual comes first, as it is in
 reply follows: the HTML and Pico rules kept from the benchmark prompt, links by `@id`, the paste
 markup, and the filing and visit lines the paper test settled. The visit's last two sentences
 came from the app: without them Terra asked for 11 redraws on a real paper, and wrote lines over
-the 120 characters code takes. Code sets every screen to the device's width.
+the 120 characters code takes. Code sets every screen to its mockup's frame.
 
 ```text
 # Lean UI canvas manual
