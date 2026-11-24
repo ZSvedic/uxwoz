@@ -25,8 +25,12 @@ export function button(text: string, title: string, run: () => void, cls = 'box-
   return b
 }
 
-/** Text the user types in place: Enter or leaving the field saves it, Esc puts it back. */
+/** The boxes shown are the tour's: nothing in them can be typed into. */
+let readOnly = false
+
+/** Text the user types in place: Enter or leaving the field saves it, Esc puts it back. Plain text in the tour. */
 function editable<E extends HTMLElement>(e: E, save: (text: string) => void): E {
+  if (readOnly) return e
   e.contentEditable = 'plaintext-only'
   e.spellcheck = false
   const was = () => e.dataset.was ?? ''
@@ -89,7 +93,8 @@ export const countLabel = (n: number, name: Box) => name === 'notes' ? `${n} vis
 export const markBox = (side: ReturnType<typeof createSide>, current: Box | null) => { for (const [name, s] of Object.entries(side.sections)) s.classList.toggle('current', name === current) }
 
 /** Draw the boxes' headers, the rules, the tables and the fixer's notes. A box the user is typing in is left alone. */
-export function renderSide(side: ReturnType<typeof createSide>, v: { boxes: Boxes; components: CacheEntry[]; current: Box | null }, op: (o: BoxOp) => void) {
+export function renderSide(side: ReturnType<typeof createSide>, v: { boxes: Boxes; components: CacheEntry[]; current: Box | null; tour?: boolean }, op: (o: BoxOp) => void) {
+  readOnly = !!v.tour
   const visits = [...v.boxes.visits ?? []].reverse()
   markBox(side, v.current)
   for (const name of BOXES) {

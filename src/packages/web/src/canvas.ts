@@ -33,7 +33,7 @@ const MAX_REAL = 1.5
 const FAR = 0.5
 /** The glide to another mock or box, in ms. */
 const GLIDE_MS = 600
-/** A narrow window (a phone); the drawer closes after an Edit there. */
+/** A narrow window (a phone). */
 export const PHONE = '(max-width: 720px)'
 
 /** The room kept between a mock and the stage's edge: thin on a phone, where a mock fills the window. */

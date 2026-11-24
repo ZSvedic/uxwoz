@@ -30,3 +30,21 @@
 .account-card a { color: inherit; }
 @media (max-width: 719px) { .generate.generate { top: 8px; max-height: calc(100% - 16px); } }
 .gen-row { display: flex; gap: 8px; } .gen-row:empty { display: none; }
+/* The menu panel's pages (Share, Feedback, sharing.ts): the menu's rows give way to the page, with ← back to them. */
+.side-menu.paged > :not(.side-head, .menu-page) { display: none; }
+.menu-page, .page-body { display: flex; flex-direction: column; gap: 8px; }
+.menu-page { padding: 0 6px; }
+.page-head { display: flex; align-items: center; gap: 4px; margin-left: -6px; }
+.page-head .back { width: auto; font-size: 18px; }
+.page-head h2 { margin: 0; font-size: 19px; font-weight: 600; }
+.menu-page .primary { align-self: flex-start; padding: 6px 18px; border-radius: 99px; box-shadow: var(--pick-shadow); }
+/* The Share and Feedback pages: links per role, then the feedback by mock and the trips. */
+.share-pane select { width: 100%; }
+.share-pane select, .share-pane input { font: inherit; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--field); color: var(--text); }
+.share-cap input { width: 5em; }
+.share-links, .feedback { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.share-link .share-url { display: block; width: 100%; margin: 4px 0; font-size: 12px; }
+.share-link button { margin-right: 6px; }
+.share-pane h4 { margin: 8px 0 0; font-size: 13px; }
+.share-pane small, .share-pane .none { color: var(--muted); }
+.share-pane li.none { list-style: none; }

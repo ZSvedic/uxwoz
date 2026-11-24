@@ -1,5 +1,5 @@
 // The browser side: builds the canvas and the boxes beside it, opens and closes projects and the tour, and starts the
-// page. screens.ts, nav.ts, drawer.ts, bar.ts, menu.ts and net.ts do the rest; state.ts holds what they share.
+// page. screens.ts, nav.ts, cards.ts, bar.ts, menu.ts and net.ts do the rest; state.ts holds what they share.
 // Those modules import each other in a circle, so the code at their top level (listeners, loops) may use only
 // its own module and state.ts; anything else waits inside a function. Bun's dev server fails the page otherwise.
 

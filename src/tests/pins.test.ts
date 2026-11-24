@@ -1,7 +1,7 @@
 // The pins' helpers: the anchor a comment sends its frame, and the pin numbers of a screen's comments.
 import { expect, test } from 'bun:test'
 import type { Feedback } from '@uxwoz/core'
-import { anchorOf, dayOf, numbered, partLabel, SHARE_REFRESH_MS, trailOf, whereOf, whileOpen } from '../packages/web/src/pins.ts'
+import { anchorOf, dayOf, inLayer, numbered, partLabel, playerFit, SHARE_REFRESH_MS, trailOf, whereOf, whileOpen } from '../packages/web/src/pins.ts'
 
 const f = (id: string, at: string, more: Partial<Feedback> = {}): Feedback =>
   ({ id, at, visitor: 'v', name: 'Ana', screen: 's', title: 'Home', kind: 'comment', text: id, ...more })
@@ -42,4 +42,23 @@ test('the Share pane reads its list again only while it is open', () => {
   tick(); tick()
   expect(loads).toBe(2)
   expect(SHARE_REFRESH_MS).toBe(10_000)
+})
+
+test('a pin hides while its part is scrolled outside the frame\'s view, and shows when any of it is inside', () => {
+  const spot = (y: number, h = 40) => ({ id: 'a', x: 10, y, w: 100, h })
+  expect(inLayer(spot(100), 360, 500)).toBe(true)
+  expect(inLayer(spot(480), 360, 500)).toBe(true) // half in view at the bottom
+  expect(inLayer(spot(-30), 360, 500)).toBe(true) // half in view at the top
+  expect(inLayer(spot(-40), 360, 500)).toBe(false) // scrolled above the frame
+  expect(inLayer(spot(500), 360, 500)).toBe(false) // still below it
+  expect(inLayer({ id: 'b', x: 400, y: 10, w: 20, h: 20 }, 360, 500)).toBe(false)
+})
+
+test('the player\'s frame has the mock\'s size, old sizes too, and a mock wider than the window shrinks to fit', () => {
+  expect(playerFit('small-phone', 1248)).toEqual({ w: 360, h: 500, k: 1 })
+  expect(playerFit('laptop', 1248)).toEqual({ w: 1280, h: 560, k: 1248 / 1280 })
+  expect(playerFit('laptop', 358).k).toBeCloseTo(358 / 1280)
+  expect(playerFit('phone', 1000)).toEqual({ w: 390, h: 844, k: 1 })
+  expect(playerFit('desktop', 512)).toEqual({ w: 1024, h: 768, k: 0.5 })
+  expect(playerFit(undefined, 1000)).toEqual({ w: 800, h: 800, k: 1 })
 })

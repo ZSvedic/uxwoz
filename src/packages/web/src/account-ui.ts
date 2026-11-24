@@ -258,7 +258,7 @@ export function needsAccount(what: 'share' | 'export'): boolean {
 }
 
 /**
- * A refused request (net.ts, drawer.ts): the card opens, or the red pill says the server's words alone, and `me`
+ * A refused request (net.ts, cards.ts): the card opens, or the red pill says the server's words alone, and `me`
  * loads again. True when it was handled here.
  */
 export function refused(status: number, body: { error?: string; reason?: string } | null): boolean {

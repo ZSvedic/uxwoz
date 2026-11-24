@@ -136,7 +136,7 @@ export async function stream(url: string, body: object, what: string, on: (ev: S
   state.busy?.abort()
   const ctrl = new AbortController()
   state.busy = ctrl
-  draw() // rails and the drawer wait while busy
+  draw() // the buttons and the cards wait while busy
   let failed = false, answered = false
   try {
     const css = await themeCss(state.theme)

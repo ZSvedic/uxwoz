@@ -35,8 +35,6 @@ export const state = {
   revising: null as { key: string; change: string | null } | null,
   /** The card the current mock, box or component shows flipped over (cards.ts), and the comment Info rings. */
   flip: null as Tool | null,
-  /** Left for sharing.ts until its rework lands: never set. */
-  drawer: null as 'share' | null,
   busy: null as AbortController | null,
   /** Counts mockups opened, so a slower earlier open gives way to a newer one. */
   starts: 0,

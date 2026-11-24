@@ -103,15 +103,14 @@ src/packages/web/src/
   cards.ts       browser: the cards a mock, a box or a component flips to in place (Edit with Delete asked in the card,
                  History with Undo, Redo and a tap on a version, Info, Describe it differently behind `hooks.describe`),
                  the buttons under the current box, a component current in its box (`focusComponent`), `boxOp`,
-                 `focusBox`, `lookAt`, `unseen`, Export the boxes; drawer.ts is a shim for sharing.ts until it imports
-                 `renderCards` from here
+                 `focusBox`, `lookAt`, `unseen`, Export the boxes
   flip.ts        what the cards say, no DOM (tested): History's rows and marks, Undo and Redo live, when 🎲 asks for new
                  words, Info's fields (mock, component, box), each box's buttons
   bar.ts         browser: the top bar (logo, ← name →, the boxes while they fit, − zoom + ⛶), the name's dropdown
                  (the boxes, the sentence, the tree), the zoom menu and its keys, `closeMenus`, `renderToolbar`;
                  `treeRows`, `sizeFor` (Design for's start), `boxesFit` with no DOM (tested); the page's parts come in at `initBar`
   menu.ts        browser: the menu panel from the logo (New project, Recent, Tour, This project, Theme, Sound, the
-                 account's line, Model in the private app, Privacy), Export project with its hint; New project (the
+                 account's line, Model in the private app, Privacy; Share and Feedback pages are sharing.ts's), Export project with its hint; New project (the
                  examples first for a newcomer, the prompt box, Design for, Draw it; also on `uxwoz:new-project`)
   net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill, the brief hint,
                  the note while a design is drawn (`note`), and the hint that stays (after a live design, until the next click or key)
@@ -141,16 +140,19 @@ src/packages/web/src/
   share.ts       share links per role, the player's map, feedback (a name first; a visitor's own; Resolve) and
                  trips, an edit link's scope and cap (a settle that files counts), the owner's gate (UXWOZ_OWNER), the
                  tour refused; `guard` wraps server.ts's routes
-  sharing.ts     browser: the drawer's Share and feedback pane (a comment jumps to it), a screen's thumbs in Info,
-                 an edit link's token on every API call
+  sharing.ts     browser: the menu panel's Share and Feedback pages (`showPage`, ← back to the menu; a comment
+                 closes the panel, makes its mock current and calls `commentHook.showComment`, which is comments.ts's
+                 `jump`), a mock's thumbs in Info, an edit link's token on every API call
   comments.ts    browser: the owner's comments: pins over every drawn mock with open ones (parts scrolled `away` count as
                  found), the comments at the end of Info with Resolve and Reopen, their count on ℹ️, the jump to a comment
                  from its pin or Feedback (`jump`: Info flips open at it, ringed)
-  player.html, player.ts   the player at /s/<token>: one screen in its device frame, Back, the trail, the name card,
-                 comments pinned to parts in the margin beside the screen, thumbs, Done, trips
+  player.html, player.ts   the player at /s/<token>: one mock in a frame of its size that scrolls inside (shrunk
+                 to fit a narrower window), Back, the trail, the name card, comments pinned to parts (asked again on
+                 every `scroll`) in the margin beside the mock, thumbs, Done, trips, `open` in a new tab
   pins.ts        browser: a comment's anchor, the pin numbers of a screen's comments, the layer of pins over a frame
                  (the player's and the app's), the rows of the owner's Comments tab, a part's label, the player's
-                 trail, a link's day, the Share pane's refresh (no DOM, tested)
+                 trail, a link's day, the Share page's refresh, `inLayer` (a pin scrolled out of view hides),
+                 `playerFit` (the player's frame size) (no DOM, tested)
   index.html     the page around the canvas; links design/index.css
   design/        the look: tokens.css (every colour), base.css (shared by parts), one file per part (bar,
                  canvas, boxes, cards, panel), motion.css; index.css imports them all; fx.ts (the speaker and the whoosh);

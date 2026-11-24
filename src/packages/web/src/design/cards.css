@@ -40,7 +40,7 @@
 .info dd { margin: 0; overflow-wrap: anywhere; }
 
 /* Comments at the end of Info: a card each, with its pin's gold dot; the resolved ones muted; a gold ring when its
-   pin was tapped. In Feedback a comment is a plain-looking button to it. */
+   pin was tapped. On the Feedback page a comment is a plain-looking button to it. */
 .comments { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
 .comments li { padding: 10px 12px; border: 2px solid var(--border); border-radius: 14px; overflow-wrap: anywhere; outline: none; }
 .comments li.ring { box-shadow: 0 0 0 3px var(--current); }

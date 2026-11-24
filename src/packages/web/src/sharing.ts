@@ -1,11 +1,12 @@
-// Sharing, the owner's side: the drawer's Share pane (a link per role, copy, revoke, the cap used) and the
-// feedback that came back, grouped by screen (a comment jumps to it in Comments), with the trips. An edit link opens this app on one mockup:
-// every API call then carries its token.
+// Sharing, the owner's side: the menu panel's Share page (a link per role, copy, revoke, the cap used) and its
+// Feedback page (what came back, by mock; a comment shows it on its mock), with the trips. An edit link opens this app
+// on one project: every API call then carries its token.
 
 import type { Feedback, Share, Trip } from '@uxwoz/core'
 import { button, el } from './boxes.ts'
 import { jump, relocate } from './comments.ts'
-import { openDrawer, renderDrawer } from './drawer.ts'
+import { renderCards } from './cards.ts'
+import { setCurrent } from './nav.ts'
 import { hint, post, showError } from './net.ts'
 import { labelOf } from './screens.ts'
 import { closeMenus } from './bar.ts'
@@ -13,7 +14,7 @@ import { needsAccount } from './account-ui.ts'
 import { $, state } from './state.ts'
 import { dayOf, SHARE_REFRESH_MS, whileOpen } from './pins.ts'
 
-/** The edit link this page was opened by, if any: the app then shows its one mockup, without the project menu. */
+/** The edit link this page was opened by, if any: the app then shows its one project, without New project. */
 export const shareToken = location.pathname.match(/^\/s\/([a-f0-9]+)/)?.[1] ?? null
 if (shareToken) {
   const plain = window.fetch.bind(window)
@@ -24,11 +25,11 @@ if (shareToken) {
     headers.set('x-uxwoz-share', shareToken)
     return plain(input, { ...init, headers })
   }) as typeof fetch
-  $('projectButton').hidden = true
-  $('menuNew').hidden = true
+  // An edit link has no New project, and no links or feedback of its own.
+  for (const id of ['menuNew', 'shareMenu', 'feedbackMenu']) $(id).hidden = true
 }
 
-/** The mockup an edit link opens. */
+/** The project an edit link opens. */
 export async function editLinkApp(): Promise<string | null> {
   const res = await fetch(`/api/s/${shareToken}/map`)
   if (!res.ok) { showError('This link does not work any more.'); return null }
@@ -38,33 +39,58 @@ export async function editLinkApp(): Promise<string | null> {
 type Link = Share & { url: string }
 let shared: { app: string; shares: Link[]; feedback: Feedback[]; trips: Trip[] } | null = null
 
-/** The open mockup's links and feedback from the server; the drawer shows them once they come. */
+/** The open project's links and feedback from the server; the open page and a flipped card show them once they come. */
 export async function loadShared() {
   const app = state.app
   if (!app || shareToken) return
   const res = await fetch(`/api/shares?app=${encodeURIComponent(app)}`).catch(() => null)
   if (!res?.ok || app !== state.app) return
   const got = { app, ...await res.json() }
-  // A list read again with nothing new leaves the pane as it is (a half-made choice of role, the scroll).
+  // A list read again with nothing new leaves the page as it is (a half-made choice of role, the scroll).
   if (JSON.stringify(got) === JSON.stringify(shared)) return
   shared = got
-  renderDrawer()
+  renderPage()
+  renderCards()
   relocate()
 }
 const mine = () => (shared && shared.app === state.app ? shared : null)
-/** The open mockup's feedback, as last loaded. */
+/** The open project's feedback, as last loaded. */
 export const feedbackOf = (): Feedback[] => mine()?.feedback ?? []
-/** Whether the open mockup has share links or feedback: then its screens have a Comments tab. */
+/** Whether the open project has share links or feedback. */
 export const isShared = () => { const s = mine(); return !!s && (s.shares.length > 0 || s.feedback.length > 0) }
 
-// The open pane reads its list again when the tab gets focus and every 10 seconds: a comment that came in shows.
-const refresh = whileOpen(() => state.drawer === 'share' && !$('drawer').hidden, () => { loadShared() })
+/** A comment in Feedback was chosen: its mock is current; it flips to Info at that comment (comments.ts's `jump`). */
+export const commentHook = { showComment: (key: string, id: string) => jump(key, id) }
+
+// ---- The two pages of the menu panel
+
+const panel = $('menuPanel')
+type Page = 'share' | 'feedback'
+/** The page the panel shows, or null for the menu. */
+let page: Page | null = null
+
+/** Turn the panel to a page; null turns it back to the menu. */
+export function showPage(p: Page | null) {
+  page = p
+  panel.classList.toggle('paged', !!p)
+  $('menuPage').hidden = !p
+  if (!p) return panel.querySelector<HTMLElement>('.item')?.focus({ preventScroll: true })
+  $('menuPageTitle').textContent = p === 'share' ? 'Share' : 'Feedback'
+  renderPage()
+  loadShared()
+  $('menuPageBack').focus({ preventScroll: true })
+}
+$('menuPageBack').addEventListener('click', () => showPage(null))
+const pageOpen = () => !!page && !panel.hidden
+
+// The open page reads its list again when the tab gets focus and every 10 seconds: a comment that came in shows.
+const refresh = whileOpen(pageOpen, () => { loadShared() })
 setInterval(refresh, SHARE_REFRESH_MS)
 addEventListener('focus', refresh)
 
-/** The role and budget being chosen, kept when the pane draws again. */
+/** The role and budget being chosen, kept when the page draws again. */
 const making = { role: 'comment', cap: '20' }
-const ROLE_NAMES = { view: 'View: click through', comment: 'Comment: click through and leave feedback', edit: 'Edit: change this mockup' }
+const ROLE_NAMES = { view: 'View: click through', comment: 'Comment: click through and leave feedback', edit: 'Edit: change this project' }
 const when = (at: string) => new Date(at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
 const thumbsOf = (list: Feedback[]) => {
   const up = list.filter((f) => f.kind === 'thumb' && f.up).length, down = list.filter((f) => f.kind === 'thumb' && !f.up).length
@@ -72,9 +98,9 @@ const thumbsOf = (list: Feedback[]) => {
 }
 /** One line of feedback: what was said, about which part or at which dead control (an old answer, or a comment with its label). */
 const lineOf = (f: Feedback) => f.kind === 'dead' || f.label ? `At "${f.label || 'a control'}" expected: ${f.text}` : `${f.text}${f.about ? ` (about: ${f.about})` : ''}`
-const screenTitle = (key: string, title: string) => { const e = state.entries.get(key); return e?.versions.length ? labelOf(e) : title || 'A deleted screen' }
+const mockTitle = (key: string, title: string) => { const e = state.entries.get(key); return e?.versions.length ? labelOf(e) : title || 'A deleted mock' }
 
-/** The Info tab's row for a screen: its thumbs (its comments are in Comments). */
+/** The Info row for a mock: its thumbs (its comments are listed apart). */
 export function screenFeedback(key: string): [string, string][] {
   const t = thumbsOf(feedbackOf().filter((f) => f.screen === key))
   return t ? [['Thumbs', t]] : []
@@ -83,51 +109,63 @@ export function screenFeedback(key: string): [string, string][] {
 /** A trip in one line: "Ana: Home → Nights → Settings, 1 dead click (Export)". */
 export const tripLine = (t: Trip) => `${t.name}: ${t.screens.join(' → ') || 'nothing yet'}${t.dead.length ? `, ${t.dead.length} dead click${t.dead.length === 1 ? '' : 's'} (${t.dead.join(', ')})` : ''}`
 
-/** The Share pane: make a link, the links, then the feedback by screen (newest first) and the trips. */
-export function renderShare() {
-  $('drawerName').textContent = 'Share and feedback'
+function renderPage() {
+  if (!page) return
+  $('menuPageBody').replaceChildren(...page === 'share' ? sharePage() : feedbackPage())
+}
+
+/** Share: make a link, then the links. */
+function sharePage(): HTMLElement[] {
   const s = mine()
   const role = el('select')
   for (const [id, label] of Object.entries(ROLE_NAMES)) role.add(new Option(label, id))
   role.value = making.role
   const cap = el('input')
-  Object.assign(cap, { type: 'number', min: '1', max: '1000', value: making.cap, title: 'How many new screens and changes this link may ask for: they cost your credits' })
-  const capRow = el('label', 'share-cap', 'Budget: ', cap, ' new screens and changes')
+  Object.assign(cap, { type: 'number', min: '1', max: '1000', value: making.cap, title: 'How many new mocks and changes this link may ask for: they cost your credits' })
+  const capRow = el('label', 'share-cap', 'Budget: ', cap, ' new mocks and changes')
   capRow.hidden = role.value !== 'edit'
   role.addEventListener('change', () => { making.role = role.value; capRow.hidden = role.value !== 'edit' })
   cap.addEventListener('input', () => { making.cap = cap.value })
-  const make = button('Make a link', 'Make a new link with this role', () => makeLink(role.value, Number(cap.value)), 'primary')
+  const make = button('Make a link', 'Make a new link with this role (it is copied)', () => makeLink(role.value, Number(cap.value)), 'primary')
   const links = (s?.shares ?? []).map((x) => el('li', 'share-link',
     el('b', '', x.role), ` · made ${dayOf(x.createdAt)} · opened ${x.opens}×${x.cap ? ` · ${x.used} of ${x.cap} used` : ''}`,
     el('input', 'share-url'), button('Copy', 'Copy the link', () => copy(x.url)), button('Revoke', 'This link stops working', () => revoke(x.token))))
   links.forEach((li, i) => Object.assign(li.querySelector('input')!, { value: s!.shares[i]!.url, readOnly: true }))
+  return [role, capRow, make, el('ul', 'share-links', ...links.length ? links : [el('li', 'none', 'No links yet')])]
+}
 
-  // Feedback by screen, the screen with the newest first; the closing answers and the trips after.
+/** Feedback: by mock, the mock with the newest first; the closing answers and the trips after. */
+function feedbackPage(): HTMLElement[] {
+  const s = mine()
   const all = s?.feedback ?? []
   const groups = new Map<string, Feedback[]>()
   for (const f of [...all].reverse()) if (f.kind !== 'done') groups.set(f.screen, [...groups.get(f.screen) ?? [], f])
   const done = all.filter((f) => f.kind === 'done').reverse()
   const said = (f: Feedback) => el('li', '', el('b', '', f.name), `: ${lineOf(f)}`, el('small', '', ` ${when(f.at)}`))
-  // A comment on a drawn screen is a button to it in Comments.
+  // A comment on a drawn mock is a button to it; one on a deleted mock stays a plain line.
   const comment = (f: Feedback) => {
     if (!state.entries.get(f.screen)?.versions.length) return said(f)
-    const b = button('', 'Show this comment on its screen', () => jump(f.screen, f.id), 'jump')
+    const b = button('', 'Show this comment on its mock', () => showOnMock(f.screen, f.id), 'jump')
     b.append(el('b', '', f.name), `: ${lineOf(f)}`, el('small', '', ` ${when(f.at)}`))
     return el('li', '', b)
   }
   const feedback = [...groups].flatMap(([key, list]) => [
-    el('h4', '', screenTitle(key, list[0]!.title), thumbsOf(list) ? el('small', '', `  ${thumbsOf(list)}`) : ''),
+    el('h4', '', mockTitle(key, list[0]!.title), thumbsOf(list) ? el('small', '', `  ${thumbsOf(list)}`) : ''),
     el('ul', 'feedback', ...list.filter((f) => f.kind !== 'thumb').map(comment)),
   ])
-  $('sharePane').replaceChildren(
-    el('h3', '', 'Share this mockup'), role, capRow, make,
-    el('ul', 'share-links', ...links.length ? links : [el('li', 'none', 'No links yet')]),
-    el('h3', '', 'Feedback'),
+  const trips = (s?.trips ?? []).slice().reverse()
+  return [
     ...feedback.length ? feedback : [el('p', 'none', 'Nothing yet. Send a comment link to a reviewer.')],
     ...done.length ? [el('h4', '', 'Would you use this?'), el('ul', 'feedback', ...done.map(said))] : [],
-    el('h3', '', 'Trips'),
-    el('ul', 'feedback', ...(s?.trips ?? []).slice().reverse().map((t) => el('li', '', tripLine(t), el('small', '', ` ${when(t.at)}`)))),
-  )
+    ...trips.length ? [el('h4', '', 'Trips'), el('ul', 'feedback', ...trips.map((t) => el('li', '', tripLine(t), el('small', '', ` ${when(t.at)}`))))] : [],
+  ]
+}
+
+/** A comment chosen in Feedback: the panel closes, its mock is current, and the cards show the comment. */
+function showOnMock(key: string, id: string) {
+  closeMenus()
+  setCurrent(key)
+  commentHook.showComment(key, id)
 }
 
 async function makeLink(role: string, cap: number) {
@@ -147,10 +185,8 @@ function copy(url: string) {
   navigator.clipboard?.writeText(url).then(() => hint('Link copied'), () => {})
 }
 
-/** Share… and Feedback in the project menu open the pane. */
-for (const id of ['shareMenu', 'feedbackMenu']) $(id).addEventListener('click', () => {
-  closeMenus()
-  if (needsAccount('share')) return
-  openDrawer('share')
-  if (id === 'feedbackMenu') requestAnimationFrame(() => $('sharePane').querySelector('h3:nth-of-type(2)')?.scrollIntoView())
+/** Share… and Feedback in the menu turn the panel to their page. */
+for (const [id, p] of [['shareMenu', 'share'], ['feedbackMenu', 'feedback']] as const) $(id).addEventListener('click', () => {
+  if (needsAccount('share')) return closeMenus()
+  showPage(p)
 })

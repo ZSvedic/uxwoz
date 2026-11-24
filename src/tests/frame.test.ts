@@ -239,14 +239,14 @@ describe('a mock scrolls inside its frame', () => {
     expect([...scripted.sent, ...streaming.sent, ...taken.sent].filter((m) => m.uxwoz === 'open')).toEqual([])
   })
 
-  test('located leaves out a part scrolled outside the frame\'s view', () => {
+  test('located leaves out a part scrolled outside the frame\'s view, and names it in away', () => {
     const shown = new El('BUTTON', {}, 'Save', { left: 10, top: 400, width: 80, height: 30 })
     const below = new El('BUTTON', {}, 'Delete', { left: 10, top: 900, width: 80, height: 30 })
     const above = new El('H2', {}, 'Title', { left: 10, top: -60, width: 80, height: 30 })
     const f = fakeFrame({ parts: [shown, below, above] })
     const anchors = [{ id: 1, text: 'Save', tag: 'button', nth: 0 }, { id: 2, text: 'Delete', tag: 'button', nth: 0 }, { id: 3, text: 'Title', tag: 'h2', nth: 0 }]
     f.fire('message', { source: f.parent, data: { uxwoz: 'locate', n: 4, anchors } })
-    expect(f.of('located')).toEqual([{ uxwoz: 'located', n: 4, spots: [{ id: 1, x: 10, y: 400, w: 80, h: 30 }] }])
+    expect(f.of('located')).toEqual([{ uxwoz: 'located', n: 4, spots: [{ id: 1, x: 10, y: 400, w: 80, h: 30 }], away: [2, 3] }])
   })
 
   test('the keys passed on: zoom keys, Esc and ⇧1, not ⇧2 or ⇧3', () => {
