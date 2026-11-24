@@ -90,7 +90,7 @@ describe('desks', () => {
     expect(server!.desks.open()).toEqual([])
     const file = join(dir, `${ANA}.json`)
     expect(existsSync(file)).toBe(true)
-    expect(JSON.parse(readFileSync(file, 'utf8')).version).toBe(5)
+    expect(JSON.parse(readFileSync(file, 'utf8')).version).toBe(6)
     // Her next request opens it again, with her mockup.
     expect(await apps(ANA)).toEqual([APP])
     expect(await home(ANA)).toBe(true)

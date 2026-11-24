@@ -19,9 +19,9 @@ export interface Boxes {
   rules: Rule[]
   data: Table[]
   gone: Record<BoxName, string[]>
-  /** The fixer's notes, oldest first (the last 20), and the picks so far. */
+  /** The fixer's notes, oldest first (the last 20), and the screens settled for the first time so far (`picks` in a version 5 file). */
   visits?: Visit[]
-  picks?: number
+  settled?: number
 }
 
 /** A filing: when, on which screen, what it added, changed and refused, its time and cost. */
@@ -138,10 +138,13 @@ export class ScreenCache extends ScreenCacheBase {
       const why = !now ? null : u.drop === 'components' ? this.removeComponent(app, u.id) : this.setBox(app, 'delete', u.drop, { id: u.id }, 'user')
       if (why) return why
     } else {
+      // The redraw's version goes, from History too (Redo's list); the last version is never dropped.
       const e = this.entries.get(u.key), n = e?.versions.findIndex((v) => v.createdAt === u.createdAt) ?? -1
-      if (e && n >= 0 && e.versions.length > 1) {
+      const r = e?.redo?.findIndex((v) => v.createdAt === u.createdAt) ?? -1
+      if (e && (r >= 0 || (n >= 0 && e.versions.length > 1))) {
         if (isComponent(e)) this.keep(e.app, 'components')
-        e.versions.splice(n, 1)
+        if (r >= 0) e.redo!.splice(r, 1); else e.versions.splice(n, 1)
+        if (!e.redo?.length) delete e.redo
       }
     }
     c.undone = true

@@ -35,7 +35,7 @@ async function drawAndPick(d: Desk, action: string | null, side: number, from?: 
   const replayed = d.replayed('/api/pick', body)
   const entry = d.cache.pick(key, side)!
   const filing = d.file(key, { other: 'the other' })
-  const visiting = d.cache.boxesOf(APP).picks! % VISIT_EVERY === 0 && !d.visit(APP)
+  const visiting = d.cache.boxesOf(APP).settled! % VISIT_EVERY === 0 && !d.visit(APP)
   await d.idle(APP)
   return { evs, entry, filing, visiting, replayed }
 }
@@ -94,7 +94,7 @@ describe('a starter replays its recording', () => {
       expect([r.replayed, r.filing, r.visiting]).toEqual([true, false, false])
       last = r.entry
     }
-    expect(d.cache.boxesOf(APP).picks).toBe(VISIT_EVERY)
+    expect(d.cache.boxesOf(APP).settled).toBe(VISIT_EVERY)
     expect(d.cache.boxesOf(APP).visits ?? []).toEqual([])
     expect(d.calls).toEqual([])
   })

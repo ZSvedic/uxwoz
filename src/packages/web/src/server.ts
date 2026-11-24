@@ -226,7 +226,7 @@ export function createServer(opts: ServerOptions = {}) {
           // Filing reads the pick in the background, and every 5th pick the fixer visits after it;
           // the page learns of both from /api/map?wait=1.
           const filing = file(key, { other: other ?? '(none: it failed)' })
-          return json({ entry, filing, visiting: cache.boxesOf(entry.app).picks! % VISIT_EVERY === 0 && !visit(entry.app) })
+          return json({ entry, filing, visiting: cache.boxesOf(entry.app).settled! % VISIT_EVERY === 0 && !visit(entry.app) })
         }),
       },
       '/api/revise': {

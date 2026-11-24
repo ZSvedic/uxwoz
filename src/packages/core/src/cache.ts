@@ -4,7 +4,7 @@
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { canonicalAction, nameWords, normalizePrompt, screenKey, screenRef } from './keys.ts'
+import { VERSIONS, canonicalAction, nameWords, normalizePrompt, screenKey, screenRef } from './keys.ts'
 import type { Device } from './frame.ts'
 import { HOME_NAME, isComponent, screenTree } from './tree.ts'
 import type { ModelId } from './models.ts'
@@ -29,6 +29,8 @@ export interface Version {
   /** The Edit request that made this version; `by` is 'fixer' when a visit asked for it. */
   feedback?: string
   by?: 'fixer'
+  /** The new words of a Draw again that made this version. */
+  prompt?: string
 }
 
 /** The screen and click that first made a screen. */
@@ -44,6 +46,12 @@ export interface CacheEntry {
   parent: Parent | null
   /** Oldest first; the last one shows. Empty while the A OR B is open. */
   versions: Version[]
+  /** After an Undo, the versions newer than the one showing, oldest first; `versions` and `redo` keep VERSIONS together. */
+  redo?: Version[]
+  /** The designs drawn from the current prompt (an Edit is not one). */
+  draws?: number
+  /** The createdAt of the version filing read when the screen was last settled. */
+  settled?: string
   /** The open A OR B, by side; null until a side finishes (or if it failed). */
   proposals?: (Version | null)[]
   /** A component: its ID is `name`, where it belongs is `action`, parent is the screen it came from. */
@@ -88,8 +96,20 @@ function shortId(seed: string, lengths: number[], taken: Set<string>): string {
   }
 }
 
-// Format 5 adds the boxes (and later their states). Files of format 3 and 4 load with empty boxes.
-const FORMAT = 5
+// Format 5 adds the boxes (and later their states); files of format 3 and 4 load with empty boxes. Format 6 has
+// no A OR B: a format 5 one loads as versions [B, A] so A shows, and the boxes count `settled` where they had `picks`.
+const FORMAT = 6
+
+/** An entry from a file before format 6: its open A OR B becomes its versions (B, then A, which shows), and a picked screen counts as filed. Null when no side finished. */
+function fromFormat5(e: CacheEntry): CacheEntry | null {
+  if (!e.proposals) {
+    if (e.versions.length && !e.kind && !e.settled) e.settled = e.versions[0]!.createdAt
+    return e
+  }
+  const sides = e.proposals.filter((v): v is Version => !!v).reverse()
+  delete e.proposals
+  return sides.length ? { ...e, versions: sides, draws: sides.length } : null
+}
 
 /** The screens, the file and the state every part of the cache shares; ScreenCache adds the boxes. */
 export abstract class ScreenCacheBase {
@@ -115,8 +135,14 @@ export abstract class ScreenCacheBase {
       }
       if (!(data?.version >= 3)) throw new Error('it is from before names')
       // A screen from before names with no name yet (an old A OR B) goes; the first screen is home.
-      for (const e of data.entries as CacheEntry[]) if (e.name || e.key === normalizePrompt(e.app)) this.entries.set(e.key, { name: HOME_NAME, ...e })
-      for (const [root, b] of Object.entries(data.boxes ?? {})) this.boxes.set(root, b as Boxes)
+      for (const e of data.entries as CacheEntry[]) {
+        const kept = !(e.name || e.key === normalizePrompt(e.app)) ? null : data.version < FORMAT ? fromFormat5(e) : e
+        if (kept) this.entries.set(kept.key, { name: HOME_NAME, ...kept })
+      }
+      for (const [root, b] of Object.entries(data.boxes ?? {}) as [string, Boxes & { picks?: number }][]) {
+        if (b.picks !== undefined) { b.settled ??= b.picks; delete b.picks }
+        this.boxes.set(root, b)
+      }
       for (const [root, s] of Object.entries(data.states ?? {})) this.states.set(root, s as Record<BoxName, BoxState[]>)
       for (const [root, s] of Object.entries(data.shared ?? {}) as [string, Shared][]) {
         // Feedback from before ids gets one; a second entry with the same words gets its place in the list too.
@@ -212,20 +238,44 @@ export abstract class ScreenCacheBase {
     const v = Number.isInteger(side) ? entry?.proposals?.[side] : null
     if (!entry || !v) return undefined
     entry.versions = [v]
+    entry.draws = 1
+    entry.settled = v.createdAt
     delete entry.proposals
     const b = this.own(entry.app)
-    b.picks = (b.picks ?? 0) + 1
+    b.settled = (b.settled ?? 0) + 1
     this.save()
     return entry
   }
 
+  /**
+   * A new version, shown at once: any `redo` ones go back into `versions` first, and the oldest go past VERSIONS.
+   * One with no `feedback` is a design: Another counts one more in `draws`, a Draw again (`prompt`) starts at 1.
+   */
   addVersion(key: string, version: Version): CacheEntry | undefined {
     const entry = this.entries.get(key)
     if (!entry?.versions.length) return undefined
     if (isComponent(entry)) this.keep(entry.app, 'components', version.feedback ? `Edit of ${entry.name}: ${version.feedback}` : `A new design of ${entry.name}`)
-    entry.versions.push(version)
+    entry.versions.push(...entry.redo ?? [], version)
+    delete entry.redo
+    entry.versions.splice(0, Math.max(0, entry.versions.length - VERSIONS))
+    if (!version.feedback) entry.draws = version.prompt ? 1 : (entry.draws ?? 1) + 1
     this.save()
     return entry
+  }
+
+  /**
+   * Settle a screen the user clicks on from: the version showing is the one filing reads, unless it was filed
+   * already (or is an Edit, which files itself). 'first' the first time (counted in the boxes' `settled`), 'again'
+   * after a new design, null when there is nothing to file.
+   */
+  settle(key: string): 'first' | 'again' | null {
+    const entry = this.entries.get(key), v = entry?.versions.at(-1)
+    if (!entry || !v || isComponent(entry) || entry.settled === v.createdAt || (entry.settled && v.feedback)) return null
+    const first = !entry.settled
+    entry.settled = v.createdAt
+    if (first) { const b = this.own(entry.app); b.settled = (b.settled ?? 0) + 1 }
+    this.save()
+    return first ? 'first' : 'again'
   }
 
   /** Filing put a paste placeholder where a part was: no new version, as the screen looks the same. */
@@ -239,11 +289,21 @@ export abstract class ScreenCacheBase {
     if (e) { e.filed = run; this.save() }
   }
 
-  undo(key: string): CacheEntry | undefined {
+  /**
+   * Show another version: with no `at` the one before the one showing, else the one created `at`, forward or back.
+   * The versions newer than it move to `redo`, so the last of `versions` shows. Undefined when there is no such version.
+   */
+  undo(key: string, at?: string): CacheEntry | undefined {
     const entry = this.entries.get(key)
-    if (!entry || entry.versions.length < 2) return undefined
-    if (isComponent(entry)) this.keep(entry.app, 'components', `You undid a version of ${entry.name}`)
-    entry.versions.pop()
+    if (!entry?.versions.length) return undefined
+    const all = [...entry.versions, ...entry.redo ?? []], showing = entry.versions.length - 1
+    const i = at === undefined ? showing - 1 : all.findIndex((v) => v.createdAt === at)
+    if (i < 0) return undefined
+    if (i === showing) return entry
+    if (isComponent(entry)) this.keep(entry.app, 'components', i < showing ? `You undid a version of ${entry.name}` : `You redid a version of ${entry.name}`)
+    entry.versions = all.slice(0, i + 1)
+    entry.redo = all.slice(i + 1)
+    if (!entry.redo.length) delete entry.redo
     this.save()
     return entry
   }
@@ -288,7 +348,7 @@ export abstract class ScreenCacheBase {
       const a = byRoot.get(root) ?? { app: e.app, screens: 0, updatedAt: '' }
       if (e.key === root && e.mid) a.id = e.mid
       if (!isComponent(e)) a.screens++
-      for (const v of [...e.versions, ...(e.proposals ?? [])]) if (v && v.createdAt > a.updatedAt) a.updatedAt = v.createdAt
+      for (const v of [...e.versions, ...e.redo ?? [], ...(e.proposals ?? [])]) if (v && v.createdAt > a.updatedAt) a.updatedAt = v.createdAt
       byRoot.set(root, a)
     }
     return [...byRoot.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -339,6 +399,34 @@ export abstract class ScreenCacheBase {
     const shared = this.shared.delete(root)
     if (gone.length || boxes || shared) this.save()
     return gone.filter((e) => !isComponent(e)).length
+  }
+
+  /**
+   * Give a mockup a new name: every key of it (its entries and their parents, its boxes, states, share links and
+   * feedback, the fixer's Undo) moves to the new one. Its address IDs (`mid`, `sid`) stay. Throws when another
+   * mockup has that name already.
+   */
+  rename(app: string, newApp: string) {
+    const from = normalizePrompt(app), to = normalizePrompt(newApp)
+    const mine = this.mockup(from)
+    if (!mine.length) throw new Error(`no mockup ${app}`)
+    if (to !== from && ([...this.entries.values()].some((e) => normalizePrompt(e.app) === to) || this.boxes.has(to) || this.states.has(to) || this.shared.has(to))) throw new Error(`a mockup ${newApp} exists already`)
+    const rekey = (k: string) => (k === from || k.startsWith(`${from} » `) ? to + k.slice(from.length) : k)
+    const move = (e: CacheEntry) => { e.key = rekey(e.key); e.app = newApp; if (e.parent) e.parent.key = rekey(e.parent.key) }
+    // A late design for an old key must not bring the old name back.
+    for (const e of mine) if (to !== from) this.tomb(e.key)
+    mine.forEach(move)
+    this.entries = new Map([...this.entries.values()].map((e) => [e.key, e]))
+    const b = this.boxes.get(from), s = this.states.get(from), sh = this.shared.get(from)
+    for (const st of Object.values(s ?? {})) for (const x of st) for (const e of x.list) if ('key' in e) move(e)
+    for (const v of b?.visits ?? []) for (const c of v.changes) {
+      const u = c.undo
+      if (u && 'key' in u) u.key = rekey(u.key)
+      if (u && 'put' in u && 'key' in u.entry) move(u.entry)
+    }
+    for (const f of sh?.feedback ?? []) f.screen = rekey(f.screen)
+    for (const [m, x] of [[this.boxes, b], [this.states, s], [this.shared, sh]] as [Map<string, unknown>, unknown][]) if (x) { m.delete(from); m.set(to, x) }
+    this.save()
   }
 
   /**

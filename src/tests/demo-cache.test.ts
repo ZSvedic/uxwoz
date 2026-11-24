@@ -16,11 +16,12 @@ describe('the demo cache', () => {
     expect(readFileSync(copy, 'utf8')).toBe(readFileSync(DEMO_FILE, 'utf8'))
   })
 
-  test('has the screens, the open A OR B, a planned screen and versions to undo', () => {
+  test('has the screens, two designs of History, a planned screen and versions to undo', () => {
     const { entries, boxes } = cache.map(DEMO_APP)
     const screens = entries.filter((e) => !isComponent(e))
-    expect(screens.filter((e) => e.versions.length).map((e) => e.name)).toEqual(['home', 'habit-detail', 'add-habit', 'stats', 'reminders'])
-    expect(screens.find((e) => e.name === 'history')!.proposals!.every(Boolean)).toBe(true)
+    expect(screens.filter((e) => e.versions.length).map((e) => e.name)).toEqual(['home', 'habit-detail', 'add-habit', 'stats', 'reminders', 'history'])
+    expect(screens.some((e) => e.proposals)).toBe(false)
+    expect(screens.find((e) => e.name === 'history')!).toMatchObject({ draws: 2, versions: [{ idea: 'Weeks as a table' }, { idea: 'Weeks as cards with a bar each' }] })
     expect(plannedScreens(entries).map((e) => e.name)).toEqual(['settings'])
     expect(cache.find(DEMO_APP, '@habit-detail')!.versions).toHaveLength(2)
     expect(entries.filter(isComponent).map((e) => e.name)).toEqual(['tab-bar'])

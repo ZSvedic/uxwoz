@@ -181,7 +181,7 @@ function renderBoxDrawer(box: Box, b: Boxes) {
     : state.past[box].map((x) => [x.what + when(x.at), ''])
   $('history').replaceChildren(...past.length ? past.map(([t, cls]) => el('li', cls, t)).reverse() : [el('li', 'none', 'No changes yet')])
   showInfo([
-    [box === 'notes' ? 'Visits' : box === 'data' ? 'Tables' : 'Entries', box === 'notes' ? `${n}, the last ${VISITS_KEPT} kept; the next after ${VISIT_EVERY - (b.picks ?? 0) % VISIT_EVERY} more picks`
+    [box === 'notes' ? 'Visits' : box === 'data' ? 'Tables' : 'Entries', box === 'notes' ? `${n}, the last ${VISITS_KEPT} kept; the next after ${VISIT_EVERY - (b.settled ?? 0) % VISIT_EVERY} more picks`
       : countLabel(n, box) + (box === 'data' ? `, each at most ${LIMITS.columns} columns and ${LIMITS.rows} rows` : '')],
     ['New since you looked', String(unseen(box).length)],
     ['↶ Undo', box === 'notes' ? (visitToUndo(b) ? 'takes back the newest visit not undone' : 'nothing to undo') : `${state.past[box].length} of the last ${BOX_STATES} changes can be taken back`],
