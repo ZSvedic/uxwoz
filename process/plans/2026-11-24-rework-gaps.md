@@ -4,7 +4,8 @@ This plan lists what [zel-rework-prompt.md](../../spec/zel-rework-prompt.md) and
 [zel-tour-compilation-v4.md](../../spec/zel-tour-compilation-v4.md) do not settle, each with the answer
 I suggest. It decides nothing about the look: the logo versions and the black-and-white mocks come next.
 
-Status: waiting for Zel. Nothing is built.
+Status: Zel answered on 2026-11-24. Gap 3 is four sizes, gap 4 waits for a yes, the rest stand as
+suggested. Nothing is built.
 
 ## How to answer
 
@@ -26,16 +27,25 @@ OK all. 2: keep the long sheet. 6: keep "hey Woz" too. 18: call it Reroll.
    scrolls inside with one finger or the wheel, a tab bar stays at the frame's bottom, and two fingers
    (or a drag on the sky) move the canvas. On a phone the frame is as tall as the room between the two
    bars. Today a mock is one long sheet and one finger moves the canvas.
-3. **How many sizes?** Suggest two, the ones we have: Phone (390 px wide) and Desktop (1024), chosen by
-   the window (Phone under 720 px) and scaled to fit. A 390 mock on a 360 phone shows at 92%. Why: the
-   size is in the prompt, so each new size means recording every cassette and starter again; two sizes
-   need 4 stored mocks a step, not 8. The New panel keeps a **Design for** picker, so a laptop can
-   design a phone app. Four sizes can follow if 92% reads too small on a real phone.
-4. **Who draws the tour?** Its copy is exact, so no model can draw it live. Suggest: Haiku draws the four
-   mocks once from your copy, I correct any word that drifted, and the result ships with the app as one
-   read-only project: the same for everyone, free, no cookie, never in Recent. Then *A cheap model
-   generated this mock in 2.4 sec* is true, with the real time in it. A test keeps the mocks' words
-   equal to the tour file.
+3. **How many sizes?** Decided by Zel: four, and everything is recorded again with two designs a mock.
+   The window picks the size, and the mock is scaled to fit it:
+
+   | Size | Mock | For a window |
+   |---|---|---|
+   | Small phone | 360 × 640 | under 400 px wide |
+   | Large phone | 412 × 892 | 400 to 719 px |
+   | Laptop | 1280 × 720 | 720 to 1599 px |
+   | Monitor | 1920 × 1080 | 1600 px and wider |
+
+   A project keeps the size it was made at, on every device. The New panel has a **Design for** picker
+   with the four, so a laptop can design a phone app. Each of the seven starters is recorded at all
+   four sizes (28 recordings, about $5), so a starter loses its kind (*Phone app*, *Web app*). Projects
+   made before the rework keep their 390 and 1024.
+4. **Who makes the tour's four mocks?** They hold your exact words, so they are made once and saved;
+   every visitor sees the saved ones, free, with no model call. Two ways to make them once: I write
+   them by hand, or I paste your words into Haiku and save what it draws. Suggest Haiku, because the
+   third mock says *A cheap model generated this mock in 2.4 sec*, which is false for a mock I wrote.
+   I correct any word Haiku changed, and a test keeps the saved words equal to the tour file.
 5. **Edit, History, Delete.** Suggest: Edit holds the field, 🎙️, **Make the change**, and a small
    **Delete this mock…** at its bottom. History holds Undo, Redo and the list of versions; a tap on one
    shows it. So Past changes moves from Edit to History and exists once, and four buttons stay four.
