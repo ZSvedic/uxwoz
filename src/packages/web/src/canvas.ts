@@ -19,8 +19,14 @@ export const NAME_H = 34
 export const BUTTONS_H = 80
 /** How much of the ropes 100% shows above a mock's name and below its buttons, in canvas pixels. */
 export const ROPE_SHOW = 12
-/** A component's card in its box: as wide as a mock, this tall; its content scrolls inside. */
+/** A component's card in its box: laid out as wide as a mock and shown as wide as the box's inside, this tall; its
+ *  content scrolls inside. */
 const COMPONENT_H = 200
+/** A box is as wide as a mock, at most this; its padding and edges take BOX_EDGES of it. */
+export const BOX_MAX_W = 520
+const BOX_EDGES = 39
+/** A box's width for mocks this wide. */
+export const boxWidth = (mockW: number) => Math.min(mockW, BOX_MAX_W)
 const SVG_NS = 'http://www.w3.org/2000/svg'
 /** Zoom levels, as the bar shows them: 100% is the current mock fitted (`hundred`). */
 const MIN_ZOOM = 0.1
@@ -89,9 +95,11 @@ export function touchStep(last: { x: number; y: number; d: number }, now: { x: n
 /**
  * The tree's places at scale z: rows top down, each the children of the row above in order, every row as tall as the
  * others; across, side by side, a first child below its parent when that place is free. `side` (the boxes) goes
- * right of the first root, in its row. A key whose parent is not here starts a tree of its own.
+ * right of the first root, in its row, its top level with it; when the tallest box (`sideH`) is taller than a mock, the
+ * rows below start lower by the difference, so they and their ropes clear it. A key whose parent is not here starts a
+ * tree of its own.
  */
-export function placeTree(nodes: { key: string; parent: string | null }[], mock: { w: number; h: number }, z: number, sideW = 0, pad = PAD) {
+export function placeTree(nodes: { key: string; parent: string | null }[], mock: { w: number; h: number }, z: number, sideW = 0, pad = PAD, sideH = 0) {
   const keys = new Set(nodes.map((n) => n.key))
   const kids = new Map<string, string[]>(), parentOf = new Map<string, string>(), roots: string[] = []
   for (const n of nodes) {
@@ -110,12 +118,12 @@ export function placeTree(nodes: { key: string; parent: string | null }[], mock:
   const rows: string[][] = [roots.filter((r) => depth.get(r) === 0)]
   while (rows.at(-1)!.length) rows.push(rows.at(-1)!.flatMap((k) => (kids.get(k) ?? []).filter((c) => depth.get(c) === rows.length)))
   rows.pop()
-  const head = headH(z), pitch = head + mock.h + BUTTONS_H + GAP_Y
+  const head = headH(z), pitch = head + mock.h + BUTTONS_H + GAP_Y, drop = sideW && rows[0]?.length ? Math.max(0, sideH - mock.h) : 0
   const cards = new Map<string, Box>()
   let maxX = pad, side: { x: number; y: number } | null = null
   rows.forEach((row, d) => {
     let cursor = pad
-    const y = pad + head + d * pitch
+    const y = pad + head + d * pitch + (d > 0 ? drop : 0)
     for (const k of row) {
       const p = parentOf.get(k), first = p != null && kids.get(p)![0] === k
       const x = Math.max(cursor, first ? cards.get(p)!.x : cursor)
@@ -125,7 +133,7 @@ export function placeTree(nodes: { key: string; parent: string | null }[], mock:
       maxX = Math.max(maxX, cursor - GAP_X)
     }
   })
-  const extent: Box = { x: pad, y: pad, w: Math.max(0, maxX - pad), h: rows.length ? rows.length * pitch - GAP_Y : 0 }
+  const extent: Box = { x: pad, y: pad, w: Math.max(0, maxX - pad), h: rows.length ? rows.length * pitch - GAP_Y + (rows.length > 1 ? drop : 0) : 0 }
   return { cards, kids, rows, side: side as { x: number; y: number } | null, extent }
 }
 
@@ -138,10 +146,11 @@ export function curve(x1: number, y1: number, x2: number, yRow: number, y2: numb
 }
 
 /** The rope from parent card a to child card b: from a's bottom middle down past its buttons, one S-curve in the gap
- *  above b's name, then down to b's top middle. Every row is as tall as the others, so the ropes into a row bend alike. */
+ *  above b's name, then down to b's top middle. Every row is as tall as the others, so the ropes into a row bend alike;
+ *  under boxes taller than Home they bend only in the gap below the boxes' buttons. */
 export function rope(a: Box, b: Box, z: number): string {
   const yEnd = b.y - headH(z) - 6 / z
-  return curve(a.x + a.w / 2, a.y + a.h, b.x + b.w / 2, Math.min(a.y + a.h + BUTTONS_H, yEnd), b.y, yEnd)
+  return curve(a.x + a.w / 2, a.y + a.h, b.x + b.w / 2, Math.min(Math.max(a.y + a.h + BUTTONS_H, yEnd - GAP_Y), yEnd), b.y, yEnd)
 }
 
 export interface ScreenView {
@@ -196,14 +205,15 @@ function newCard(key: string) {
   const pins = el('div', 'pins')
   const screen = el('div', 'screen', frame, pins)
   return { el: el('article', 'card', el('div', 'head', name, idea), screen), name, idea, screen, frame, pins, key, view: null as ScreenView | null,
-    w: 0, h: 0, shown: null as { html: string; final: boolean; css: string } | null }
+    w: 0, h: 0, k: 1, shown: null as { html: string; final: boolean; css: string } | null }
 }
 type Card = ReturnType<typeof newCard>
 
-/** Undo the canvas's zoom inside a frame and scale it instead: the browser lays the mock out once, unzoomed. */
-function unzoom(frame: HTMLIFrameElement, z: number) {
+/** Undo the canvas's zoom inside a frame and scale it instead: the browser lays the mock out once, unzoomed. `k`: a
+ *  component's card shows its mock-wide frame smaller, to fit its box. */
+function unzoom(frame: HTMLIFrameElement, z: number, k = 1) {
   frame.style.zoom = String(1 / z)
-  frame.style.transform = z === 1 ? '' : `scale(${z})`
+  frame.style.transform = z * k === 1 ? '' : `scale(${z * k})`
 }
 
 const reduced = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -408,7 +418,7 @@ export class Canvas {
   private applyZoom(z: number) {
     this.z = z
     this.surface.style.zoom = String(z)
-    for (const c of this.cards.values()) unzoom(c.frame, z)
+    for (const c of this.cards.values()) unzoom(c.frame, z, c.k)
     this.surface.style.setProperty('--z', String(z))
     this.surface.classList.toggle('far', z < FAR)
     this.layout(false) // names keep their size on screen zoomed out, so the room they need changes
@@ -543,13 +553,17 @@ export class Canvas {
       const c = this.card(s.key, s.component ? this.components : this.surface)
       c.view = s
       c.el.dataset.id = s.key
+      // A component is laid out as wide as a mock and shown k times its size, as wide as the box's inside.
+      const k = s.component ? Math.min(1, (boxWidth(mock.w) - BOX_EDGES) / mock.w) : 1
       const size = s.component ? { w: mock.w, h: COMPONENT_H } : mock
-      if (c.w !== size.w || c.h !== size.h) {
+      if (c.w !== size.w || c.h !== size.h || c.k !== k) {
         c.w = size.w
         c.h = size.h
-        Object.assign(c.frame.style, { width: `${size.w}px`, height: `${size.h}px` })
-        Object.assign(c.screen.style, { width: `${size.w}px`, height: `${size.h}px` })
-        if (s.component) c.el.style.width = `${size.w}px`
+        c.k = k
+        Object.assign(c.frame.style, { width: `${size.w}px`, height: `${size.h / k}px` })
+        Object.assign(c.screen.style, { width: `${size.w * k}px`, height: `${size.h}px` })
+        if (s.component) c.el.style.width = `${size.w * k}px`
+        unzoom(c.frame, this.z, k)
       }
       for (const [cls, on] of Object.entries({ fresh: s.fresh, streaming: s.streaming, current: s.current })) c.el.classList.toggle(cls, !!on)
       c.name.textContent = s.name
@@ -606,17 +620,16 @@ export class Canvas {
     const t = keep ? this.currentTarget() : undefined, was = keep && !this.gliding && this.seen(t)
     const z = this.z, mock = this.mock
     const screens = this.screens.filter((s) => !s.component)
-    // The Components box is as wide as a mock; a box is as tall as Home.
-    this.components.parentElement!.style.width = `${mock.w + 50}px`
+    // A box is as wide as a mock, at most BOX_MAX_W; its height follows its content (boxes.css).
     const side = !this.side.hidden && screens.length > 0
-    if (side) this.side.style.setProperty('--box-h', `${mock.h}px`)
+    if (side) this.side.style.setProperty('--box-w', `${boxWidth(mock.w)}px`)
     const st = this.stage, pad = Math.ceil(Math.max(PAD, st.clientWidth / z / 2, st.clientHeight / z / 2))
-    const p = placeTree(screens, mock, z, side ? this.side.offsetWidth : 0, pad)
+    const p = placeTree(screens, mock, z, side ? this.side.offsetWidth : 0, pad, side ? this.side.offsetHeight : 0)
     this.places = p.cards
     this.extent = { ...p.extent }
     if (side && p.side) {
       Object.assign(this.side.style, { left: `${p.side.x}px`, top: `${p.side.y}px` })
-      this.extent.h = Math.max(this.extent.h, p.side.y - pad + this.side.offsetHeight)
+      this.extent.h = Math.max(this.extent.h, p.side.y - pad + this.side.offsetHeight + BUTTONS_H)
     }
     for (const s of screens) {
       const b = p.cards.get(s.key), c = this.cards.get(s.key)

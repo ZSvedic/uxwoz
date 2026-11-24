@@ -10,7 +10,7 @@
 <style>
   html body { height: auto; display: block; overflow: auto; overflow-x: clip; padding: 16px; background-attachment: fixed; --z: 1; }
   .sheet-card { max-width: 900px; margin: 0 auto; padding: 20px; background: var(--surface); border: 2px solid var(--border); border-radius: 20px;
-    box-shadow: inset 0 0 0 5px var(--surface), inset 0 0 0 6px var(--current), var(--halo); }
+    box-shadow: var(--halo); }
   .sheet-card > section { padding: 14px 0; border-top: 1px dashed var(--border); }
   .sheet-card > section > h2 { margin: 0 0 10px; font-size: 18px; color: var(--mark); }
   .sheet-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin: 8px 0; } .sheet-top { align-items: flex-start; }
@@ -18,7 +18,7 @@
   .sheet-wordmark { display: flex; align-items: center; gap: 10px; font: 700 28px Fredoka, system-ui, sans-serif; color: var(--text); }
   .sheet-fig > .brand { margin: 0 auto; color: var(--text); } .sheet-fig .logo { color: var(--bar-text); }
   .sheet-fredoka { font: 500 20px Fredoka, system-ui, sans-serif; } .sheet-fredoka b { font-weight: 600; } .sheet-fredoka strong { font-weight: 700; }
-  .sheet-colours { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 4px 12px;
+  .sheet-colours { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 2fr); gap: 4px 12px;
     font: 12px ui-monospace, monospace; overflow-wrap: anywhere; }
   .sheet-colours em { color: var(--muted); font-style: normal; }
   .sheet-sw { display: inline-block; width: 22px; height: 16px; margin-right: 5px; vertical-align: middle; border: 1px solid var(--border); border-radius: 4px; }
@@ -56,7 +56,7 @@
 </div></section>
 
 <section><h2>Colours</h2><p>Every custom property on <code>:root</code>: the palette first, then the roles and the token each one plays.</p>
-  <div class="sheet-colours" id="colours"><em>token</em><em>light</em><em>dark</em></div></section>
+  <div class="sheet-colours" id="colours"><em>token</em><em>value</em></div></section>
 
 <section><h2>Type</h2>
   <p class="sheet-fredoka">Fredoka 500, the bar · <b>600, headings and names</b> · <strong>700, the wordmark</strong></p>

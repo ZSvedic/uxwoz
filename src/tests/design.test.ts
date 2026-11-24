@@ -13,8 +13,8 @@ const cssFiles = readdirSync(DESIGN).filter((f) => f.endsWith('.css')).sort()
 const css = Object.fromEntries(cssFiles.map((f) => [f, read(resolve(DESIGN, f))]))
 const lineCount = (text: string) => text.split('\n').length - (text.endsWith('\n') ? 1 : 0)
 
-// Set at run time by the code (canvas.ts, nav.ts) or on one element in CSS (a box's glow, a rope's width), so tokens.css does not define them.
-const RUNTIME_VARS = ['--z', '--depth', '--box-h', '--bar-h', '--glow', '--rope-w']
+// Set at run time by the code (canvas.ts, nav.ts) or on one element in CSS (a box's glow, paper and pin, a rope's width), so tokens.css does not define them.
+const RUNTIME_VARS = ['--z', '--depth', '--box-w', '--bar-h', '--glow', '--sheet', '--tack', '--rope-w']
 const COLOUR = /#[0-9a-f]{3,8}\b|\b(rgba?|hsla?)\(/i
 
 describe('design/', () => {
@@ -125,13 +125,10 @@ describe('/design and /og.png', () => {
   })
 })
 
-// Contrast, from tokens.css: the light tokens, then the dark ones over them; a role resolves through var() to a hex.
+// Contrast, from tokens.css: one look; a role resolves through var() to a hex.
 const tokens = css['tokens.css']!.replace(/\/\*[\s\S]*?\*\//g, '')
-const darkStart = tokens.indexOf('@media (prefers-color-scheme: dark)')
-const darkEnd = tokens.indexOf('\n}', darkStart) + 2
 const decls = (text: string) => Object.fromEntries([...text.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1]!, m[2]!.trim()]))
-const light = decls(tokens.slice(0, darkStart) + tokens.slice(darkEnd))
-const modes = { light, dark: { ...light, ...decls(tokens.slice(darkStart, darkEnd)) } }
+const look = decls(tokens)
 
 /** A token as an opaque #rrggbb; a see-through #rrggbbaa (a chip) is laid over --surface, where it sits. */
 function hex(map: Record<string, string>, name: string): string {
@@ -166,14 +163,25 @@ const PAIRS: [string, string, number][] = [
   ['--disabled', '--surface-2', 3], ['--deck-edge', '--deck', 4.5], ['--deck-edge', '--deck-stripe', 4.5],
   // An ID on its chip, and the "new" after it; the drawer's open tab. A screen's name chip is --text on --surface.
   ['--text', '--chip', 4.5], ['--mark', '--chip', 4.5], ['--on-tab', '--tab', 4.5],
+  // A label over a value on a card.
+  ['--label', '--surface', 4.5],
+  // Each box's paper with its ink, its counts and hints, and what is new.
+  ['--text', '--rules-paper', 4.5], ['--text', '--notes-paper', 4.5], ['--text', '--components-paper', 4.5], ['--text', '--data-paper', 4.5],
+  ['--muted', '--rules-paper', 4.5], ['--muted', '--notes-paper', 4.5], ['--muted', '--components-paper', 4.5], ['--muted', '--data-paper', 4.5],
+  ['--mark', '--rules-paper', 4.5], ['--mark', '--notes-paper', 4.5], ['--mark', '--components-paper', 4.5], ['--mark', '--data-paper', 4.5],
 ]
 
 describe('contrast in tokens.css', () => {
-  for (const [mode, map] of Object.entries(modes)) {
-    test(`${mode}: every text pair passes`, () => {
-      const low = PAIRS.map(([fg, bg, min]) => [fg, bg, Math.round(ratio(hex(map, fg), hex(map, bg)) * 100) / 100, min] as const)
-        .filter(([, , r, min]) => r < min)
-      expect(low).toEqual([])
-    })
-  }
+  test('every text pair passes', () => {
+    const low = PAIRS.map(([fg, bg, min]) => [fg, bg, Math.round(ratio(hex(look, fg), hex(look, bg)) * 100) / 100, min] as const)
+      .filter(([, , r, min]) => r < min)
+    expect(low).toEqual([])
+  })
+
+  test('one look: nothing follows the system\'s dark setting', () => {
+    for (const [file, text] of Object.entries(css)) expect([file, text.includes('prefers-color-scheme')]).toEqual([file, false])
+    for (const page of ['index.html', 'player.html', 'admin.html', 'privacy.html', 'design/sheet.html', 'design/sheet.ts']) {
+      expect([page, read(resolve(WEB, page)).includes('prefers-color-scheme')]).toEqual([page, false])
+    }
+  })
 })

@@ -230,7 +230,8 @@ Four buttons on the canvas, centred under the current mock, narrow, with room be
 zoom with the mock. No other mock shows any.
 
 Edit, History and Info **flip** the mock: it turns over in place to a card of the same size, with
-a double line inside its edge and ✕ in its corner. The pressed button is dark. ✕, Esc or the same
+one clean edge and ✕ in its corner; on an Info card each label (*Asked for*, *Model*) is bold ink
+over its value. The pressed button is dark. ✕, Esc or the same
 button again flips back to the mock; another button turns the card to that one. Choosing another
 mock flips back first.
 
@@ -281,13 +282,21 @@ browser's word for it>).*
 ## Boxes
 
 Right of Home, in its row, four labelled boxes stand side by side, tops level with Home: **Rules**,
-**Fixer's notes**, **Components**, **Data**. A box is as tall as Home and as wide as a box is
-today; the rest scrolls inside it, with the same scroll corners as a mock. A child of Home that does not fit below Home goes
-right, under the boxes. Every model call reads Components, Rules and Data in full, so what is in
+**Fixer's notes**, **Components**, **Data**. A box is as wide as the project's mock, at most 520
+px: 360 or 412 in a phone project, 520 in a laptop or monitor project. A box has room for 10
+ruled lines to start and grows with what it holds up to 20 lines, the same rule for all four;
+past 20 lines the rest scrolls inside it, with the same scroll corners as a mock. The cap holds
+even where 20 lines are taller than Home. Their bottoms differ, and each box's buttons sit under
+its own bottom. A child of Home that does not fit below Home goes right, under the boxes; the row
+of Home's children and the ropes into it start below the tallest box and its buttons. A component
+in its box is drawn as wide as a mock and shown smaller, as wide as the box. Every model call reads Components, Rules and Data in full, so what is in
 them is what the mocks share.
 
-A box is a page of a ruled yellow pad with a gold pin, each entry a line or two of writing on the
-ruling with no frame round it. A tap in a box, or on its button in the dropdown or the bar, makes
+A box is a page of ruled paper with dark ink, as a mock is white paper: Rules a light yellow
+legal pad, Fixer's notes a very light red, Components a light blue, Data a light green. Its pin is
+the dark of its own colour: dark amber, dark red, dark blue, dark green. Each entry is a line or
+two of writing on the ruling with no frame round it. A box flipped to Edit, History or Info shows
+a parchment card of the box's size. A tap in a box, or on its button in the dropdown or the bar, makes
 it current: a gold ring, the top bar's name (*📐 Rules*), and its buttons under it. A box's buttons
 are a mock's four with its own action in 🎲's place:
 
@@ -638,12 +647,15 @@ page before it, so the app teaches itself. Shapes and limits: [public.md](public
 ## Colours
 
 Black and white is the mock, and blue is a control in a mock that opens another mock, in both
-themes. UXWoz itself sits on a night sky, its bar wood, its menus, panels and cards parchment by
-day and indigo by night, its boxes a yellow pad. Ember is UXWoz's actions: Draw it, Make the
-change, Draw again; it also marks what is *new*. Gold is the box counts, the pins, and the ring
+themes. UXWoz itself sits on a night sky, its bar wood, its menus, panels and cards parchment, its
+boxes paper in four light colours with a pin in the dark of each. Ember is UXWoz's actions: Draw it, Make the
+change, Draw again; it also marks what is *new*. Gold is the box counts, the comment pins, and the ring
 of the current mock or box. The sparkle of the logo is yellow. Ropes are tan with a dark twist.
 
 ## Look
+
+UXWoz has one look. It does not follow the system's dark setting: the app, the player, the
+admin's page and the privacy page look the same with it on or off.
 
 Sounds are off by default; **Sound** in the menu turns them on, kept in this browser: a whoosh
 when a mock is drawn and when a card flips. Turning them on plays it once. With the system's

@@ -123,8 +123,8 @@ src/packages/web/src/
   voice.ts       browser: hold to talk: the words after the typed text, kept on release, the four problems (`Talk`,
                  no DOM, tested), the speech recognition behind it (`HoldToTalk`), the 🎙️ button beside a field (`talkButton`: cards'
                  fields and New project's prompt box; none without speech)
-  canvas.ts      browser: the boxes right of Home, the tree layout (`placeTree`: rows of equal height, ropes that bend in
-                 the gap), cards of the project's size with name tags and scroll corners, frames scaled not zoomed, the
+  canvas.ts      browser: the boxes right of Home (`boxWidth`; rows below drop under a box taller than Home), the tree
+                 layout (`placeTree`: rows of equal height, ropes that bend in the gap), cards of the project's size with name tags and scroll corners, frames scaled not zoomed, the
                  four buttons under the current mock, 100% (`hundred`; a box's `boxHundred`) and zoom levels relative to it, Fit all, the glide
                  (`glideAt`), a resize redoes the last fit, a tap on the sky, links out (`open`), touch: two fingers pan and pinch
   boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes (pages of the pad, as tall as Home, a place

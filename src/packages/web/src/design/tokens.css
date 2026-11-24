@@ -1,33 +1,30 @@
-/* Every colour of the app, light and dark, and its font. Other design files use the role tokens at the end. */
+/* Every colour of the app (one look, by day), and its font. Other design files use the role tokens at the end. */
 /* Fredoka, from this folder: headings, the bar, the logo, primary buttons, the OR. Body text is the system font. */
 @font-face { font-family: Fredoka; src: url("./brand/fredoka.woff2") format("woff2"); font-weight: 500 700; font-style: normal;
   font-display: swap; }
 
-/* The palette, by day: the night sky, parchment chrome, ink, ember and gold, wood and rope. */
+/* The palette: the night sky, parchment chrome, ink, ember and gold, wood and rope. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --sky1: #1b2160; --sky2: #0b1030; --ch: #f6ecd2; --ch2: #eadbb4; --edge: #c9ad72; --ink: #2a1f3d; --muted: #64567a;
   --ivory: #fffdf6; --blue: #2f5bff; --ember: #ff6a2b; --ember-ink: #a83a0a; --gold: #f5c542; --amber: #e0a100; --chip: #2a1f3d14;
   --wood1: #8f5c3a; --wood2: #7d4e30; --rope: #c9a46a; --rope2: #6e4b22; --red: #b3261e; --dull: #85788f; --dull-wood: #dcbf98;
   --field-bg: var(--ivory); --green: #2e9d5b; --tab-ink: #fff;
 }
-/* The palette, by night: indigo chrome with pale text, darker wood. */
-@media (prefers-color-scheme: dark) {
-  :root { --ch: #1a1f4a; --ch2: #252b63; --edge: #2e3680; --ink: #e6e4ff; --muted: #a4a6d6; --ivory: #fbf4e2; --blue: #6f8cff;
-    --ember: #ff7a3d; --ember-ink: #ff7a3d; --gold: #ffd166; --amber: #ffd166; --chip: #ffffff17; --wood1: #6b4430; --wood2: #43281a;
-    --rope: #d9b77c; --rope2: #7a5428; --red: #ff8a80; --dull: #7a7fb8; --dull-wood: #c9a07a; --field-bg: var(--ch2);
-    --green: #4cd18a; --tab-ink: #1a1f4a; }
-}
-/* The same by day and night: the indigo plate and pale text on the sky, the corner glows, the dim behind the panel,
-   the cream of the bar's text, the dark text on ember and on gold, a screen's paper. */
+/* The indigo plate and pale text on the sky, the corner glows, the dim behind the panel, the cream of the bar's text,
+   the dark text on ember and on gold, a screen's paper. */
 :root {
   --indigo: #1a1f4a; --star-ink: #e6e4ff; --star-muted: #a4a6d6; --violet-glow: #7c5cff40; --green-glow: #2ecc9a26;
   --night-dim: #05082099; --cream: #fbf4e2; --brown: #3a1500; --gold-ink: #3a2600; --paper: #fff;
   --deck-stripe: #3b5fb5; --deck-blue: #2f5bff;
   /* A screen's ivory frame and its fine edges; the gold glow of the current one; a box's margin line and ruled lines. */
   --frame-line: #ddd3bf; --frame-edge: #fff8; --gold-glow: #f5c54299; --margin-ink: #ff6a2b88; --ruling: #7f8cff26;
-  /* The gold pin of a box and the gold coin of the OR: a lit face, a glow, a shadow under them. */
-  --pin: radial-gradient(circle at 35% 35%, #ffe9a8, var(--gold) 55%, #8a5a00); --pin-shadow: 0 0 8px var(--gold), 0 3px 4px #0006;
+  /* Each box's paper, light with dark ink, and its pin, the dark of the same colour: a legal pad's yellow for Rules,
+     a faint red for Fixer's notes, a light blue for Components, a light green for Data. */
+  --pad-yellow: #fff4bd; --pad-red: #fdeceb; --pad-blue: #e4eefc; --pad-green: #e5f4e4;
+  --pin-amber: #8f5a00; --pin-red: #9e1c1c; --pin-blue: #1f3f94; --pin-green: #1d6a3a;
+  /* A pin's lit face and its shadow; the gold coin of the OR: a lit face, a glow, a shadow under it. */
+  --pin-lit: #ffffffa0; --pin-shadow: 0 3px 4px #0006;
   --coin: radial-gradient(#fff3c4, var(--gold)); --coin-shadow: 0 0 18px var(--gold), inset 0 -3px 0 #0003;
   /* The wood's lit and shaded edges; the light and the line on wood for hover and separators. */
   --wood-shadow: 0 2px 0 rgba(255, 255, 255, .15) inset, 0 -3px 0 rgba(0, 0, 0, .25) inset, 0 16px 34px -8px rgba(0, 0, 0, .55);
@@ -45,23 +42,27 @@
   /* Chrome: menus, panels, the drawer, the boxes, buttons and fields. */
   --surface: var(--ch); --surface-2: var(--ch2); --border: var(--edge); --text: var(--ink); --field: var(--field-bg);
   --disabled: var(--dull); --err: var(--red); --shadow: var(--lift);
+  /* A label over a value on a card (Asked for, Model): ink, bold, so it stands out from the muted rest. */
+  --label: var(--ink);
   /* UXWoz's actions (Generate, Make the change, Pick) are ember with dark text; ember also marks what is new. */
   --pick: var(--ember); --on-pick: var(--brown); --mark: var(--ember-ink); --sky-mark: var(--ember);
   /* Gold: the current screen or box, the OR, the box numbers, the focus ring (with a dark inner ring). */
   --current: var(--gold); --badge: var(--gold); --on-badge: var(--gold-ink);
   --focus: var(--gold); --focus-in: var(--sky2);
-  /* The bar: wood, cream text, a dimmer cream when disabled, the deck (New mockup) a blue card, deep in both modes so its + reads. */
+  /* The bar: wood, cream text, a dimmer cream when disabled, the deck (New mockup) a blue card, deep so its + reads. */
   --bar-text: var(--cream); --bar-disabled: var(--dull-wood); --deck: var(--deck-blue); --deck-edge: var(--ivory);
-  /* The logo's sparkle: amber by day so it reads on parchment, gold by night; gold on the bar's wood. The W is the text's. */
+  /* The logo's sparkle: amber so it reads on parchment; gold on the bar's wood. The W is the text's. */
   --sparkle: var(--amber); --bar-sparkle: var(--gold);
   /* The sky behind the canvas and the bar, and what sits straight on it. */
   --sky-text: var(--star-ink); --sky-muted: var(--star-muted); --plate: var(--indigo); --dim: var(--night-dim);
   /* Lines between screens are ropes: a tan strand and a dark twist. */
   --rope-twist: var(--rope2);
-  /* A screen is white paper in both modes, in an ivory frame. */
+  /* A screen is white paper, in an ivory frame. */
   --screen: var(--paper); --frame: var(--ivory);
-  /* Each box's edge glows in its colour; a box's ID sits on a faint chip. */
+  /* Each box's paper and pin; its edge glows in its colour; a box's ID sits on a faint chip. */
+  --rules-paper: var(--pad-yellow); --notes-paper: var(--pad-red); --components-paper: var(--pad-blue); --data-paper: var(--pad-green);
+  --rules-pin: var(--pin-amber); --notes-pin: var(--pin-red); --components-pin: var(--pin-blue); --data-pin: var(--pin-green);
   --rules-glow: var(--blue); --notes-glow: var(--ember); --components-glow: var(--gold); --data-glow: var(--green);
-  /* The drawer's open tab: blue, with white text by day and dark text by night. */
+  /* The drawer's open tab: blue, with white text. */
   --tab: var(--blue); --on-tab: var(--tab-ink);
 }

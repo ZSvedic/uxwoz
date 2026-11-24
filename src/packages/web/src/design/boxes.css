@@ -1,19 +1,23 @@
 /* The boxes side by side right of the first screen, at canvas scale: they zoom with the screens. */
 .boxes { position: absolute; display: flex; align-items: flex-start; gap: 120px; font-size: 15px; }
-/* A box is an index card: ruled lines and an ember margin line under the title, a gold pin, an edge that glows in the
-   box's colour (gold and stronger while current). Rules, Data and Fixer's notes lean a little and stand straight while
-   current; Components holds live screens and never leans. A transform does not move the layout, so sizes stay. */
-.box { --glow: var(--rules-glow); position: relative; flex: none; display: flex; flex-direction: column; width: 520px;
-  height: var(--box-h); padding: 14px 18px 18px; border: 1.5px solid var(--glow); border-radius: 4px;
+/* A box is a page of paper in the box's colour with dark ink: ruled lines and an ember margin line under the title, a pin
+   in the dark of its colour, an edge that glows in the box's colour (gold and stronger while current). As wide as a mock,
+   at most 520 px (--box-w, canvas.ts); room for 10 ruled lines, growing with its content to 20, then it scrolls inside.
+   Rules, Data and Fixer's notes lean a little and stand straight while current; Components holds live screens and never
+   leans. A transform does not move the layout, so sizes stay. */
+.box { --glow: var(--rules-glow); --sheet: var(--rules-paper); --tack: var(--rules-pin); position: relative; flex: none;
+  display: flex; flex-direction: column; width: var(--box-w); min-height: calc(46px + 10 * 24px + 18px);
+  max-height: calc(46px + 20 * 24px + 18px); padding: 14px 18px 18px; border: 1.5px solid var(--glow); border-radius: 4px;
   background: linear-gradient(transparent 43px, var(--margin-ink) 43px 44.5px, transparent 44.5px),
-    repeating-linear-gradient(transparent 0 23px, var(--ruling) 23px 24px), var(--surface);
+    repeating-linear-gradient(transparent 0 23px, var(--ruling) 23px 24px), var(--sheet);
   box-shadow: 0 0 16px var(--glow), var(--lift); }
 .box::before { content: ''; position: absolute; top: -7px; left: 50%; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%;
-  background: var(--pin); box-shadow: var(--pin-shadow); }
+  background: radial-gradient(circle at 35% 35%, var(--pin-lit), transparent 45%), var(--tack); box-shadow: var(--pin-shadow); }
 .box-rules { transform: rotate(-1.5deg); }
-.box-notes { --glow: var(--notes-glow); transform: rotate(1deg); border-radius: 2px 2px 18px 2px; }
-.box-components { --glow: var(--components-glow); }
-.box-data { --glow: var(--data-glow); transform: rotate(-1deg); }
+.box-notes { --glow: var(--notes-glow); --sheet: var(--notes-paper); --tack: var(--notes-pin); transform: rotate(1deg);
+  border-radius: 2px 2px 18px 2px; }
+.box-components { --glow: var(--components-glow); --sheet: var(--components-paper); --tack: var(--components-pin); }
+.box-data { --glow: var(--data-glow); --sheet: var(--data-paper); --tack: var(--data-pin); transform: rotate(-1deg); }
 .box.current { transform: none; }
 .box.current { --glow: var(--current); box-shadow: 0 0 0 1px var(--glow), 0 0 28px var(--glow), var(--lift); }
 .box h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font-size: 18px; }

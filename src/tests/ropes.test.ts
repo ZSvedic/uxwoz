@@ -1,6 +1,6 @@
 // The canvas worked out with no page: rows of equal height, the 100% scale, where a glide ends, and the ropes.
 import { describe, expect, test } from 'bun:test'
-import { BUTTONS_H, NAME_H, ROPE_SHOW, boxHundred, curve, frameOf, glideAt, headH, hundred, landing, placeTree, rope, sizeOf, touchStep } from '../packages/web/src/canvas.ts'
+import { BOX_MAX_W, BUTTONS_H, NAME_H, ROPE_SHOW, boxHundred, boxWidth, curve, frameOf, glideAt, headH, hundred, landing, placeTree, rope, sizeOf, touchStep } from '../packages/web/src/canvas.ts'
 
 const small = sizeOf('small-phone'), laptop = sizeOf('laptop')
 
@@ -40,6 +40,25 @@ describe('rows', () => {
     expect(p.side!.y).toBe(p.cards.get('home')!.y)
     expect(p.side!.x).toBeGreaterThan(p.cards.get('home')!.x + small.w)
     expect(p.cards.get('lost')!.x).toBeGreaterThan(p.side!.x + 900)
+  })
+})
+
+describe('boxes', () => {
+  test('a box is as wide as the project\'s mock, at most 520 px', () => {
+    expect([sizeOf('small-phone'), sizeOf('large-phone'), sizeOf('phone'), laptop, sizeOf('monitor'), sizeOf()].map((m) => boxWidth(m.w)))
+      .toEqual([360, 412, 390, BOX_MAX_W, BOX_MAX_W, BOX_MAX_W])
+  })
+
+  test('boxes taller than Home push the rows below down, and the ropes bend only below the boxes\' buttons', () => {
+    const nodes = [{ key: 'h', parent: null }, { key: 'h1', parent: 'h' }, { key: 'h2', parent: 'h' }, { key: 'h3', parent: 'h' }, { key: 'h11', parent: 'h1' }]
+    const flat = placeTree(nodes, small, 1, 1800), tall = placeTree(nodes, small, 1, 1800, 600, small.h + 60)
+    const drop = (k: string) => tall.cards.get(k)!.y - flat.cards.get(k)!.y
+    expect([drop('h'), drop('h1'), drop('h2'), drop('h11')]).toEqual([0, 60, 60, 60])
+    expect(tall.extent.h - flat.extent.h).toBe(60)
+    // A shorter one changes nothing.
+    expect(placeTree(nodes, small, 1, 1800, 600, small.h - 100).cards).toEqual(flat.cards)
+    const c = (k: string) => tall.cards.get(k)!, under = c('h').y + small.h + 60 + BUTTONS_H
+    for (const q of sample(rope(c('h'), c('h3'), 1))) if (q.x !== c('h').x + small.w / 2) expect(q.y).toBeGreaterThanOrEqual(under - 6)
   })
 })
 

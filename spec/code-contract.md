@@ -218,7 +218,7 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
   (`HttpOnly; SameSite=Lax`, and `Secure` when the public origin is https) and redirects to the same path without it. The server fetches the
   pages it proxies from itself (`127.0.0.1` and its port), never from the request's Host.
 - `GET /design`: the design sheet, built from the app's own CSS and classes on static markup: the logo, every
-  colour token by day and night, type, controls, surfaces, motion, and a ▶ per sound.
+  colour token, type, controls, surfaces, motion, and a ▶ per sound.
 - `GET /og.png`: the share preview image (1200×630, `design/brand/og.png`) that `player.html`'s `og:image` names.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
   `pico.css` followed by `mockup.css`.
