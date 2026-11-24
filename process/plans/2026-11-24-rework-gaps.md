@@ -4,8 +4,9 @@ This plan lists what [zel-rework-prompt.md](../../spec/zel-rework-prompt.md) and
 [zel-tour-compilation-v4.md](../../spec/zel-tour-compilation-v4.md) do not settle, each with the answer
 I suggest. It decides nothing about the look: the logo versions and the black-and-white mocks come next.
 
-Status: Zel answered on 2026-11-24. Gap 3 is four sizes, gap 4 waits for a yes, the rest stand as
-suggested. Nothing is built.
+Status: Zel answered on 2026-11-24. Decided: four sizes (3), Haiku draws the tour (4), the logo is C2
+(`2026-11-24-rework/logo.html`). Open: where the four buttons live (17) and the sizes' heights (3). The
+rest stand as suggested. Nothing is built.
 
 ## How to answer
 
@@ -32,16 +33,20 @@ OK all. 2: keep the long sheet. 6: keep "hey Woz" too. 18: call it Reroll.
 
    | Size | Mock | For a window |
    |---|---|---|
-   | Small phone | 360 × 640 | under 400 px wide |
-   | Large phone | 412 × 892 | 400 to 719 px |
-   | Laptop | 1280 × 720 | 720 to 1599 px |
-   | Monitor | 1920 × 1080 | 1600 px and wider |
+   | Small phone | 360 × 520 | under 400 px wide |
+   | Large phone | 412 × 640 | 400 to 719 px |
+   | Laptop | 1280 × 600 | 720 to 1599 px |
+   | Monitor | 1920 × 820 | 1600 px and wider |
+
+   The heights wait for Zel's yes. Zel wants a fitted mock at 100% and the tour with no scroll. The
+   two bars take 120 px, so the mock that shows whole on a 360 × 640 window is 360 × 520, and each
+   size is its window less the bars.
 
    A project keeps the size it was made at, on every device. The New panel has a **Design for** picker
    with the four, so a laptop can design a phone app. Each of the seven starters is recorded at all
    four sizes (28 recordings, about $5), so a starter loses its kind (*Phone app*, *Web app*). Projects
    made before the rework keep their 390 and 1024.
-4. **Who makes the tour's four mocks?** They hold your exact words, so they are made once and saved;
+4. **Who makes the tour's four mocks?** Decided by Zel: Haiku. They hold your exact words, so they are made once and saved;
    every visitor sees the saved ones, free, with no model call. Two ways to make them once: I write
    them by hand, or I paste your words into Haiku and save what it draws. Suggest Haiku, because the
    third mock says *A cheap model generated this mock in 2.4 sec*, which is false for a mock I wrote.
@@ -71,8 +76,9 @@ OK all. 2: keep the long sheet. 6: keep "hey Woz" too. 18: call it Reroll.
 10. The layout shows `[ UXWoz Tour v ]`, but a person steers by the mock's name. Suggest the button
     names the current mock or box (`[ This is Bill v ]`), and the project's name is the dropdown's
     first line.
-11. In the tour 🎲, ✏️ and ⏪ are grey, and a tap says *Off in the tour.* ℹ️ works. Its boxes are
-    read-only.
+11. In the tour all four buttons are grey (Zel: Info too), and a tap says *Off in the tour.* Its
+    boxes are read-only. A tour mock never scrolls: all of its text and its button, which comes after
+    the text, fit a small phone (the longest at 13 px type).
 12. *Try it now: pick Rules…* is text. The app does not check that you did it.
 13. The tour's boxes need content. I write it: three rules, the big button as a component, Bill's hours
     as a table, one fixer's note.
@@ -85,8 +91,8 @@ OK all. 2: keep the long sheet. 6: keep "hey Woz" too. 18: call it Reroll.
 
 **The buttons under a mock**
 
-17. The four buttons are one bar fixed at the window's bottom, for the current mock or box, at every
-    window size. The rail beside each mock goes.
+17. Open, Zel chooses: the four buttons as one bar fixed at the window's bottom (suggested), or on the
+    canvas under each mock. The rail beside each mock goes either way.
 18. *New* reads as a new project. Suggest 🎲 **Another**.
 19. 🎲 draws the second design when pressed, not ahead: half of today's cost. It is asked to differ
     clearly from the first. Both stay in History.
