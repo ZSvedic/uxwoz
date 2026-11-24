@@ -5,9 +5,9 @@ what is still open, which tests go, change and come, and the steps by part with 
 The spec on this branch (`rework-spec`) already describes the new app; no code and no prompt byte
 has changed.
 
-Status: waiting for Zel's yes to the spec and to this plan. One test is red on this branch, as it
-must be: `onboarding.test.ts` checks that the spec quotes the five hints word for word, and the spec
-no longer has them. Wave 1 deletes that test with the hints.
+Status: Zel approved the spec and this plan on 2026-11-24, with the open points as written. The build
+is under way on `rework-spec`. `onboarding.test.ts` is red until wave 1 lands, which deletes it with the
+hints it checks.
 
 ## In one picture
 
