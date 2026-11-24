@@ -12,6 +12,8 @@ RUN bun install --frozen-lockfile
 COPY src/packages packages
 # The starters' recordings, replayed in place of the model (core/src/recordings.ts reads /app/recordings).
 COPY recordings ../recordings
+# The tour's mocks and boxes, read at each GET /api/tour (web/src/tour.ts reads /app/tour).
+COPY tour ../tour
 
 ENV NODE_ENV=production \
     UXWOZ_HOST=0.0.0.0 \

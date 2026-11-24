@@ -1,50 +1,33 @@
-// The work behind a screen: the filing chain per mockup and the fixer's visits, and the streaming of a
-// screen (A OR B at once, a revise) as NDJSON. server.ts's routes call what `drawing` returns.
+// The work behind a mock: the filing chain per mockup and the fixer's visits, settling, and the streaming of
+// one design (a new screen, an Edit, Another, Draw again) as NDJSON. server.ts's routes call what `drawing` returns.
 // In a starter's mockup a recording answers where a model would be called (spec/public.md, Recordings).
 
 import {
-  DEFAULT_DEVICE, DEFAULT_MODEL, HOME_LINE, HOME_NAME, PROPOSALS, canonicalAction, drawRequest, editRequest,
-  fileDecision, generateScreen, recordedDesign, recordedFiling, recordedHtml, recordingFor, isComponent, isModelId, normalizePrompt, visitPaper, plannedScreens, promptFromLabel, screenKey, screenRef,
-  type CacheEntry, type Device, type ScreenCache, type GenerateEvent, type Io, type ModelId, type Recorded, type Recording, type Version, type VisitOptions,
+  ALTERNATIVE_REQUEST, DEFAULT_DEVICE, DEFAULT_MODEL, HOME_LINE, HOME_NAME, canonicalAction, drawRequest, editRequest,
+  fileDecision, generateScreen, isComponent, isDevice, isModelId, normalizePrompt, plannedScreens, promptFromLabel, recordedDesign,
+  recordedFiling, recordedHtml, recordingFor, screenKey, screenRef, VISIT_EVERY, visitPaper,
+  type CacheEntry, type Device, type Io, type ModelId, type Recorded, type Recording, type ScreenCache, type Version, type VisitOptions,
 } from '@uxwoz/core'
 
-/** One line of a /api/screen or /api/revise NDJSON stream (spec/code-contract.md). `meta.variants`: 2, 1 for a revise, 0 for a cache hit. */
+/** One line of a /api/screen or /api/revise NDJSON stream (spec/code-contract.md): one design. */
 export type ScreenEvent =
-  | { type: 'meta'; key: string; cached: boolean; variants: number }
-  | { type: 'chunk'; variant: number; text: string }
-  | { type: 'version'; variant: number; version: Version }
-  | { type: 'failed'; variant: number; message: string }
+  | { type: 'meta'; key: string; cached: boolean }
+  | { type: 'chunk'; text: string }
+  | { type: 'version'; version: Version }
   | { type: 'done'; entry: CacheEntry; filing?: boolean }
   | { type: 'error'; message: string }
 
+/** What a revise asks for: an Edit (`change`), Draw again (`prompt`), or Another (neither). */
+export type Revise = { change: string } | { prompt: string } | null
+
 const shown = (e: CacheEntry) => ({ id: e.name ?? HOME_NAME, line: e.action ?? HOME_LINE, html: e.versions.at(-1)?.html ?? '' })
-
-/** Interleave several streams, yielding each item as soon as its stream has it. */
-async function* merge<T>(sources: AsyncIterator<T>[]): AsyncGenerator<T> {
-  const next = (i: number) => sources[i]!.next().then((r) => ({ i, r }))
-  const pending = new Map(sources.map((_, i) => [i, next(i)]))
-  while (pending.size) {
-    const { i, r } = await Promise.race(pending.values())
-    if (r.done) pending.delete(i)
-    else { pending.set(i, next(i)); yield r.value }
-  }
-}
-
-/** One side's events, tagged with its slot; a failure becomes an event, so the other side goes on. */
-async function* tagged(slot: number, events: AsyncIterable<GenerateEvent>): AsyncGenerator<{ slot: number; ev: GenerateEvent } | { slot: number; error: unknown }> {
-  try {
-    for await (const ev of events) yield { slot, ev }
-  } catch (error) {
-    yield { slot, error }
-  }
-}
+const message = (err: unknown) => (err instanceof Error ? err.message : String(err))
 
 export function ndjson(events: AsyncIterable<ScreenEvent>): Response {
   const enc = new TextEncoder()
   const body = new ReadableStream({
     async start(controller) {
-      // Once the browser has gone, writing throws; keep draining, so the generator still gets to
-      // cache the sides that finished.
+      // Once the browser has gone, writing throws; keep draining, so the generator still stores a design that finished.
       let open = true
       const send = (ev: ScreenEvent) => {
         if (!open) return
@@ -54,7 +37,7 @@ export function ndjson(events: AsyncIterable<ScreenEvent>): Response {
         for await (const ev of events) send(ev)
       } catch (err) {
         console.warn(`screen stream failed: ${err}`)
-        send({ type: 'error', message: err instanceof Error ? err.message : String(err) })
+        send({ type: 'error', message: message(err) })
       } finally {
         if (open) try { controller.close() } catch { /* already closed */ }
       }
@@ -66,49 +49,51 @@ export function ndjson(events: AsyncIterable<ScreenEvent>): Response {
 /** A recorded call to replay: it cost nothing this time. */
 const free = (r: Recorded | null): Recorded | undefined => (r ? { ...r, final: { ...r.final, costUsd: 0 } } : undefined)
 
+/** How a settle is filed: a replay (Home's first filing), `nothing` (another recorded screen), or `live`. */
+type Plan = { replay: Recorded } | 'nothing' | 'live'
+
 /** The chains of every mockup, and the screens drawn with them. `may`: whether a live filing or visit may start now. */
-export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string) => void, random: () => number, fileWaitMs: number, may: () => boolean = () => true) {
+export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string) => void, fileWaitMs: number, may: () => boolean = () => true) {
   /** Mockups that have had a live call since the server started. */
   const lived = new Set<string>()
-  /** Mockups whose pick was just answered by a recording: the visit asked for in the same breath is refused. */
-  const quiet = new Set<string>()
+  /** The screens being drawn now (a new screen, a revise), by key. */
+  const drawingNow = new Set<string>()
 
-  /** The mockup's recording, if its prompt is a starter's. */
-  const recOf = (app: string): Recording | null => recordingFor(app)
-  /** Whether the mockup has had a live call: here, or (after a restart) a screen's design that cost something, or a visit. */
+  /** A mockup's size: its first screen's. */
+  const deviceOf = (app: string): Device | undefined => { const e = cache.get(normalizePrompt(app)); return (e?.versions.at(-1) ?? e?.versions[0])?.device }
+  /** The mockup's recording, if its prompt is a starter's and its size has one. */
+  const recOf = (app: string, device = deviceOf(app)): Recording | null => recordingFor(app, device)
+  /** Whether the mockup has had a live call: here, or (after a restart) a design that cost something, or a visit. */
   function live(app: string): boolean {
-    const root = normalizePrompt(app)
-    if (lived.has(root)) return true
+    if (lived.has(normalizePrompt(app))) return true
     const { entries, boxes } = cache.map(app)
-    return !!boxes.visits?.length || entries.some((e) => !isComponent(e) && [...e.versions, ...(e.proposals ?? [])].some((v) => v && v.costUsd !== 0))
+    return !!boxes.visits?.length || entries.some((e) => !isComponent(e) && [...e.versions, ...e.redo ?? []].some((v) => v.costUsd !== 0))
   }
   const goLive = (app: string) => lived.add(normalizePrompt(app))
 
-  /** The recorded design for a new screen's side `slot`, or null when it has none. */
-  function recordedScreen(app: string, action: string | null, slot: number): Recorded | null {
-    const rec = recOf(app), ref = action && screenRef(action)
+  /** The recorded first design of a new screen, or null. */
+  function recordedFirst(app: string, action: string | null, device: Device): Recorded | null {
+    const rec = recOf(app, device), ref = action && screenRef(action)
     if (!rec || (action && !ref)) return null
-    return recordedDesign(rec, ref ? ref.name : null, slot)
+    return recordedDesign(rec, ref ? ref.name : null, 0)
   }
-  /** The recorded design for a Regenerate of `entry` (the next after those it has), or null: an Edit, a component, or a screen whose newest version an Edit made stay live. */
-  function recordedRegenerate(entry: CacheEntry, change: string | null): Recorded | null {
+  /** The recorded Another of `entry`: a recorded screen with one design in its History, from its first words. */
+  function recordedAnother(entry: CacheEntry): Recorded | null {
+    const rec = recOf(entry.app), all = [...entry.versions, ...entry.redo ?? []], v = all[0]
+    if (!rec || isComponent(entry) || all.length !== 1 || !v || v.feedback || v.by || v.prompt) return null
+    return recordedDesign(rec, entry.name ?? null, 1)
+  }
+  /** How settling `entry` (`first` time or `again`) is filed. */
+  function plan(entry: CacheEntry, how: 'first' | 'again'): Plan {
     const rec = recOf(entry.app), v = entry.versions.at(-1)
-    if (!rec || change || isComponent(entry) || !v || v.feedback || v.by) return null
-    return recordedDesign(rec, entry.name ?? null, entry.versions.length + 1)
-  }
-  /**
-   * How a pick of `key` is filed: a replay (Home's filing by its side), `nothing` (another recorded screen,
-   * before the mockup's first live call), or `live`.
-   */
-  function pickFiling(key: string, side: number | null): { replay: Recorded } | 'nothing' | 'live' {
-    const e = cache.get(key), rec = e && recOf(e.app)
-    if (!e || !rec || live(e.app) || !recordedDesign(rec, e.name ?? null, 0)) return 'live'
-    if ((e.name ?? HOME_NAME) !== HOME_NAME) return 'nothing'
-    // After the pick, the side is the recorded design the screen now shows.
-    side ??= rec.screens[HOME_NAME]!.designs.slice(0, PROPOSALS).findIndex((d) => recordedHtml(d) === e.versions[0]?.html)
-    const f = side >= 0 ? recordedFiling(rec, side) : null
+    if (!rec || !v || live(entry.app)) return 'live'
+    const n = [0, 1].findIndex((i) => { const d = recordedDesign(rec, entry.name ?? null, i); return !!d && recordedHtml(d) === v.html })
+    if (n < 0) return 'live'
+    if ((entry.name ?? HOME_NAME) !== HOME_NAME) return 'nothing'
+    const f = how === 'first' ? recordedFiling(rec, n) : null
     return f ? { replay: f } : 'live'
   }
+
   /** The background job running for each mockup, by root key: filings and the fixer's visits run one after another. */
   const filings = new Map<string, Promise<unknown>>()
   /** How many filings each mockup has in its chain. */
@@ -123,23 +108,17 @@ export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string
     return p
   }
 
-  /** File a decision in the mockup's chain (a pick's is `other`). Whether a filing started. */
-  function file(key: string, decision: { other: string } | { change: string }): boolean {
+  /** File the version showing in the mockup's chain: a settled screen's (`{}`) or an Edit's (`change`). `replay`: a recorded filing. Whether a filing started. */
+  function file(key: string, decision: Record<string, never> | { change: string }, replay?: Recorded): boolean {
     const e = cache.get(key)
     if (!e || isComponent(e)) return false
     const root = normalizePrompt(e.app), t0 = performance.now(), since = cache.now()
-    const how = 'other' in decision ? pickFiling(key, null) : 'live'
-    if (how !== 'live') {
-      quiet.add(root)
-      queueMicrotask(() => quiet.delete(root))
-      if (how === 'nothing') return false
-    } else {
+    if (!replay) {
       if (!may()) return false
       goLive(e.app)
     }
-    const recorded = how === 'live' ? undefined : free(how.replay)
     count(root, 1)
-    chain(root, () => fileDecision({ cache, key, decision, ...io, log, recorded }))
+    chain(root, () => fileDecision({ cache, key, decision, ...io, log, recorded: free(replay ?? null) }))
       .then((run) => run && log(`filed ${run.screen} in ${(run.ms / 1000).toFixed(1)} s for $${run.costUsd?.toFixed(4)}: added ${run.added.join(', ') || 'nothing'}, changed ${run.changed.join(', ') || 'nothing'}, refused ${run.refused.length}`))
       .catch((err) => {
         log(`filing failed: ${message(err)}`)
@@ -147,6 +126,21 @@ export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string
       })
       .finally(() => count(root, -1))
     return true
+  }
+
+  /**
+   * Settle a screen the user clicks on from: its filing starts (a recording's, or none, in a starter's mockup), and on
+   * every 5th screen settled for the first time a visit after it, unless a recording answered. Null for an unknown screen.
+   */
+  function settle(key: string): { entry: CacheEntry; filing: boolean; visiting: boolean } | null {
+    const entry = cache.get(key)
+    if (!entry || isComponent(entry) || !entry.versions.length) return null
+    const how = cache.settle(key)
+    if (!how) return { entry, filing: false, visiting: false }
+    const p = plan(entry, how)
+    const filing = p === 'nothing' ? false : file(key, {}, p === 'live' ? undefined : p.replay)
+    const every = how === 'first' && p === 'live' && cache.boxesOf(entry.app).settled! % VISIT_EVERY === 0
+    return { entry, filing, visiting: every && !visit(entry.app) }
   }
 
   /** Per mockup: the visit running (with its redraws), how to stop its redraws, and whether another waits. */
@@ -158,13 +152,12 @@ export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string
    */
   function visit(app: string, ask?: VisitOptions['ask']): string | null {
     const root = normalizePrompt(app)
-    if (!cache.get(root)?.versions.length) return 'Wait for Home\'s pick.'
+    if (!cache.get(root)?.versions.length) return 'Wait for Home.'
     if (visits.has(root)) {
       if (ask) return 'The fixer is visiting now: try again when it is done.'
       again.add(root)
       return null
     }
-    if (!ask && quiet.has(root)) return 'A pick answered by a recording brings no visit.'
     if (!may()) return 'No live calls now.'
     goLive(app)
     const since = cache.now(), t0 = performance.now(), stop = new AbortController()
@@ -176,8 +169,8 @@ export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string
         await Promise.all(r.redraws.map(async (d) => {
           const e = cache.get(d.key), v = e?.versions.at(-1)
           if (!e || !v) return
-          if (v.createdAt > r.visit.at) return void (d.change.text = `did not redraw ${e.name}: it changed during the visit`)
-          for await (const ev of reviseEvents(e, d.sentence, isModelId(v.model) ? v.model : DEFAULT_MODEL, v.device ?? DEFAULT_DEVICE, stop.signal, r.group)) {
+          if (v.createdAt > r.visit.at || drawingNow.has(e.key)) return void (d.change.text = `did not redraw ${e.name}: it changed during the visit`)
+          for await (const ev of reviseEvents(e, { change: d.sentence }, isModelId(v.model) ? v.model : DEFAULT_MODEL, stop.signal, r.group)) {
             if (ev.type === 'version') Object.assign(d.change, { text: d.change.text.replace('redrawing', 'redrew'), undo: { key: d.key, createdAt: ev.version.createdAt } }), cost += ev.version.costUsd ?? 0
             if (ev.type === 'error') d.change.text = `could not redraw ${e.name}: ${ev.message}`
           }
@@ -213,32 +206,31 @@ export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string
     stops.get(root)?.abort()
   }
 
-  const message = (err: unknown) => (err instanceof Error ? err.message : String(err))
+  /** Mark a key as being drawn while `events` run. */
+  async function* drawingKey<T>(key: string, events: AsyncGenerator<T>): AsyncGenerator<T> {
+    drawingNow.add(key)
+    try { yield* events } finally { drawingNow.delete(key) }
+  }
 
   /**
-   * A new screen: from the cache when it is there (with its open A OR B, if any), else two designs at once. Asked
-   * `again`, an open A OR B with a side missing (refused, or failed) draws that side only; the side there is sent as it is.
+   * A new screen: from the cache when it is there, else one design. The click's screen (`from`) is settled first,
+   * whether or not the screen it opens is drawn already.
    */
-  async function* screenEvents(app: string, asked: string | null, model: ModelId, device: Device, click: { from: string; label: string } | null, signal: AbortSignal, again = false): AsyncGenerator<ScreenEvent> {
+  async function* screenEvents(app: string, asked: string | null, model: ModelId, device: Device, click: { from: string; label: string } | null, signal: AbortSignal): AsyncGenerator<ScreenEvent> {
     let action = canonicalAction(asked)
+    if (click && cache.get(click.from)?.versions.length) settle(click.from)
     const hit = cache.find(app, action)
     const key = hit?.key ?? screenKey(app, action)
-    const slots = Array.from({ length: PROPOSALS }, (_, i) => i)
-    const missing = hit ? (!again || hit.versions.length || !hit.proposals ? [] : slots.filter((i) => !hit.proposals![i])) : slots
-    if (hit && !missing.length) {
-      yield { type: 'meta', key, cached: true, variants: 0 }
+    if (hit) {
+      yield { type: 'meta', key, cached: true }
       yield { type: 'done', entry: hit }
       return
     }
     const root = screenKey(app, null)
-    if (action != null && !cache.get(root)) {
-      yield { type: 'error', message: 'this mockup has no first screen: it was deleted, or never made' }
-      return
-    }
-    if (click && !cache.get(click.from)?.versions.length) {
-      yield { type: 'error', message: 'the screen clicked in is gone' }
-      return
-    }
+    if (action != null && !cache.get(root)) return void (yield { type: 'error', message: 'this mockup has no first screen: it was deleted, or never made' })
+    if (click && !cache.get(click.from)?.versions.length) return void (yield { type: 'error', message: 'the screen clicked in is gone' })
+    // Every later screen takes the first screen's size.
+    if (action != null) device = deviceOf(app) ?? device
     // A design that finishes after its screen, the screen clicked in or its mockup was deleted is not kept.
     const since = cache.now()
     const gone = () => cache.removedSince(key, since) || cache.removedSince(root, since) || (!!click && cache.removedSince(click.from, since))
@@ -248,73 +240,71 @@ export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string
       const planned = plannedScreens(cache.map(app).entries).find((p) => p.name === ref.name)
       action = `@${ref.name}: ${planned?.action ?? promptFromLabel(ref.name, click?.label ?? '')}`
     }
-    // The side missing of an open A OR B is drawn from that screen's own line.
-    if (hit?.action != null && hit.name) action = `@${hit.name}: ${hit.action}`
-    const prompt = ref || hit?.action != null ? screenRef(action!)!.prompt : null
-    yield { type: 'meta', key, cached: false, variants: PROPOSALS }
-    for (const [slot, v] of (hit?.proposals ?? []).entries()) if (v) yield { type: 'version', variant: slot, version: v }
-    // The paper should hold what the last decision filed: wait for it, a little.
+    const prompt = ref ? screenRef(action!)!.prompt : null
+    yield { type: 'meta', key, cached: false }
+    // The paper should hold what the last settle filed: wait for it, a little.
     await filed(app, fileWaitMs)
     if (signal.aborted) return
     const from = click && cache.get(click.from)
-    const target = { id: hit?.action != null && hit.name ? hit.name : ref ? ref.name : HOME_NAME, line: prompt ?? HOME_LINE }
-    const paper = cache.paper(app, device)
-    // One random side asks for a clearly different design, so the side says nothing about which is which.
-    const different = Math.min(PROPOSALS - 1, Math.floor(random() * PROPOSALS))
-    // A starter's recorded screen replays its first two designs, A and B; any other is drawn live.
-    const recorded = slots.map((slot) => recordedScreen(app, action, slot))
-    if (missing.some((slot) => !recorded[slot])) goLive(app)
-    const streams = missing.map((slot) => tagged(slot, generateScreen({
-      user: drawRequest(paper, target, from ? { ...shown(from), label: click!.label } : null, slot === different),
-      model, device, signal, ...io, recorded: free(recorded[slot] ?? null),
-    })))
+    const target = { id: ref ? ref.name : HOME_NAME, line: prompt ?? HOME_LINE }
+    const recorded = recordedFirst(app, action, device)
+    if (!recorded) goLive(app)
     const parent = click && { key: click.from, label: click.label || prompt || 'home' }
-    const failed: string[] = []
-    for await (const t of merge(streams)) {
-      if ('error' in t) {
-        if (signal.aborted) continue // the browser left; nothing to report
-        log(`screen failed (${model}): ${message(t.error)}`)
-        failed.push(message(t.error))
-        yield { type: 'failed', variant: t.slot, message: message(t.error) }
-      } else if (t.ev.type === 'chunk') yield { type: 'chunk', variant: t.slot, text: t.ev.text }
-      else {
-        // A finished side is paid for: keep it even if the browser left or picked the other side,
-        // unless the screen was deleted or picked meanwhile.
-        if (gone()) continue
-        if (!cache.propose(app, action, t.slot, t.ev.version, parent)) continue
-        yield { type: 'version', variant: t.slot, version: t.ev.version }
+    try {
+      for await (const ev of generateScreen({ user: drawRequest(cache.paper(app, device), target, from ? { ...shown(from), label: click!.label } : null), model, device, signal, ...io, recorded: free(recorded) })) {
+        if (ev.type === 'chunk') { yield { type: 'chunk', text: ev.text }; continue }
+        // A finished design is paid for: keep it even if the browser left, unless its screen or mockup was deleted.
+        if (gone()) return void (yield { type: 'error', message: 'this screen was deleted while it was being made' })
+        const made = cache.find(app, action)
+        const entry = made ? cache.addVersion(made.key, ev.version) : cache.addScreen(app, action, ev.version, parent)
+        if (!entry) return void (yield { type: 'error', message: 'no screen was made' })
+        yield { type: 'version', version: ev.version }
+        yield { type: 'done', entry }
       }
+    } catch (err) {
+      if (signal.aborted) return
+      log(`screen failed (${model}): ${message(err)}`)
+      yield { type: 'error', message: message(err) }
     }
-    if (signal.aborted) return
-    const entry = cache.get(key)
-    if (gone()) yield { type: 'error', message: 'this screen was deleted while it was being made' }
-    else if (!entry) yield { type: 'error', message: [...new Set(failed)].join('; ') || 'no screen was made' }
-    else yield { type: 'done', entry }
   }
 
-  /** A new version: an Edit with `change` (a screen's is filed), else a Regenerate. `group`: a fixer's redraw, in its visit's change. */
-  async function* reviseEvents(entry: CacheEntry, change: string | null, model: ModelId, device: Device, signal: AbortSignal, group?: number): AsyncGenerator<ScreenEvent> {
+  /**
+   * A new version: an Edit (`change`; a screen's is filed), Draw again (`prompt`; Home's renames the mockup) or Another
+   * (neither). `group`: a fixer's redraw, in its visit's change.
+   */
+  async function* reviseEvents(entry: CacheEntry, ask: Revise, model: ModelId, signal: AbortSignal, group?: number): AsyncGenerator<ScreenEvent> {
     const fixer = group != null
-    const { key, app } = entry
-    yield { type: 'meta', key, cached: false, variants: 1 }
-    await filed(app, fileWaitMs)
+    const change = ask && 'change' in ask ? ask.change : null, words = ask && 'prompt' in ask ? ask.prompt : null
+    const home = entry.key === normalizePrompt(entry.app)
+    yield { type: 'meta', key: entry.key, cached: false }
+    await filed(entry.app, fileWaitMs)
     if (signal.aborted) return
-    device = entry.versions.at(-1)!.device ?? device
-    const paper = cache.paper(app, device), parent = entry.parent && cache.get(entry.parent.key)
+    const device = entry.versions.at(-1)?.device ?? deviceOf(entry.app) ?? DEFAULT_DEVICE
+    const parent = entry.parent && cache.get(entry.parent.key)
+    const from = parent?.versions.length ? { ...shown(parent), label: entry.parent!.label } : null
+    const paper = cache.paper(entry.app, device)
     const user = change ? editRequest(paper, shown(entry), change, isComponent(entry))
-      : drawRequest(paper, shown(entry), parent?.versions.length ? { ...shown(parent), label: entry.parent!.label } : null)
-    const recorded = fixer ? null : recordedRegenerate(entry, change)
-    if (!recorded) goLive(app)
+      : words != null ? drawRequest(home ? { ...paper, app: words } : paper, { id: entry.name ?? HOME_NAME, line: home ? HOME_LINE : words }, from)
+      : `${drawRequest(paper, shown(entry), from)}\n\n${ALTERNATIVE_REQUEST}`
+    const recorded = fixer || ask ? null : recordedAnother(entry)
+    if (!recorded) goLive(entry.app)
     try {
       for await (const ev of generateScreen({ user, model, device, signal, ...io, recorded: free(recorded) })) {
-        if (ev.type === 'chunk') { yield { type: 'chunk', variant: 0, text: ev.text }; continue }
-        const version: Version = { ...ev.version, ...(change && { feedback: change }), ...(fixer && { by: 'fixer' as const }) }
+        if (ev.type === 'chunk') { yield { type: 'chunk', text: ev.text }; continue }
+        const version: Version = { ...ev.version, ...(change && { feedback: change }), ...(words != null && { prompt: words }), ...(fixer && { by: 'fixer' as const }) }
+        let key = entry.key
+        if (words != null && cache.get(key)) {
+          // Draw again: the new words are the screen's prompt; Home's are the mockup's name.
+          try {
+            if (home) { cache.rename(entry.app, words); key = normalizePrompt(words) } else entry.action = words
+          } catch (err) { return void (yield { type: 'error', message: message(err) }) }
+        }
         const stored = cache.group(() => cache.addVersion(key, version), group)
         // A component the user changed is the user's now; a fixer's redraw keeps its mark.
         if (isComponent(entry) && !fixer) Object.assign(entry, { by: 'user', at: version.createdAt, seen: true })
         if (signal.aborted) return
-        if (!stored) { yield { type: 'error', message: 'this screen was deleted while it was being changed' }; return }
-        yield { type: 'version', variant: 0, version }
+        if (!stored) return void (yield { type: 'error', message: 'this screen was deleted while it was being changed' })
+        yield { type: 'version', version }
         yield { type: 'done', entry: stored, filing: !!change && !fixer && file(key, { change }) }
       }
     } catch (err) {
@@ -331,24 +321,27 @@ export function drawing(cache: ScreenCache, io: Omit<Io, 'log'>, log: (m: string
   const busy = () => filings.size > 0 || visits.size > 0 || [...filingCount.values()].some((n) => n > 0)
 
   /**
-   * Whether a request to `path` with JSON body `b` would be answered by a recording, with no model call:
-   * a recorded screen's A OR B, a Regenerate of one, a pick whose filing is replayed or that files nothing.
+   * Whether a request to `path` with JSON body `b` would be answered by a recording, with no model call: a recorded
+   * screen's first design, Another on it, a settle whose filing is replayed or that files nothing.
    */
   function replayed(path: string, b: any): boolean {
     if (path === '/api/screen') {
       const app = typeof b?.app === 'string' ? b.app.trim() : ''
       const action = canonicalAction(typeof b?.action === 'string' && b.action.trim() ? b.action.trim() : null)
-      return !!app && Array.from({ length: PROPOSALS }, (_, slot) => recordedScreen(app, action, slot)).every(Boolean)
+      const device = action != null ? deviceOf(app) : isDevice(b?.device) ? b.device : DEFAULT_DEVICE
+      return !!app && !!device && !!recordedFirst(app, action, device)
     }
     const entry = cache.get(String(b?.key ?? ''))
-    if (!entry) return false
-    if (path === '/api/revise') {
-      const change = typeof b?.change === 'string' && b.change.trim() ? b.change.trim() : null
-      return !!entry.versions.length && !!recordedRegenerate(entry, change)
-    }
-    if (path === '/api/pick') return !!entry.proposals && pickFiling(entry.key, Number(b?.index)) !== 'live'
+    if (!entry?.versions.length) return false
+    if (path === '/api/revise') return b?.change == null && b?.prompt == null && !!recordedAnother(entry)
+    if (path === '/api/settle') return !isComponent(entry) && plan(entry, entry.settled ? 'again' : 'first') !== 'live'
     return false
   }
 
-  return { file, visit, mapOf, forget, idle, busy, screenEvents, reviseEvents, replayed }
+  return {
+    file, settle, visit, mapOf, forget, idle, busy, replayed, drawingNow: (key: string) => drawingNow.has(key),
+    screenEvents: (...a: Parameters<typeof screenEvents>) => drawingKey(screenKey(a[0], canonicalAction(a[1])), screenEvents(...a)),
+    reviseEvents: (...a: Parameters<typeof reviseEvents>) => drawingKey(a[0].key, reviseEvents(...a)),
+  }
 }
+

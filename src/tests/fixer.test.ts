@@ -13,11 +13,11 @@ const ver = (html: string, createdAt = '2026-11-08T00:00:00Z'): Version => ({
 })
 const HOME = '<title>Home</title><h1>Tonight</h1><nav><a data-action="@history: every night">History</a></nav>'
 
-/** Home and History picked; two rules, a table and a component, one rule the user's. */
+/** Home and History drawn; two rules, a table and a component, one rule the user's. */
 function paper() {
   const cache = new ScreenCache()
-  const home = cache.pick(cache.propose('Snore', null, 0, ver(HOME))!.key, 0)!
-  const history = cache.pick(cache.propose('Snore', '@history: every night', 0, ver('<title>History</title><nav><a data-action="@home">Home</a></nav>'), { key: home.key, label: 'History' })!.key, 0)!
+  const home = cache.addScreen('Snore', null, ver(HOME))!
+  const history = cache.addScreen('Snore', '@history: every night', ver('<title>History</title><nav><a data-action="@home">Home</a></nav>'), { key: home.key, label: 'History' })!
   cache.setBox('Snore', 'add', 'rules', { id: 'score-scale', text: 'Scores run from 0 to 10.' }, 'filing')
   cache.setBox('Snore', 'add', 'rules', { id: 'score-range', text: 'A score is between 0 and 10.' }, 'filing')
   cache.setBox('Snore', 'add', 'rules', { id: 'calm', text: 'Screens speak calmly.' }, 'user')
@@ -55,15 +55,14 @@ describe('a visit\'s reply', () => {
     expect(rules(cache)).toContain('calm')
   })
 
-  test('remove, add a rule, take a component from a screen it read, redraw at most 5 screens, each once and none with an open A OR B', () => {
+  test('remove, add a rule, take a component from a screen it read, redraw at most 5 screens, each once and none that is not there', () => {
     const { cache, home, visit } = paper()
-    cache.propose('Snore', '@nights: all nights', 0, ver('<h1>n</h1>'), { key: home.key, label: 'Nights' })
-    const more = Array.from({ length: MAX_REDRAWS }, (_, i) => cache.pick(cache.propose('Snore', `@s${i}: screen ${i}`, 0, ver('<h1>s</h1>'), { key: home.key, label: 'S' })!.key, 0)!.name)
+    const more = Array.from({ length: MAX_REDRAWS }, (_, i) => cache.addScreen('Snore', `@s${i}: screen ${i}`, ver('<h1>s</h1>'), { key: home.key, label: 'S' })!.name)
     const out = visit(['remove devices', 'add rule score-direction: A higher score is worse.', 'add component tab-bar from home part 2: every main screen',
       'add component nope from nights part 1: x', 'redraw nights: x', 'redraw home: x', 'redraw home: again', ...more.map((n) => `redraw ${n}: x`)].join('\n'))
     expect(out.changes.map((c) => c.text)).toEqual(['removed devices', 'added rule score-direction: A higher score is worse.', 'added component tab-bar from home',
       'redrawing home: x', ...more.slice(0, MAX_REDRAWS - 1).map((n) => `redrawing ${n}: x`)])
-    expect(out.refused.map((r) => r.split('": ')[1])).toEqual(['the visit did not read a screen nights', 'nights is waiting for a pick', 'home is redrawn once a visit', 'a visit redraws at most 5 screens'])
+    expect(out.refused.map((r) => r.split('": ')[1])).toEqual(['the visit did not read a screen nights', 'no screen nights', 'home is redrawn once a visit', 'a visit redraws at most 5 screens'])
     expect(cache.component('Snore', 'tab-bar')).toMatchObject({ by: 'fixer', seen: false, parent: { key: home.key }, versions: [{ html: '<nav><a data-action="@history: every night">History</a></nav>' }] })
     expect(cache.boxesOf('Snore').rules.at(-1)).toMatchObject({ id: 'score-direction', by: 'fixer' })
     expect(out.redraws.map((r) => [r.key, r.sentence])[0]).toEqual([home.key, 'x'])
@@ -161,7 +160,7 @@ describe('the Undo of a box', () => {
   test('the states are saved with the cache', () => {
     const file = join(tmpdir(), `uxwoz-states-${Date.now()}.json`)
     const a = new ScreenCache(file)
-    a.pick(a.propose('Snore', null, 0, ver(HOME))!.key, 0)
+    a.addScreen('Snore', null, ver(HOME))
     a.setBox('Snore', 'add', 'rules', { id: 'big', text: 'Big.' }, 'user')
     const b = new ScreenCache(file)
     expect(b.undoBox('Snore', 'rules')).toBeNull()
@@ -172,7 +171,7 @@ describe('the Undo of a box', () => {
 describe('fixes after review', () => {
   test('Undo of Components after filing took tab-bar from Home leaves Home showing the tab bar', () => {
     const cache = new ScreenCache()
-    const home = cache.pick(cache.propose('Snore', null, 0, ver(HOME))!.key, 0)!
+    const home = cache.addScreen('Snore', null, ver(HOME))!
     applyFiling(cache, 'Snore', home.key, HOME, 'component tab-bar from part 2: every main screen', backgroundVersion(null))
     expect(cache.get(home.key)!.versions[0]!.html).toContain('data-component="tab-bar"')
     expect(cache.undoBox('Snore', 'components')).toBeNull()
@@ -300,23 +299,23 @@ function provider(reply: string) {
 
 async function withServer(reply: string, run: (s: { post: (p: string, b: object) => Promise<Response>; map: (wait?: boolean) => Promise<any>; p: ReturnType<typeof provider>; cache: ScreenCache }) => Promise<void>) {
   const p = provider(reply), cache = new ScreenCache()
-  const server = createServer({ port: 0, cache, fetch: p.fetch, env, log: () => {}, random: () => 0.9, fileWaitMs: 100 })
+  const server = createServer({ port: 0, cache, fetch: p.fetch, env, log: () => {}, fileWaitMs: 100 })
   const post = (path: string, body: object) => fetch(new URL(path, server.url), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   const map = async (wait = false) => (await fetch(new URL(`/api/map?app=Snore${wait ? '&wait=1' : ''}`, server.url))).json()
   try { await run({ post, map, p, cache }) } finally { p.open(); server.stop(true) }
 }
 
-/** Make and pick the first screen and `n - 1` more. */
+/** Make and settle the first screen and `n - 1` more. */
 async function picks(post: (p: string, b: object) => Promise<Response>, n: number, from = 0) {
   for (let i = from; i < from + n; i++) {
     const action = i ? `@s${i}: screen ${i}` : null
     const done = (await (await post('/api/screen', { app: 'Snore', action, ...(i && { from: 'snore', label: `S${i}` }) })).text()).trim().split('\n').at(-1)!
-    await post('/api/pick', { key: JSON.parse(done).entry.key, index: 0 })
+    await post('/api/settle', { key: JSON.parse(done).entry.key })
   }
 }
 
 describe('the visit in the server', () => {
-  test('every 5th pick brings a visit after its filing; its redraw is an Edit that files nothing', () => {
+  test('every 5th settled screen brings a visit after its filing; its redraw is an Edit that files nothing', () => {
     return withServer('remove old-rule\nnote: No screen needs it.\nredraw home: add a Back\nnote: x', async ({ post, map, p, cache }) => {
       await picks(post, 4)
       cache.setBox('Snore', 'add', 'rules', { id: 'old-rule', text: 'Old.' }, 'filing')
@@ -346,7 +345,7 @@ describe('the visit in the server', () => {
       await map(true)
       expect((await (await post('/api/box', { app: 'Snore', op: 'visit' })).json()).visiting).toBe(true)
       await (await post('/api/screen', { app: 'Snore', action: '@s9: nine', from: 'snore', label: 'S9' })).text()
-      await post('/api/pick', { key: 'snore » @s9', index: 0 })
+      await post('/api/settle', { key: 'snore » @s9' })
       expect(p.asked.at(-1)).toBe('visit') // the pick's filing waits in the chain
       p.open()
       const m = await map(true)
@@ -400,11 +399,11 @@ describe('the visit in the server', () => {
     })
   })
 
-  test('a 409 says why; a 5-pick visit that lands during a visit runs after it', () => {
+  test('before Home a box\'s Edit is refused; a 5th settle\'s visit that lands during a visit runs after it', () => {
     return withServer('', async ({ post, map, p }) => {
+      expect((await post('/api/box', { app: 'Snore', op: 'edit', box: 'rules', text: 'x' })).status).toBe(404)
       await (await post('/api/screen', { app: 'Snore' })).text()
-      expect(await (await post('/api/box', { app: 'Snore', op: 'edit', box: 'rules', text: 'x' })).json()).toEqual({ error: 'Wait for Home\'s pick.' })
-      await post('/api/pick', { key: 'snore', index: 0 })
+      await post('/api/settle', { key: 'snore' })
       await map(true)
       await post('/api/box', { app: 'Snore', op: 'visit' })
       await picks(post, 4, 1)

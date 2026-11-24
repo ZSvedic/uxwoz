@@ -1,4 +1,4 @@
-// The screen cache: each screen, its open A OR B until a pick, then its versions, and the click that
+// The screen cache: each screen, its versions (the last shows) and those Undo set aside, and the click that
 // made it. Each mockup has its boxes (components are entries), their last states and the fixer's notes:
 // those are in cache-boxes.ts, whose ScreenCache extends the class here.
 
@@ -44,7 +44,7 @@ export interface CacheEntry {
   name?: string
   /** Null for the first screen (and screens made without a click). */
   parent: Parent | null
-  /** Oldest first; the last one shows. Empty while the A OR B is open. */
+  /** Oldest first; the last one shows. */
   versions: Version[]
   /** After an Undo, the versions newer than the one showing, oldest first; `versions` and `redo` keep VERSIONS together. */
   redo?: Version[]
@@ -52,7 +52,7 @@ export interface CacheEntry {
   draws?: number
   /** The createdAt of the version filing read when the screen was last settled. */
   settled?: string
-  /** The open A OR B, by side; null until a side finishes (or if it failed). */
+  /** The open A OR B of a version 5 file, by side: read at load only (as versions); the browser still names it. */
   proposals?: (Version | null)[]
   /** A component: its ID is `name`, where it belongs is `action`, parent is the screen it came from. */
   kind?: 'component'
@@ -85,8 +85,6 @@ export interface Trip { id: string; visitor: string; name: string; at: string; s
 export interface Shared { shares: Share[]; feedback: Feedback[]; trips: Trip[] }
 
 const emptyBoxes = (): Boxes => ({ rules: [], data: [], gone: { components: [], rules: [], data: [] } })
-
-export const PROPOSALS = 2
 
 /** A short ID from a seed's hash: the shortest of `lengths` not `taken`, else from the seed again with a count. */
 function shortId(seed: string, lengths: number[], taken: Set<string>): string {
@@ -210,39 +208,22 @@ export abstract class ScreenCacheBase {
     this.removed.set(key, ++this.clock)
   }
 
-  /** Store one finished side of a new screen's A OR B; the first side makes the screen. Undefined once picked. */
-  propose(app: string, action: string | null, side: number, version: Version, parent: Parent | null = null): CacheEntry | undefined {
+  /**
+   * A new screen with its first design, shown at once (`draws` 1). A parent must be a drawn screen of this mockup; a
+   * click that raced a delete makes no parent. Undefined for an action that names no screen, or a screen there already.
+   */
+  addScreen(app: string, action: string | null, version: Version, parent: Parent | null = null): CacheEntry | undefined {
     action = canonicalAction(action)
-    let entry = this.find(app, action)
-    if (!entry) {
-      const key = screenKey(app, action)
-      const ref = action ? screenRef(action) : null
-      if (action && !ref) return undefined
-      // A parent must be a picked screen of this mockup; a click that raced a delete makes no parent.
-      const from = parent && this.entries.get(parent.key)
-      const ok = action && parent && from?.versions.length && normalizePrompt(from.app) === normalizePrompt(app)
-      entry = {
-        key, app, action: ref ? ref.prompt || nameWords(ref.name) : null, name: ref ? ref.name : HOME_NAME,
-        parent: ok ? { key: parent!.key, label: parent!.label } : null, versions: [], proposals: Array(PROPOSALS).fill(null),
-      }
-      this.entries.set(key, entry)
+    const ref = action ? screenRef(action) : null
+    if ((action && !ref) || this.find(app, action)) return undefined
+    const key = screenKey(app, action)
+    const from = parent && this.entries.get(parent.key)
+    const ok = action && parent && from?.versions.length && normalizePrompt(from.app) === normalizePrompt(app)
+    const entry: CacheEntry = {
+      key, app, action: ref ? ref.prompt || nameWords(ref.name) : null, name: ref ? ref.name : HOME_NAME,
+      parent: ok ? { key: parent!.key, label: parent!.label } : null, versions: [version], draws: 1,
     }
-    if (!entry.proposals || !Number.isInteger(side) || side < 0 || side >= entry.proposals.length) return undefined
-    entry.proposals[side] = version
-    this.save()
-    return entry
-  }
-
-  pick(key: string, side: number): CacheEntry | undefined {
-    const entry = this.entries.get(key)
-    const v = Number.isInteger(side) ? entry?.proposals?.[side] : null
-    if (!entry || !v) return undefined
-    entry.versions = [v]
-    entry.draws = 1
-    entry.settled = v.createdAt
-    delete entry.proposals
-    const b = this.own(entry.app)
-    b.settled = (b.settled ?? 0) + 1
+    this.entries.set(key, entry)
     this.save()
     return entry
   }
@@ -348,7 +329,7 @@ export abstract class ScreenCacheBase {
       const a = byRoot.get(root) ?? { app: e.app, screens: 0, updatedAt: '' }
       if (e.key === root && e.mid) a.id = e.mid
       if (!isComponent(e)) a.screens++
-      for (const v of [...e.versions, ...e.redo ?? [], ...(e.proposals ?? [])]) if (v && v.createdAt > a.updatedAt) a.updatedAt = v.createdAt
+      for (const v of [...e.versions, ...e.redo ?? []]) if (v.createdAt > a.updatedAt) a.updatedAt = v.createdAt
       byRoot.set(root, a)
     }
     return [...byRoot.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))

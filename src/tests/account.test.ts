@@ -61,8 +61,7 @@ const codeOf = (email: string) => mails.findLast((m) => m.to[0] === email.trim()
 const cookieOf = (r: Response) => r.headers.get('Set-Cookie')!.match(/uxwoz_who=([a-f0-9]{32})/)![1]!
 const ver = (html: string): Version => ({ html, model: 'claude-haiku-5.5', servedModel: null, createdAt: '2026-11-11T00:00:00Z', costUsd: 0.001, costEstimated: false, firstChunkMs: 1, totalMs: 2, finishReason: 'stop' })
 function mockup(id: string, app: string, html: string) {
-  const c = cacheOf(id), e = c.propose(app, null, 0, ver(html))!
-  c.pick(e.key, 0)
+  cacheOf(id).addScreen(app, null, ver(html))
 }
 /** Signs in by code; the response of /api/verify. */
 async function signIn(email: string, who: string | null, address = ADDR) {

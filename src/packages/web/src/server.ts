@@ -4,7 +4,7 @@
 import { dirname, join, resolve } from 'node:path'
 import {
   BOX_TITLES, DEFAULT_DEVICE, DEFAULT_MODEL, DEVICES, MODELS, OFFERED_DEVICES, ScreenCache, canonicalAction, isComponent, isDevice, isModelId, normalizePrompt,
-  screenKey, screenRef, STARTERS, VISIT_EVERY, startersCurrent, warmUp, zip, type BoxName, type Io,
+  screenKey, screenRef, STARTERS, startersCurrent, warmUp, zip, type BoxName, type Io,
 } from '@uxwoz/core'
 import { accountRoutes, startAsks } from './account.ts'
 import { adminRoutes } from './admin.ts'
@@ -17,19 +17,30 @@ import sheet from './design/sheet.html'
 import { people, type People } from './people.ts'
 import { PUBLIC_MODEL, clearCookie, gate, publicMode, setCookie, tokenOf } from './public.ts'
 import { hostOf, sharing } from './share.ts'
+import { tourMap } from './tour.ts'
 
 const THEMES_DIR = resolve(import.meta.dir, '../themes')
 /** Theme ids and labels; the first is the default. `clean` is Pico alone, `mockup` is Pico plus mockup.css. */
 const THEMES = { mockup: 'Mockup (sketch)', clean: 'Clean (Pico)' } as const
 const THEME_FILES = new Set(['pico', 'mockup'])
 
-export type { ScreenEvent } from './drawing.ts'
+/** One line of a /api/screen or /api/revise stream: one design. */
+export type { ScreenEvent as DrawEvent, Revise } from './drawing.ts'
+/**
+ * The old A OR B stream's events, which the page still reads until its rework (wave 4); the server now sends
+ * drawing.ts's `ScreenEvent`, one design a stream.
+ */
+export type ScreenEvent =
+  | { type: 'meta'; key: string; cached: boolean; variants: number }
+  | { type: 'chunk'; variant: number; text: string }
+  | { type: 'version'; variant: number; version: import('@uxwoz/core').Version }
+  | { type: 'failed'; variant: number; message: string }
+  | { type: 'done'; entry: import('@uxwoz/core').CacheEntry; filing?: boolean }
+  | { type: 'error'; message: string }
 
 interface ServerOptions extends Io {
   port?: number
   cache?: ScreenCache
-  /** Picks the side that is asked for a clearly different design; Math.random by default. */
-  random?: () => number
   /** How long a new screen or a change waits for a running filing before it goes on without it. */
   fileWaitMs?: number
   /** Who sent a request: 'owner' (the default, always) or a person's id, whose own cache it reaches. */
@@ -73,7 +84,6 @@ const badApp = (app: string) => (!app || app.length > 2000 ? fail('app must be 1
 
 export function createServer(opts: ServerOptions = {}) {
   const log = opts.log ?? ((m: string) => console.warn(m))
-  const random = opts.random ?? Math.random
   const fileWaitMs = opts.fileWaitMs ?? 5000
   const io = { fetch: opts.fetch, env: opts.env, record: opts.record, spent: opts.spent, allow: opts.allow, sleep: opts.sleep }
   const env = () => opts.env ?? process.env
@@ -91,7 +101,7 @@ export function createServer(opts: ServerOptions = {}) {
   const all = desks(opts.cache ?? new ScreenCache(), {
     dir: opts.usersDir ?? process.env.UXWOZ_USERS_DIR ?? null,
     who: pub ? pub.deskOf : (opts.who ?? (() => 'owner')),
-    draw: (cache, id) => drawing(cache, ioOf(id), log, random, fileWaitMs, pub && id !== 'owner' ? pub.may(id) : () => true),
+    draw: (cache, id) => drawing(cache, ioOf(id), log, fileWaitMs, pub && id !== 'owner' ? pub.may(id) : () => true),
     idleMs: opts.idleMs,
     ...(store && { shareOwner: (t: string) => store.shareOwner(t) }),
   })
@@ -176,6 +186,10 @@ export function createServer(opts: ServerOptions = {}) {
       // A mockup's address, and a screen's in it: the same page as `/`, through the same gate (share.ts).
       '/m/:mockup': index,
       '/m/:mockup/:screen': index,
+      // The tour's addresses: the same page, which reads the tour from /api/tour.
+      '/tour': index,
+      '/tour/:name': index,
+      '/api/tour': () => json(tourMap()),
       '/design': sheet,
       ...publicRoutes,
       // For the host's health check: open with the owner's gate on, touches nothing.
@@ -213,40 +227,43 @@ export function createServer(opts: ServerOptions = {}) {
           const p = pickers(b)
           if (p instanceof Response) return p
           const click = typeof b?.from === 'string' && b.from ? { from: b.from.slice(0, 3000), label: String(b?.label ?? '').slice(0, 200) } : null
-          return ndjson(at(req).screenEvents(app, action, p.model, p.device, click, req.signal, b?.again === true))
+          return ndjson(at(req).screenEvents(app, action, p.model, p.device, click, req.signal))
         }),
       },
-      '/api/pick': {
+      // A click that leads to a screen already drawn settles the screen it came from: its filing starts in the
+      // background, and every 5th screen settled the fixer visits after it; the page learns of both from /api/map?wait=1.
+      '/api/settle': {
         POST: api(async (b, req) => {
-          const { cache, file, visit } = at(req)
-          const key = String(b?.key ?? ''), index = Number(b?.index)
-          const other = cache.get(key)?.proposals?.find((p, i) => p && i !== index)?.html
-          const entry = cache.pick(key, index)
-          if (!entry) return fail('no such screen, or no such design to pick', 404)
-          // Filing reads the pick in the background, and every 5th pick the fixer visits after it;
-          // the page learns of both from /api/map?wait=1.
-          const filing = file(key, { other: other ?? '(none: it failed)' })
-          return json({ entry, filing, visiting: cache.boxesOf(entry.app).settled! % VISIT_EVERY === 0 && !visit(entry.app) })
+          const settled = at(req).settle(String(b?.key ?? ''))
+          return settled ? json(settled) : fail('no such screen', 404)
         }),
       },
+      // One new version: an Edit (`change`), Draw again (`prompt`), or Another (neither).
       '/api/revise': {
         POST: api(async (b, req) => {
-          const { cache, reviseEvents } = at(req)
-          const change = typeof b?.change === 'string' ? b.change.trim() : null
-          if (b?.change != null && (!change || change.length > 1000)) return fail('change must be 1-1000 characters')
+          const { cache, reviseEvents, drawingNow } = at(req)
+          const text = (v: unknown, max: number) => (v == null ? null : typeof v === 'string' && v.trim() && v.trim().length <= max ? v.trim() : false)
+          const change = text(b?.change, 1000), prompt = text(b?.prompt, 500)
+          if (change === false) return fail('change must be 1-1000 characters')
+          if (prompt === false) return fail('prompt must be 1-500 characters')
+          if (change && prompt) return fail('send a change or a prompt, not both')
           const p = pickers(b)
           if (p instanceof Response) return p
           const entry = cache.get(String(b?.key ?? ''))
-          if (!entry) return fail('no such screen', 404)
-          if (!entry.versions.length) return fail('pick one of the two designs first', 409)
+          if (!entry || !entry.versions.length) return fail('no such screen', 404)
           if (isComponent(entry) && !change) return fail('a component changes by Edit')
-          return ndjson(reviseEvents(entry, change, p.model, p.device, req.signal))
+          if (drawingNow(entry.key)) return fail('This mock is being drawn: wait for it.', 409)
+          // Home's new words are the mockup's new name: refused when another mockup has it.
+          const other = prompt && entry.key === normalizePrompt(entry.app) ? cache.find(prompt, null) : null
+          if (other && other.key !== entry.key) return fail('You have another project with these words.', 409)
+          return ndjson(reviseEvents(entry, change ? { change } : prompt ? { prompt } : null, p.model, req.signal))
         }),
       },
       '/api/undo': {
         POST: api(async (b, req) => {
-          const entry = at(req).cache.undo(String(b?.key ?? ''))
-          return entry ? json({ entry }) : fail('no such screen, or nothing to undo', 404)
+          const at_ = typeof b?.at === 'string' ? b.at : undefined
+          const entry = at(req).cache.undo(String(b?.key ?? ''), at_)
+          return entry ? json({ entry }) : fail('no such screen, or no such version', 404)
         }),
       },
       '/api/map': async (req) => {

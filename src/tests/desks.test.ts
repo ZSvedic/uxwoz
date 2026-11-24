@@ -32,7 +32,7 @@ const lines = async (res: Response) => (await res.text()).trim().split('\n').map
 async function home(person: string | null) {
   const evs = await lines(await post(person, '/api/screen', { app: APP, model: 'claude-haiku-5.5' }))
   const cached = evs[0].cached as boolean
-  if (!cached) expect((await post(person, '/api/pick', { key: evs[0].key, index: 0 })).status).toBe(200)
+  if (!cached) expect((await post(person, '/api/settle', { key: evs[0].key })).status).toBe(200)
   return cached
 }
 const apps = async (person: string | null) => (await (await get(person, '/api/apps')).json()).apps.map((a: any) => a.app)

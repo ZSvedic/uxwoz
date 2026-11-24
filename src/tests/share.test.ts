@@ -16,15 +16,12 @@ const ver = (html: string, name: string): Version => ({
 })
 const APP = 'A sleep tracker'
 
-/** A mockup with Home (a link to Nights and one to a planned Settings), Nights, a component, and an open A OR B. */
+/** A mockup with Home (a link to Nights and one to a planned Settings), Nights, and a component. */
 function mockup(file: string | null = null) {
   const cache = new ScreenCache(file)
-  const home = cache.propose(APP, null, 0, ver('<h1>Home</h1><div data-component="tab-bar"></div><button data-action="@nights: Last nights">Nights</button><button data-action="@settings: Settings">Settings</button>', 'Home'))!
-  cache.pick(home.key, 0)
-  const nights = cache.propose(APP, '@nights: Last nights', 0, ver('<h1>Nights</h1><button data-action="back">Back</button>', 'Nights'), { key: home.key, label: 'Nights' })!
-  cache.pick(nights.key, 0)
+  const home = cache.addScreen(APP, null, ver('<h1>Home</h1><div data-component="tab-bar"></div><button data-action="@nights: Last nights">Nights</button><button data-action="@settings: Settings">Settings</button>', 'Home'))!
+  const nights = cache.addScreen(APP, '@nights: Last nights', ver('<h1>Nights</h1><button data-action="back">Back</button>', 'Nights'), { key: home.key, label: 'Nights' })!
   cache.addComponent(APP, 'tab-bar', 'every screen', ver('<nav>Tabs</nav>', 'tab-bar'), 'filing')
-  cache.propose(APP, '@stats: Stats', 1, ver('<h1>Stats</h1>', 'Stats'), { key: home.key, label: 'Stats' })
   return { cache, home: home.key, nights: nights.key }
 }
 
@@ -55,8 +52,11 @@ describe('sharing', () => {
     expect((await post('/api/unshare', { token: view.token })).status).toBe(404)
   })
 
-  test('the player gets the picked screens\' newest versions, their parents and the components, nothing else', async () => {
+  test('the player gets the drawn screens\' versions showing, their parents and the components, nothing else', async () => {
     const { cache, home, nights } = mockup()
+    // Another design of Nights, then Undo: the first shows again, and the player reads that one.
+    cache.addVersion(nights, ver('<h1>Nights, again</h1>', 'Nights'))
+    cache.undo(nights)
     start(cache)
     const { token } = await share('view')
     const page = await fetch(url(`/s/${token}`))
@@ -69,6 +69,7 @@ describe('sharing', () => {
     expect(map.screens.map((s: any) => [s.key, s.name, s.title, s.parent])).toEqual([[home, 'home', 'Home', null], [nights, 'nights', 'Nights', home]])
     expect(Object.keys(map)).toEqual(['role', 'app', 'root', 'components', 'screens'])
     expect(Object.keys(map.screens[0])).toEqual(['key', 'name', 'title', 'html', 'device', 'parent'])
+    expect(map.screens[1].html).toBe('<h1>Nights</h1><button data-action="back">Back</button>')
   })
 
   test('feedback: a view link gets 403, a comment link stores it, one thumb per visitor and screen, texts and lists capped', async () => {
@@ -114,7 +115,7 @@ describe('sharing', () => {
 
   test('an edit link reaches only its mockup, not the share routes, and stops at its cap with 429', async () => {
     const { cache, home, nights } = mockup()
-    cache.propose('Another app', null, 0, ver('<h1>Other</h1>', 'Other'))
+    cache.addScreen('Another app', null, ver('<h1>Other</h1>', 'Other'))
     start(cache)
     const edit = await share('edit', 1), comment = await share('comment')
     const h = { 'x-uxwoz-share': edit.token }
@@ -198,7 +199,7 @@ describe('sharing', () => {
 
   test('an edit link\'s scope reads a POST\'s body only, refuses an app or key that is not a string, and cannot delete its mockup', async () => {
     const { cache, home, nights } = mockup()
-    cache.propose('Another app', null, 0, ver('<h1>Other</h1>', 'Other'))
+    cache.addScreen('Another app', null, ver('<h1>Other</h1>', 'Other'))
     start(cache)
     const h = { 'x-uxwoz-share': (await share('edit')).token }
     // 1. The query names this mockup, the body another (or the other way round): refused.
@@ -216,15 +217,16 @@ describe('sharing', () => {
     expect((await post('/api/warmup', { model: 'claude-haiku-5.5' }, h)).status).toBe(403)
   })
 
-  test('a pick counts against the budget, and a refused call gives its unit back', async () => {
-    const { cache } = mockup()
+  test('a settle that files counts against the budget; one that files nothing, or is refused, costs nothing', async () => {
+    const { cache, nights } = mockup()
     start(cache)
     const edit = await share('edit', 1), h = { 'x-uxwoz-share': edit.token }
-    const open = cache.map(APP).entries.find((e) => !e.versions.length)!
-    expect((await post('/api/pick', { key: open.key, index: 0 }, h)).status).toBe(404) // side 0 never finished
+    expect((await post('/api/settle', { key: `${nights}x` }, h)).status).toBe(404)
     expect(cache.share(edit.token)!.share.used).toBe(0)
-    expect((await post('/api/pick', { key: open.key, index: 1 }, h)).status).toBe(200)
+    expect((await post('/api/settle', { key: nights }, h)).status).toBe(200)
     expect(cache.share(edit.token)!.share.used).toBe(1)
+    // Settled already: nothing to file, so free even past the cap.
+    expect((await post('/api/settle', { key: nights }, h)).status).toBe(200)
     expect((await post('/api/box', { app: APP, op: 'visit' }, h)).status).toBe(429)
   })
 
