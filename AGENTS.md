@@ -14,6 +14,9 @@
 
 Start a session with the latest file in `process/journal/`: it says where the work stands.
 
+**Words.** A person reads *mock* (one screen), *project* (the whole thing) and *UXWoz*. Code, routes
+and types keep the older names: a mock is a `screen`, a project an `app` or `mockup`.
+
 ## Explaining things in chat: KISS
 
 When you answer the user in chat (status updates, failure reports, "why did X happen"), keep it simple:
@@ -31,153 +34,75 @@ When you answer the user in chat (status updates, failure reports, "why did X ha
 
 ## Code map
 
+One line a file: what it owns. Keep it that short; details belong in the file's own header comment.
+
 ```
 src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in the browser
-  models.ts      the 3 screen models and Terra (background, filing), call settings, prices
-  prompt.ts      system prompt (the canvas manual verbatim + how to reply) and the user messages: the paper
-                 (titles, lines, boxes), then Draw, Edit or File (one design, the other only when there was one; a copy of spec/prompt-screen.md; a test keeps them equal)
-  providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol, Terra); a live call checked right
-                 before it is sent (`allow`), its cost once however it ends (`spent`), a live call captured (`record`), a `recorded` one replayed with its timing
+  models.ts      the 3 screen models and Terra (filing, the fixer), call settings, prices
+  prompt.ts      the system prompt and the user messages (the paper, then Draw, Edit, File, Visit); a copy of
+                 spec/prompt-screen.md, kept equal by a test
+  providers.ts   streaming clients (OpenRouter, OpenAI); `allow` before a live call, `spent` after, record and replay
   generate.ts    one design: stream, 20 s deadline, cost, name and idea, refuse cut-off replies
-  starters.ts    the seven starters: id, label, prompt (data only, also in the browser)
-  recordings.ts  server only: recordings/<id>.<device>.json read, a recorded screen's first design and its Another,
-                 Home's first filing by the design showing, promptHash and startersCurrent, what a recording lacks
-  filing.ts      filing: number a screen's parts, ask Terra (also for the fixer), parse its lines, apply them to
-                 the boxes with refusals
-  fixer.ts       the fixer's visit: the paper and the screens new since the last one, parse its lines, apply them
-                 with refusals and an Undo per change; the redraws are left to the server
-  keys.ts        cache keys: a link by @name, normalize a prompt, "home" means the first screen, `back`; box limits and IDs,
-                 states and versions kept, visits kept and how often; a Data table as markdown
-  tree.ts        the tree, worked out: links in each screen (components pasted), @names, planned screens,
-                 shortest-path levels, the titles and lines of the paper
-  cache.ts       screen cache, the screens (ScreenCacheBase): entry and version types, find by name, addScreen (a
-                 new screen with its first design), versions with Undo and Redo (`redo`,
-                 10 kept), draws, settle, rename (every key of a mockup), parents, delete with pruning, apps, sharing
-                 data, takeIn (another cache's mockups, at a sign-in), the JSON file (version 6; a version 5 A OR B
-                 loads as two versions; load, format, save, detach),
-                 the address IDs (a mockup's `mid`, an entry's `sid`, stamped at load and save)
-  cache-boxes.ts screen cache, the boxes (ScreenCache extends the base): components as entries, rules, tables,
-                 limits, IDs, a box's states, Past and Undo, the fixer's notes and their Undo, markSeen, the paper
-  frame.ts       srcdoc page for a screen + our in-frame script (clicks, links out as `open`, the page scrolling inside
-                 the frame and its `scroll` edges, the wheel by `scrollsFirst`, two-finger pinch, picking and locating
-                 a part in view for a comment); the sizes (four offered, two read from before), each with its Device line;
-                 name, idea; paste by ID and the current link
-  zip.ts         a zip of stored entries (CRC-32, central directory), for Export project
-src/packages/web/src/
-  desks.ts       a desk per person: their ScreenCache and its drawing; owner's is createServer's cache, others
-                 open <dir>/<id>.json on demand and close after 10 idle minutes; whose(token) finds a share's desk
-                 (through the store's share index in public mode, opening a closed desk); move (a sign-in's
-                 takeIn), remove (desk and file gone for good), peek, people (for the backup)
-  public.ts      public mode (UXWOZ_PUBLIC needs UXWOZ_OWNER), the uxwoz_who cookie, the address, who(req); the
-                 gate a person's /api request passes onto their own desk: role table, Haiku only, 402 by the
-                 meter (a settle never refused), 409 one at a time, 413 at 5 MB, the warm-up rule, the steps counted
-                 (`picked` at a settle or a click into a new screen); `arrived` and `toured` from the page; a person's metered
-                 Io and `may`; /api/me and the arrived step
-  export.ts      GET /api/export: a mockup as a zip for a coding or design agent (handoff, README with the tree,
-                 the boxes, one page per drawn screen whose links work from disk)
-  server.ts      Bun.serve: /, /m/… and /tour/… (the page), /api/config, /api/screen (NDJSON, one design), /api/settle,
-                 /api/revise (Edit, Another, Draw again: Home's renames, 409 when taken), /api/undo (by `at` too),
-                 /api/tour, /api/map (wait=1 for filing and a visit), /api/apps, /api/delete, /api/delete-app,
-                 /api/box (also undo, a box's Undo and Edit, Visit now), /api/warmup, /api/backup, /api/me, /api/step,
-                 themes; request checks;
-                 every route takes its cache from the request's desk; in public mode the account's and the
-                 admin's routes, the owner's mail of requests, idle visitors swept each day, the backup as a zip
-  drawing.ts     the work behind the routes: filing and visits in one chain per mockup (a click waits for it),
-                 `settle` (filing, a visit every 5th first settle), a visit's redraws as Edits; one design a stream (a
-                 new screen settling its `from` first, Edit, Another, Draw again) as NDJSON, 409 while a screen is
-                 drawn; a starter's recording at the mockup's size replayed in place of those calls, and `replayed`
-  tour.ts        the tour read from tour/ at each request (mocks, rules.md, data.md, components/, notes.md) as
-                 /api/map sends a mockup; `isTour`, which share.ts's `guard` refuses on every other route (404)
-  app.ts         browser entry: builds the canvas and the boxes, opens a project (`start`) or the tour (`openTour`,
-                 `state.tour`), what `/` opens (`openLast`: the last project, the newest, else the tour), Start over
-                 and Delete (then the newest other, else the tour), init
-  state.ts       browser: the shared state (`tour`: the read-only tour is open), local storage, elements by id, Enter sends a form
-  screens.ts     browser: views (a card's name) and draw, a new mock streamed where it lands (glide there, back on a
-                 failure), clicks (@names, back, `new` as the event `uxwoz:new-project`, `/api/settle` for a drawn one;
-                 in the tour only walks to drawn mocks), 🎲 Another (`hooks.describe` after two designs), Edit, Undo, delete
-  nav.ts         browser: the current mock or box, the ← → steps (boxes are steps too), `showBox`, `goTo`, the
-                 address kept in step and followed (Back and Forward, a pasted one, *That project is not here.*),
-                 the map after filing, the step `toured` when the tour's last mock is current
-  address.ts     browser: the address `/m/<project>/<mock>`, `/m/<project>/box-rules` (and -components, -data,
-                 -fixer), `/tour/<mock>`: read and written, which mock it names, push or replace, the ← → steps (`addStep`,
-                 `stepTo`: one browser history entry each) (no DOM, tested)
-  cards.ts       browser: the cards a mock, a box or a component flips to in place (Edit with Delete asked in the card,
-                 History with Undo, Redo and a tap on a version, Info, Describe it differently behind `hooks.describe`),
-                 the buttons under the current box, a component current in its box (`focusComponent`), `boxOp`,
-                 `focusBox`, `lookAt`, `unseen`, Export the boxes
-  flip.ts        what the cards say, no DOM (tested): History's rows and marks, Undo and Redo live, when 🎲 asks for new
-                 words, Info's fields (mock, component, box), each box's buttons
-  bar.ts         browser: the top bar (logo, ← name →, the boxes while they fit, − zoom + ⛶), the name's dropdown
-                 (the boxes, the sentence, the tree), the zoom menu and its keys, `closeMenus`, `renderToolbar`;
-                 `treeRows`, `sizeFor` (Design for's start), `boxesFit`, `keyOf` (none in a text field) with no DOM (tested); the page's parts come in at `initBar`
-  menu.ts        browser: the menu panel from the logo (New project, Recent, Tour, This project, Theme, Sound, the
-                 account's line, Model in the private app, Privacy; Share and Feedback pages are sharing.ts's), Export project with its hint; New project (the
-                 examples first for a newcomer, the prompt box, Design for, Draw it; also on `uxwoz:new-project`)
-  net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill, the brief hint,
-                 the note while a design is drawn (`note`), and the hint that stays (after a live design, until the next click or key)
-  account-ui.ts  browser: the public's account line in the menu (`lineOf`) and the account card (sign in by code, Ask for
-                 more, Delete my account), a refused live design (402, or a design refused while it streams) or a thing
-                 that needs an account; what each shows from
-                 /api/me as functions with no DOM (tested); nothing of it in private mode; the live hint's text and
-                 its record in this browser (`liveHint`)
-  voice.ts       browser: hold to talk: the words after the typed text, kept on release, the four problems (`Talk`,
-                 no DOM, tested), the speech recognition behind it (`HoldToTalk`), the 🎙️ button beside a field (`talkButton`: cards'
-                 fields and New project's prompt box; none without speech)
-  canvas.ts      browser: the boxes right of Home (`boxWidth`; rows below drop under a box taller than Home), the tree
-                 layout (`placeTree`: rows of equal height, ropes that bend in the gap), cards of the project's size with name tags and scroll corners, frames scaled not zoomed, the
-                 four buttons under the current mock, 100% (`hundred`; a box's `boxHundred`) and zoom levels relative to it, Fit all, the glide
-                 (`glideAt`), a resize redoes the last fit, a tap on the sky, links out (`open`), touch: two fingers pan and pinch
-  boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes (pages of the pad, as tall as Home, a place
-                 for their buttons), editing and adding in place (`addEmpty`), the notes' last line (`nextVisit`), Export
-  people.ts      the public's people and money over bun:sqlite (spec/public.md): visitors, sessions, the meter
-                 (mayCall, reserve: $0.004 held per running call, hold, charge), sign-in codes (per network, per email and day) and verify, blocked emails, the top-up at verify, guests at 70% of the day, quota requests, steps, caps, share
-                 tokens, the admin's summary, deletes, the day's address HMAC; no routes
-  mail.ts        mail through Resend (logs with no key off production) and the texts of the emails
-  admin.ts       adminRoutes(store, extras): GET and POST /api/admin (the ops, their checks, their emails), /admin,
-                 /privacy (privacy.html with the operator and contact from the env, the design inline); no gate
-  account.ts     accountRoutes(store, extras): /api/signin, /api/verify, /api/signout, /api/delete-account,
-                 /api/ask, meOf (/api/me's body), closedOf; startAsks: the owner's mail of open requests, one an hour
-  admin.html, admin-page.ts   browser: the admin's page: spend and mode, caps, steps, Requests, People, each dollar amount in screens too
-  share.ts       share links per role, the player's map, feedback (a name first; a visitor's own; Resolve) and
-                 trips, an edit link's scope and cap (a settle that files counts), the owner's gate (UXWOZ_OWNER), the
-                 tour refused; `guard` wraps server.ts's routes
-  sharing.ts     browser: the menu panel's Share and Feedback pages (`showPage`, ← back to the menu; a comment
-                 closes the panel, makes its mock current and calls `commentHook.showComment`, which is comments.ts's
-                 `jump`), a mock's thumbs in Info, an edit link's token on every API call
-  comments.ts    browser: the owner's comments: pins over every drawn mock with open ones (parts scrolled `away` count as
-                 found), the comments at the end of Info with Resolve and Reopen, their count on ℹ️, the jump to a comment
-                 from its pin or Feedback (`jump`: Info flips open at it, ringed)
-  player.html, player.ts   the player at /s/<token>: one mock in a frame of its size that scrolls inside (shrunk
-                 to fit a narrower window), Back, the trail, the name card, comments pinned to parts (asked again on
-                 every `scroll`) in the margin beside the mock, thumbs, Done, trips, `open` in a new tab
-  pins.ts        browser: a comment's anchor, the pin numbers of a screen's comments, the layer of pins over a frame
-                 (the player's and the app's), the rows of the owner's Comments tab, a part's label, the player's
-                 trail, a link's day, the Share page's refresh, `inLayer` (a pin scrolled out of view hides),
-                 `playerFit` (the player's frame size), a comment's number (`numbered`, `numbers`), the player's visits (`visit`) (no DOM, tested)
-  index.html     the page around the canvas; links design/index.css
-  design/        the look: tokens.css (every colour), base.css (shared by parts), one file per part (bar,
-                 canvas, boxes, cards, panel), motion.css; index.css imports them all; fx.ts (the speaker and the whoosh);
-                 player.css (the player's, not in index.css), admin.css (/admin and /privacy, not in index.css), sheet.html and sheet.ts (the sheet at /design)
-  design/brand/  logo.svg (the mark, C2: a drawn W, a sparkle above its short last stroke), the favicons (SVG, PNG,
-                 home screen), the three star tiles, Fredoka and its licence, og.png (the share preview); the pages
-                 inline the mark and the wordmark (UX and oz in Fredoka, the W between) as `.brand` SVGs
-src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
-src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
-src/tests/fixtures/demo-cache.json   the demo mockup (a habit tracker); made by scripts/make-demo-cache.ts
-src/scripts/make-demo-cache.ts   writes the demo mockup through ScreenCache, the same on every run
-src/scripts/record-starters.ts   `bun run starters:record [id…] [--device <id>]`: live calls through createServer on
-                             temporary caches, no old recording replayed, writes recordings/<id>.<device>.json
-recordings/                  the starters' recordings (spec/public.md, Recordings); copied into the image
-tour/                        the tour: four mocks (home.html first), rules.md, data.md, components/, notes.md; a
-                             placeholder until its real content; copied into the image
-src/scripts/demo.ts          `bun run demo`: the app on a temporary copy of the demo mockup, no keys, prints the URLs
-src/scripts/backup.sh        run by hand or weekly by launchd: GET /api/backup (the cache, or the public's zip) into backups/ (git-ignored)
+  starters.ts    the seven examples: id, label, prompt (data only)
+  recordings.ts  recordings/<id>.<device>.json: a recorded mock's two designs, Home's filing, promptHash
+  filing.ts      filing: number a screen's parts, ask Terra, parse its lines, apply them to the boxes
+  fixer.ts       the fixer's visit: its paper, parse its lines, apply them with an Undo per change
+  keys.ts        cache keys, @names, normalize, `back`; box limits and IDs; how many states, versions, visits are kept
+  tree.ts        the tree worked out: links, planned screens, shortest-path levels, the paper's titles and lines
+  cache.ts       the screens: entries and versions, Undo and Redo, draws, settle, rename, delete, the JSON file (v6), IDs
+  cache-boxes.ts the boxes: components as entries, rules, tables, a box's states and Undo, the fixer's notes, the paper
+  frame.ts       the page inside a mock's frame and its script (clicks, scroll, pinch, parts for comments); the sizes
+  zip.ts         a zip of stored entries, for Export project
+src/packages/web/src/        the server
+  server.ts      Bun.serve and every route's entry; request checks; each route works on the request's desk
+  drawing.ts     the work behind the routes: one design a stream, settle, filing and visits in one chain, replays
+  desks.ts       a desk per person: their cache and drawing, opened on demand, closed when idle
+  public.ts      public mode: who a request is, the gate (roles, the meter, one at a time), /api/me, steps
+  people.ts      people and money over bun:sqlite: sessions, the meter, codes, caps, steps, share index; no routes
+  account.ts     /api/signin, verify, signout, delete-account, ask; the owner's mail of requests
+  admin.ts       /api/admin, /admin, /privacy
+  mail.ts        mail through Resend and the emails' texts
+  share.ts       share links per role, the player's map, feedback and trips, an edit link's scope and budget,
+                 the owner's gate; `guard` wraps every route
+  export.ts      /api/export: a project as a zip for a coding agent
+  tour.ts        the tour read from tour/ at each request; `isTour`, refused by every changing route
+src/packages/web/src/        the page
+  app.ts         entry: builds the canvas, opens a project or the tour, what `/` opens, Start over, Delete
+  state.ts       the shared state, local storage, elements by id
+  canvas.ts      the canvas: tree layout and ropes, cards, the boxes' place and size, 100% and zoom, the glide, touch
+  screens.ts     a mock's life: draw and stream, clicks in a mock, Another, Edit, Undo, delete; `labelOf`
+  nav.ts         the current mock or box, ← → steps, the address followed, the map after filing
+  address.ts     the address read and written (/m/…, box-…, /tour/…), the steps (no DOM, tested)
+  bar.ts         the top bar, the name's dropdown, the zoom menu and keys; `treeRows`, `sizeFor` (no DOM, tested)
+  menu.ts        the menu panel and New project; Export project
+  cards.ts       the cards a mock, box or component flips to (Edit, History, Info, Describe it differently); `boxOp`
+  flip.ts        what the cards say (no DOM, tested)
+  boxes.ts       the four boxes: their entries, editing in place
+  voice.ts       hold to talk: `Talk` (no DOM, tested), the speech recognition, the 🎙️ button
+  net.ts         fetches and NDJSON streams, theme CSS, the red pill, hints, the note while drawing
+  account-ui.ts  the public's account line and card; what each shows as functions (no DOM, tested)
+  sharing.ts     the menu's Share and Feedback pages, an edit link's token on every call
+  comments.ts    the owner's comments: pins on the canvas, the list in Info, the jump to one
+  pins.ts        anchors, pin numbers, the pin layer, the player's frame size and trail (no DOM, tested)
+  player.html, player.ts       the player at /s/<token>
+  admin.html, admin-page.ts    the admin's page
+  index.html, privacy.html     the app's page, the privacy page
+  design/        the look: tokens.css (every colour), base.css, one file per part, motion.css, index.css;
+                 fx.ts (sound); player.css and admin.css apart; sheet.html and sheet.ts (/design); brand/ (logo, icons)
+src/packages/web/themes/     pico.css (vendored), mockup.css (the sketch theme)
+src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest;
+                             fixtures/demo-cache.json is the demo project
+src/scripts/                 demo.ts (`bun run demo`), make-demo-cache.ts, record-starters.ts
+                             (`bun run starters:record [id…] [--device <id>]`), backup.sh
+recordings/                  the examples' recordings, 28 files; copied into the image
+tour/                        the tour's four mocks and boxes, edited by hand; copied into the image
 ```
 
 ## Do not read (large or generated)
 
-`cassettes/*.json`, `recordings/*.json`, `src/packages/web/themes/pico.css`, `src/bun.lock`, `temp/`, and
-`process/journal/` beyond its latest file. Search them with grep if you must.
+`cassettes/*.json`, `recordings/*.json`, `src/packages/web/themes/pico.css`, `src/bun.lock`, `temp/`,
+`backups/`, `process/plans/` (finished plans), and `process/journal/` beyond its latest file. Search
+them with grep if you must.
 
 ## Layout rules
 
@@ -189,27 +114,34 @@ The repo is organized by lifecycle; the tree is in [README.md](README.md#find-yo
 - **`spec/` says what, `src/` says how.** Tests read `spec/` by plain path (the prompt test does).
 - **`cassettes/` is recorded data**: the model replies the tests replay, one JSON per test file.
   The prompt bytes are part of every key, so a prompt change means `bun run test:record` (live
-  calls, a few cents). Never delete casually.
+  calls, a few cents) and `bun run starters:record` (20 cents). Never delete casually.
 - **`temp/`** is git-ignored scratch; the dev server's screen cache lives there.
+- **The image takes only what `.dockerignore` lets in** (`src`, `recordings`, `tour`). A new top-level
+  folder the server reads must be added there and in the `Dockerfile`, or the deploy fails.
 
 ## Before you commit
 
 From `src/`: `bun run check` (`bun test`, offline and quick, then the typecheck). In a fresh worktree
 run `bun install --frozen-lockfile` from `src/` first. For UI changes, also look at the running app.
-Bun's `--hot` server cannot pick up a newly added frontend file: restart it after adding one.
 
 **Look at the app.** `PORT=3131 bun run demo` (3100 if no PORT) starts the app on a fresh temporary
-copy of a made-up mockup, a habit tracker, and prints four URLs: the app, and the view, comment and
-edit links. Start it in the background (your shell tool's background option, or `nohup … &`) and stop
-it with `kill $(lsof -ti tcp:3131)`. Open the printed `127.0.0.1` URLs in a browser tab of your own and
-pass its tabId on every call: other agents share the pane. The app opens on Recent: click the mockup.
-A field's blur does not fire from script in a hidden pane, so click for real. It reads no `.env` and clears the model keys, so a model call
-is impossible: a new mock, Edit, Another, Draw again, filing after a click on and a fixer visit fail by design.
-You can still exercise the tree, the boxes (add, change, delete, Undo), Undo on Habit detail, the
-fixer's Undo, History's Undo and Redo, the cards (Edit, History, Info), the tour at `/tour`, Delete, Share, Comments, Export, and the player:
-walking the screens, thumbs, a new comment, Done. The pinned comment on Habit detail shows in the
-player only for its visitor (the demo prints how). Frontend edits show on reload. The mockup is
-`src/tests/fixtures/demo-cache.json`; to change it, edit `src/scripts/make-demo-cache.ts` and run it.
+copy of a made-up project, a habit tracker, and prints four URLs: the app, and the view, comment and
+edit links. Start it in the background and stop it with `kill $(lsof -ti tcp:3131)`. Open the printed
+`127.0.0.1` URLs in a browser tab of your own and pass its tabId on every call: other agents share
+the pane. Close your tab when you are done: the pane holds about nine.
+
+- It reads no `.env` and clears the model keys, so a model call is impossible: a new mock, Edit,
+  Another, Draw again, filing and a fixer visit fail by design.
+- You can exercise the tree, the boxes (add, change, delete, Undo), the cards (Edit, History with
+  Undo and Redo on Habit detail, Info), the fixer's Undo, the tour at `/tour`, Delete, Share,
+  Feedback, Export, and the player (walking, thumbs, a new comment, Done).
+- For live calls use the launch entry `uxwoz-rework` (port 3210, its own cache in `temp/`).
+- **A server started before your edit serves the old page.** Restart it, then look.
+- The pane cannot click inside a frame the canvas has scaled (send the frame's message by script, or
+  zoom to 100% first), pinch, show `confirm()` or `prompt()`, or save a download. A background tab
+  paints frames white and pauses animation: front the tab, or check by script.
+- The demo project is `src/tests/fixtures/demo-cache.json`; to change it, edit
+  `src/scripts/make-demo-cache.ts` and run it.
 
 ## Design
 
@@ -217,6 +149,7 @@ player only for its visitor (the demo prints how). Frontend edits show on reload
   130 lines, colours only in `tokens.css`.** A change that crosses a cap removes something first.
   `tests/design.test.ts` checks it. To find the file for a look change: a colour is in `tokens.css`, a
   shape in the part's file, a rule two parts share in `base.css`, movement in `motion.css`.
+- **One look.** There is no night look: nothing may depend on `prefers-color-scheme`.
 - **No design tweak without a request.** Change colours, spacing, fonts, motion or sounds only when the
   user asked for that change. A bug fix keeps the look as it is.
 
@@ -235,7 +168,7 @@ same time only in different parts.
 |---|---|---|---|
 | Engine | core: `models`, `prompt`, `providers`, `generate`, `starters`, `recordings` | `generate-screen`, `cut-off`, `recordings` | `prompt-screen.md`, `ui-generation.md` |
 | Cache | core: `cache`, `cache-boxes`, `keys`, `tree` | `cache`, `boxes`, `tree`, `demo-cache` | contract: Types |
-| Server | web: `server`, `drawing`, `desks`, `public`, `export`, `people`, `mail`, `admin`, `account`, `tour`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks`, `public`, `people`, `mail`, `admin`, `account`, `replay`, `journey` | contract: HTTP API, `public.md` |
+| Server | web: `server`, `drawing`, `desks`, `public`, `export`, `people`, `mail`, `admin`, `account`, `tour`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks`, `public`, `people`, `mail`, `admin`, `account`, `signin`, `replay`, `journey`, `bursts`, `tour` | contract: HTTP API, `public.md` |
 | Canvas | web: `app`, `state`, `screens`, `nav`, `address`, `canvas`, `bar`, `menu`, `net`, `account-ui`; core: `frame` | `ropes`, `frame`, `bar`, `address`, `account-ui` | behavior: Top bar to A mock, Navigation |
 | Boxes and cards | web: `boxes`, `cards`, `flip`, `voice` | `boxes`, `cards`, `voice` | behavior: The buttons under a mock, Voice, Boxes |
 | Sharing | web: `share`, `sharing`, `comments`, `pins`, `player.*` | `share`, `comments`, `pins` | behavior: Sharing |
@@ -244,38 +177,44 @@ same time only in different parts.
 Facts that cost builders a search:
 
 - On a canvas card `note` is the status line (*Making the change…*), and "notes" is the fixer's box.
-- A card's name is `labelOf` in `screens.ts`; the bar, the cards and Delete use it too.
+- The last of an entry's `versions` is the one showing; versions undone wait in `redo`.
 - The player's map (`playerMap` in `share.ts`) lists drawn screens only, each with its `parent`, in no
   promised order. Share tokens are hex.
-- `guard` in `share.ts` wraps every `/api` route: a route that takes `key` or `app` is already limited
-  to an edit link's own mockup, view and comment links get 403, and `/api/apps` is cut there too.
+- `guard` in `share.ts` wraps every `/api` route: a route that takes `key`, `app` or `from` is already
+  limited to an edit link's own project, view and comment links get 403, and the tour is refused.
 - Components are cache entries. The player's map and the paper the models get copy named fields, so a
   new field on an entry stays private until you add it there.
-- A builder's worktree can start behind `main`: fast-forward it to `main` before reading anything.
-- Builders add their lines to the code map and leave the Parts table to the lead: every builder who
-  edited its Server row caused a merge conflict.
-- To look at the public app: `UXWOZ_PUBLIC=1 UXWOZ_OWNER=<any>` with `UXWOZ_CACHE_FILE`, `UXWOZ_DB` and
-  `UXWOZ_USERS_DIR` in a temporary folder. With no `RESEND_API_KEY` outside production the sign-in code
-  is in the server's log. The owner's cookie is per host, so be the owner on `localhost` and a visitor
-  on `127.0.0.1`.
-- A click inside a screen's frame never reaches the page around it. The frame posts messages (see
+- A click inside a mock's frame never reaches the page around it. The frame posts messages (see
   Frame messages in the contract); of the keys, only Escape and the zoom keys are passed on.
+- In the tour (`state.tour`) the page sends no request that changes anything.
+- To look at the public app: the launch entry `uxwoz-public` (port 3200, a temporary folder). With no
+  `RESEND_API_KEY` the sign-in code is in the server's log. The owner's cookie is per host: be the
+  owner on `localhost/?owner=letmein`, visitors on `127.0.0.1` and `<any>.localhost`.
 
 ## How a request is built
 
-The lead sizes the request, then runs builders (Opus, each in its own worktree). Measured on
-2026-11-11: a small feature takes a builder 2 minutes, a medium one 3 to 5.
+The lead sizes the request, then runs builders (Opus, each in its own worktree). A small feature
+takes a builder 2 minutes, a medium one 3 to 5, a part's rewrite 10 to 15.
 
-- **Small** (one part, about 50 lines): one builder, no plan file, no critic. The lead reads the diff,
-  runs `bun run check`, merges.
+- **Small** (one part, about 50 lines): the lead does it, or one builder with no critic. `bun run
+  check`, a look, merge.
 - **Medium** (crosses parts, or a new route, or stored data): one builder, then one critic on the
   diff while the lead looks at the app. Fixes go back to the same builder.
 - **Large**: cut it into medium steps by part. Steps in different parts run together, three at most;
   one critic reads two steps' diffs at once. Write a plan file only when the user must choose
   something first.
 
-A critic gets the diff and the spec section, looks for behaviour that is wrong with a failing case
-each, and is told to say so plainly when it finds nothing.
+Rules that held on 2026-11-24, when ten builders rebuilt the app in an hour and a half:
+
+- A builder's worktree can start behind: its first command is `git merge --ff-only <the lead's branch>`.
+- Builders correct their lines in the code map and leave the Parts table to the lead.
+- When two builders' steps overlap, merge the first, then send the second back to merge the lead's
+  branch into its own and resolve: it knows its changes.
+- A critic gets the diff and the spec section, looks for behaviour that is wrong with a failing case
+  each, and says so plainly when it finds nothing. Never skip it: builders report green on work with
+  real defects.
+- Critics' findings go to one fix builder as numbered lists; it reports per number.
+- When the work is merged, remove the worktrees and their branches.
 
 Pictures are slow to read. A builder checks the page by its text and by script, and takes two
 screenshots at most; the lead looks once before merging. Design work is the exception.
@@ -283,7 +222,7 @@ screenshots at most; the lead looks once before merging. Design work is the exce
 The brief, under 1,500 characters:
 
 ```
-You are a builder on UX Woz. Read AGENTS.md first and follow it. Part: <part>.
+You are a builder on UX Woz. First run `git merge --ff-only <branch>`, then read AGENTS.md and follow it. Part: <part>.
 Feature: <what the user sees, in the user's words; the edge cases that matter; what must not change>.
 Done means: the code; tests for <what>; the sentences in spec/<file>; the code map if a line is no
 longer true; `bun run check` green; looked at with `PORT=<own port> bun run demo`; committed on your

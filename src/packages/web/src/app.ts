@@ -49,13 +49,13 @@ export const canvas = new Canvas($('stage'), {
 export async function start(app: string, make = true, at: { sid?: string | null; box?: Box | null; inPlace?: boolean; device?: Device } = {}) {
   // Its draws write no address until it is open: then one, as a new step unless in place.
   address.hold++
-  try { await openProject(app, make, at.sid, at.box ?? null, !!at.inPlace, at.device) } finally { address.hold--; syncAddress(at.inPlace) }
+  try { await openProject(app, make, at.sid, at.box ?? null, at.device) } finally { address.hold--; syncAddress(at.inPlace) }
 }
 
 /** A project's boxes and their Undo, as none: the map of the project opened brings its own. */
 const noBoxes = () => { state.boxes = null; state.past = { components: [], rules: [], data: [] } }
 
-async function openProject(app: string, make: boolean, sid: string | null | undefined, box: Box | null, inPlace: boolean, device?: Device) {
+async function openProject(app: string, make: boolean, sid: string | null | undefined, box: Box | null, device?: Device) {
   showError(null)
   const n = ++state.starts
   const res = await mapOf(app)

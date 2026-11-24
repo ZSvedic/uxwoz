@@ -1,7 +1,7 @@
 # Rework gaps: what the prompt and the tour leave open
 
-This plan lists what [zel-rework-prompt.md](../../spec/zel-rework-prompt.md) and
-[zel-tour-compilation-v4.md](../../spec/zel-tour-compilation-v4.md) do not settle, each with the answer
+This plan lists what [zel-rework-prompt.md](2026-11-24-rework/zel-rework-prompt.md) and
+[zel-tour-compilation-v4.md](2026-11-24-rework/zel-tour-compilation-v4.md) do not settle, each with the answer
 I suggest. It decides nothing about the look: the logo versions and the black-and-white mocks come next.
 
 Status: Zel answered on 2026-11-24, in three rounds. Decided: four sizes and their heights (3), Haiku
@@ -62,7 +62,7 @@ OK all. 2: keep the long sheet. 6: keep "hey Woz" too. 18: call it Reroll.
    ```
 
    The app reads the folder when the tour opens, so an edit shows on reload. The files are the source
-   from then on: `spec/zel-tour-compilation-v4.md` is the draft they came from, and no test ties them.
+   from then on: `2026-11-24-rework/zel-tour-compilation-v4.md` is the draft they came from, and no test ties them.
 5. **Edit, History, Delete.** Suggest: Edit holds the field, 🎙️, **Make the change**, and a small
    **Delete this mock…** at its bottom. History holds Undo, Redo and the list of versions; a tap on one
    shows it. So Past changes moves from Edit to History and exists once, and four buttons stay four.
