@@ -5,7 +5,7 @@
 /** The classes, ids and attributes this file and motion.css key on, each with the feature file that sets it. */
 export const HOOKS = {
   card: 'canvas.ts', streaming: 'canvas.ts', screen: 'canvas.ts',
-  'data-id': 'canvas.ts', rail: 'boxes.ts', box: 'boxes.ts', drawer: 'index.html', sound: 'index.html', logo: 'index.html',
+  'data-id': 'canvas.ts', box: 'boxes.ts', flip: 'cards.ts', turn: 'cards.ts', sound: 'index.html', logo: 'index.html',
 } as const
 
 /** Sounds play only when the stored setting says so: off by default. */
@@ -62,7 +62,7 @@ if (DOM) {
     // Made inside the click, so Safari lets the later sounds play.
     if (sound) audio(true)
   })
-  // A design appearing and the drawer swinging in.
+  // A design appearing and a card turning over.
   document.addEventListener('animationstart', (e) => {
     if (e.animationName !== 'summon' && e.animationName !== 'hand') return
     const t = performance.now()

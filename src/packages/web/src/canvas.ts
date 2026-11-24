@@ -160,8 +160,10 @@ export interface ScreenView {
   fresh?: boolean
   /** The tour: every button grey. */
   tour?: boolean
-  /** The button whose card shows (✏️ or ℹ️ while the drawer is open on it): dark. */
+  /** The button whose card shows (cards.ts): dark. */
   pressed?: string | null
+  /** Open comments on it, counted on ℹ️ (*ℹ️ 2*). */
+  comments?: number
 }
 
 interface CanvasHandlers {
@@ -336,7 +338,7 @@ export class Canvas {
 
   /** What 100% shows of a mock (its name, buttons and ropes), a box with its buttons, or a component's card. */
   private frame(t: Target): Box | undefined {
-    if (t instanceof HTMLElement) return { ...this.elBox(t), w: t.offsetWidth + RAIL_W }
+    if (t instanceof HTMLElement) { const b = this.elBox(t); return { ...b, h: b.h + BUTTONS_H } } // a box and its buttons
     const card = this.places.get(t)
     if (card) return frameOf(card, this.z)
     const comp = this.cards.get(t)
@@ -550,6 +552,12 @@ export class Canvas {
     c.frame.srcdoc = framePage(html, css, final)
   }
 
+  /** A mock's card and its screen, where cards.ts lays the card it flips to. */
+  face(key: string) {
+    const c = this.cards.get(key)
+    return c ? { el: c.el, screen: c.screen } : null
+  }
+
   /** A drawn, finished mock's frame and the layer of its pins; null while it streams. */
   pinTarget(key: string) {
     const c = this.cards.get(key)
@@ -612,6 +620,7 @@ export class Canvas {
       btn.classList.toggle('off', off)
       btn.setAttribute('aria-disabled', String(off))
       btn.classList.toggle('on', s.pressed === name)
+      if (name === 'info') btn.lastChild!.textContent = s.comments ? `Info ${s.comments}` : 'Info'
     }
   }
 

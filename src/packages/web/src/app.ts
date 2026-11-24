@@ -8,7 +8,7 @@ import { plannedScreens } from '@uxwoz/core/tree'
 import type { CacheEntry } from '@uxwoz/core'
 import { createSide, type Box } from './boxes.ts'
 import { Canvas } from './canvas.ts'
-import { boxOp, focusBox, onTool, openDrawer, unseen } from './drawer.ts'
+import { focusBox, focusComponent, onTool, unseen } from './cards.ts'
 import { hint, mapOf, post, showError, themeCss } from './net.ts'
 import { landing, readAddress } from './address.ts'
 import { address, applyMap, boxShown, currentKey, followAddress, goTo, notHere, resetTrail, setCurrent, showBox, syncAddress, toStart, trailStep, walkTrail } from './nav.ts'
@@ -20,16 +20,21 @@ import { initAccount } from './account-ui.ts'
 import { $, generate, modelSelect, state, store } from './state.ts'
 import './design/fx.ts' // the speaker and the whoosh
 
-export const side = createSide(boxOp, (box, tab) => { focusBox(box); boxShown(); openDrawer(tab) })
-// A press in a box makes it current (a step); one in a component card makes that card current instead.
+export const side = createSide()
+// A press in a box makes it current (a step); one on a component's card makes that component current instead. Its
+// buttons and the card it flipped to leave things as they are.
 for (const [name, s] of Object.entries(side.sections)) s.addEventListener('pointerdown', (e) => {
-  if ((e.target as Element).closest('.card')) return
+  const t = e.target as Element
+  if (t.closest('.acts, .flip')) return
+  const comp = t.closest<HTMLElement>('.card[data-id]')
+  if (comp) return focusComponent(comp.dataset.id!)
   focusBox(name as Box)
   boxShown()
 })
 export const canvas = new Canvas($('stage'), {
   action: onAction,
-  focus: setCurrent,
+  // A press in a component's frame makes that component current, in its box.
+  focus: (key) => (state.entries.get(key)?.kind === 'component' ? focusComponent(key) : setCurrent(key)),
   tool: onTool,
   zoomed: (z) => { $('zoomPct').textContent = `${Math.round(z * 100)}%` },
 }, side.el, side.components)
@@ -62,7 +67,7 @@ async function openProject(app: string, make: boolean, sid: string | null | unde
   }
   state.app = app
   state.tour = false
-  state.drawer = state.box = null
+  state.flip = state.box = state.component = null
   store.set('uxwoz:app', app)
   generate.classList.remove('open')
   applyMap(map)
@@ -96,7 +101,7 @@ export async function openTour(at: { at?: string | null; box?: Box | null } = {}
     if (n !== state.starts) return
     const app = map.entries[0]?.app
     if (!app) throw new Error('the tour is missing')
-    Object.assign(state, { app, tour: true, drawer: null, box: null })
+    Object.assign(state, { app, tour: true, flip: null, box: null, component: null })
     generate.classList.remove('open')
     applyMap(map)
     const l = landing(app, state.entries, at.at ?? null, true)
@@ -121,7 +126,7 @@ export async function openLast(inPlace = false, except?: string) {
 export function closeMockup() {
   state.busy?.abort()
   store.set('uxwoz:app', '')
-  Object.assign(state, { app: null, tour: false, entries: new Map(), boxes: null, filing: false, current: null, box: null, making: null, revising: null, drawer: null })
+  Object.assign(state, { app: null, tour: false, entries: new Map(), boxes: null, filing: false, current: null, box: null, making: null, revising: null, flip: null, component: null })
   resetTrail()
   loadRecent()
   draw()

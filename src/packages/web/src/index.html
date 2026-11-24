@@ -80,33 +80,13 @@
   <div id="hint" class="hint-pill" role="status" hidden>One screen at a time: wait until this one is made.</div>
   <div id="error" class="error-pill" role="alert" hidden><span id="errorText"></span><button id="errorClose" title="Close">✕</button></div>
   </div>
-  <aside id="drawer" class="drawer" hidden>
-    <div class="drawer-head">
-      <div class="tabs" role="tablist">
-        <button role="tab" data-tab="edit">✎ Edit</button>
-        <button role="tab" data-tab="info">ⓘ Info</button>
-        <button role="tab" data-tab="comments" id="commentsTab">💬 Comments</button>
-      </div>
-      <button id="drawerClose" class="close" title="Close (Esc)">✕</button>
-    </div>
-    <p id="drawerName" class="drawer-name"></p>
-    <form id="editPane" class="pane">
-      <label for="change" id="changeLabel">What should change?</label>
-      <textarea id="change" rows="4" maxlength="1000" placeholder="e.g. Show one level indicator, not four"></textarea>
-      <button id="makeChange" type="submit" class="primary">Make the change</button>
-      <h3>Past changes</h3>
-      <ol id="history" class="history" reversed></ol>
-    </form>
-    <div id="infoPane" class="pane"><dl id="info" class="info"></dl></div>
-    <div id="commentsPane" class="pane comments-pane" hidden></div>
-    <div id="sharePane" class="pane share-pane" hidden></div>
-  </aside>
   <form id="generate" class="generate">
     <div class="gen-head"><h2 id="genTitle">What should we mock up?</h2><button type="button" id="genClose" class="close" title="Close (Esc)" aria-label="Close">✕</button></div>
     <p id="genLead" class="lead" hidden>Pick an example, or describe your own.</p>
     <h3 id="ownTitle" hidden>or describe your own</h3>
     <textarea id="prompt" name="prompt" rows="2" maxlength="2000" required
       placeholder="Describe a product, e.g. a cat litter box app"></textarea>
+    <div class="gen-row" id="promptTalk"></div>
     <label class="gen-for">Design for <select id="device" title="The size of the project's mocks"></select></label>
     <button type="submit" class="primary go">Draw it</button>
     <div class="gen-list" id="startersBox">

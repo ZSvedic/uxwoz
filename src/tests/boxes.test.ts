@@ -6,6 +6,21 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { LIMITS, ScreenCache, applyFiling, elementEnd, markCurrent, numberParts, parseFiling, pasteComponents, type Fetch, type Version } from '@uxwoz/core'
 import { createServer } from '@uxwoz/web/src/server.ts'
+import { boxesMarkdown, nextVisit } from '../packages/web/src/boxes.ts'
+
+describe('the boxes on the canvas', () => {
+  test('the fixer\'s notes end with the mocks left before the next visit', () => {
+    const b = { rules: [], data: [], gone: { components: [], rules: [], data: [] } }
+    expect([nextVisit({ ...b, settled: 2 }), nextVisit({ ...b, settled: 9 }), nextVisit(b)])
+      .toEqual(['The next visit comes after 3 more mocks.', 'The next visit comes after 1 more mock.', 'The next visit comes after 5 more mocks.'])
+  })
+
+  test('Export the boxes writes the rules and the tables as markdown', () => {
+    const md = boxesMarkdown('Snore', [], { rules: [{ id: 'calm', text: 'Calm.', by: 'user', at: '', seen: true }], data: [], gone: { components: [], rules: [], data: [] } })
+    expect(md).toContain('# Boxes of Snore')
+    expect(md).toContain('- **calm**: Calm.')
+  })
+})
 
 const ver = (html: string): Version => ({
   html, model: 'claude-haiku-5.5', servedModel: null, createdAt: '2026-11-07T00:00:00Z',

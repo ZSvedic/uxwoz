@@ -100,7 +100,13 @@ src/packages/web/src/
                  the map after filing, the step `toured` when the tour's last mock is current
   address.ts     browser: the address `/m/<project>/<mock>`, `/m/<project>/box-rules` (and -components, -data,
                  -fixer), `/tour/<mock>`: read and written, which mock it names, push or replace (no DOM, tested)
-  drawer.ts      browser: box changes and rail tools, the drawer (Edit, Info, and Comments for a screen) for a screen or a box
+  cards.ts       browser: the cards a mock, a box or a component flips to in place (Edit with Delete asked in the card,
+                 History with Undo, Redo and a tap on a version, Info, Describe it differently behind `hooks.describe`),
+                 the buttons under the current box, a component current in its box (`focusComponent`), `boxOp`,
+                 `focusBox`, `lookAt`, `unseen`, Export the boxes; drawer.ts is a shim for sharing.ts until it imports
+                 `renderCards` from here
+  flip.ts        what the cards say, no DOM (tested): History's rows and marks, Undo and Redo live, when 🎲 asks for new
+                 words, Info's fields (mock, component, box), each box's buttons
   bar.ts         browser: the top bar (logo, ← name →, the boxes while they fit, − zoom + ⛶), the name's dropdown
                  (the boxes, the sentence, the tree), the zoom menu and its keys, `closeMenus`, `renderToolbar`;
                  `treeRows`, `sizeFor` (Design for's start), `boxesFit` with no DOM (tested); the page's parts come in at `initBar`
@@ -115,13 +121,14 @@ src/packages/web/src/
                  /api/me as functions with no DOM (tested); nothing of it in private mode; the live hint's text and
                  its record in this browser (`liveHint`)
   voice.ts       browser: hold to talk: the words after the typed text, kept on release, the four problems (`Talk`,
-                 no DOM, tested) and the speech recognition behind it (`HoldToTalk`); no button wired in yet
+                 no DOM, tested), the speech recognition behind it (`HoldToTalk`), the 🎙️ button beside a field (`talkButton`: cards'
+                 fields and New project's prompt box; none without speech)
   canvas.ts      browser: the boxes right of Home, the tree layout (`placeTree`: rows of equal height, ropes that bend in
                  the gap), cards of the project's size with name tags and scroll corners, frames scaled not zoomed, the
                  four buttons under the current mock, 100% (`hundred`) and zoom levels relative to it, Fit all, the glide
                  (`glideEnd`, `glideAt`), a tap on the sky, links out (`open`), touch: two fingers pan and pinch
-  boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes and their rails, editing and adding in
-                 place, Export
+  boxes.ts       browser: the Components, Rules, Data and Fixer's notes boxes (pages of the pad, as tall as Home, a place
+                 for their buttons), editing and adding in place (`addEmpty`), the notes' last line (`nextVisit`), Export
   people.ts      the public's people and money over bun:sqlite (spec/public.md): visitors, sessions, the meter
                  (mayCall, reserve: $0.004 held per running call, hold, charge), sign-in codes (per network, per email and day) and verify, blocked emails, the top-up at verify, guests at 70% of the day, quota requests, steps, caps, share
                  tokens, the admin's summary, deletes, the day's address HMAC; no routes
@@ -136,8 +143,9 @@ src/packages/web/src/
                  tour refused; `guard` wraps server.ts's routes
   sharing.ts     browser: the drawer's Share and feedback pane (a comment jumps to it), a screen's thumbs in Info,
                  an edit link's token on every API call
-  comments.ts    browser: the owner's comments: pins over every drawn screen with open ones, the Comments tab with
-                 Resolve and Reopen, the jump to a comment from its pin or the Feedback pane
+  comments.ts    browser: the owner's comments: pins over every drawn mock with open ones (parts scrolled `away` count as
+                 found), the comments at the end of Info with Resolve and Reopen, their count on ℹ️, the jump to a comment
+                 from its pin or Feedback (`jump`: Info flips open at it, ringed)
   player.html, player.ts   the player at /s/<token>: one screen in its device frame, Back, the trail, the name card,
                  comments pinned to parts in the margin beside the screen, thumbs, Done, trips
   pins.ts        browser: a comment's anchor, the pin numbers of a screen's comments, the layer of pins over a frame
@@ -145,7 +153,7 @@ src/packages/web/src/
                  trail, a link's day, the Share pane's refresh (no DOM, tested)
   index.html     the page around the canvas; links design/index.css
   design/        the look: tokens.css (every colour), base.css (shared by parts), one file per part (bar,
-                 canvas, boxes, drawer, panel), motion.css; index.css imports them all; fx.ts (the speaker and the whoosh);
+                 canvas, boxes, cards, panel), motion.css; index.css imports them all; fx.ts (the speaker and the whoosh);
                  player.css (the player's, not in index.css), admin.css (/admin and /privacy, not in index.css), sheet.html and sheet.ts (the sheet at /design)
   design/brand/  logo.svg (the mark, C2: a drawn W, a sparkle above its short last stroke), the favicons (SVG, PNG,
                  home screen), the three star tiles, Fredoka and its licence, og.png (the share preview); the pages

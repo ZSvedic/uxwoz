@@ -46,3 +46,10 @@ test('through an edit link there are no comments and no count', () => {
   expect(commentRows(list, 'home', new Set(['late']), true)).toEqual([])
   expect(openCount(list, 'home', true)).toBe(0)
 })
+
+test('Info counts the open comments on ℹ️ and lists the resolved ones last; a reopened one counts again', () => {
+  const reopened = list.map((x) => (x.id === 'fixed' ? { ...x, resolved: undefined } : x))
+  expect(commentRows(list, 'home', null).map((r) => r.n)).toEqual([1, 2, null])
+  expect([openCount(list, 'home'), openCount(reopened, 'home')]).toEqual([2, 3])
+  expect(commentRows(reopened, 'home', null).map((r) => [r.f.id, r.n])).toEqual([['fixed', 1], ['first', 2], ['late', 3]])
+})

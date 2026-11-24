@@ -1,0 +1,52 @@
+/* The card a mock, a box or a component flips to (Edit, History, Info, Describe it differently): parchment of the same
+   size laid over it, with a double gold line inside its edge. At the canvas's scale from 100% up; zoomed out, its words
+   keep their real size and the card scrolls. */
+.flip { position: absolute; inset: 0; z-index: 3; zoom: max(1, calc(1 / var(--z))); display: flex; flex-direction: column;
+  gap: 10px; padding: 16px 18px; overflow: auto; border-radius: inherit; background: var(--surface); color: var(--text);
+  font-size: 14px; box-shadow: inset 0 0 0 5px var(--surface), inset 0 0 0 6px var(--current); }
+.card.flipped .screen { mask-image: none; border-radius: 10px; }
+.flip h4 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; font-size: 18px; font-weight: 600; }
+.flip h4 span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flip .close { flex: none; min-width: 32px; color: var(--muted); }
+.flip p { margin: 0; }
+.flip h5 { margin: 8px 0 0; }
+.pane { display: flex; flex-direction: column; gap: 8px; }
+.pane label { color: var(--muted); }
+.pane textarea { width: 100%; resize: vertical; padding: 6px 8px; border: 2px solid var(--border); border-radius: 10px; background: var(--field); }
+.flip .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.flip .row > button { flex: 1; min-height: 36px; border-radius: 99px; }
+/* Make the change and Draw again: the ember button, as Draw it. */
+.flip .row > .primary { flex: 2; box-shadow: var(--pick-shadow); }
+.flip .primary:focus-visible { box-shadow: 0 0 0 2px var(--focus-in), var(--pick-shadow); }
+/* Hold to talk: dark while held. */
+.talk { white-space: nowrap; }
+.talk.on { background: var(--text); color: var(--surface); }
+/* Delete this mock…: at the card's bottom, a plain underlined word until it asks. */
+.flip .del { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+.flip .link { align-self: flex-start; padding: 4px 0; border: 0; background: none; color: var(--muted); text-decoration: underline; }
+.flip .danger { color: var(--err); }
+/* History: each version a slip, the one showing with a gold edge; an undone visit struck through. */
+.versions { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.versions button, .versions li:not(:has(button)) { display: block; width: 100%; padding: 7px 10px; text-align: left;
+  border: 1.5px solid var(--border); border-radius: 10px; background: var(--field); }
+.versions .now { border: 2.5px solid var(--current); }
+.versions small { display: block; color: var(--muted); }
+.versions .undone b { text-decoration: line-through; color: var(--muted); }
+.flip .none { color: var(--muted); }
+/* Info: a label over each value. */
+.info { margin: 0; }
+.info dt { margin-top: 8px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.info dt:first-child { margin-top: 0; }
+.info dd { margin: 0; overflow-wrap: anywhere; }
+
+/* Comments at the end of Info: a card each, with its pin's gold dot; the resolved ones muted; a gold ring when its
+   pin was tapped. In Feedback a comment is a plain-looking button to it. */
+.comments { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.comments li { padding: 10px 12px; border: 2px solid var(--border); border-radius: 14px; overflow-wrap: anywhere; outline: none; }
+.comments li.ring { box-shadow: 0 0 0 3px var(--current); }
+.comments .head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.comments p { margin: 4px 0; white-space: pre-wrap; }
+.comments li > small { display: block; margin-bottom: 6px; }
+.comments small, .comments li.resolved { color: var(--muted); }
+.feedback .jump { display: block; width: 100%; padding: 2px 6px; margin-left: -6px; text-align: left; border-color: transparent; background: none; }
+.feedback .jump:hover { border-color: var(--border); }

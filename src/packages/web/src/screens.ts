@@ -8,12 +8,14 @@ import type { CacheEntry, Version } from '@uxwoz/core'
 import { renderSide } from './boxes.ts'
 import type { ScreenView } from './canvas.ts'
 import { canvas, closeMockup, side } from './app.ts'
-import { boxOp, renderDrawer } from './drawer.ts'
+import { boxOp, renderCards } from './cards.ts'
+import { pressedOf } from './flip.ts'
+import { commentCount } from './comments.ts'
 import { endHint, liveDesign, showLasting, post, showError, hint, note, stream, streamInto, themeCss, type StreamRenderer } from './net.ts'
 import { applyMap, filed, saveCurrent, setCurrent, syncAddress } from './nav.ts'
 import { renderToolbar } from './bar.ts'
 import { loadRecent, openGenerate } from './menu.ts'
-import { changeInput, deviceSelect, generate, modelSelect, promptInput, state, type Making } from './state.ts'
+import { deviceSelect, generate, modelSelect, promptInput, state, type Making } from './state.ts'
 
 // ---- Views
 
@@ -50,13 +52,13 @@ export function views(): ScreenView[] {
   const m = state.making
   // A new mock is current while it is drawn; a box current leaves no mock current.
   const current = m?.key ?? (state.box ? null : state.current)
-  const pressed = !state.box && (state.drawer === 'edit' || state.drawer === 'info') ? state.drawer : null
+  const pressed = state.box ? null : pressedOf(state.flip)
   for (const e of state.entries.values()) {
     const v = e.versions.at(-1)
     if (!v) continue
     const view = { key: e.key, device: v.device, current: current === e.key, streaming: state.revising?.key === e.key, tour: state.tour }
-    if (isComponent(e)) out.push({ ...view, parent: null, name: e.name!, component: true, fresh: !e.seen })
-    else out.push({ ...view, parent: treeParent(e.key), name: labelOf(e), pressed: view.current ? pressed : null })
+    if (isComponent(e)) out.push({ ...view, current: state.box === 'components' && state.component === e.key, parent: null, name: e.name!, component: true, fresh: !e.seen })
+    else out.push({ ...view, parent: treeParent(e.key), name: labelOf(e), pressed: view.current ? pressed : null, comments: view.current ? commentCount(e.key) : 0 })
   }
   if (m && !state.entries.has(m.key)) out.push({ key: m.key, parent: m.parent, name: m.version?.name || m.name, device: m.device, current: true, streaming: !m.version, tour: state.tour })
   return out
@@ -67,10 +69,10 @@ export async function draw() {
   syncAddress()
   state.tree = screenTree(all())
   side.el.hidden = !state.app || !state.entries.size || !state.boxes
-  if (state.boxes) renderSide(side, { boxes: state.boxes, components: components(), past: state.past, visiting: state.visiting, current: state.box }, boxOp)
+  if (state.boxes) renderSide(side, { boxes: state.boxes, components: components(), current: state.box }, boxOp)
   canvas.render(views(), !!state.busy)
   generate.hidden = !!state.app && !generate.classList.contains('open')
-  renderDrawer()
+  renderCards()
   renderToolbar()
   showLasting()
   const theme = state.theme
@@ -242,48 +244,51 @@ export function another(key: string) {
   revise(key, null)
 }
 
-/** One new version of a mock, streamed into its own frame: an Edit with `change`, else Another. */
-export async function revise(key: string, change: string | null) {
+/** One new version of a mock or a component, streamed into its own frame: an Edit with `change`, Draw again with
+ *  `prompt` (new words), else Another. The stored entry once done. */
+export async function revise(key: string, change: string | null, prompt?: string): Promise<CacheEntry | null> {
   const e = state.entries.get(key)
-  if (!e?.versions.length || state.tour) return
-  if (state.busy) return hint()
+  if (!e?.versions.length || state.tour) return null
+  if (state.busy) { hint(); return null }
   state.revising = { key, change }
   refused = null
-  note(change ? 'Making the change…' : `Drawing another design of ${labelOf(e)}…`)
+  let done: CacheEntry | null = null
+  note(change ? 'Making the change…' : `Drawing ${prompt ? 'a new design' : 'another design'} of ${labelOf(e)}…`)
   let frame: StreamRenderer | null = null
-  await stream('/api/revise', { key, ...(change && { change }), model: modelSelect.value }, change ? 'make the change' : 'draw another design', (ev, css) => {
+  await stream('/api/revise', { key, ...(change && { change }), ...(prompt && { prompt }), model: modelSelect.value }, change ? 'make the change' : 'draw another design', (ev, css) => {
     if (ev.type === 'chunk') (frame ??= streamInto(key, css, isComponent(e))).push(ev.text)
     else if (ev.type === 'done') {
       frame?.cancel()
       keep(ev.entry)
+      done = ev.entry
       if (ev.filing) { state.filing = true; filed() }
       state.revising = null
-      if (change) changeInput.value = ''
       if (ev.entry.versions.at(-1)?.costUsd !== 0) liveDesign()
     }
   }, (failed, answered) => {
     frame?.cancel()
     note(null)
-    if (failed && answered) refused = { app: state.app, run: () => revise(key, change) }
+    if (failed && answered) refused = { app: state.app, run: () => revise(key, change, prompt) }
     // After a failure, draw() puts the mock as it was back into its frame.
     if (state.revising?.key === key) state.revising = null
   })
+  return done
 }
 
-/** ⏪ for now: the version before the one showing. */
-export async function undo(key: string) {
+/** History: the version before the one showing, or the one shown at `at` (Redo, a tap on a version). */
+export async function undo(key: string, at?: string) {
   if (state.tour) return
   if (state.busy) return hint()
-  const res = await post('/api/undo', { key }).catch(() => null)
+  const res = await post('/api/undo', { key, ...(at && { at }) }).catch(() => null)
   if (!res?.ok) return showError('Nothing to undo')
   keep((await res.json()).entry)
   draw()
 }
 
-/** Delete a mock, after asking. Mocks only it leads to go too; Home takes the project. */
-export async function removeScreen(key: string) {
+/** The question before a delete: what goes with the mock or component. */
+export function deleteQuestion(key: string): string {
   const e = state.entries.get(key)
-  if (!e || state.busy || !state.app || state.tour) return
+  if (!e || !state.app) return ''
   const root = screenKey(state.app, null) === key
   // The mocks that paste a component, or the mocks Home would no longer reach.
   const rest = screenTree(all().filter((x) => x.key !== key))
@@ -291,7 +296,16 @@ export async function removeScreen(key: string) {
   const what = isComponent(e) ? `the component ${e.name}? ${n ? `The ${n === 1 ? 'mock' : `${n} mocks`} that paste it show nothing in its place.` : 'No mock pastes it.'}`
     : root ? `${labelOf(e)}? That deletes the whole project.`
     : `${labelOf(e)}${n ? ` and the ${n === 1 ? 'mock' : `${n} mocks`} only it leads to` : ''}?`
-  if (!confirm(`Delete ${what}`)) return
+  return `Delete ${what}`
+}
+
+/** Delete a mock or a component, after asking (`asked`: its card asked already). Mocks only it leads to go too; Home
+ *  takes the project. */
+export async function removeScreen(key: string, asked = false) {
+  const e = state.entries.get(key)
+  if (!e || state.busy || !state.app || state.tour) return
+  const root = screenKey(state.app, null) === key
+  if (!asked && !confirm(deleteQuestion(key))) return
   const res = await post('/api/delete', { key }).catch(() => null)
   if (!res?.ok) return showError('Could not delete the mock')
   const map = await res.json() as { removed: string[]; entries: CacheEntry[] }
@@ -299,6 +313,7 @@ export async function removeScreen(key: string) {
   if (root) return closeMockup()
   const parent = treeParent(key)
   applyMap(map)
+  if (isComponent(e)) return
   setCurrent(parent && state.entries.has(parent) ? parent : screenKey(state.app, null))
   if (state.current) canvas.reveal(state.current)
 }

@@ -4,6 +4,7 @@ import type { Device } from '@uxwoz/core/frame'
 import type { TreeNode } from '@uxwoz/core/tree'
 import type { BoxName, Boxes, CacheEntry, Past, Version } from '@uxwoz/core'
 import type { Box } from './boxes.ts'
+import type { Tool } from './flip.ts'
 import type { StreamRenderer } from './net.ts'
 
 export const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -11,8 +12,6 @@ export const generate = $<HTMLFormElement>('generate')
 export const promptInput = $<HTMLTextAreaElement>('prompt')
 export const modelSelect = $<HTMLSelectElement>('model')
 export const deviceSelect = $<HTMLSelectElement>('device')
-export const drawer = $('drawer')
-export const changeInput = $<HTMLTextAreaElement>('change')
 
 /** A new mock while its one design streams in, before it is stored: where it hangs, its name until it has its own. */
 export interface Making { key: string; parent: string | null; device?: Device; name: string; stream: StreamRenderer | null; version: Version | null }
@@ -27,12 +26,17 @@ export const state = {
   tree: new Map<string, TreeNode>(),
   /** The mock the user last opened, tapped, or chose in the dropdown. */
   current: null as string | null,
-  /** The box clicked or shown since: it is current instead of that screen (its rail, the drawer). */
+  /** The box clicked or shown since: it is current instead of that mock (its buttons, its cards). */
   box: null as Box | null,
+  /** A component tapped in the Components box (the box current): the box's three buttons are its own. */
+  component: null as string | null,
   making: null as Making | null,
   /** A drawn mock getting a new version: an Edit with `change`, else Another. */
   revising: null as { key: string; change: string | null } | null,
-  drawer: null as 'edit' | 'info' | 'comments' | 'share' | null,
+  /** The card the current mock, box or component shows flipped over (cards.ts), and the comment Info rings. */
+  flip: null as Tool | null,
+  /** Left for sharing.ts until its rework lands: never set. */
+  drawer: null as 'share' | null,
   busy: null as AbortController | null,
   /** Counts mockups opened, so a slower earlier open gives way to a newer one. */
   starts: 0,

@@ -11,23 +11,23 @@ input, select, button, textarea { font: inherit; color: inherit; }
 button, select { padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); cursor: pointer; }
 button:disabled { color: var(--disabled); cursor: default; }
 button.primary { background: var(--pick); border-color: var(--pick); color: var(--on-pick); font-weight: 600; }
-.toolbar button, .recent button, .drawer :is(.tabs button, .close) { border-color: transparent; background: none; }
+.toolbar button, .recent button, .flip .close { border-color: transparent; background: none; }
 /* The logo, inline SVG: the mark (the drawn W, its sparkle) or the wordmark (UX and oz in Fredoka, the W between). */
 .brand { display: block; overflow: visible; } .brand text { font: 700 38px Fredoka, system-ui, sans-serif; fill: currentColor; }
 .brand polyline { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; } .brand path { fill: var(--sparkle); }
 /* Fredoka: headings, the bar, the logo, primary buttons, the Pick pill, the OR and the names of screens. */
-h2, .box h3, .drawer-name, .toolbar, button.primary, .pick-hint, .or b, .card .name { font-family: Fredoka, system-ui, sans-serif; }
+h2, .box h3, .flip h4, .toolbar, button.primary, .pick-hint, .or b, .card .name { font-family: Fredoka, system-ui, sans-serif; }
 /* Focus: a gold ring around a dark one, so it shows on parchment, wood and sky. */
 :focus-visible:not(.stage, [contenteditable]) { outline: 2px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 2px var(--focus-in); }
-/* Small uppercase headings of menus, the generate panel and the drawer. */
-.menu h3, .generate h3, .pane h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+/* Small uppercase headings of menus, the generate panel and a card. */
+.menu h3, .generate h3, .flip h5 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 /* Text cut off with an ellipsis: menu buttons, menu items, Recent, a screen's name and idea. */
 .menu-button > span:first-child, .menu .item > span, .recent button span, .card .head > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu .item > span, .recent button span { flex: 1; min-width: 0; }
 /* The red hover of the buttons that delete or drop. */
-.rail .tool[data-tool="delete"]:hover:not(:disabled), .or .drop:hover, .menu-foot .danger:hover { color: var(--err); border-color: var(--err); }
+.flip .danger:hover, .or .drop:hover, .menu-foot .danger:hover { color: var(--err); border-color: var(--err); }
 /* The pins over a screen, drawn by pins.ts, in the player and on the canvas: gold dots with dark numbers; clicks pass
-   through the layer to the screen. A pin is ringed while its comment in the drawer is pointed at. */
+   through the layer to the screen. A pin is ringed while its comment in Info is pointed at. */
 .pins { position: absolute; inset: 0; pointer-events: none; }
 .pin, .dot { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; padding: 0; border-radius: 50%;
   background: var(--badge); color: var(--on-badge); font: 600 12px/1 Fredoka, system-ui, sans-serif; }

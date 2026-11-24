@@ -7,7 +7,8 @@ import { STARTERS } from '../../core/src/starters.ts'
 import { el } from './boxes.ts'
 import { openLast, openTour, start } from './app.ts'
 import { closeMenus, sizeFor } from './bar.ts'
-import { closeDrawer } from './drawer.ts'
+import { closeCard } from './cards.ts'
+import { talkButton } from './voice.ts'
 import { beginHint, hint, post, showError, themeCss } from './net.ts'
 import { draw } from './screens.ts'
 import { needsAccount, renderAccountLine } from './account-ui.ts'
@@ -81,7 +82,7 @@ function open(app: string) {
   start(app, false).then(() => { if (!state.app) return openLast(true) }).catch((err) => showError(String(err)))
 }
 
-// A press outside the panel closes it; Esc closes it, the New project panel and the drawer.
+// A press outside the panel closes it; Esc closes it, the New project panel and a flipped card.
 document.addEventListener('pointerdown', (e) => {
   const t = e.target as Node
   if (!panel.hidden && !panel.contains(t) && !$('logo').contains(t)) closeMenu()
@@ -91,7 +92,7 @@ addEventListener('keydown', (e: KeyboardEvent) => {
   if (e.key !== 'Escape') return
   closeMenus()
   if (generate.classList.contains('open')) closeGenerate()
-  if (state.drawer) closeDrawer()
+  if (state.flip) closeCard()
 })
 
 // ---- UXWoz: Theme and Model
@@ -125,7 +126,7 @@ function sizeHere(fallback = deviceSelect.value) {
   deviceSelect.value = [...deviceSelect.options].some((o) => o.value === want) ? want : fallback
 }
 
-// ---- This project: Export project (Share…, Feedback and Export the boxes are wired in sharing.ts and drawer.ts)
+// ---- This project: Export project (Share…, Feedback and Export the boxes are wired in sharing.ts and cards.ts)
 
 /** Export project: the whole project as a zip for a coding or design agent, from the server; a brief hint names the file. */
 $('exportProject').addEventListener('click', () => {
@@ -150,6 +151,8 @@ generate.addEventListener('submit', (e) => {
   if (app) start(app).catch((err) => showError(String(err)))
 })
 enterSubmits(promptInput, generate)
+// 🎙️ Hold to talk beside the prompt box, where the browser can turn speech into text.
+$('promptTalk').append(...[talkButton(promptInput, (m) => showError(m))].filter((b) => b != null))
 $('genClose').addEventListener('click', closeGenerate)
 document.addEventListener('uxwoz:new-project', () => openGenerate())
 

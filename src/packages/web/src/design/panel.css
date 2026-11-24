@@ -29,3 +29,4 @@
 .account-card .err { color: var(--err); }
 .account-card a { color: inherit; }
 @media (max-width: 719px) { .generate.generate { top: 8px; max-height: calc(100% - 16px); } }
+.gen-row { display: flex; gap: 8px; } .gen-row:empty { display: none; }

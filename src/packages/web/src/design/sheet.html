@@ -28,7 +28,6 @@
   .sheet-card .pick-hint { opacity: 1; }
   .sheet-hold { position: relative; flex: none; width: 90px; height: 140px; }
   .sheet-hold > .or { inset: 0; }
-  .sheet-rail .rail { position: static; flex-direction: row; padding: 0; opacity: 1; }
   .sheet-cards { display: flex; flex-wrap: wrap; gap: 80px 90px; padding: 70px 16px 16px; border-radius: 14px;
     background: radial-gradient(40% 40% at 85% 5%, var(--violet-glow), transparent), linear-gradient(var(--sky1), var(--sky2)); }
   .sheet-cards .card { position: relative; width: 200px; }
@@ -36,7 +35,7 @@
   .sheet-boxes { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; padding-top: 10px; }
   .sheet-boxes .box { width: min(100%, 380px); }
   .sheet-pills { display: flex; flex-wrap: wrap; gap: 12px; } .sheet-pills > :is(.error-pill, .hint-pill) { position: static; transform: none; }
-  .drawer.sheet-drawer { position: static; margin: 0; }
+  .sheet-flip { position: relative; width: 300px; height: 360px; }
   .sheet-moves { margin: 0; padding-left: 1.2em; } .sheet-moves button { margin-right: 6px; padding: 0 9px; border-radius: 99px; }
 </style>
 </head>
@@ -73,8 +72,7 @@
     <span class="bar-boxes"><button>📐 Rules <b>2</b></button><button>🗄️ Data <b></b></button></span>
     <button class="wide-only">−</button><span class="pop"><button class="menu-button">100% <span class="caret"></span></button></span><button class="wide-only">+</button>
   </nav></div>
-  <div class="sheet-row sheet-rail"><div class="rail"><button class="tool" data-tool="edit" title="Edit">✎</button><button class="tool" disabled title="Regenerate, disabled">↻</button>
-    <button class="tool" data-tool="info" title="Info">ⓘ</button><button class="tool" data-tool="delete" title="Delete: red on hover">✕</button></div></div></section>
+</section>
 
 <section><h2>Surfaces</h2>
   <div class="sheet-cards">
@@ -104,9 +102,11 @@
       <button class="item current" style="--depth: 1"><span>Nights</span></button>
       <button class="item planned" style="--depth: 1"><span>Settings</span><small>not made yet</small></button></div><hr>
       <button class="item"><span>Zoom in</span> <kbd>⌘+</kbd></button></div></span></div></div>
-    <aside class="drawer sheet-drawer"><div class="drawer-head"><div class="tabs" role="tablist"><button role="tab" aria-selected="true">✎ Edit</button><button role="tab" aria-selected="false">ⓘ Info</button></div><button class="close">✕</button></div>
-      <p class="drawer-name">Home</p><div class="pane"><label for="change">What should change?</label><textarea id="change" rows="2">Show a moon next to quiet nights</textarea>
-      <button class="primary">Make the change</button><h3>Past changes</h3><ol class="history" reversed><li class="now">Edit: one level indicator</li><li class="undone">Edit: a red alarm</li><li>Drawn</li></ol></div></aside>
+    <div class="screen sheet-flip"><div class="flip"><h4><span>History of Home</span><button class="close">✕</button></h4>
+      <div class="row"><button>↶ Undo</button><button disabled>↷ Redo</button></div>
+      <ol class="versions"><li><button class="now"><b>Edit: one level indicator</b><small>showing · 2 min ago</small></button></li><li><button><b>Another design</b><small>9 min ago</small></button></li></ol>
+      <form class="pane"><label>What should change?</label><textarea rows="2">Show a moon next to quiet nights</textarea>
+      <div class="row"><button type="button" class="talk">🎙️ Hold to talk</button><button type="button" class="primary">Make the change</button></div></form></div></div>
   </div>
   <div class="sheet-row"><div class="sheet-pills"><div class="error-pill" role="alert"><span>The model did not answer in 20 s.</span><button>✕</button></div><div class="hint-pill">One screen at a time.</div></div>
 </div></section>
@@ -114,10 +114,10 @@
 <section><h2>Motion and sound</h2><ul class="sheet-moves">
   <li>Summon: a design appears out of a blur, the second 0.15 s later, 0.8 s</li>
   <li>Lift: hovering a finished design raises it with a gold glow, 0.9 s</li>
-  <li>Hand: the drawer swings in and rests level, 0.45 s; it closes at once</li>
-  <li>Fades: the Pick pill and the rails 0.15 s, a box straightening 0.2 s</li>
+  <li>Hand: a mock or a box turns over to its card, 0.35 s; it turns back at once</li>
+  <li>Fades: a box straightening 0.2 s</li>
   <li>Reduced motion: every move jumps to its end. <code>?design=still</code>: no motion, sound or tilt</li>
-  <li><button data-sound="whoosh">▶</button>Whoosh: a design appears, the drawer swings in</li>
+  <li><button data-sound="whoosh">▶</button>Whoosh: a design appears, a card turns over</li>
   <li>In the app, sounds play only while its speaker is on (off by default, kept in this browser); a ▶ here always plays</li></ul></section>
 </article>
 <script type="module" src="./sheet.ts"></script>

@@ -1,7 +1,7 @@
 // Hold to talk (spec/behavior.md, Voice): while the button is held, the browser's speech recognition writes the words
 // into a field, after the text already typed there; let go and the words stay, to correct by hand. Voice never sends.
-// Two parts, no DOM at the top level so tests can import it: Talk keeps the field's text, HoldToTalk feeds it from the
-// browser's speech recognition.
+// No DOM at the top level so tests can import it: Talk keeps the field's text, HoldToTalk feeds it from the browser's
+// speech recognition, talkButton is the 🎙️ button beside a field.
 
 const join = (a: string, b: string) => (a && b ? `${a} ${b}` : a || b)
 
@@ -75,4 +75,31 @@ export class HoldToTalk {
   }
 
   release() { try { this.rec?.stop() } catch { /* not listening */ } }
+}
+
+/** 🎙️ Hold to talk beside a field: held, the browser's words go into the field after its text; let go, they stay.
+ *  None where the browser has no speech recognition. `fail` shows a problem in the red pill. */
+export function talkButton(field: HTMLTextAreaElement | HTMLInputElement, fail: (message: string) => void): HTMLButtonElement | null {
+  if (!speechSupported()) return null
+  const b = document.createElement('button')
+  b.type = 'button'
+  b.className = 'talk'
+  b.textContent = '🎙️ Hold to talk'
+  b.title = 'Hold and speak, then let go. In Chrome the audio goes to Google to be turned into text.'
+  const voice = new HoldToTalk((v) => { field.value = v; field.dispatchEvent(new Event('input', { bubbles: true })) }, fail)
+  const down = () => { b.classList.add('on'); voice.press(field.value) }
+  const up = () => { b.classList.remove('on'); voice.release() }
+  b.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 && e.pointerType !== 'touch') return
+    e.preventDefault() // the field keeps its focus
+    b.setPointerCapture?.(e.pointerId)
+    down()
+  })
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, up)
+  b.addEventListener('contextmenu', (e) => e.preventDefault()) // a long press on a phone
+  // Space held on the focused button talks too; a click alone does nothing.
+  b.addEventListener('keydown', (e) => { if (e.key === ' ' && !e.repeat) { e.preventDefault(); down() } })
+  b.addEventListener('keyup', (e) => { if (e.key === ' ') up() })
+  b.addEventListener('click', (e) => e.preventDefault())
+  return b
 }
