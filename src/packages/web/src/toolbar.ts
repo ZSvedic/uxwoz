@@ -28,15 +28,14 @@ generate.addEventListener('submit', (e) => {
 })
 enterSubmits(promptInput, generate)
 
-// The starters, in place of templates: a card opens its mockup with the starter's device, and the server replays its
-// recording. The device is for that mockup only: the saved choice stays.
+// The starters, in place of templates: a card opens its mockup at the device asked for, and the server replays its
+// recording.
 $('starters').replaceChildren(...STARTERS.map((s) => {
   const b = el('button', 'starter')
   b.type = 'button'
   b.title = s.prompt
-  b.append(el('b', '', s.label), el('small', '', s.kind))
+  b.append(el('b', '', s.label))
   b.addEventListener('click', () => {
-    deviceSelect.value = s.device
     start(s.prompt).catch((err) => showError(String(err)))
   })
   return b

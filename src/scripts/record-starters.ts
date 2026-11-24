@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  DEFAULT_MODEL, FILING_MODEL, RECORDED_DESIGNS, RECORDINGS_DIR, STARTERS, ScreenCache, linkedNames, promptHash, recordedHtml,
+  DEFAULT_DEVICE, DEFAULT_MODEL, FILING_MODEL, RECORDED_DESIGNS, RECORDINGS_DIR, STARTERS, ScreenCache, linkedNames, promptHash, recordedHtml,
   recordingProblems, screenKey, screenRef, linksIn, type Recorded, type Recording, type Starter, type Version,
 } from '@uxwoz/core'
 import { createServer, type ScreenEvent } from '@uxwoz/web/src/server.ts'
@@ -63,7 +63,7 @@ function serve(file: string) {
 }
 
 async function recordStarter(s: Starter, dir: string): Promise<Recording> {
-  const body = { app: s.prompt, model: DEFAULT_MODEL, device: s.device }
+  const body = { app: s.prompt, model: DEFAULT_MODEL, device: DEFAULT_DEVICE }
   const home = screenKey(s.prompt, null)
   const a = serve(join(dir, 'a.json'))
   try {
@@ -81,7 +81,7 @@ async function recordStarter(s: Starter, dir: string): Promise<Recording> {
     const filingA = await a.pickHome(home, 0)
 
     const regenerate = async (key: string) => {
-      const v = a.versions(await a.stream('/api/revise', { key, model: DEFAULT_MODEL, device: s.device }))[0]
+      const v = a.versions(await a.stream('/api/revise', { key, model: DEFAULT_MODEL, device: DEFAULT_DEVICE }))[0]
       if (!v) throw new Error('a Regenerate made no design')
       return a.callFor(v)
     }

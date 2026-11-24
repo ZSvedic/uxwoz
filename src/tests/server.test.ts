@@ -48,7 +48,7 @@ describe('web server', () => {
     expect(evs.filter((e) => e.type === 'version').map((e) => e.variant).sort()).toEqual([0, 1])
     const { entry } = done(evs)
     expect(entry.versions).toEqual([])
-    expect(entry.proposals!.map((p) => p!.device)).toEqual(['phone', 'phone'])
+    expect(entry.proposals!.map((p) => p!.device)).toEqual(['small-phone', 'small-phone'])
     expect(entry.proposals![0]!.html).not.toBe(entry.proposals![1]!.html)
     for (const p of entry.proposals!) expect(p!.idea!.length).toBeGreaterThan(8)
   }, 30_000)
@@ -122,7 +122,7 @@ describe('web server', () => {
     const asked = sent.filter((m) => m.includes('Draw this screen: opening-hours: Opening hours of the bakery, by day'))
     expect(asked).toHaveLength(2)
     for (const m of asked) {
-      expect(m).toStartWith(`App: ${APP}\nDevice: a phone screen, 390 px wide.\n\nScreens, the first screen first (id: what it is for):\nhome: the first screen\n`)
+      expect(m).toStartWith(`App: ${APP}\nDevice: a phone screen, 360 × 500 px; the screen scrolls inside it, and a bar pinned to its bottom stays in view.\n\nScreens, the first screen first (id: what it is for):\nhome: the first screen\n`)
       expect(m).toContain(`The screen the click came from, home (the first screen):\n${shown(first)}`)
     }
     // A link by ID alone names a screen on the paper (made or planned).
@@ -153,12 +153,12 @@ describe('web server', () => {
   test('an Edit makes a new version from the screen and the change, for its device; Regenerate one from its prompt; Undo drops them', async () => {
     const first = done(await screen({ app: APP })).entry
     const change = 'Make the main heading say "Fresh bread daily"'
-    const edited = await stream('/api/revise', { key: first.key, change, device: 'desktop' })
+    const edited = await stream('/api/revise', { key: first.key, change, device: 'laptop' })
     expect(edited[0]).toEqual({ type: 'meta', key: first.key, cached: false, variants: 1 })
     expect(edited.filter((e) => e.type === 'chunk').length).toBeGreaterThan(5)
     const e1 = done(edited).entry
     expect(e1.versions).toHaveLength(2)
-    expect(e1.versions[1]).toMatchObject({ feedback: change, device: 'phone' })
+    expect(e1.versions[1]).toMatchObject({ feedback: change, device: 'small-phone' })
     expect(shown(e1)).toContain('Fresh bread daily')
     const e2 = done(await stream('/api/revise', { key: first.key })).entry
     expect(e2.versions).toHaveLength(3)
@@ -190,12 +190,12 @@ describe('web server', () => {
     expect((await post('/api/pick', { key: 'no such screen', index: 0 })).status).toBe(404)
   })
 
-  test('the mockup theme and the phone are the defaults, and the stylesheet is served', async () => {
+  test('the mockup theme and the small phone are the defaults, and the stylesheet is served', async () => {
     const cfg = await (await fetch(new URL('/api/config', server.url))).json()
     expect(cfg.defaultTheme).toBe('mockup')
     expect(cfg.themes.map((t: { id: string }) => t.id)).toEqual(['mockup', 'clean'])
-    expect(cfg.defaultDevice).toBe('phone')
-    expect(cfg.devices.map((d: { id: string }) => d.id)).toEqual(['phone', 'desktop'])
+    expect(cfg.defaultDevice).toBe('small-phone')
+    expect(cfg.devices.map((d: { id: string }) => d.id)).toEqual(['small-phone', 'large-phone', 'laptop', 'monitor'])
     const css = await (await fetch(new URL('/themes/mockup.css', server.url))).text()
     expect(css).toContain('grayscale(1)')
     expect((await fetch(new URL('/themes/clean.css', server.url))).status).toBe(404)

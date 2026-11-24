@@ -141,7 +141,8 @@ function fileLines(cache: ScreenCache, app: string, key: string, filedHtml: stri
 interface FileOptions extends Io {
   cache: ScreenCache
   key: string
-  decision: { other: string } | { change: string }
+  /** The other design of an A OR B, when there was one, or the change of an Edit. */
+  decision: { other?: string } | { change: string }
   /** A recorded filing to replay in place of the model call. */
   recorded?: Recorded
 }

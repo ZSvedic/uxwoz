@@ -35,11 +35,11 @@ When you answer the user in chat (status updates, failure reports, "why did X ha
 src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in the browser
   models.ts      the 3 screen models and Terra (background, filing), call settings, prices
   prompt.ts      system prompt (the canvas manual verbatim + how to reply) and the user messages: the paper
-                 (titles, lines, boxes), then Draw, Edit or File (a copy of spec/prompt-screen.md; a test keeps them equal)
+                 (titles, lines, boxes), then Draw, Edit or File (one design, the other only when there was one; a copy of spec/prompt-screen.md; a test keeps them equal)
   providers.ts   streaming clients: OpenRouter (Haiku), OpenAI Responses (Luna, Sol, Terra); a live call checked right
                  before it is sent (`allow`), its cost once however it ends (`spent`), a live call captured (`record`), a `recorded` one replayed with its timing
   generate.ts    one design: stream, 20 s deadline, cost, name and idea, refuse cut-off replies
-  starters.ts    the eight starters: id, label, kind, device, prompt (data only, also in the browser)
+  starters.ts    the seven starters: id, label, prompt (data only, also in the browser)
   recordings.ts  server only: recordings/<id>.json read, the design for a screen's nth draw, Home's filing by side,
                  promptHash and startersCurrent, what a recording lacks
   filing.ts      filing: number a screen's parts, ask Terra (also for the fixer), parse its lines, apply them to
@@ -57,7 +57,7 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
   cache-boxes.ts screen cache, the boxes (ScreenCache extends the base): components as entries, rules, tables,
                  limits, IDs, a box's states, Past and Undo, the fixer's notes and their Undo, markSeen, the paper
   frame.ts       srcdoc page for a screen + our in-frame script (clicks, height, scroll and `scrollsFirst`, touch and `dragOwner`, vh fix, picking and locating
-                 a part for a comment); devices and their size;
+                 a part for a comment); the sizes (four offered, two read from before), each with its Device line;
                  name, idea; paste by ID and the current link
   zip.ts         a zip of stored entries (CRC-32, central directory), for Export project
 src/packages/web/src/

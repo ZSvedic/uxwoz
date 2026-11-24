@@ -214,11 +214,12 @@ export function editRequest(p: Paper, what: Shown, change: string, component = f
     + `Reply with the HTML of this ${kind} again with one change; keep everything else as it is, including its data-action links and pasted components. The change: ${change}`
 }
 
-/** Filing after a pick (with the other variant) or an Edit (with the change); the screen's parts are numbered. */
-export function fileRequest(p: Paper, screen: Shown, decision: { other: string } | { change: string }): string {
-  const second = 'change' in decision ? `The user typed this change on it: "${decision.change}"` : `The other variant, which the user did not pick:\n${decision.other}`
+/** Filing a decision: the design kept (with the other one, when there was one) or an Edit (with the change); the screen's parts are numbered. */
+export function fileRequest(p: Paper, screen: Shown, decision: { other?: string } | { change: string }): string {
+  const second = 'change' in decision ? `\n\nThe user typed this change on it: "${decision.change}"`
+    : decision.other ? `\n\nThe other variant, which the user did not pick:\n${decision.other}` : ''
   return `${paperText(p)}\n\nThe decision, on the screen ${screen.id} (${screen.line}).\n`
-    + `${'change' in decision ? 'The screen after the change' : 'The user picked this variant'}:\n${screen.html}\n\n${second}\n\nFile what this decision settles.`
+    + `${'change' in decision ? 'The screen after the change' : 'The user picked this variant'}:\n${screen.html}${second}\n\nFile what this decision settles.`
 }
 
 /** A fixer's visit: the screens added or changed since the last one (all on the first), parts numbered; for an Edit of a box, the user's request. */

@@ -1,16 +1,16 @@
 // Feature: generate one screen with each of the three models (cassette: generate-screen).
 import { afterAll, describe, expect, test } from 'bun:test'
-import { MODELS, drawRequest, generateScreen, type ModelId } from '@uxwoz/core'
+import { MODELS, drawRequest, fileRequest, generateScreen, type ModelId } from '@uxwoz/core'
 import { cassette } from './cassette.ts'
 
 const tape = cassette('generate-screen')
 afterAll(tape.save)
 
-const paper = { app: 'A coffee shop ordering app', device: 'phone' as const, titles: [], lines: [], components: [], rules: [], data: [] }
+const paper = { app: 'A coffee shop ordering app', device: 'small-phone' as const, titles: [], lines: [], components: [], rules: [], data: [] }
 
 async function run(model: ModelId, target: { id: string; line: string }) {
   const chunks: string[] = []
-  for await (const ev of generateScreen({ user: drawRequest(paper, target, null), model, device: 'phone', fetch: tape.fetch, env: tape.env })) {
+  for await (const ev of generateScreen({ user: drawRequest(paper, target, null), model, device: 'small-phone', fetch: tape.fetch, env: tape.env })) {
     if (ev.type === 'chunk') chunks.push(ev.text)
     else return { chunks, version: ev.version }
   }
@@ -41,4 +41,13 @@ describe('generate a screen', () => {
     const { version } = await run('claude-haiku-5.5', { id: 'checkout', line: 'Checkout screen with 2 lattes in the cart' })
     expect(version.html.toLowerCase()).toContain('checkout')
   }, 30_000)
+})
+
+test('File names the one design kept, and the other only when there was one', () => {
+  const screen = { id: 'home', line: 'the first screen', html: '<h1 data-part="1">Hi</h1>' }
+  const one = fileRequest(paper, screen, {})
+  expect(one).toContain('Device: a phone screen, 360 × 500 px; the screen scrolls inside it, and a bar pinned to its bottom stays in view.')
+  expect(one).toEndWith('The user picked this variant:\n<h1 data-part="1">Hi</h1>\n\nFile what this decision settles.')
+  expect(fileRequest(paper, screen, { other: '<h1>Hello</h1>' })).toContain('<h1 data-part="1">Hi</h1>\n\nThe other variant, which the user did not pick:\n<h1>Hello</h1>\n\nFile')
+  expect(fileRequest(paper, screen, { change: 'Bigger' })).toContain('The screen after the change:\n<h1 data-part="1">Hi</h1>\n\nThe user typed this change on it: "Bigger"\n\nFile')
 })

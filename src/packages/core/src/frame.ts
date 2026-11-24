@@ -32,13 +32,19 @@ export function screenIdea(html: string): string {
 /** The window height of a screen made before devices; our script turns vh units into pixels of it, as a frame grows with its screen. */
 export const VIEWPORT_H = 800
 
-/** The devices a screen can be designed for: the width of its window, and the least height of a screen. */
+/** The sizes a mockup can have: the frame of every screen, and how the model is told of it. 'phone' and 'desktop' are read from mockups made before, never offered. */
 export const DEVICES = {
+  'small-phone': { label: 'Small phone', width: 360, height: 500, request: 'a phone screen, 360 × 500 px; the screen scrolls inside it, and a bar pinned to its bottom stays in view' },
+  'large-phone': { label: 'Large phone', width: 412, height: 620, request: 'a phone screen, 412 × 620 px; the screen scrolls inside it, and a bar pinned to its bottom stays in view' },
+  laptop: { label: 'Laptop', width: 1280, height: 560, request: 'a laptop browser window, 1280 × 560 px; the page scrolls inside it, and a bar pinned to its bottom stays in view' },
+  monitor: { label: 'Monitor', width: 1920, height: 780, request: 'a large monitor\'s browser window, 1920 × 780 px; the page scrolls inside it, and a bar pinned to its bottom stays in view' },
   phone: { label: 'Phone', width: 390, height: 844, request: 'a phone screen, 390 px wide' },
   desktop: { label: 'Desktop', width: 1024, height: 768, request: 'a desktop browser window, 1024 px wide' },
 } as const
 export type Device = keyof typeof DEVICES
-export const DEFAULT_DEVICE: Device = 'phone'
+/** The sizes a new mockup is offered, in /api/config. */
+export const OFFERED_DEVICES: Device[] = ['small-phone', 'large-phone', 'laptop', 'monitor']
+export const DEFAULT_DEVICE: Device = 'small-phone'
 /** The window width of screens made before devices existed. */
 export const LEGACY_WIDTH = 800
 export const isDevice = (v: unknown): v is Device => typeof v === 'string' && Object.hasOwn(DEVICES, v)
