@@ -4,9 +4,9 @@ This plan lists what [zel-rework-prompt.md](../../spec/zel-rework-prompt.md) and
 [zel-tour-compilation-v4.md](../../spec/zel-tour-compilation-v4.md) do not settle, each with the answer
 I suggest. It decides nothing about the look: the logo versions and the black-and-white mocks come next.
 
-Status: Zel answered on 2026-11-24. Decided: four sizes (3), Haiku draws the tour (4), the logo is C2
-(`2026-11-24-rework/logo.html`). Open: where the four buttons live (17) and the sizes' heights (3). The
-rest stand as suggested. Nothing is built.
+Status: Zel answered on 2026-11-24, in three rounds. Decided: four sizes and their heights (3), Haiku
+draws the tour (4), the logo is C2 (`2026-11-24-rework/logo.html`), the buttons are on the canvas (17),
+the starting view is a card at 100% (25). The rest stand as suggested. Nothing is built.
 
 ## How to answer
 
@@ -27,20 +27,20 @@ OK all. 2: keep the long sheet. 6: keep "hey Woz" too. 18: call it Reroll.
    must belong to the mock. Suggest: a mock is a frame of fixed size, like a real device. Its content
    scrolls inside with one finger or the wheel, a tab bar stays at the frame's bottom, and two fingers
    (or a drag on the sky) move the canvas. On a phone the frame is as tall as the room between the two
-   bars. Today a mock is one long sheet and one finger moves the canvas.
+   bars. Today a mock is one long sheet and one finger moves the canvas. Zel's idea for showing it: a
+   mock is a rounded card; an edge with more beyond it has flat corners and fades.
 3. **How many sizes?** Decided by Zel: four, and everything is recorded again with two designs a mock.
    The window picks the size, and the mock is scaled to fit it:
 
    | Size | Mock | For a window |
    |---|---|---|
-   | Small phone | 360 × 520 | under 400 px wide |
-   | Large phone | 412 × 640 | 400 to 719 px |
-   | Laptop | 1280 × 600 | 720 to 1599 px |
-   | Monitor | 1920 × 820 | 1600 px and wider |
+   | Small phone | 360 × 500 | under 400 px wide |
+   | Large phone | 412 × 620 | 400 to 719 px |
+   | Laptop | 1280 × 560 | 720 to 1599 px |
+   | Monitor | 1920 × 780 | 1600 px and wider |
 
-   The heights wait for Zel's yes. Zel wants a fitted mock at 100% and the tour with no scroll. The
-   two bars take 120 px, so the mock that shows whole on a 360 × 640 window is 360 × 520, and each
-   size is its window less the bars.
+   Each size is its window less what the app needs around a mock: the top bar, the name above and
+   the buttons under, about 140 px. Zel agreed to the shorter heights.
 
    A project keeps the size it was made at, on every device. The New panel has a **Design for** picker
    with the four, so a laptop can design a phone app. Each of the seven starters is recorded at all
@@ -78,7 +78,8 @@ OK all. 2: keep the long sheet. 6: keep "hey Woz" too. 18: call it Reroll.
     first line.
 11. In the tour all four buttons are grey (Zel: Info too), and a tap says *Off in the tour.* Its
     boxes are read-only. A tour mock never scrolls: all of its text and its button, which comes after
-    the text, fit a small phone (the longest at 13 px type).
+    the text, fit a small phone (the longest at 12 px type); a smaller window shows it scaled down.
+    Bill, a stick figure, stands in the right third of the first and last mocks, the text beside him.
 12. *Try it now: pick Rules…* is text. The app does not check that you did it.
 13. The tour's boxes need content. I write it: three rules, the big button as a component, Bill's hours
     as a table, one fixer's note.
@@ -91,8 +92,8 @@ OK all. 2: keep the long sheet. 6: keep "hey Woz" too. 18: call it Reroll.
 
 **The buttons under a mock**
 
-17. Open, Zel chooses: the four buttons as one bar fixed at the window's bottom (suggested), or on the
-    canvas under each mock. The rail beside each mock goes either way.
+17. Decided by Zel: the four buttons are on the canvas, under the current mock or box only, and zoom
+    with it. With nothing current there are none. The rail beside each mock goes.
 18. *New* reads as a new project. Suggest 🎲 **Another**.
 19. 🎲 draws the second design when pressed, not ahead: half of today's cost. It is asked to differ
     clearly from the first. Both stay in History.
@@ -112,8 +113,9 @@ OK all. 2: keep the long sheet. 6: keep "hey Woz" too. 18: call it Reroll.
 
 24. The move between mocks is a straight glide of 0.6 s at the current zoom; the new mock streams in
     where it lands. With reduced motion it jumps.
-25. The tree, the ropes and the boxes right of Home stay. The default view fits the mock, and the zoom
-    shows the true number (92%).
+25. The tree, the ropes and the boxes right of Home stay. Decided by Zel: the starting view shows the
+    current mock as a card, with its name above, its buttons under and its ropes, and the zoom calls
+    that view 100%.
 26. A large window has the same three bands. The top bar adds −, +, Fit and the four box links while
     they fit.
 
