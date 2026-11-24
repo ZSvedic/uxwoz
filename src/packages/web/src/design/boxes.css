@@ -1,5 +1,5 @@
 /* The boxes side by side right of the first screen, at canvas scale: they zoom with the screens. */
-.boxes { position: absolute; display: flex; align-items: flex-start; gap: 120px; font-size: 15px; }
+.boxes { position: absolute; display: flex; align-items: flex-start; gap: 40px; font-size: 15px; }
 /* A box is a page of paper in the box's colour with dark ink: ruled lines and an ember margin line under the title, a pin
    in the dark of its colour, an edge that glows in the box's colour (gold and stronger while current). As wide as a mock,
    at most 520 px (--box-w, canvas.ts); room for 10 ruled lines, growing with its content to 20, then it scrolls inside.
@@ -16,7 +16,7 @@
 .box-rules { transform: rotate(-1.5deg); }
 .box-notes { --glow: var(--notes-glow); --sheet: var(--notes-paper); --tack: var(--notes-pin); transform: rotate(1deg);
   border-radius: 2px 2px 18px 2px; }
-.box-components { --glow: var(--components-glow); --sheet: var(--components-paper); --tack: var(--components-pin); }
+.box-components { width: var(--comp-w); --glow: var(--components-glow); --sheet: var(--components-paper); --tack: var(--components-pin); }
 .box-data { --glow: var(--data-glow); --sheet: var(--data-paper); --tack: var(--data-pin); transform: rotate(-1deg); }
 .box.current { transform: none; }
 .box.current { --glow: var(--current); box-shadow: 0 0 0 1px var(--glow), 0 0 28px var(--glow), var(--lift); }

@@ -27,6 +27,8 @@ export const BOX_MAX_W = 520
 const BOX_EDGES = 39
 /** A box's width for mocks this wide. */
 export const boxWidth = (mockW: number) => Math.min(mockW, BOX_MAX_W)
+/** Components is the exception: wide enough to show a component at its real size, a mock's width inside its edges. */
+export const componentsWidth = (mockW: number) => mockW + BOX_EDGES
 const SVG_NS = 'http://www.w3.org/2000/svg'
 /** Zoom levels, as the bar shows them: 100% is the current mock fitted (`hundred`). */
 const MIN_ZOOM = 0.1
@@ -553,8 +555,8 @@ export class Canvas {
       const c = this.card(s.key, s.component ? this.components : this.surface)
       c.view = s
       c.el.dataset.id = s.key
-      // A component is laid out as wide as a mock and shown k times its size, as wide as the box's inside.
-      const k = s.component ? Math.min(1, (boxWidth(mock.w) - BOX_EDGES) / mock.w) : 1
+      // A component is laid out as wide as a mock and shown at that size: its box is that wide inside (componentsWidth).
+      const k = 1
       const size = s.component ? { w: mock.w, h: COMPONENT_H } : mock
       if (c.w !== size.w || c.h !== size.h || c.k !== k) {
         c.w = size.w
@@ -622,7 +624,7 @@ export class Canvas {
     const screens = this.screens.filter((s) => !s.component)
     // A box is as wide as a mock, at most BOX_MAX_W; its height follows its content (boxes.css).
     const side = !this.side.hidden && screens.length > 0
-    if (side) this.side.style.setProperty('--box-w', `${boxWidth(mock.w)}px`)
+    if (side) { this.side.style.setProperty('--box-w', `${boxWidth(mock.w)}px`); this.side.style.setProperty('--comp-w', `${componentsWidth(mock.w)}px`) }
     const st = this.stage, pad = Math.ceil(Math.max(PAD, st.clientWidth / z / 2, st.clientHeight / z / 2))
     const p = placeTree(screens, mock, z, side ? this.side.offsetWidth : 0, pad, side ? this.side.offsetHeight : 0)
     this.places = p.cards

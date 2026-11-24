@@ -14,7 +14,7 @@ const css = Object.fromEntries(cssFiles.map((f) => [f, read(resolve(DESIGN, f))]
 const lineCount = (text: string) => text.split('\n').length - (text.endsWith('\n') ? 1 : 0)
 
 // Set at run time by the code (canvas.ts, nav.ts) or on one element in CSS (a box's glow, paper and pin, a rope's width), so tokens.css does not define them.
-const RUNTIME_VARS = ['--z', '--depth', '--box-w', '--bar-h', '--glow', '--sheet', '--tack', '--rope-w']
+const RUNTIME_VARS = ['--z', '--depth', '--box-w', '--comp-w', '--bar-h', '--glow', '--sheet', '--tack', '--rope-w']
 const COLOUR = /#[0-9a-f]{3,8}\b|\b(rgba?|hsla?)\(/i
 
 describe('design/', () => {

@@ -288,9 +288,10 @@ ruled lines to start and grows with what it holds up to 20 lines, the same rule 
 past 20 lines the rest scrolls inside it, with the same scroll corners as a mock. The cap holds
 even where 20 lines are taller than Home. Their bottoms differ, and each box's buttons sit under
 its own bottom. A child of Home that does not fit below Home goes right, under the boxes; the row
-of Home's children and the ropes into it start below the tallest box and its buttons. A component
-in its box is drawn as wide as a mock and shown smaller, as wide as the box. Every model call reads Components, Rules and Data in full, so what is in
-them is what the mocks share.
+of Home's children and the ropes into it start below the tallest box and its buttons. Components is the
+exception in width: it is as wide as a mock, so a component shows at its real size. The boxes
+stand close together, 40 px apart. Every model call reads Components, Rules and Data in full, so
+what is in them is what the mocks share.
 
 A box is a page of ruled paper with dark ink, as a mock is white paper: Rules a light yellow
 legal pad, Fixer's notes a very light red, Components a light blue, Data a light green. Its pin is
