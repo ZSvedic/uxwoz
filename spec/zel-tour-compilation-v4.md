@@ -1,6 +1,27 @@
+Text in [ brackets ] is the button.
+
+# App layout
+
+Top Navigation bar: 
+[←] [ UXWoz Tour v ] [→]
+
+Middle content: 
+* Canvas with stars as background (same as now).
+* One mock screen centered in the canvas (not two variants like now).
+* Since on mobile it is hard to see multiple mocks at once, add a navigation animation which animates going from one mockup to another (<1sec), so the mobile users have a feeling what it where on canvas. 
+That is also good because percieved wait time will be shorter. 
+While the canvas animates to a new position LLM is called in the background.
+
+Below are four mock action buttons:
+[  🎲  ]  [  ✏️  ]  [  ⏪  ]  [  ℹ️  ]
+[ New ]  [ Edit ]  [History]  [ Info ]
+
+# Behavior
+
+
+
 # UXWoz Tutorial
 
-Text in [ brackets ] is the button to the next screen.
 
 Idea: https://knowyourmeme.com/memes/be-like-bill
 
