@@ -280,6 +280,15 @@ describe('sharing', () => {
     expect(cache.share(edit.token)!.share.used).toBe(0)
   })
 
+  test('the player\'s words say mock, never mockup or screen, and it waits for no size from its frame', () => {
+    const html = readFileSync(new URL('../packages/web/src/player.html', import.meta.url), 'utf8')
+    const ts = readFileSync(new URL('../packages/web/src/player.ts', import.meta.url), 'utf8')
+    const words = [...html.matchAll(/(?:title|content|aria-label)="([^"]*)"|<title>([^<]*)/g)].map((m) => m[1] ?? m[2]).join(' | ')
+    expect(words).toContain('UXWoz mock')
+    expect(words).not.toMatch(/mockup|screen/i)
+    expect(ts).not.toContain("'size'")
+  })
+
   test('3. a page is fetched from this server, whatever Host the request names', async () => {
     const { cache } = mockup()
     start(cache)

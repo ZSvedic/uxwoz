@@ -118,13 +118,15 @@ const bootstrap = (final: boolean) => `(() => {
     if (!d) return
     if (d.uxwoz === 'name-part') { naming = !d.off; if (!naming) light(null) }
     if (d.uxwoz === 'locate' && Array.isArray(d.anchors)) {
-      const spots = []
+      // A part found but scrolled outside the view has no spot; its id is in away, so it is not taken for gone.
+      const spots = [], away = []
       for (const a of d.anchors.slice(0, 200)) {
         if (!a || typeof a.text !== 'string') continue
         const el = find(all, { id: a.id, text: a.text, tag: String(a.tag || ''), nth: Math.max(0, Number(a.nth) || 0) })
         if (el && inView(el)) { const p = describe(el); spots.push({ id: a.id, x: p.x, y: p.y, w: p.w, h: p.h }) }
+        else if (el) away.push(a.id)
       }
-      parent.postMessage({ uxwoz: 'located', n: d.n, spots }, '*')
+      parent.postMessage({ uxwoz: 'located', n: d.n, spots, away }, '*')
     }
   })
   addEventListener('pointerover', (e) => { if (naming) light(partAt(e.target)) }, true)
