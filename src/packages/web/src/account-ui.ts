@@ -116,6 +116,18 @@ export function forget(s: Pick<Storage, 'length' | 'key' | 'removeItem'>) {
   for (const k of ours) s.removeItem(k)
 }
 
+/** The one hint (spec/behavior.md, The public): a model drew this design, so it cost a free screen. */
+export const LIVE_HINT = 'This design was drawn fresh for you, so it used one of your free screens.'
+/**
+ * The hint's record in this browser (`uxwoz:hint`) after `event`: a live design brings it ('due', on show) until the
+ * visitor's next click or key (`act`) ends it for good ('done'); a browser first seen with mockups in Recent
+ * (`veteran`) never shows it.
+ */
+export function liveHint(was: string | null, event: 'live' | 'act' | 'veteran'): string | null {
+  if (event === 'act') return was === 'due' ? 'done' : was
+  return was ?? (event === 'live' ? 'due' : 'done')
+}
+
 // ---- The page
 
 export interface AccountDeps {

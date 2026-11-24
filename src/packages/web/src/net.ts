@@ -4,11 +4,8 @@ import { REBUILD_MS, extractFragment, hasVisibleText } from '@uxwoz/core/frame'
 import type { ScreenEvent } from './server.ts'
 import { canvas } from './app.ts'
 import { draw, page } from './screens.ts'
-import { openGenerate } from './toolbar.ts'
-import { Coach, OnShow, doneBy, fits, type Where } from './onboarding.ts'
-import { stepFx } from './design/fx.ts'
-import { loadMe, refused, sideAct } from './account-ui.ts'
-import { $, generate, state, store } from './state.ts'
+import { LIVE_HINT, liveHint, loadMe, refused, sideAct } from './account-ui.ts'
+import { $, state, store } from './state.ts'
 
 async function fetchText(url: string): Promise<string> {
   const res = await fetch(url)
@@ -70,47 +67,31 @@ export function hint(text = 'One screen at a time: wait until this one is made.'
 }
 
 /**
- * The hint that stays until the visitor does the thing (onboarding.ts), with where the visitor was when it showed;
- * a brief hint shows over it, then gives it back. None with no mockup open, nor under the red pill.
+ * The one hint that stays (account-ui.ts, `liveHint`): after a live design, until the visitor's next click or key,
+ * or a press on it. A brief hint shows over it, then gives it back. None with no mockup open, nor under the red pill.
  */
-const lasting = new OnShow()
-const where = (): Where => ({
-  app: state.app, current: state.current, box: state.box, drawer: state.drawer,
-  card: generate.classList.contains('open') || !$('account').hidden,
-  drawn: !state.box && !!state.current && !!state.entries.get(state.current)?.versions.length,
-  choice: !!state.making || [...state.entries.values()].some((e) => !e.versions.length),
-})
-function showLasting() {
+let liveOn = false
+function liveEvent(event: 'live' | 'act' | 'veteran') {
+  const now = liveHint(store.get('uxwoz:hint'), event)
+  if (now) store.set('uxwoz:hint', now)
+  liveOn = now === 'due' && (event === 'live' || liveOn)
+  showLasting()
+}
+/** A model drew a design (it cost more than 0). */
+export const liveDesign = () => liveEvent('live')
+/** Recent is known: a browser first seen with mockups never shows the hint. */
+export const beginHint = (hasMockups: boolean) => { if (hasMockups) liveEvent('veteran') }
+/** The visitor did something (a click in a screen too): the hint goes. */
+export const endHint = () => { if (liveOn) liveEvent('act') }
+export function showLasting() {
   if (hintTimer) return
-  const h = $('hint'), on = state.app && $('error').hidden && lasting.hint && fits(lasting.hint, where()) ? lasting.hint : null
-  // On a narrow window A sits above B, and B starts below the window: the first hint says so.
-  const below = on?.after === 'ready' && matchMedia('(max-width: 720px)').matches ? ' The second is below.' : ''
-  h.textContent = on ? on.text + below : ''
+  const h = $('hint'), on = liveOn && !!state.app && !!$('error').hidden
+  h.textContent = on ? LIVE_HINT : ''
   h.hidden = !on
-  h.classList.toggle('press', !!on?.opens || !!on?.live)
+  h.classList.toggle('press', on)
 }
-/** The visitor went elsewhere since the hint showed: it goes (draw() and every click or key ask). */
-export function checkHint() {
-  const w = where(), step = lasting.hint && doneBy(lasting.hint, w)
-  if (step) coach.did(step) // following the hint (opening Edit) is doing it
-  else if (lasting.stale(w)) coach.away()
-  else showLasting()
-}
-const soon = () => setTimeout(checkHint)
-addEventListener('click', soon, true)
-addEventListener('keydown', soon, true)
-export const coach = new Coach({
-  load: () => store.get('uxwoz:hints'),
-  save: (json) => store.set('uxwoz:hints', json),
-  show: (h) => {
-    lasting.show(h)
-    setTimeout(() => lasting.settle(where())) // once the step that showed it has run to its end
-    showLasting()
-  },
-  fx: (sound) => stepFx($('hint'), sound),
-  later: (run, ms) => setTimeout(run, ms),
-})
-$('hint').addEventListener('click', () => { if (!hintTimer && coach.press()) openGenerate() })
+addEventListener('pointerdown', endHint, true)
+addEventListener('keydown', endHint, true)
 
 /** A refusal the account card or the red pill already answered (account-ui.ts): no "Could not" pill on top. */
 class Answered extends Error {}

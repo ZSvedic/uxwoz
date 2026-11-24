@@ -17,7 +17,6 @@ You need [bun](https://bun.sh). Every `bun` command runs from `src/`.
 | Test and typecheck | `bun run check` | nothing: tests replay `cassettes/` offline |
 | Re-record after a prompt change | `bun run test:record` | the keys, a few cents |
 | Re-record the starters after a prompt change | `bun run starters:record` (or `… plants bill` for some) | the keys, about 2 cents a starter |
-| Check voice input on a Mac | `bun scripts/voice-check.ts --voice Karen` | the app running, speakers the microphone hears |
 
 Your mockups are saved in `temp/screen-cache.json`. `PORT=3001` picks another port. Restart `bun run dev`
 after adding a frontend file: live reload cannot add one.

@@ -17,6 +17,7 @@ import { PICKERS, closeMenus, loadRecent, openGenerate, warmUp } from './toolbar
 import { editLinkApp, loadShared, shareToken } from './sharing.ts'
 import { initAccount } from './account-ui.ts'
 import { $, deviceSelect, generate, modelSelect, promptInput, state, store } from './state.ts'
+import './design/fx.ts' // the speaker and the whoosh
 
 export const side = createSide(boxOp, (box, tab) => { focusBox(box); openDrawer(tab) })
 // A press in a box makes it current; one in a component card makes that card current instead.
@@ -77,7 +78,7 @@ async function openMockup(app: string, make: boolean, sid: string | null | undef
   loadShared()
   // An open A OR B is fitted, unless the address named a drawn screen: then that screen, and the address stays.
   const open = all().find((e) => !e.versions.length)
-  if (open && !named?.versions.length) fitChoice(open.key, false) // a reload or another mockup opened: no hint
+  if (open && !named?.versions.length) fitChoice(open.key)
   else fitScreenSoon(state.current ?? root)
   if (named) showsAt(named.key)
 }

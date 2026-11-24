@@ -7,7 +7,7 @@ import type { Boxes } from '@uxwoz/core'
 import { boxesMarkdown, countLabel, countOf, el, markBox, visitToUndo, type Box, type BoxOp } from './boxes.ts'
 import { canvas, side } from './app.ts'
 import { PHONE } from './canvas.ts'
-import { coach, fmtS, fmtUsd, post, showError } from './net.ts'
+import { fmtS, fmtUsd, liveDesign, post, showError } from './net.ts'
 import { loadMe, refused } from './account-ui.ts'
 import { applyMap, currentAt, setCurrent } from './nav.ts'
 import { components, draw, ideaOf, labelOf, pastedOn, removeScreen, revise, undo, views } from './screens.ts'
@@ -24,10 +24,10 @@ export async function boxOp(o: BoxOp | { op: 'seen'; box: Box; ids: string[] }):
   const body = await res?.json().catch(() => null)
   // The fixer's Undo sends the map with the changes it could not undo.
   if (body?.entries && app === state.app) applyMap(body)
-  // A box's Edit and Visit now call the models: a live design, as screens.ts tells the coach.
+  // A box's Edit and Visit now call the models: a live design, as screens.ts says (the hint).
   const live = o.op === 'edit' || o.op === 'visit'
   if (live) loadMe()
-  if (res?.ok && !body?.error) { if (live) coach.did('live'); return true }
+  if (res?.ok && !body?.error) { if (live) liveDesign(); return true }
   if (res && refused(res.status, body)) { draw(); return false }
   showError(`Could not change the box: ${body?.error ?? 'no answer'}`)
   draw()
