@@ -69,6 +69,17 @@ describe('design/', () => {
     }
   })
 
+  test('the logo is C2 (a drawn W, a sparkle in a token) and the name is UXWoz in one word', () => {
+    const w = '11.5,19 16.5,41 24,26 31.5,41 34.7,27'
+    for (const f of ['brand/logo.svg', 'brand/favicon.svg', '../index.html', '../player.html', '../privacy.html', 'sheet.html']) {
+      expect([f, read(resolve(DESIGN, f)).includes(w)]).toEqual([f, true])
+    }
+    expect(read(resolve(DESIGN, 'tokens.css'))).toMatch(/--sparkle: var\(/)
+    for (const f of ['../index.html', '../player.html', '../admin.html', '../privacy.html', 'sheet.html', '../mail.ts']) {
+      expect([f, read(resolve(DESIGN, f)).includes('UX Woz')]).toEqual([f, false])
+    }
+  })
+
   test('index.html has no data: URI and no <style>', () => {
     const html = read(resolve(WEB, 'index.html'))
     expect(html.includes('data:')).toBe(false)
@@ -149,8 +160,9 @@ const PAIRS: [string, string, number][] = [
   ['--sky-text', '--sky1', 4.5], ['--sky-text', '--sky2', 4.5], ['--sky-muted', '--sky1', 4.5], ['--sky-muted', '--sky2', 4.5],
   ['--sky-mark', '--sky1', 4.5], ['--sky-text', '--plate', 4.5], ['--sky-muted', '--plate', 4.5],
   ['--disabled', '--surface', 3], ['--bar-disabled', '--wood1', 3], ['--bar-disabled', '--wood2', 3],
-  // The wordmark is large text; an idea opened in a box lies on surface-2; the deck's + on both of its stripes.
-  ['--wordmark', '--surface', 3], ['--text', '--surface-2', 4.5], ['--muted', '--surface-2', 4.5], ['--mark', '--surface-2', 4.5],
+  // The logo is --text (its W, UX and oz) with a sparkle, at 3:1 on the bar's wood (the amber one on parchment is only an
+  // accent); an idea opened in a box lies on surface-2; the deck's + on both of its stripes.
+  ['--bar-sparkle', '--wood1', 3], ['--bar-sparkle', '--wood2', 3], ['--text', '--surface-2', 4.5], ['--muted', '--surface-2', 4.5], ['--mark', '--surface-2', 4.5],
   ['--disabled', '--surface-2', 3], ['--deck-edge', '--deck', 4.5], ['--deck-edge', '--deck-stripe', 4.5],
   // An ID on its chip, and the "new" after it; the drawer's open tab. A screen's name chip is --text on --surface.
   ['--text', '--chip', 4.5], ['--mark', '--chip', 4.5], ['--on-tab', '--tab', 4.5],

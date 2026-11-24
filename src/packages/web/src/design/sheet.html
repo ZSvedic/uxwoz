@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UX Woz design sheet</title>
+<title>UXWoz design sheet</title>
 <link rel="icon" type="image/svg+xml" href="./brand/favicon.svg">
 <link rel="stylesheet" href="./index.css">
 <!-- The sheet's own layout. Everything else is the app's CSS on the app's classes, so the sheet follows any change. -->
@@ -15,8 +15,8 @@
   .sheet-card > section > h2 { margin: 0 0 10px; font-size: 18px; color: var(--mark); }
   .sheet-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin: 8px 0; } .sheet-top { align-items: flex-start; }
   .sheet-fig { margin: 0; text-align: center; font-size: 11px; color: var(--muted); }
-  .sheet-wordmark { font: 700 28px Fredoka, system-ui, sans-serif; color: var(--text); }
-  .sheet-wordmark span { color: var(--wordmark); }
+  .sheet-wordmark { display: flex; align-items: center; gap: 10px; font: 700 28px Fredoka, system-ui, sans-serif; color: var(--text); }
+  .sheet-fig > .brand { margin: 0 auto; color: var(--text); } .sheet-fig .logo { color: var(--bar-text); }
   .sheet-fredoka { font: 500 20px Fredoka, system-ui, sans-serif; } .sheet-fredoka b { font-weight: 600; } .sheet-fredoka strong { font-weight: 700; }
   .sheet-colours { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 4px 12px;
     font: 12px ui-monospace, monospace; overflow-wrap: anywhere; }
@@ -43,17 +43,19 @@
 </head>
 <body>
 <article class="sheet-card">
-<h1 class="sheet-wordmark">UX <span>Woz</span> design sheet</h1>
+<h1 class="sheet-wordmark"><svg class="brand wm" viewBox="0 -2 123 46" width="96" height="36" role="img" aria-label="UXWoz"><text x="0" y="40">UX</text><polyline stroke-width="6.42" points="56.55,16.61 61.14,36.79 68.02,23.03 74.9,36.79 77.83,23.95"/><path transform="translate(80.49 12.21) scale(7.89)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/><text x="81.54" y="40">oz</text></svg> design sheet</h1>
 <p>The app's own CSS on static markup: change a token or a part's rule and this page changes with it.</p>
 
 <section><h2>Logo</h2><div class="sheet-row">
-  <figure class="sheet-fig"><img src="./brand/logo.svg" alt="" width="96" height="96"><br>logo 96</figure>
-  <figure class="sheet-fig"><img src="./brand/logo.svg" alt="" width="48" height="48"><br>48</figure>
-  <figure class="sheet-fig"><img src="./brand/logo.svg" alt="" width="24" height="24"><br>24</figure>
+  <figure class="sheet-fig"><svg class="brand mark" viewBox="0 0 50 48" width="96" height="96"><polyline stroke-width="7" points="11.5,19 16.5,41 24,26 31.5,41 34.7,27"/><path transform="translate(37.6 14.2) scale(8.6)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/></svg>mark 96</figure>
+  <figure class="sheet-fig"><svg class="brand mark" viewBox="0 0 50 48" width="48" height="48"><polyline stroke-width="7" points="11.5,19 16.5,41 24,26 31.5,41 34.7,27"/><path transform="translate(37.6 14.2) scale(8.6)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/></svg>48</figure>
+  <figure class="sheet-fig"><svg class="brand mark" viewBox="0 0 50 48" width="24" height="24"><polyline stroke-width="7" points="11.5,19 16.5,41 24,26 31.5,41 34.7,27"/><path transform="translate(37.6 14.2) scale(8.6)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/></svg>24</figure>
+  <figure class="sheet-fig"><img src="./brand/logo.svg" alt="" width="48" height="48"><br>logo.svg</figure>
   <figure class="sheet-fig"><img src="./brand/favicon.svg" alt="" width="32" height="32"><br>favicon 32</figure>
   <figure class="sheet-fig"><img src="./brand/favicon.svg" alt="" width="16" height="16"><br>16</figure>
-  <figure class="sheet-fig"><span class="sheet-wordmark">UX <span>Woz</span></span><br>wordmark, Fredoka 700</figure>
-  <figure class="sheet-fig"><nav class="bar"><div class="logo"><img src="./brand/logo.svg" alt="" width="36" height="36"><b>UX <span>Woz</span></b></div></nav><br>in the bar (the hat alone under 900 px)</figure>
+  <figure class="sheet-fig"><svg class="brand wm" viewBox="0 -2 123 46" width="118" height="44" role="img" aria-label="UXWoz"><text x="0" y="40">UX</text><polyline stroke-width="6.42" points="56.55,16.61 61.14,36.79 68.02,23.03 74.9,36.79 77.83,23.95"/><path transform="translate(80.49 12.21) scale(7.89)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/><text x="81.54" y="40">oz</text></svg>wordmark: UX and oz in Fredoka 700, the drawn W</figure>
+  <figure class="sheet-fig"><nav class="bar"><div class="logo"><svg class="brand wm" viewBox="0 -2 123 46" width="75" height="28"><text x="0" y="40">UX</text><polyline stroke-width="6.42" points="56.55,16.61 61.14,36.79 68.02,23.03 74.9,36.79 77.83,23.95"/><path transform="translate(80.49 12.21) scale(7.89)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/><text x="81.54" y="40">oz</text></svg><svg class="brand mark" viewBox="0 0 50 48" width="36" height="36"><polyline stroke-width="7" points="11.5,19 16.5,41 24,26 31.5,41 34.7,27"/><path transform="translate(37.6 14.2) scale(8.6)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/></svg></div></nav><br>in the bar</figure>
+  <figure class="sheet-fig"><nav class="bar tight"><div class="logo"><svg class="brand wm" viewBox="0 -2 123 46" width="75" height="28"><text x="0" y="40">UX</text><polyline stroke-width="6.42" points="56.55,16.61 61.14,36.79 68.02,23.03 74.9,36.79 77.83,23.95"/><path transform="translate(80.49 12.21) scale(7.89)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/><text x="81.54" y="40">oz</text></svg><svg class="brand mark" viewBox="0 0 50 48" width="36" height="36"><polyline stroke-width="7" points="11.5,19 16.5,41 24,26 31.5,41 34.7,27"/><path transform="translate(37.6 14.2) scale(8.6)" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/></svg></div></nav><br>the mark alone when the bar is short</figure>
 </div></section>
 
 <section><h2>Colours</h2><p>Every custom property on <code>:root</code>: the palette first, then the roles and the token each one plays.</p>

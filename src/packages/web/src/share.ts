@@ -216,7 +216,7 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
   const wrap = (path: string, run: (req: Request) => Response | Promise<Response>) => async (req: Request) => {
     const t = req.headers.get('x-uxwoz-share')
     if (!t && pub && !pub.isOwner(req)) return pub.route(path, req, run, (b, cache) => costs(path, b, cache))
-    if (!t) return !isOwner(req) ? fail('This UX Woz is private.', 401) : desks.of(req) ? run(req) : fail('Who sent this is not known.', 400)
+    if (!t) return !isOwner(req) ? fail('This UXWoz is private.', 401) : desks.of(req) ? run(req) : fail('Who sent this is not known.', 400)
     const f = desks.whose(t)
     if (!f || f.share.role !== 'edit') return fail('This link does not work any more.', 403)
     const cache = f.desk.cache
@@ -237,7 +237,7 @@ export function sharing(desks: Desks, api: Api, pages: { app: Route; player: Rou
     return res
   }
 
-  const closed = () => new Response(pub ? 'Only the owner can open this.' : 'This UX Woz is private.', { status: 403, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+  const closed = () => new Response(pub ? 'Only the owner can open this.' : 'This UXWoz is private.', { status: 403, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
   /** Every /api route but the visitors' goes through `wrap`; with UXWOZ_OWNER set, `/`, `/m/…` and `/design` ask for the owner's cookie. */
   function guard<R extends string>(all: Bun.Serve.Routes<unknown, R>): Bun.Serve.Routes<unknown, R> {
     const out: Record<string, Route> = { ...all, ...routes }

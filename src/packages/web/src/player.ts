@@ -331,7 +331,7 @@ function note(text: string) {
   $('stage').hidden = true
   $('note').textContent = text
   $('note').hidden = false
-  $('name').textContent = 'UX Woz'
+  $('name').textContent = 'UXWoz'
 }
 
 async function init() {

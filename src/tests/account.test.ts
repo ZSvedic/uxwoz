@@ -57,7 +57,7 @@ const post = (path: Path, body: unknown, who?: string | null, address = ADDR) =>
   method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body),
   headers: { ...(who ? { cookie: `uxwoz_who=${who}` } : {}), 'x-real-ip': address },
 }))
-const codeOf = (email: string) => mails.findLast((m) => m.to[0] === email.trim().toLowerCase() &&m.subject.startsWith('Your UX Woz code'))!.subject.slice(-6)
+const codeOf = (email: string) => mails.findLast((m) => m.to[0] === email.trim().toLowerCase() &&m.subject.startsWith('Your UXWoz code'))!.subject.slice(-6)
 const cookieOf = (r: Response) => r.headers.get('Set-Cookie')!.match(/uxwoz_who=([a-f0-9]{32})/)![1]!
 const ver = (html: string): Version => ({ html, model: 'claude-haiku-5.5', servedModel: null, createdAt: '2026-11-11T00:00:00Z', costUsd: 0.001, costEstimated: false, firstChunkMs: 1, totalMs: 2, finishReason: 'stop' })
 function mockup(id: string, app: string, html: string) {
@@ -178,7 +178,7 @@ test('429 when the day\'s emails are used; 503 in production with no mail key, a
   make({})
   store.setCaps({ mailPerDay: 100 })
   expect((await post('/api/signin', { email: 'f@example.com' })).status).toBe(204)
-  expect(logs.join('\n')).toContain('Your UX Woz code')
+  expect(logs.join('\n')).toContain('Your UXWoz code')
   logs = []
   const failing: Fetch = async () => new Response('nope', { status: 500 })
   routes = accountRoutes(store, { ...extras, io: { fetch: failing, env: { NODE_ENV: 'production', RESEND_API_KEY: 're_x' }, log: (m) => { logs.push(m) } } })
@@ -222,7 +222,7 @@ test('ask: the owner hears at once; a second ask waits for the answer; a visitor
   expect((await post('/api/ask', {}, t)).status).toBe(400)
   expect((await post('/api/ask', { note: 'A vet clinic app' }, t)).status).toBe(204)
   expect(mails).toHaveLength(1)
-  expect(mails[0]).toMatchObject({ to: [ADMIN], subject: 'UX Woz: j@example.com asks for more' })
+  expect(mails[0]).toMatchObject({ to: [ADMIN], subject: 'UXWoz: j@example.com asks for more' })
   expect(mails[0]!.text).toContain('A vet clinic app')
   expect(mails[0]!.text).toContain('https://uxwoz.example/admin')
   const again = await post('/api/ask', { note: 'Please' }, t)
@@ -255,7 +255,7 @@ test('the owner gets one mail of requests an hour at most, listing the open ones
   await asks.tick()
   expect(owner()).toHaveLength(2)
   const m = owner()[1]!
-  expect(m.subject).toBe('UX Woz: 2 people ask for more')
+  expect(m.subject).toBe('UXWoz: 2 people ask for more')
   expect(m.text).toContain('k2@example.com spent')
   expect(m.text).toContain('Third note')
   expect(m.text).not.toContain('First note')

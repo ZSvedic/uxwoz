@@ -94,7 +94,7 @@ function readme(app: string, all: CacheEntry[], screens: CacheEntry[], component
   const unreached = screens.filter((e) => !seen.has(e.key))
   const planned = plannedScreens(all)
   return [
-    `# ${short(app, 80)}`, '', 'A clickable mockup made with UX Woz. Read HANDOFF.md first.', '',
+    `# ${short(app, 80)}`, '', 'A clickable mockup made with UXWoz. Read HANDOFF.md first.', '',
     '## Prompt', '', 'As the user typed it:', '', '```text', app, '```', '',
     `- Device: ${devices.join(', ')}`, `- Drawn by: ${models.join(', ')}`, `- Screens: ${screens.length} drawn, ${planned.length} not drawn yet`, '',
     '## Screens', '', 'Each screen hangs under the screen with the fewest clicks to it, starting at Home.', '', ...out, '',
@@ -106,7 +106,7 @@ function readme(app: string, all: CacheEntry[], screens: CacheEntry[], component
 
 const HANDOFF = (app: string) => `# Handoff
 
-This folder is a clickable mockup of one app, made with UX Woz. Build the real front end from it.
+This folder is a clickable mockup of one app, made with UXWoz. Build the real front end from it.
 
 ## What is here
 

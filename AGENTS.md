@@ -136,8 +136,9 @@ src/packages/web/src/
   design/        the look: tokens.css (every colour), base.css (shared by parts), one file per part (bar,
                  canvas, boxes, drawer, panel), motion.css; index.css imports them all; fx.ts (sparks, sounds, pickFx);
                  player.css (the player's, not in index.css), admin.css (/admin and /privacy, not in index.css), sheet.html and sheet.ts (the sheet at /design)
-  design/brand/  the logo, the favicons (SVG, PNG, home screen), the three star tiles, Fredoka and its licence,
-                 og.png (the share preview)
+  design/brand/  logo.svg (the mark, C2: a drawn W, a sparkle above its short last stroke), the favicons (SVG, PNG,
+                 home screen), the three star tiles, Fredoka and its licence, og.png (the share preview); the pages
+                 inline the mark and the wordmark (UX and oz in Fredoka, the W between) as `.brand` SVGs
 src/packages/web/themes/     pico.css (vendored), mockup.css (default theme, loaded after Pico)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest
 src/tests/fixtures/demo-cache.json   the demo mockup (a habit tracker); made by scripts/make-demo-cache.ts

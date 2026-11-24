@@ -1,6 +1,6 @@
-# UX Woz
+# UXWoz
 
-*UX Woz* is short for *UX Wizard of Oz*, after the
+*UXWoz* is short for *UX Wizard of Oz*, after the
 [prototyping technique](https://en.wikipedia.org/wiki/Wizard_of_Oz_experiment) where a hidden person plays
 the system. Here a model plays it: type a product idea, click around, and each screen you reach is drawn
 on demand, two designs at a time, and kept. The result is a clickable mockup you can share for comments

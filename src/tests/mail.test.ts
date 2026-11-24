@@ -17,7 +17,7 @@ test('a mail goes to Resend with the key, the sender, one recipient and plain te
   expect(calls[0]!.init.method).toBe('POST')
   expect((calls[0]!.init.headers as Record<string, string>).Authorization).toBe('Bearer re_test')
   expect(JSON.parse(calls[0]!.init.body as string)).toEqual({
-    from: MAIL_FROM, to: ['ana@example.com'], subject: 'Your UX Woz code: 123456', text: expect.stringContaining('15 minutes'),
+    from: MAIL_FROM, to: ['ana@example.com'], subject: 'Your UXWoz code: 123456', text: expect.stringContaining('15 minutes'),
   })
 })
 
@@ -52,12 +52,12 @@ test('no key: logged on a dev machine, not sent in production', async () => {
 test('the texts', () => {
   const r = requestMail('owner@x.co', [{ email: 'ana@example.com', note: 'For a pitch on Friday', spent: 0.25, allowance: 0.25 }], 'https://app.uxwoz.com/admin')
   expect(r.to).toBe('owner@x.co')
-  expect(r.subject).toBe('UX Woz: ana@example.com asks for more')
+  expect(r.subject).toBe('UXWoz: ana@example.com asks for more')
   expect(r.text).toContain('For a pitch on Friday')
   expect(r.text).toContain('$0.25 of $0.25')
   expect(r.text).toContain('/admin')
   const two = requestMail('o@x.co', [{ email: 'a@x.co', note: 'one', spent: 0, allowance: 0.25 }, { email: null, note: 'two', spent: 0, allowance: 0.25 }], 'u')
-  expect(two.subject).toBe('UX Woz: 2 people ask for more')
+  expect(two.subject).toBe('UXWoz: 2 people ask for more')
   expect(two.text).toMatch(/one[\s\S]*someone spent[\s\S]*two/)
   expect(answerMail('a@b.co', true, 0.5, 'u').text).toContain('about 125 more screens')
   expect(answerMail('a@b.co', false, 0.5, 'u').subject).toContain('request')

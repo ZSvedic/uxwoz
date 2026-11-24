@@ -4,7 +4,7 @@ import type { Io } from '@uxwoz/core'
 import { screensOf } from './people.ts'
 
 export const RESEND_URL = 'https://api.resend.com/emails'
-export const MAIL_FROM = 'UX Woz <hello@mail.uxwoz.com>'
+export const MAIL_FROM = 'UXWoz <hello@mail.uxwoz.com>'
 export interface Mail { to: string; subject: string; text: string }
 type Env = Record<string, string | undefined>
 const envOf = (io: Io): Env => io.env ?? process.env
@@ -41,7 +41,7 @@ const money = (usd: number) => `$${usd.toFixed(2)}`
 
 /** The six-digit code. */
 export const codeMail = (to: string, code: string): Mail => ({
-  to, subject: `Your UX Woz code: ${code}`,
+  to, subject: `Your UXWoz code: ${code}`,
   text: `Your code is ${code}.\n\nType it in the tab where you asked for it. It works for 15 minutes.\n\nIf you did not ask for it, ignore this email.\n`,
 })
 
@@ -51,12 +51,12 @@ export const contactOf = (env: Env) => env.UXWOZ_CONTACT?.trim() || env.UXWOZ_AD
 export interface Asking { email: string | null; note: string; spent: number; allowance: number }
 /** The open quota requests, to the owner, one email an hour at most (the caller keeps the hour). */
 export const requestMail = (to: string, open: Asking[], adminUrl: string): Mail => ({
-  to, subject: open.length === 1 ? `UX Woz: ${open[0]!.email ?? 'someone'} asks for more` : `UX Woz: ${open.length} people ask for more`,
+  to, subject: open.length === 1 ? `UXWoz: ${open[0]!.email ?? 'someone'} asks for more` : `UXWoz: ${open.length} people ask for more`,
   text: open.map((r) => `${r.email ?? 'someone'} spent ${money(r.spent)} of ${money(r.allowance)} and asks for more:\n\n${r.note}\n`).join('\n')
     + `\nApprove or refuse: ${adminUrl}\n`,
 })
 
 /** The owner's answer to a quota request, to the user. */
 export const answerMail = (to: string, approved: boolean, usd: number, appUrl: string): Mail => approved
-  ? { to, subject: 'You have more free screens', text: `Your request was approved: ${about(usd)} more screens are ready in UX Woz.\n\n${appUrl}\n` }
+  ? { to, subject: 'You have more free screens', text: `Your request was approved: ${about(usd)} more screens are ready in UXWoz.\n\n${appUrl}\n` }
   : { to, subject: 'About your request for more screens', text: `Sorry, we cannot give more free screens right now. Your mockups stay open: look, click, export.\n\n${appUrl}\n` }
