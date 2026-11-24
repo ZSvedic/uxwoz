@@ -88,21 +88,27 @@ src/packages/web/src/
                  drawn; a starter's recording at the mockup's size replayed in place of those calls, and `replayed`
   tour.ts        the tour read from tour/ at each request (mocks, rules.md, data.md, components/, notes.md) as
                  /api/map sends a mockup; `isTour`, which share.ts's `guard` refuses on every other route (404)
-  app.ts         browser entry: builds the canvas and the boxes, opens, closes and deletes a mockup, init
-  state.ts       browser: the shared state, local storage, elements by id, Enter sends a form
+  app.ts         browser entry: builds the canvas and the boxes, opens a project (`start`) or the tour (`openTour`,
+                 `state.tour`), what `/` opens (`openLast`: the last project, the newest, else the tour), Start over
+                 and Delete (then the newest other, else the tour), init
+  state.ts       browser: the shared state (`tour`: the read-only tour is open), local storage, elements by id, Enter sends a form
   screens.ts     browser: views (a card's name) and draw, A OR B streaming, refit and pick, clicks (@names, back), Regenerate, Edit,
                  Undo, delete
-  nav.ts         browser: the current screen, ← → trail, the address kept in step and followed (Back and Forward,
-                 a pasted one, *That mockup is not here.*), the map after filing, Nav
-  address.ts     browser: the address `/m/<mockup>/<screen>` read and written, which screen it names, push or
-                 replace (no DOM, tested)
+  nav.ts         browser: the current mock or box, the ← → steps (boxes are steps too), `showBox`, `goTo`, the
+                 address kept in step and followed (Back and Forward, a pasted one, *That project is not here.*),
+                 the map after filing, the step `toured` when the tour's last mock is current
+  address.ts     browser: the address `/m/<project>/<mock>`, `/m/<project>/box-rules` (and -components, -data,
+                 -fixer), `/tour/<mock>`: read and written, which mock it names, push or replace (no DOM, tested)
   drawer.ts      browser: box changes and rail tools, the drawer (Edit, Info, and Comments for a screen) for a screen or a box
-  toolbar.ts     browser: generate panel (the starters, above the prompt box for a first-time visitor) and
-                 pickers, toolbar menus (Theme too), Recent, zoom and its keys; the bar's fit (`fitBar`: tight,
-                 then fold the boxes, by measuring), Export project with its hint
+  bar.ts         browser: the top bar (logo, ← name →, the boxes while they fit, − zoom + ⛶), the name's dropdown
+                 (the boxes, the sentence, the tree), the zoom menu and its keys, `closeMenus`, `renderToolbar`;
+                 `treeRows`, `sizeFor` (Design for's start), `boxesFit` with no DOM (tested); the page's parts come in at `initBar`
+  menu.ts        browser: the menu panel from the logo (New project, Recent, Tour, This project, Theme, Sound, the
+                 account's line, Model in the private app, Privacy), Export project with its hint; New project (the
+                 examples first for a newcomer, the prompt box, Design for, Draw it; also on `uxwoz:new-project`)
   net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill, the brief hint
                  and the one that stays (after a live design, until the next click or key)
-  account-ui.ts  browser: the public's account button, its menu and the account card (sign in by code, Ask for
+  account-ui.ts  browser: the public's account line in the menu (`lineOf`) and the account card (sign in by code, Ask for
                  more, Delete my account), a refused live design (402, or a refused side of an A OR B) or a thing
                  that needs an account; what each shows from
                  /api/me as functions with no DOM (tested); nothing of it in private mode; the live hint's text and

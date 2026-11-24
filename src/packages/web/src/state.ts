@@ -22,6 +22,8 @@ export interface Making { key: string; parent: string | null; device: Device; si
 
 export const state = {
   app: null as string | null,
+  /** The open project is the tour: read-only, so nothing sends a request that changes it. */
+  tour: false,
   entries: new Map<string, CacheEntry>(),
   /** Each screen's level and parent, worked out on every draw. */
   tree: new Map<string, TreeNode>(),
