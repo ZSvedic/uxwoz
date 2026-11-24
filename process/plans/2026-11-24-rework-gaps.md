@@ -6,7 +6,8 @@ I suggest. It decides nothing about the look: the logo versions and the black-an
 
 Status: Zel answered on 2026-11-24, in three rounds. Decided: four sizes and their heights (3), Haiku
 draws the tour (4), the logo is C2 (`2026-11-24-rework/logo.html`), the buttons are on the canvas (17),
-the starting view is a card at 100% (25). The rest stand as suggested. Nothing is built.
+the starting view is a card at 100% (25). The rest stand as suggested. Zel approved the mocks
+(`2026-11-24-rework/mocks.html`, round 5). Nothing is built.
 
 ## How to answer
 

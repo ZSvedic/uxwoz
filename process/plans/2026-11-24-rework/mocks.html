@@ -3,6 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>UXWoz rework mocks</title>
 <style>
+@font-face { font-family: Fredoka; src: url("../../../src/packages/web/src/design/brand/fredoka.woff2") format("woff2"); font-weight: 500 700; }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 20px 16px 80px; font: 14px/1.4 system-ui, sans-serif; background: #fff; color: #111; }
 h1 { font-size: 24px; margin: 0 0 6px; } h2 { font-size: 19px; margin: 44px 0 4px; border-top: 2px solid #111; padding-top: 14px; }
@@ -154,7 +155,7 @@ const app = [
     { name: 'Monstera', zoom: '100%', in: true, out: true, on: 'Another', body: chip('Monstera') + `<div class="card cur"><h4>Describe it differently <span>✕</span></h4><div>Neither design fits? Say what this mock should be.</div><div class="ta" style="color:#111">A plant's page with a care log and its light needs</div>
       <div class="r"><button class="btn">🎙️ Hold to talk</button><button class="btn go">Draw again</button></div></div>` }),
   phone(8, 'The W+ menu', 'A tap on the logo opens the left panel. It holds what the old toolbar had and the new bar has no room for.',
-    { name: 'Home', zoom: '100%', out: true, body: chip('Home') + plants, over: `<div class="dim-bg"></div><div class="side"><div style="display:flex;justify-content:space-between;align-items:center;font:800 20px system-ui">UXW✦oz <span>✕</span></div>
+    { name: 'Home', zoom: '100%', out: true, body: chip('Home') + plants, over: `<div class="dim-bg"></div><div class="side"><div style="display:flex;justify-content:space-between;align-items:center;font:800 20px system-ui"><span class="wm" data-h="30"></span> <span>✕</span></div>
       <div class="it">➕ New project</div><div class="it">🕘 Recent</div><div class="it sub">✓ A plant care app…</div><div class="it sub">Split a bill with friends…</div><div class="it">🎓 Tour</div>
       <div class="h">This project</div><div class="it">🔗 Share…</div><div class="it">💬 Feedback</div><div class="it">⇩ Export project…</div><div class="it">⇩ Export the boxes</div><div class="it">↺ Start over</div><div class="it">✕ Delete</div>
       <div class="h">UXWoz</div><div class="it">🎨 Theme: Mockup ▾</div><div class="it">🔈 Sound: off</div><div class="it">👤 25 free screens · Register</div><div class="it">Privacy</div></div>` }),
@@ -201,7 +202,7 @@ const tour = [
     { ...TOUR, in: true, name: 'Be like Bill', body: chip('Be like Bill') + mock(`${bill}<p>Bill types his new idea into Woz.<br>3 sec later, there is a mock.</p><p>The menu is wrong. Change. 3 sec.</p><p>The dialogs are wrong. Change. 3 sec.</p><p>The model already knows the usual app patterns. Bill just states the <i>differences</i> from the standard mockup: "Same checkout, but pay without an account." The app spec stays short.</p><p>Bill shows the mocks to target users and fixes what confuses them. Then he exports the mocks and specs for his coding agent.</p><p>Prototyping apps is fun again.<br>Bill is smart. Be like Bill.</p><button class="cta">Try another example</button>`, '', 'cur fit') }),
 ]
 
-const wbar = (name, zoom) => `<div class="tb"><button class="lg" style="font:800 14px system-ui;padding:0 8px">UXW✦oz</button><button>←</button><button class="nm" style="flex:none;width:120px">${name} ▾</button><button>→</button><span class="sep"></span>
+const wbar = (name, zoom) => `<div class="tb"><button class="lg" style="padding:0 7px"><span class="wm" data-h="20"></span></button><button>←</button><button class="nm" style="flex:none;width:120px">${name} ▾</button><button>→</button><span class="sep"></span>
   <button>📐 Rules<span class="n">2</span></button><button>🧩 Components</button><button>🗄️ Data</button><button>🕵️ Fixer<span class="n">1</span></button><span style="flex:1"></span><button>−</button><button>${zoom} ▾</button><button>+</button><button>⛶</button></div>`
 const small = (l, t, w, h, name, cur = '') => `<div class="chip" style="left:${l}px;top:${t - 19}px">${name}</div><div class="mock ${cur}" style="left:${l}px;top:${t}px;width:${w}px;height:${h}px"><div class="in"><h3>${name}</h3><div class="rowi"><span>…</span><span>…</span></div><div class="rowi"><span>…</span><span>…</span></div><div class="sk" style="height:5px;width:70%"></div><div class="sk" style="height:5px;width:50%"></div></div></div>`
 const box = (l, t, name) => `<div class="box" style="left:${l}px;top:${t}px;width:104px;height:140px"><b>${name}</b><div class="sk" style="height:5px"></div><div class="sk" style="height:5px;width:70%"></div><div class="sk" style="height:5px;width:85%"></div></div>`
@@ -217,6 +218,15 @@ const wide = [
       <div class="box" style="left:746px;top:28px;width:104px;height:316px"><b>📐 Rules</b><div class="sk" style="height:5px"></div></div><div style="position:absolute;left:210px;top:312px;width:380px">${acts(MOCK, 'Edit')}</div></div></div></figure>`,
 ]
 for (const [id, list] of [['app', app], ['boxes', boxes], ['tour', tour], ['wide', wide]]) document.getElementById(id).innerHTML = list.join('')
+// The wordmark, version C2: UX and oz in Fredoka, the drawn W between them, the sparkle above the tip of its short last stroke.
+document.fonts.load('700 38px Fredoka').then(() => {
+  const meas = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); document.body.append(meas)
+  const wd = (t) => { meas.innerHTML = `<text font-size="38" font-family="Fredoka" font-weight="700">${t}</text>`; return meas.firstChild.getComputedTextLength() }
+  const w = [[8.5, 19], [13.5, 41], [21, 26], [28.5, 41], [31.7, 27]], sw = 7, sp = [34.6, 14.2, 8.6], ux = wd('UX'), oz = wd('oz')
+  const K = 26.6 / (w[1][1] - w[0][1] + sw), h = sw * K / 2, ty = 40 - (w[1][1] + sw / 2) * K, tx = ux + 1.5 + h - K * w[0][0], ozx = tx + K * w[4][0] + h + .5
+  meas.remove()
+  for (const el of document.querySelectorAll('.wm')) el.innerHTML = `<svg height="${el.dataset.h}" viewBox="0 -2 ${ozx + oz} 46" style="display:block;overflow:visible" font-family="Fredoka" font-weight="700" font-size="38"><text x="0" y="40">UX</text><polyline points="${w.map(q => q.join(',')).join(' ')}" transform="translate(${tx} ${ty}) scale(${K})" fill="none" stroke="#111" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/><path transform="translate(${tx + K * sp[0]} ${ty + K * sp[1]}) scale(${K * sp[2]})" d="M0-1C.1-.32.32-.1 1 0 .32.1.1.32 0 1-.1.32-.32.1-1 0-.32-.1-.1-.32 0-1z"/><text x="${ozx}" y="40">oz</text></svg>`
+})
 // The tour's mocks never scroll: each gets the largest type at which all of its text and its button fit.
 for (const fig of document.querySelectorAll('#tour figure')) {
   const el = fig.querySelector('.mock .in'); let fs = 17
