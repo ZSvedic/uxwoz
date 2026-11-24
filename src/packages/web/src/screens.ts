@@ -8,9 +8,8 @@ import { renderSide } from './boxes.ts'
 import type { CardView, ScreenView } from './canvas.ts'
 import { canvas, closeMockup, side } from './app.ts'
 import { boxOp, renderDrawer } from './drawer.ts'
-import { checkHint, coach, mapOf, post, showError, hint, stream, streamInto, themeCss, type StreamRenderer } from './net.ts'
+import { endHint, liveDesign, mapOf, showLasting, post, showError, hint, stream, streamInto, themeCss, type StreamRenderer } from './net.ts'
 import { sideAct } from './account-ui.ts'
-import { pickFx } from './design/fx.ts'
 import { applyMap, filed, saveCurrent, setCurrent, syncAddress } from './nav.ts'
 import { loadRecent, openGenerate, renderToolbar } from './toolbar.ts'
 import { changeInput, deviceSelect, generate, modelSelect, promptInput, state, type Making, type Side } from './state.ts'
@@ -92,7 +91,7 @@ export async function draw() {
   generate.hidden = !!state.app && !generate.classList.contains('open')
   renderDrawer()
   renderToolbar()
-  checkHint()
+  showLasting()
   const theme = state.theme
   const css = await themeCss(theme)
   if (theme !== state.theme) return // a newer draw shows the newer theme
@@ -137,8 +136,7 @@ export async function openScreen(action: string | null, from: string | null, lab
       s.stream = null
       if (ev.type === 'version') {
         s.version = ev.version
-        if (ev.version.costUsd !== 0) coach.did('live') // a replayed design costs 0
-        if (m!.sides.every((x) => x.version)) coach.did('ready')
+        if (ev.version.costUsd !== 0) liveDesign() // a replayed design costs 0
       } else {
         s.error = ev.message
         state.failed.set(`${m!.key}#${ev.variant}`, ev.message)
@@ -213,8 +211,7 @@ async function refit(key: string, fitted: number | null, choice = true) {
 }
 
 /** Fit a finished A OR B by width now, then snugly once both have their size. */
-export function fitChoice(key: string, step = true) {
-  if (step) coach.did('ready')
+export function fitChoice(key: string) {
   canvas.fit(key, { top: true })
   refit(key, performance.now())
 }
@@ -250,12 +247,12 @@ export async function pick(key: string, index: number) {
   const m = state.making?.key === key ? state.making : null
   if (state.picking || !(m?.sides[index]?.version ?? state.entries.get(key)?.proposals?.[index])) return
   state.picking = true
-  const app = state.app, fx = pickFx(key, index)
+  const app = state.app
   try {
     // The other side stops; the A OR B stays drawn until the server answers, so the picked frame
     // is kept (and renamed below) instead of loading again.
     if (m) { stopMaking(); state.making = m }
-    const [res] = await Promise.all([post('/api/pick', { key, index }).catch(() => null), fx.wait])
+    const res = await post('/api/pick', { key, index }).catch(() => null)
     if (state.making === m) state.making = null
     if (app !== state.app) return
     if (!res?.ok) {
@@ -271,12 +268,10 @@ export async function pick(key: string, index: number) {
     canvas.rename(`${key}#${index}`, key)
     state.current = key
     saveCurrent()
-    coach.did('pick')
     await draw()
     if (state.before) { back(); canvas.reveal(key, false) } else fitScreenSoon(key)
   } finally {
     state.picking = false
-    fx.done()
   }
 }
 
@@ -307,7 +302,7 @@ function target(app: string, from: string, prompt: string): { to: string; prompt
 export function onAction(from: string, action: string, label: string) {
   const app = state.app
   if (!app) return
-  coach.did('click')
+  endHint()
   const { to, prompt } = target(app, from, action)
   setCurrent(from)
   if (to === from) return void (screenRef(action) || isBack(action) || hint('This control leads nowhere yet: the fixer redraws it.'))
@@ -328,7 +323,6 @@ export async function revise(key: string, change: string | null) {
   state.revising = { key, change }
   refused = null
   const app = state.app
-  if (change) coach.did('editSent')
   const edited = !change && !!e.versions.at(-1)!.feedback && e.versions.at(-1)!.by !== 'fixer'
   let frame: StreamRenderer | null = null
   await stream('/api/revise', { key, change, model: modelSelect.value, device: deviceSelect.value }, change ? 'make the change' : 'make a new design', (ev, css) => {
@@ -338,8 +332,8 @@ export async function revise(key: string, change: string | null) {
       keep(ev.entry)
       if (ev.filing) { state.filing = true; filed() }
       state.revising = null
-      if (change) { changeInput.value = ''; coach.did('edited') }
-      if (ev.entry.versions.at(-1)?.costUsd !== 0) coach.did('live')
+      if (change) changeInput.value = ''
+      if (ev.entry.versions.at(-1)?.costUsd !== 0) liveDesign()
       // A Regenerate over an Edit: say the edit is not lost.
       if (edited) hint('A fresh design. Undo brings your edit back.')
       // The new version may be taller or narrower: keep it in view once it has its size.
@@ -358,7 +352,6 @@ export async function undo(key: string) {
   const res = await post('/api/undo', { key }).catch(() => null)
   if (!res?.ok) return showError('Nothing to undo')
   keep((await res.json()).entry)
-  coach.did('undo')
   draw()
 }
 

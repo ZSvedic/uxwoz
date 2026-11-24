@@ -1,7 +1,7 @@
 // The public's account button, menu and card (spec/behavior.md, The public): what each shows, given `me` and why
 // the card opened, and what a refused request leads to. No DOM.
 import { describe, expect, test } from 'bun:test'
-import { buttonOf, cardOf, forget, menuOf, refusalOf, shows, sideOf, type Me } from '../packages/web/src/account-ui.ts'
+import { LIVE_HINT, buttonOf, cardOf, forget, liveHint, menuOf, refusalOf, shows, sideOf, type Me } from '../packages/web/src/account-ui.ts'
 
 const fresh: Me = { role: 'new', left: 0.1, allowance: 0.1, screensLeft: 14 }
 const visitor: Me = { role: 'visitor', left: 0.0984, allowance: 0.1, screensLeft: 14, more: 30, may: { share: false, exportZip: false } }
@@ -108,5 +108,22 @@ describe('after Delete my account', () => {
     const s = { get length() { return m.size }, key: (i: number) => [...m.keys()][i] ?? null, removeItem: (k: string) => void m.delete(k) }
     forget(s)
     expect([...m.keys()]).toEqual(['other', 'uxwoz:arrived'])
+  })
+})
+
+describe('the live hint', () => {
+  test('a live design brings it, in plain words; the next click or key ends it for good', () => {
+    expect(LIVE_HINT).toBe('This design was drawn fresh for you, so it used one of your free screens.')
+    expect(liveHint(null, 'live')).toBe('due')
+    expect(liveHint('due', 'live')).toBe('due') // still due after a reload: the next live design shows it
+    expect(liveHint('due', 'act')).toBe('done')
+    expect(liveHint('done', 'live')).toBe('done') // only the first time
+    expect(liveHint(null, 'act')).toBeNull()
+  })
+
+  test('a browser first seen with mockups in Recent never shows it', () => {
+    expect(liveHint(null, 'veteran')).toBe('done')
+    expect(liveHint('done', 'live')).toBe('done')
+    expect(liveHint('due', 'veteran')).toBe('due')
   })
 })

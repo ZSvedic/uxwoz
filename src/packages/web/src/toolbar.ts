@@ -6,10 +6,9 @@ import { MAX_ZOOM } from './canvas.ts'
 import { el, type Box } from './boxes.ts'
 import { canvas, restorePickers, side, start } from './app.ts'
 import { closeDrawer, unseen } from './drawer.ts'
-import { coach, hint, post, showError, themeCss } from './net.ts'
+import { beginHint, hint, post, showError, themeCss } from './net.ts'
 import { currentAt, renderNav, trailStep, walkTrail } from './nav.ts'
 import { draw, labelOf } from './screens.ts'
-import { initVoice } from './voice-ui.ts'
 import { needsAccount, renderAccountMenu } from './account-ui.ts'
 import { $, deviceSelect, enterSubmits, generate, modelSelect, promptInput, state, store } from './state.ts'
 
@@ -96,7 +95,7 @@ export async function loadRecent() {
   $('recent').replaceChildren(...recentApps.map((a) => item(a.app, screensNote(a.screens), () => open(a.app))))
   $('recentBox').hidden = recentApps.length === 0
   placeStarters(recentApps.length === 0)
-  coach.begin(recentApps.length > 0)
+  beginHint(recentApps.length > 0)
   renderRecentMenu()
   // Also when nothing else draws: an address that names no mockup leads to the start page with no draw().
   renderToolbar()
@@ -170,7 +169,6 @@ addEventListener('keydown', (e: KeyboardEvent) => {
 })
 
 export function openGenerate() {
-  coach.did('own')
   if (state.app && generate.classList.contains('open')) return promptInput.focus() // already over a mockup: keep what was typed
   restorePickers()
   generate.classList.add('open')
@@ -245,11 +243,6 @@ addEventListener('resize', fitBar)
 document.fonts.ready.then(fitBar)
 
 for (const b of document.querySelectorAll<HTMLButtonElement>('[data-zoom]')) b.addEventListener('click', () => { closeMenus(); zoomTo(b.dataset.zoom!) })
-
-// The microphone, after the speaker and before the account (voice-ui.ts).
-const mic = el('button')
-$('accountPop').before(mic)
-initVoice(mic)
 
 export const warmUp = (model: string) => post('/api/warmup', { model }).catch(() => {})
 modelSelect.addEventListener('change', () => warmUp(modelSelect.value))

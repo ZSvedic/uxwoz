@@ -95,17 +95,14 @@ src/packages/web/src/
                  pickers, toolbar menus (Theme too), Recent, zoom and its keys; the bar's fit (`fitBar`: tight,
                  then fold the boxes, by measuring), Export project with its hint
   net.ts         browser: fetches and NDJSON streams, a streaming frame, theme CSS, the red pill, the brief hint
-                 and the lasting one (`coach`)
-  onboarding.ts  the public's hints: which is due from what the visitor did, kept in local storage, and when one on
-                 show goes stale (`left`) (no DOM, tested)
+                 and the one that stays (after a live design, until the next click or key)
   account-ui.ts  browser: the public's account button, its menu and the account card (sign in by code, Ask for
                  more, Delete my account), a refused live design (402, or a refused side of an A OR B) or a thing
                  that needs an account; what each shows from
-                 /api/me as functions with no DOM (tested); nothing of it in private mode
-  voice.ts       browser: voice input's state machine (wake phrase as Chrome hears it, what was heard, countdown,
-                 stop, cancel; no DOM, tested) and speech recognition that restarts itself and says why it stops
-  voice-ui.ts    browser: the microphone button, the label with what was heard, the words in the drawer's Edit
-                 field, Sending in 3… and Cancel
+                 /api/me as functions with no DOM (tested); nothing of it in private mode; the live hint's text and
+                 its record in this browser (`liveHint`)
+  voice.ts       browser: hold to talk: the words after the typed text, kept on release, the four problems (`Talk`,
+                 no DOM, tested) and the speech recognition behind it (`HoldToTalk`); no button wired in yet
   canvas.ts      browser: the boxes right of Home, the tree layout (packed rows, ropes that bend in the gap), cards and frames, A OR B sides,
                  rails at the canvas's scale, pan and zoom, fits (and again on a window resize), frames scaled
                  not zoomed, where a zoom lands (`landing`), the current screen kept in view; a narrow window
@@ -134,7 +131,7 @@ src/packages/web/src/
                  trail, a link's day, the Share pane's refresh (no DOM, tested)
   index.html     the page around the canvas; links design/index.css
   design/        the look: tokens.css (every colour), base.css (shared by parts), one file per part (bar,
-                 canvas, boxes, drawer, panel), motion.css; index.css imports them all; fx.ts (sparks, sounds, pickFx);
+                 canvas, boxes, drawer, panel), motion.css; index.css imports them all; fx.ts (the speaker and the whoosh);
                  player.css (the player's, not in index.css), admin.css (/admin and /privacy, not in index.css), sheet.html and sheet.ts (the sheet at /design)
   design/brand/  the logo, the favicons (SVG, PNG, home screen), the three star tiles, Fredoka and its licence,
                  og.png (the share preview)
@@ -147,7 +144,6 @@ src/scripts/record-starters.ts   `bun run starters:record [id…]`: live calls t
 recordings/                  the starters' recordings (spec/public.md, Recordings); copied into the image
 src/scripts/demo.ts          `bun run demo`: the app on a temporary copy of the demo mockup, no keys, prints the URLs
 src/scripts/backup.sh        run by hand or weekly by launchd: GET /api/backup (the cache, or the public's zip) into backups/ (git-ignored)
-src/scripts/voice-check.ts   run by hand: a macOS voice says an Edit to a separate Chrome; PASS if the Edit was sent
 ```
 
 ## Do not read (large or generated)

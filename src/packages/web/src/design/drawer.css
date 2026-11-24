@@ -28,9 +28,6 @@
 .info dt { color: var(--muted); }
 .info dd { margin: 0; overflow-wrap: anywhere; }
 
-/* Voice: "Sending in 3…" under the Edit field. */
-.voice-count { display: flex; gap: 8px; align-items: center; color: var(--muted); }
-
 /* The Share pane: links per role, then the feedback by screen and the trips. */
 .share-pane select { width: 100%; }
 .share-pane select, .share-pane input { font: inherit; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--field); color: var(--text); }
