@@ -67,7 +67,7 @@ export async function draw() {
   syncAddress()
   state.tree = screenTree(all())
   side.el.hidden = !state.app || !state.entries.size || !state.boxes
-  if (state.boxes) renderSide(side, { boxes: state.boxes, components: components(), current: state.box, tour: state.tour }, boxOp)
+  if (state.boxes) renderSide(side, { boxes: state.boxes, components: components(), current: state.box, tour: state.tour, making: state.boxEdit, visiting: state.visiting }, boxOp)
   canvas.render(views(), !!state.busy)
   generate.hidden = !!state.app && !generate.classList.contains('open')
   renderCards()

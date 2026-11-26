@@ -107,6 +107,7 @@ function toured() {
 
 export function applyMap(map: { entries: CacheEntry[]; boxes?: typeof state.boxes; past?: typeof state.past; filing?: boolean; visiting?: boolean }) {
   Object.assign(state, { entries: new Map(map.entries.map((e) => [e.key, e])), boxes: map.boxes ?? state.boxes, past: map.past ?? state.past, filing: !!map.filing, visiting: !!map.visiting })
+  if (!state.visiting) state.boxEdit = null
   state.edits++
   // Filing or a visit runs (after a reload, say) and nothing waits for it yet.
   if ((state.filing || state.visiting) && state.waiting !== state.app && !state.tour) filed()
@@ -138,7 +139,7 @@ export async function filed() {
     if (state.waiting === app) {
       state.waiting = null
       // Given up (no answer, or changes kept crossing it): the lines say filing and visiting no more.
-      if (app === state.app) { state.filing = state.visiting = false; draw() }
+      if (app === state.app) { state.filing = state.visiting = false; state.boxEdit = null; draw() }
     }
     loadMe() // filing, a box's Edit and a visit are live calls: the free screens left
   }

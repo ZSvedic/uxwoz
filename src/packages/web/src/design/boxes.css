@@ -22,6 +22,8 @@
 .box.current { --glow: var(--current); box-shadow: 0 0 0 1px var(--glow), 0 0 28px var(--glow), var(--lift); }
 .box h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font-size: 18px; }
 .box h3 small { color: var(--muted); font-weight: 400; font-size: 13px; flex: 1; }
+/* While the fixer works on a box: *Making the change…* (or *Visiting…* on Fixer) at the header's right. */
+.box h3 .busy { color: var(--mark); font-size: 13px; font-weight: 600; }
 .box-hint { margin: 0; color: var(--muted); font-size: 13px; }
 .box-btn { padding: 1px 8px; font-size: 12px; color: var(--muted); }
 .box-btn:hover { color: var(--text); border-color: var(--current); }
@@ -54,10 +56,13 @@
 .rule:first-child { border-top: 0; }
 .rule-text { flex: 1; min-width: 0; }
 .rule .box-btn, .table-head .box-btn:last-child { border-color: transparent; background: none; }
-[contenteditable] { outline: none; border-radius: 4px; cursor: text; }
+/* A field (boxes.ts) is written on in the current box only: there it shows it takes a tap. */
+.field { outline: none; border-radius: 4px; }
 [data-placeholder]:empty::before { content: attr(data-placeholder); color: var(--muted); }
-.table-head > [contenteditable] { flex: 1; }
-[contenteditable]:hover, [contenteditable]:focus { background: var(--field); box-shadow: 0 0 0 2px var(--border); }
+.table-head > .field { flex: 1; }
+.box.current .field { cursor: text; }
+.field[contenteditable]:focus { background: var(--field); box-shadow: 0 0 0 2px var(--border); }
+@media (hover: hover) { .box.current .field:hover { background: var(--field); box-shadow: 0 0 0 2px var(--border); } }
 .data-table + .data-table { margin-top: 16px; }
 .table-head { display: flex; gap: 6px; align-items: baseline; margin-bottom: 4px; }
 .table-head > .yours { flex: 1; }

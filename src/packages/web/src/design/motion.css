@@ -12,6 +12,10 @@
   100% { transform: none; }
 }
 
+/* A box the fixer works on says so, breathing. */
+.box h3 .busy { animation: breathe 1.2s ease-in-out infinite alternate; }
+@keyframes breathe { to { opacity: .35; } }
+
 /* A mock or a box turns over to its card, about its middle, and comes to rest flat. It turns back at once. */
 .flip.turn { animation: hand .35s ease-out; }
 @keyframes hand { from { transform: perspective(1200px) rotateY(-90deg); } }

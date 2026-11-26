@@ -205,6 +205,11 @@ when the user branches.
   come into view. One finger on the sky, or two fingers anywhere, move the canvas. Two fingers
   pinch to zoom: they only pan until their spread has changed by more than 5%, then the zoom
   follows them, so a pan does not wobble the zoom.
+- **The edges**: the sky left of and above the tree is only as wide as Home needs to come to the
+  middle, so a pan or flick to the top left corner ends on Home. Right of and below the tree there
+  is room for any mock to come to the middle. A zoom near that corner still keeps the point under
+  the fingers or the pointer: the canvas grows there as much as it needs, and gives the room back
+  as a pan leaves it (or at the next 100%, Fit all or glide).
 - **The window**: when its size really changes (or it moves to another display), the canvas shows
   the current mock or box at 100% again, unless the user zoomed or panned by hand since. A
   keyboard that opens on a phone moves nothing. Nothing makes the page wider than the window.
@@ -323,7 +328,9 @@ legal pad, Fixer a very light red, Components a light blue, Data a light green. 
 the dark of its own colour: dark amber, dark red, dark blue, dark green. Each entry is a line or
 two of writing on the ruling with no frame round it. A box flipped to Edit, History or Info shows
 a parchment card of the box's size; where it scrolls its words fade into the parchment. A tap in a box, or on its button in the dropdown or the bar, makes
-it current: a gold ring, the top bar's name (*📐 Rules*), and its buttons under it. A box's buttons
+it current: a gold ring, the top bar's name (*📐 Rules*), and its buttons under it. A tap on an
+entry of a box that is not current only makes the box current; the next tap edits the entry. From
+the keyboard, Tab to an entry of the current box edits it, and Enter edits one already focused. A box's buttons
 are a mock's four with its own action in 🎲's place:
 
 | Box | First button | Then |
@@ -336,7 +343,9 @@ are a mock's four with its own action in 🎲's place:
 - **✏️ Edit** flips the box to *What should change in Rules?* (or the box's name), a field,
   **Make the change** and 🎙️. The request goes to the fixer as a visit that starts from it: the fixer
   does what the user asks first, and may then change entries the user wrote in that box; then it
-  tidies up as on any visit. Each change gets its line and Undo in Fixer, under *You
+  tidies up as on any visit. The card flips back at once, and until the visit ends the box's title
+  line says *Making the change…* and Fixer's says *Visiting…* (as on any visit; after a reload
+  during it, Fixer's line alone says so). Each change gets its line and Undo in Fixer, under *You
   asked: …*. While a visit runs, Make the change and Run fixer wait (Add rule and Add table do
   not). An Edit asked for before Home is drawn says *Wait for Home.*
 - **⏪ History** flips to **↶ Undo** and the changes it can take back, newest first, each with
@@ -364,10 +373,10 @@ What each box holds:
   (where it belongs, the mocks that paste it, the mock it was taken from). A tap elsewhere in the
   box gives the buttons back to the box.
 - **Rules**: one line each, the ID and one sentence; an entry the user wrote is marked *yours*,
-  in Data too. Tap the sentence to change it; Enter or a tap elsewhere saves, Esc puts it back, an
+  in Data too. In the current box, tap the sentence to change it; Enter or a tap elsewhere saves, Esc puts it back, an
   empty sentence deletes it. **Add rule** adds an empty rule at the end with the cursor in it; its
   sentence's first words make its ID, and left empty it goes.
-- **Data**: small tables, each with an ID, named columns and rows. Tap a cell to change it; a row
+- **Data**: small tables, each with an ID, named columns and rows. In the current box, tap a cell to change it; a row
   left empty or a column without a name goes when the table saves. **+ row**, **+ column**, ✕
   under each table. **Add table** adds a table with only its name, the cursor in it: the name
   makes its ID, and it gets the columns *name* and *value* and one empty row. Left empty, it goes.

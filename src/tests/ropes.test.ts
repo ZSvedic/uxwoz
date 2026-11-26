@@ -1,6 +1,6 @@
 // The canvas worked out with no page: rows of equal height, the 100% scale, where a glide ends, and the ropes.
 import { describe, expect, test } from 'bun:test'
-import { BOX_MAX_W, BUTTONS_H, NAME_H, ROPE_SHOW, boxHundred, boxWidth, curve, fingersAt, frameOf, glideAt, glideZoom, headH, hundred, landing, pinchPoint, placeTree, rope, sizeOf, touchStep } from '../packages/web/src/canvas.ts'
+import { BOX_MAX_W, BUTTONS_H, NAME_H, ROPE_SHOW, boxHundred, boxWidth, curve, edges, fingersAt, frameOf, glideAt, glideZoom, headH, hundred, landing, pinchPoint, placeTree, rope, sizeOf, touchStep } from '../packages/web/src/canvas.ts'
 
 describe('two fingers over a mock (pinchPoint)', () => {
   test('the first step is put on the window by the frame; later steps by the screen, whatever the frame did since', () => {
@@ -151,6 +151,20 @@ describe('the glide', () => {
     for (const t of [0.2, 0.5, 0.8]) {
       const p = glideAt(a, b, t)
       expect((p.left - a.left) / (b.left - a.left)).toBeCloseTo((p.top - a.top) / (b.top - a.top))
+    }
+  })
+
+  test('scrolled to the top left corner, the view is on Home; every mock can still come to the middle', () => {
+    for (const [mock, w, h] of [[small, 402, 700], [small, 402, 1600], [laptop, 1280, 900], [laptop, 390, 700]] as const) {
+      for (const k of [0.25, 1, 2]) {
+        const z = hundred(w, h, mock) * k, pad = edges(w, h, z, mock)
+        const home = placeTree([{ key: 'h', parent: null }], mock, z, 0, pad).cards.get('h')!
+        const to = landing(frameOf(home, z), z, w, h)
+        // Home's own landing needs no room left of or above the canvas, and gets no more than it needs.
+        expect(Math.min(to.left, to.top)).toBeGreaterThanOrEqual(-0.5)
+        expect(Math.max(to.left, to.top)).toBeLessThanOrEqual(z + 0.5)
+        expect(pad.end * z).toBeGreaterThanOrEqual(Math.max(w, h) / 2 - 0.5)
+      }
     }
   })
 

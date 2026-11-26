@@ -43,6 +43,8 @@ export const state = {
   past: { components: [], rules: [], data: [] } as Record<BoxName, Past[]>,
   filing: false,
   visiting: false,
+  /** The box whose Edit the fixer's visit is making: it says *Making the change…* until the visit ends. */
+  boxEdit: null as Box | null,
   /** The project a filed() loop is waiting for, for its filing or a visit to end. */
   waiting: null as string | null,
   /** Counts changes this page applied, so a map fetched before one of them is not applied after it. */

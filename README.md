@@ -15,6 +15,7 @@ You need [bun](https://bun.sh). Every `bun` command runs from `src/`.
 | Look around on a made-up mockup | `bun install && bun run demo` | nothing: no keys, no model calls |
 | Make your own mockups | `bun run dev`, then http://127.0.0.1:3000 | a root `.env` with `OPENROUTER_API_KEY` and `OPENAI_API_KEY` |
 | Test and typecheck | `bun run check` | nothing: tests replay `cassettes/` offline |
+| Check two-finger pan and pinch | `bun run touch:check` (with `bun run demo` running) | Google Chrome; prints PASS or FAIL |
 | Re-record after a prompt change | `bun run test:record` | the keys, a few cents |
 | Re-record the examples after a prompt change | `bun run starters:record` (or `… plants --device laptop` for some) | the keys, about 20 cents for all 28 files |
 

@@ -37,22 +37,47 @@ const fresh = (x: { seen?: boolean }) => (readOnly || x.seen ? '' : ' fresh')
 /** Buttons that change a box (✕, + row, + column, the fixer's Undo): none in the tour. */
 const changes = <T,>(kids: T[]): T[] => (readOnly ? [] : kids)
 
-/** Text the user types in place: Enter or leaving the field saves it, Esc puts it back. Plain text in the tour. */
-function editable<E extends HTMLElement>(e: E, save: (text: string) => void): E {
+/** Text the user types in place (`.field`): Enter or leaving the field saves it, Esc puts it back. Plain text in the
+ *  tour. It takes typing only once a press on the current box opens it (`openField`), or at once when `open`; leaving
+ *  it closes it again, so a press that only makes a box current never starts an edit. From the keyboard, Tab to it in
+ *  the current box opens it, and Enter opens one reached while its box was not current. */
+function editable<E extends HTMLElement>(e: E, save: (text: string) => void, open = false): E {
   if (readOnly) return e
-  e.contentEditable = 'plaintext-only'
+  e.classList.add('field')
+  e.tabIndex = 0
+  if (open) e.contentEditable = 'plaintext-only'
   e.spellcheck = false
   const was = () => e.dataset.was ?? ''
   e.dataset.was = e.textContent ?? ''
+  const fromKeys = () => {
+    if (e.isContentEditable || !e.closest('.box.current')) return false
+    e.contentEditable = 'plaintext-only'
+    getSelection()?.selectAllChildren(e)
+    getSelection()?.collapseToEnd()
+    return true
+  }
+  e.addEventListener('focus', () => { if (e.matches(':focus-visible')) fromKeys() })
   e.addEventListener('keydown', (k) => {
+    if (!e.isContentEditable) { if (k.key === 'Enter' && fromKeys()) k.preventDefault(); return }
     if (k.key === 'Enter') { k.preventDefault(); e.blur() }
     if (k.key === 'Escape') { e.textContent = was(); e.blur(); k.stopPropagation() }
   })
   e.addEventListener('blur', () => {
+    e.removeAttribute('contenteditable')
     const t = (e.textContent ?? '').replace(/\s+/g, ' ').trim()
     if (t !== was().trim()) save(t)
   })
   return e
+}
+
+/** A press on a field of the current box: the field takes typing, and the press puts the cursor in it. */
+export function openField(target: Element) {
+  const f = target.closest<HTMLElement>('.field')
+  if (!f || f.isContentEditable) return
+  // Focused already by the press that made its box current: let go, so this press focuses it again and a phone
+  // shows its keyboard.
+  if (f === document.activeElement) f.blur()
+  f.contentEditable = 'plaintext-only'
 }
 
 const HINTS: Record<Box, string> = {
@@ -98,7 +123,7 @@ export function createSide() {
 /** Add rule and Add table: an empty rule, or a table with only its name, in place with the cursor in it; left empty, it goes. */
 export function addEmpty(box: HTMLElement, rule: boolean, op: (o: BoxOp) => void) {
   const body = box.querySelector<HTMLElement>('.box-body')!
-  const text = editable(el('span', rule ? 'rule-text' : ''), (t) => op(rule ? { op: 'add', box: 'rules', text: t } : { op: 'add', box: 'data', text: t, columns: ['name', 'value'], rows: [['', '']] }))
+  const text = editable(el('span', rule ? 'rule-text' : ''), (t) => op(rule ? { op: 'add', box: 'rules', text: t } : { op: 'add', box: 'data', text: t, columns: ['name', 'value'], rows: [['', '']] }), true)
   text.dataset.placeholder = rule ? 'A new rule, one sentence' : 'Name of the new table, e.g. nights'
   const row = rule ? el('div', 'rule', el('b', '', 'new:'), ' ', text) : el('div', 'data-table', el('div', 'table-head', text))
   const hint = box.querySelector<HTMLElement>('.box-hint')!
@@ -116,18 +141,30 @@ const typing = (box: HTMLElement) => document.activeElement instanceof HTMLEleme
 export const countOf = (boxes: Boxes, components: CacheEntry[], name: Box) => name === 'notes' ? boxes.visits?.length ?? 0 : name === 'components' ? components.length : boxes[name].length
 export const countLabel = (n: number, name: Box) => name === 'notes' ? `${n} visit${n === 1 ? '' : 's'}` : `${n} of ${LIMITS[name]}`
 
-/** Mark the current box: a gold border. */
-export const markBox = (side: ReturnType<typeof createSide>, current: Box | null) => { for (const [name, s] of Object.entries(side.sections)) s.classList.toggle('current', name === current) }
+/** Mark the current box: a gold border. A field opened in a box no longer current, and not typed in, closes. */
+export const markBox = (side: ReturnType<typeof createSide>, current: Box | null) => {
+  for (const [name, s] of Object.entries(side.sections)) {
+    s.classList.toggle('current', name === current)
+    if (name !== current) for (const f of s.querySelectorAll('.field[contenteditable]')) if (f !== document.activeElement) f.removeAttribute('contenteditable')
+  }
+}
+
+/** What a box's header says while the fixer works on it: the box whose Edit it makes, and Fixer during any visit. */
+export const workOf = (name: Box, making: Box | null | undefined, visiting: boolean | undefined) =>
+  making === name ? 'Making the change…' : name === 'notes' && visiting ? 'Visiting…' : ''
 
 /** Draw the boxes' headers, the rules, the tables and the fixer's notes. A box the user is typing in is left alone. */
-export function renderSide(side: ReturnType<typeof createSide>, v: { boxes: Boxes; components: CacheEntry[]; current: Box | null; tour?: boolean }, op: (o: BoxOp) => void) {
+export function renderSide(side: ReturnType<typeof createSide>, v: { boxes: Boxes; components: CacheEntry[]; current: Box | null; tour?: boolean; making?: Box | null; visiting?: boolean }, op: (o: BoxOp) => void) {
   readOnly = !!v.tour
   const visits = [...v.boxes.visits ?? []].reverse()
   markBox(side, v.current)
   for (const name of BOX_ORDER) {
     const s = side.sections[name]
     const n = countOf(v.boxes, v.components, name)
-    s.querySelector('h3')!.replaceChildren(boxTitle(name), el('small', '', ` ${countLabel(n, name)}`))
+    // Rebuilt only when it says something new: a redraw does not restart the line's breathing.
+    const work = workOf(name, v.making, v.visiting), h3 = s.querySelector('h3')!, said = `${countLabel(n, name)}|${work}`
+    if (h3.dataset.said !== said) h3.replaceChildren(boxTitle(name), el('small', '', ` ${countLabel(n, name)}`), ...work ? [el('span', 'busy', work)] : [])
+    h3.dataset.said = said
     if (!typing(s)) s.querySelector<HTMLElement>('.box-hint')!.hidden = n > 0
   }
   const rules = side.sections.rules.querySelector<HTMLElement>('.box-body')!

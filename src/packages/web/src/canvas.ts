@@ -12,7 +12,7 @@ import { MOCK_BUTTONS } from './flip.ts'
 /** Gaps between columns and between a row's buttons and the next row's names, in canvas pixels. */
 const GAP_X = 120
 const GAP_Y = 110
-/** Margin round the tree, at least, so any mock can be scrolled to the middle; more on a stage wider than that. */
+/** Room right of and below the tree, at least, so any mock can be scrolled to the middle; more on a larger stage. */
 const PAD = 600
 /** The room for a name above a mock at zoom 1 and more, in canvas pixels; zoomed out it keeps its size on screen. */
 export const NAME_H = 34
@@ -52,6 +52,20 @@ export const headH = (z: number) => NAME_H / Math.min(1, z)
 export const sizeOf = (d?: Device) => (d ? { w: DEVICES[d].width, h: DEVICES[d].height } : { w: LEGACY_WIDTH, h: VIEWPORT_H })
 
 export interface Box { x: number; y: number; w: number; h: number }
+
+/**
+ * The canvas round the tree at zoom z on a stage w × h, in canvas pixels. Left and top only as much as Home needs to
+ * come to the middle of the view (or to the margin, when it does not fit), so scrolled to the top left corner the view
+ * is on Home; right and bottom (`end`) at least PAD and half the stage, so any mock can come to the middle.
+ */
+export function edges(stageW: number, stageH: number, z: number, mock: { w: number; h: number }) {
+  const m = margin(stageW) / z, frameH = headH(z) + mock.h + BUTTONS_H + 2 * ROPE_SHOW
+  return {
+    left: Math.ceil(Math.max(m, (stageW / z - mock.w) / 2)),
+    top: Math.ceil(ROPE_SHOW + Math.max(m, (stageH / z - frameH) / 2)),
+    end: Math.ceil(Math.max(PAD, stageW / z / 2, stageH / z / 2)),
+  }
+}
 
 /**
  * The scale of 100% on a stage w × h for mocks of a size: the mock with its name above, its buttons under it and some
@@ -134,7 +148,8 @@ export function glideZoom(z: number, h: number, fitted: boolean, near: boolean):
  * rows below start lower by the difference, so they and their ropes clear it. A key whose parent is not here starts a
  * tree of its own.
  */
-export function placeTree(nodes: { key: string; parent: string | null }[], mock: { w: number; h: number }, z: number, sideW = 0, pad = PAD, sideH = 0) {
+export function placeTree(nodes: { key: string; parent: string | null }[], mock: { w: number; h: number }, z: number, sideW = 0, pad: number | { left: number; top: number } = PAD, sideH = 0) {
+  const left = typeof pad === 'number' ? pad : pad.left, top = typeof pad === 'number' ? pad : pad.top
   const keys = new Set(nodes.map((n) => n.key))
   const kids = new Map<string, string[]>(), parentOf = new Map<string, string>(), roots: string[] = []
   for (const n of nodes) {
@@ -155,10 +170,10 @@ export function placeTree(nodes: { key: string; parent: string | null }[], mock:
   rows.pop()
   const head = headH(z), pitch = head + mock.h + BUTTONS_H + GAP_Y, drop = sideW && rows[0]?.length ? Math.max(0, sideH - mock.h) : 0
   const cards = new Map<string, Box>()
-  let maxX = pad, side: { x: number; y: number } | null = null
+  let maxX = left, side: { x: number; y: number } | null = null
   rows.forEach((row, d) => {
-    let cursor = pad
-    const y = pad + head + d * pitch + (d > 0 ? drop : 0)
+    let cursor = left
+    const y = top + head + d * pitch + (d > 0 ? drop : 0)
     for (const k of row) {
       const p = parentOf.get(k), first = p != null && kids.get(p)![0] === k
       const x = Math.max(cursor, first ? cards.get(p)!.x : cursor)
@@ -168,7 +183,7 @@ export function placeTree(nodes: { key: string; parent: string | null }[], mock:
       maxX = Math.max(maxX, cursor - GAP_X)
     }
   })
-  const extent: Box = { x: pad, y: pad, w: Math.max(0, maxX - pad), h: rows.length ? rows.length * pitch - GAP_Y + (rows.length > 1 ? drop : 0) : 0 }
+  const extent: Box = { x: left, y: top, w: Math.max(0, maxX - left), h: rows.length ? rows.length * pitch - GAP_Y + (rows.length > 1 ? drop : 0) : 0 }
   return { cards, kids, rows, side: side as { x: number; y: number } | null, extent }
 }
 
@@ -263,6 +278,10 @@ export class Canvas {
   /** Each mock's card from the last layout, in canvas pixels. */
   private places = new Map<string, Box>()
   private extent: Box = { x: 0, y: 0, w: 0, h: 0 }
+  /** The stage's height the canvas's edges were last worked out for (`layout`). */
+  private stageH = 0
+  /** Room a zoom near the top left corner added left of and above the tree, in canvas pixels (`zoomAround`). */
+  private slack = { x: 0, y: 0 }
   /** The size of the project's mocks. */
   private mock = sizeOf('small-phone')
   private queued = false
@@ -296,6 +315,7 @@ export class Canvas {
     this.surface.style.setProperty('--z', '1')
     addEventListener('message', (e) => this.onFrameMessage(e))
     new ResizeObserver(() => this.queue()).observe(stage)
+    stage.addEventListener('scroll', () => this.trimSlack(), { passive: true })
     // The window really changed size (or moved to another display): 100% again, unless the user zoomed or panned by
     // hand since. A keyboard that opens on a phone changes only the height while a field has the focus: no reason to move.
     let w0 = innerWidth, h0 = innerHeight, timer: ReturnType<typeof setTimeout> | undefined
@@ -425,16 +445,42 @@ export class Canvas {
     const b = this.base()
     z = Math.min(MAX_ZOOM * b, Math.max(MIN_ZOOM * b, z))
     if (Math.abs(z - this.z) < 0.001) return
-    const st = this.stage, r = st.getBoundingClientRect()
-    const ax = x - r.left, ay = y - r.top
+    const r = this.stage.getBoundingClientRect()
+    this.zoomAround(z, x - r.left, y - r.top)
+  }
+
+  /** Zoom to scale z keeping the point (ax, ay) of the stage still. Names keep their size on screen zoomed out and the
+   *  canvas's left and top edges follow the zoom (`edges`), so the tree shifts with it: follow the nearest mock. Near
+   *  the top left corner the point would need the view left of or above the canvas: the canvas gets that much more
+   *  room there (`slack`), until a pan takes the view away from it (`trimSlack`). */
+  private zoomAround(z: number, ax: number, ay: number) {
+    const st = this.stage
     let px = (st.scrollLeft + ax) / this.z, py = (st.scrollTop + ay) / this.z
-    // Names keep their size on screen zoomed out, so rows shift with the zoom: follow the nearest mock.
-    const near = this.nearest(px, py), before = near && { ...this.places.get(near)! }
+    const near = this.nearest(px, py), place = () => (near ? { ...this.places.get(near)! } : null)
+    let was = place()
+    const follow = () => { const now = place(); if (was && now) { px += now.x - was.x; py += now.y - was.y } was = now }
     this.applyZoom(z)
-    const after = near && this.places.get(near)
-    if (before && after) { px += after.x - before.x; py += after.y - before.y }
+    follow()
+    const more = { x: Math.max(0, ax - px * z) / z, y: Math.max(0, ay - py * z) / z }
+    if (more.x || more.y) {
+      this.slack = { x: this.slack.x + more.x, y: this.slack.y + more.y }
+      this.layout(false)
+      follow()
+    }
     st.scrollLeft = px * z - ax
     st.scrollTop = py * z - ay
+  }
+
+  /** The room a zoom added at the top left (`slack`) goes as the view leaves it, the view staying where it is. */
+  private trimSlack(all = false) {
+    const st = this.stage, s = this.slack, z = this.z
+    if (!s.x && !s.y) return
+    const cut = all ? s : { x: Math.min(s.x, st.scrollLeft / z), y: Math.min(s.y, st.scrollTop / z) }
+    if (cut.x < 0.5 && cut.y < 0.5 && !all) return
+    this.slack = { x: s.x - cut.x, y: s.y - cut.y }
+    const l = st.scrollLeft - cut.x * z, t = st.scrollTop - cut.y * z
+    this.layout(false)
+    st.scrollTo(Math.max(0, l), Math.max(0, t))
   }
 
   private nearest(px: number, py: number): string | undefined {
@@ -478,6 +524,7 @@ export class Canvas {
    * and ropes as large as the stage allows, at once.
    */
   fit(key?: Target) {
+    this.trimSlack(true)
     if (this.queued) this.layout(false)
     const st = this.stage
     if (key === undefined) {
@@ -543,6 +590,7 @@ export class Canvas {
   /** Glide to a mock or a box that became current, at the zoom the user has (after a navigation, 75% of its 100% at
    *  least): a straight line, 0.6 s; a jump with the system's reduced motion, or with `smooth` false. */
   reveal(key: Target, smooth = true) {
+    this.trimSlack(true)
     if (this.queued) this.layout(false)
     this.setLoose(false)
     this.whole = false
@@ -552,12 +600,7 @@ export class Canvas {
     const near = this.near
     this.near = false
     const h = glideZoom(this.z, this.hundredOf(key), this.fitted, near)
-    if (Math.abs(h - this.z) >= 0.001) {
-      const cx = (st.scrollLeft + st.clientWidth / 2) / this.z, cy = (st.scrollTop + st.clientHeight / 2) / this.z
-      this.applyZoom(h)
-      st.scrollLeft = cx * h - st.clientWidth / 2
-      st.scrollTop = cy * h - st.clientHeight / 2
-    }
+    if (Math.abs(h - this.z) >= 0.001) this.zoomAround(h, st.clientWidth / 2, st.clientHeight / 2)
     const f = this.frame(key)
     if (!f) return
     const to = landing(f, this.z, st.clientWidth, st.clientHeight)
@@ -672,13 +715,16 @@ export class Canvas {
     // A box is as wide as a mock, at most BOX_MAX_W; its height follows its content (boxes.css).
     const side = !this.side.hidden && screens.length > 0
     if (side) { this.side.style.setProperty('--box-w', `${boxWidth(mock.w)}px`); this.side.style.setProperty('--comp-w', `${componentsWidth(mock.w)}px`) }
-    const st = this.stage, pad = Math.ceil(Math.max(PAD, st.clientWidth / z / 2, st.clientHeight / z / 2))
+    // A keyboard that opens on a phone may shorten the stage while a field has the focus: the edges keep their height.
+    const st = this.stage, typing = document.activeElement?.matches('input, textarea, select, [contenteditable]')
+    if (!typing || st.clientHeight > this.stageH) this.stageH = st.clientHeight
+    const e = edges(st.clientWidth, this.stageH, z, mock), pad = { ...e, left: e.left + this.slack.x, top: e.top + this.slack.y }
     const p = placeTree(screens, mock, z, side ? this.side.offsetWidth : 0, pad, side ? this.side.offsetHeight : 0)
     this.places = p.cards
     this.extent = { ...p.extent }
     if (side && p.side) {
       Object.assign(this.side.style, { left: `${p.side.x}px`, top: `${p.side.y}px` })
-      this.extent.h = Math.max(this.extent.h, p.side.y - pad + this.side.offsetHeight + BUTTONS_H)
+      this.extent.h = Math.max(this.extent.h, p.side.y - pad.top + this.side.offsetHeight + BUTTONS_H)
     }
     for (const s of screens) {
       const b = p.cards.get(s.key), c = this.cards.get(s.key)
@@ -686,7 +732,7 @@ export class Canvas {
     }
     this.placeButtons()
     // The canvas reaches past the tree, and at least fills the stage, so any mock can be centred.
-    const w = this.extent.x + this.extent.w + pad, h = this.extent.y + this.extent.h + pad
+    const w = this.extent.x + this.extent.w + pad.end, h = this.extent.y + this.extent.h + pad.end
     this.surface.style.width = `${w}px`
     this.surface.style.height = `${h}px`
     this.drawLines(p.kids)

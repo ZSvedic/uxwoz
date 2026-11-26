@@ -276,7 +276,8 @@ function fieldForm(t: Target, label: string, text: string, go: string, send: (te
 function editCard(t: Target): Node[] {
   const e = entryOf(t)
   const form = fieldForm(t, t.kind === 'box' ? `What should change in ${boxTitle(t.box)}?` : 'What should change?', '', 'Make the change', (text) => {
-    if (t.kind === 'box') return void boxOp({ op: 'edit', box: t.box, text }).then((ok) => { if (ok) closeCard() })
+    // The card flips back at once when the visit starts; the box says Making the change… until it ends.
+    if (t.kind === 'box') return void boxOp({ op: 'edit', box: t.box, text }).then((ok) => { if (ok && state.visiting) state.boxEdit = t.box; if (ok) closeCard(); draw() })
     closeCard()
     revise(t.key, text)
   }, t.kind === 'box' ? 'e.g. Merge the two rules about scores' : 'e.g. Show one level indicator, not four')

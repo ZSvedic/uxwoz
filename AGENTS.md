@@ -69,7 +69,8 @@ src/packages/web/src/        the server
 src/packages/web/src/        the page
   app.ts         entry: builds the canvas, opens a project or the tour, what `/` opens, Start over, Delete
   state.ts       the shared state, local storage, elements by id
-  canvas.ts      the canvas: tree layout and ropes, cards, the boxes' place and size, 100% and zoom, the glide, touch
+  canvas.ts      the canvas: tree layout and ropes, its edges, cards, the boxes' place and size, 100% and zoom, the
+                 glide, touch
   screens.ts     a mock's life: draw and stream, clicks in a mock, Another, Edit, Undo, delete; `labelOf`
   nav.ts         the current mock or box, ← → steps, the address followed, the map after filing
   address.ts     the address read and written (/m/…, box-…, /tour/…), the steps (no DOM, tested)
@@ -77,7 +78,8 @@ src/packages/web/src/        the page
   menu.ts        the menu panel and New project; Export project
   cards.ts       the cards a mock, box or component flips to (Edit, History, Info, Describe it differently); `boxOp`
   flip.ts        what the cards say (no DOM, tested)
-  boxes.ts       the four boxes in the bar's order: their entries, editing in place; scroll corners (`watchEdges`)
+  boxes.ts       the four boxes in the bar's order: their entries, editing in place (a field opens on a press on the
+                 current box), *Making the change…* while the fixer works; scroll corners (`watchEdges`)
   voice.ts       hold to talk: `Talk` (no DOM, tested), the speech recognition, the 🎙️ button
   net.ts         fetches and NDJSON streams, theme CSS, the red pill, hints, the note while drawing
   account-ui.ts  the public's account line and card; what each shows as functions (no DOM, tested)
@@ -94,7 +96,7 @@ src/tests/                   bun tests; cassette.ts replays cassettes/, no-netwo
                              fixtures/demo-cache.json is the demo project
 src/scripts/                 demo.ts (`bun run demo`), make-demo-cache.ts, record-starters.ts
                              (`bun run starters:record [id…] [--device <id>]`), backup.sh, touch-check.ts
-                             (two fingers in headless Chrome over a mock; the pane cannot touch)
+                             (`bun run touch:check`: two fingers in headless Chrome, PASS or FAIL)
 recordings/                  the examples' recordings, 28 files; copied into the image
 tour/                        the tour's four mocks and boxes, edited by hand; copied into the image
 ```
@@ -124,6 +126,13 @@ The repo is organized by lifecycle; the tree is in [README.md](README.md#find-yo
 
 From `src/`: `bun run check` (`bun test`, offline and quick, then the typecheck). In a fresh worktree
 run `bun install --frozen-lockfile` from `src/` first. For UI changes, also look at the running app.
+
+**Touch.** A change to touch, pinch, the wheel, the frame's messages or the canvas's scroll and zoom math
+also runs `bun run touch:check` with the demo on 3131 (or pass its URL): two fingers in headless Chrome over a
+mock and over the sky, at full speed; it must print PASS. Unit tests feed made-up points and cannot see a
+loop between the fingers and a frame that moves under them; neither can the pane (no two fingers) nor the
+iOS simulator (its fingers never showed the jerk real iPhones had). This check fails on the build before
+0cbc65c, which shipped that jerk.
 
 **Look at the app.** `PORT=3131 bun run demo` (3100 if no PORT) starts the app on a fresh temporary
 copy of a made-up project, a habit tracker, and prints four URLs: the app, and the view, comment and

@@ -6,9 +6,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { LIMITS, ScreenCache, applyFiling, elementEnd, markCurrent, numberParts, parseFiling, pasteComponents, type Fetch, type Version } from '@uxwoz/core'
 import { createServer } from '@uxwoz/web/src/server.ts'
-import { boxesMarkdown, countLabel, nextVisit, visitLine } from '../packages/web/src/boxes.ts'
+import { boxesMarkdown, countLabel, nextVisit, visitLine, workOf } from '../packages/web/src/boxes.ts'
 
 describe('the boxes on the canvas', () => {
+  test('while the fixer works, the edited box says Making the change… and Fixer says Visiting…', () => {
+    expect(workOf('rules', 'rules', true)).toBe('Making the change…')
+    expect(workOf('notes', 'rules', true)).toBe('Visiting…')
+    expect(workOf('data', 'rules', true)).toBe('')
+    expect(workOf('notes', 'notes', true)).toBe('Making the change…')
+    expect(['rules', 'components', 'data', 'notes'].map((b) => workOf(b as 'rules', null, false))).toEqual(['', '', '', ''])
+  })
   test('the fixer\'s notes end with the mocks left before the next visit', () => {
     const b = { rules: [], data: [], gone: { components: [], rules: [], data: [] } }
     expect([nextVisit({ ...b, settled: 2 }), nextVisit({ ...b, settled: 9 }), nextVisit(b)])

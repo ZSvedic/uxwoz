@@ -7,7 +7,7 @@ import { screenKey } from '@uxwoz/core/keys'
 import { plannedScreens } from '@uxwoz/core/tree'
 import type { CacheEntry } from '@uxwoz/core'
 import type { Device } from '@uxwoz/core/frame'
-import { createSide, type Box } from './boxes.ts'
+import { createSide, openField, type Box } from './boxes.ts'
 import { Canvas } from './canvas.ts'
 import { focusBox, focusComponent, onTool, unseen } from './cards.ts'
 import { hint, mapOf, post, showError, themeCss } from './net.ts'
@@ -23,12 +23,13 @@ import './design/fx.ts' // the speaker and the whoosh
 
 export const side = createSide()
 // A press in a box makes it current (a step); one on a component's card makes that component current instead. Its
-// buttons and the card it flipped to leave things as they are.
+// buttons and the card it flipped to leave things as they are. Only a press on a box already current edits a field.
 for (const [name, s] of Object.entries(side.sections)) s.addEventListener('pointerdown', (e) => {
   const t = e.target as Element
   if (t.closest('.acts, .flip')) return
   const comp = t.closest<HTMLElement>('.card[data-id]')
   if (comp) return focusComponent(comp.dataset.id!)
+  if (state.box === name && !state.component) openField(t)
   focusBox(name as Box)
   boxShown()
 })
@@ -73,7 +74,7 @@ async function openProject(app: string, make: boolean, sid: string | null | unde
   noBoxes()
   state.app = app
   state.tour = false
-  state.flip = state.box = state.component = null
+  state.flip = state.box = state.component = state.boxEdit = null
   store.set('uxwoz:app', app)
   generate.classList.remove('open')
   applyMap(map)
@@ -109,7 +110,7 @@ export async function openTour(at: { at?: string | null; box?: Box | null } = {}
     if (!app) throw new Error('the tour is missing')
     stopMaking()
     noBoxes()
-    Object.assign(state, { app, tour: true, flip: null, box: null, component: null })
+    Object.assign(state, { app, tour: true, flip: null, box: null, component: null, boxEdit: null })
     generate.classList.remove('open')
     applyMap(map)
     const l = landing(app, state.entries, at.at ?? null, true)
@@ -135,7 +136,7 @@ export function closeMockup() {
   state.busy?.abort()
   store.set('uxwoz:app', '')
   noBoxes()
-  Object.assign(state, { app: null, tour: false, entries: new Map(), filing: false, visiting: false, current: null, box: null, making: null, revising: null, flip: null, component: null })
+  Object.assign(state, { app: null, tour: false, entries: new Map(), filing: false, visiting: false, boxEdit: null, current: null, box: null, making: null, revising: null, flip: null, component: null })
   resetTrail()
   loadRecent()
   draw()
