@@ -2,7 +2,8 @@
 // has one size, so every row is as tall as the others; a first child sits below its parent when there is room, and a
 // rope from each mock to its parent bends only in the gap below. Names keep a readable size zoomed out. Right of Home:
 // the boxes (boxes.ts). Under the current mock: its four buttons. 100% is the current mock fitted with its name, its
-// buttons and its ropes; another mock or box becoming current is a glide there at the zoom the user has.
+// buttons and its ropes; another mock or box becoming current is a glide there at the zoom the user has, after a
+// navigation no further out than 75% of its 100%.
 
 import { DEVICES, FRAME_SANDBOX, LEGACY_WIDTH, VIEWPORT_H, framePage, type Device } from '@uxwoz/core/frame'
 import { el } from './boxes.ts'
@@ -88,10 +89,28 @@ export function glideAt(from: { left: number; top: number }, to: { left: number;
   return { left: from.left + (to.left - from.left) * k, top: from.top + (to.top - from.top) * k }
 }
 
+/** Two fingers on the window: their middle and spread, the spread they started with, and whether they zoom yet. */
+export interface Fingers { x: number; y: number; d: number; d0: number; zooming: boolean }
+/** Two fingers only pan until their spread has changed by more than this from where it started; then they zoom too. */
+export const SPREAD_DEAD = 0.05
+/** Two fingers that just touched down. */
+export const fingersAt = (p: { x: number; y: number; d: number }): Fingers => ({ ...p, d0: p.d, zooming: false })
+
 /** One step of two fingers: their middle and spread, before and now. The canvas follows the middle (scrolled by its
- *  way back, so the content moves with the fingers) and zooms by how the spread grew. */
-export function touchStep(last: { x: number; y: number; d: number }, now: { x: number; y: number; d: number }) {
-  return { zoom: last.d > 0 && now.d > 0 ? now.d / last.d : 1, dx: last.x - now.x, dy: last.y - now.y }
+ *  way back, so the content moves with the fingers); once the spread left the dead zone it zooms by how the spread
+ *  grew since the last step, so it starts from where it is, without a jump. `next` is the fingers for the next step. */
+export function touchStep(last: Fingers, now: { x: number; y: number; d: number }) {
+  const zooming = last.zooming || (last.d0 > 0 && Math.abs(now.d / last.d0 - 1) > SPREAD_DEAD)
+  const zoom = zooming && last.d > 0 && now.d > 0 ? now.d / last.d : 1
+  return { zoom, dx: last.x - now.x, dy: last.y - now.y, next: { ...now, d0: last.d0, zooming } }
+}
+
+/** The zoom a glide ends at, from the zoom `z` the user has: at 100% still (`fitted`), the target's own 100% (`h`);
+ *  after a navigation (`near`), at least 75% of it, never further out than now; else the zoom stays. */
+export const NEAR = 0.75
+export function glideZoom(z: number, h: number, fitted: boolean, near: boolean): number {
+  if (fitted) return h
+  return near && z < NEAR * h - 0.001 ? NEAR * h : z
 }
 
 /**
@@ -287,25 +306,28 @@ export class Canvas {
       e.preventDefault()
       this.zoomBy(e.deltaY, e.clientX, e.clientY)
     }, { passive: false })
-    // Safari reports a pinch as gesture events instead.
+    // Safari on a Mac reports a trackpad pinch as gesture events. Where there are touch events (iOS) they come with
+    // every two-finger touch too, and the touches below do the zoom: the gestures are only kept from zooming the page.
+    const touchy = 'ontouchstart' in window
     let z0 = 1
     stage.addEventListener('gesturestart', (e) => { e.preventDefault(); z0 = this.z })
     stage.addEventListener('gesturechange', (e) => {
       e.preventDefault()
+      if (touchy) return
       const g = e as Event & { scale: number; clientX: number; clientY: number }
       this.setScale(z0 * g.scale, g.clientX, g.clientY)
     })
-    // One finger on the sky pans it as the browser scrolls; two fingers pan it too and zoom by their spread, around
-    // their middle (a mock hands its two-finger touches on, see the frame).
-    let fingers: { x: number; y: number; d: number } | null = null
+    // One finger on the sky pans it as the browser scrolls; two fingers pan it too and, out of the dead zone, zoom by
+    // their spread around their middle (a mock hands its two-finger touches on, see the frame).
+    let fingers: Fingers | null = null
     const two = (t: TouchList) => ({ x: (t[0]!.clientX + t[1]!.clientX) / 2, y: (t[0]!.clientY + t[1]!.clientY) / 2, d: Math.hypot(t[0]!.clientX - t[1]!.clientX, t[0]!.clientY - t[1]!.clientY) })
-    stage.addEventListener('touchstart', (e) => { byHand(); fingers = e.touches.length === 2 ? two(e.touches) : null }, { passive: true })
+    stage.addEventListener('touchstart', (e) => { byHand(); fingers = e.touches.length === 2 ? fingersAt(two(e.touches)) : null }, { passive: true })
     stage.addEventListener('touchmove', (e) => {
       byHand()
       if (!fingers || e.touches.length !== 2) return
       e.preventDefault()
       const now = two(e.touches), s = touchStep(fingers, now)
-      fingers = now
+      fingers = s.next
       if (s.zoom !== 1) this.setScale(this.z * s.zoom, now.x, now.y)
       stage.scrollBy(s.dx, s.dy)
     }, { passive: false })
@@ -496,8 +518,16 @@ export class Canvas {
     this.reveal(el)
   }
 
-  /** Glide to a mock or a box that became current, at the zoom the user has: a straight line, 0.6 s; a jump with the
-   *  system's reduced motion, or with `smooth` false. */
+  /** The next glide comes from a navigation (the dropdown, ← →, the bar's boxes): it ends at 75% of the target's 100% at least. */
+  private near = false
+  /** Run `go`, a navigation: the glide it starts ends no further out than 75% of its target's 100%. */
+  navigate(go: () => void) {
+    this.near = true
+    try { go() } finally { this.near = false }
+  }
+
+  /** Glide to a mock or a box that became current, at the zoom the user has (after a navigation, 75% of its 100% at
+   *  least): a straight line, 0.6 s; a jump with the system's reduced motion, or with `smooth` false. */
   reveal(key: Target, smooth = true) {
     if (this.queued) this.layout(false)
     this.setLoose(false)
@@ -505,7 +535,9 @@ export class Canvas {
     const st = this.stage
     // At 100% still (nothing zoomed by hand), the target's own 100%: a wide box on a phone fits too, and a mock after it
     // is its size again. The middle of the view stays put while the zoom changes.
-    const h = this.fitted ? this.hundredOf(key) : this.z
+    const near = this.near
+    this.near = false
+    const h = glideZoom(this.z, this.hundredOf(key), this.fitted, near)
     if (Math.abs(h - this.z) >= 0.001) {
       const cx = (st.scrollLeft + st.clientWidth / 2) / this.z, cy = (st.scrollTop + st.clientHeight / 2) / this.z
       this.applyZoom(h)
@@ -694,7 +726,7 @@ export class Canvas {
   }
 
   /** The last middle and spread of two fingers a frame handed on, on the window. */
-  private touch: { x: number; y: number; d: number } | null = null
+  private touch: Fingers | null = null
 
   /** Clicks, links out, scroll edges, keys and gestures from a mock's frame (see the frame script). */
   private onFrameMessage(e: MessageEvent) {
@@ -727,16 +759,16 @@ export class Canvas {
       const r = c.frame.getBoundingClientRect(), k = r.width / (c.frame.offsetWidth || 1)
       const now = { x: r.left + (Number(d.x) || 0) * k, y: r.top + (Number(d.y) || 0) * k, d: (Number(d.d) || 0) * k }
       const last = d.start ? null : this.touch
-      this.touch = now
       this.moved = performance.now()
       this.fitted = this.whole = false
       this.stopGlide()
-      if (!last) return
+      if (!last) { this.touch = fingersAt(now); return }
       const s = touchStep(last, now)
+      this.touch = s.next
       if (s.zoom !== 1) this.setScale(this.z * s.zoom, now.x, now.y)
       this.stage.scrollBy(s.dx, s.dy)
     } else if (d.uxwoz === 'wheel') {
-      // Nothing under the pointer in the mock could scroll that way: the gesture scrolls the canvas.
+      // Nothing under the pointer (or the finger) in the mock could scroll that way: the gesture scrolls the canvas.
       this.moved = performance.now()
       this.fitted = this.whole = false
       this.stopGlide()

@@ -4,7 +4,7 @@
 [hidden] { display: none !important; }
 /* The night sky fills the window, behind the canvas and the bar's strip; the workspace ends above the strip. */
 body { margin: 0; color: var(--text); font: 14px/1.4 system-ui, -apple-system, sans-serif;
-  height: 100vh; display: flex; flex-direction: column; overflow: hidden; padding-top: var(--bar-h);
+  height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; padding-top: var(--bar-h);
   --bar-h: 52px; background: radial-gradient(40% 40% at 85% 5%, var(--violet-glow), transparent),
   radial-gradient(40% 35% at 5% 95%, var(--green-glow), transparent), linear-gradient(var(--sky1), var(--sky2)); }
 input, select, button, textarea { font: inherit; color: inherit; }

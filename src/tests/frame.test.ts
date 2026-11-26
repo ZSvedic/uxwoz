@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { DEVICES, FRAME_SANDBOX, SYSTEM_PROMPT, extractFragment, framePage, hasVisibleText, scrollsFirst } from '@uxwoz/core'
+import { DEVICES, FRAME_SANDBOX, SYSTEM_PROMPT, extractFragment, framePage, hasVisibleText, scrollsFirst, swipeStep, type Swipe } from '@uxwoz/core'
 
 describe('the wheel over a screen', () => {
   const rail = { overflowX: 'auto', overflowY: 'hidden', scrollLeft: 0, scrollTop: 0, scrollWidth: 900, scrollHeight: 200, clientWidth: 340, clientHeight: 200 }
@@ -28,6 +28,44 @@ describe('the wheel over a screen', () => {
     const run = new Function(`return (${rule})`)() as typeof scrollsFirst
     expect(run([{ ...rail, scrollLeft: 200 }], -30, 0)).toBe(true)
     expect(run([rail], 0, 30)).toBe(false)
+  })
+})
+
+describe('one finger over a screen', () => {
+  const start = (x: number, y: number): Swipe => ({ x, y, x0: x, y0: y, across: null, canvas: false })
+  // A page 400 px longer than its frame, scrolled to `top`: the finger moving up scrolls it down.
+  const page = (top: number) => (dx: number, dy: number) => scrollsFirst([{ overflowX: 'hidden', overflowY: 'auto', scrollLeft: 0, scrollTop: top, scrollWidth: 340, scrollHeight: 900, clientWidth: 340, clientHeight: 500 }], dx, dy)
+
+  test('the page scrolls while it can; at its end the rest of the swipe moves the canvas, both ways', () => {
+    let top = 340
+    const s = start(100, 600), out: ({ dx: number; dy: number } | null)[] = []
+    for (const y of [597, 590, 570, 550, 530, 535]) {
+      const step = swipeStep(s, 100, y, page(top))
+      if (!step) top = Math.min(400, top + 20) // the page took it
+      out.push(step)
+    }
+    expect(out).toEqual([null, null, null, { dx: 0, dy: 20 }, { dx: 0, dy: 20 }, { dx: 0, dy: -5 }])
+  })
+
+  test('the swipe\'s axis is fixed after 6 px: a sideways wobble on a page that scrolls down does not move the canvas', () => {
+    const s = start(100, 600)
+    expect(swipeStep(s, 101, 597, page(0))).toBeNull() // under 6 px
+    expect(swipeStep(s, 102, 590, page(0))).toBeNull() // down: the page has it
+    expect(swipeStep(s, 106, 590, page(0))).toBeNull() // no step on its axis: still the page's
+    expect(s.canvas).toBe(false)
+  })
+
+  test('a swipe sideways over a page that scrolls only up and down moves the canvas from its first steps', () => {
+    const s = start(100, 600)
+    expect(swipeStep(s, 92, 601, page(0))).toEqual({ dx: 8, dy: -1 })
+    expect(swipeStep(s, 80, 601, page(0))).toEqual({ dx: 12, dy: 0 })
+  })
+
+  test('the step goes into the frame whole', () => {
+    const script = framePage('', '', true).match(/<script>([\s\S]*?)<\/script>/)![1]!
+    const rule = script.match(/const swipeStep = ([\s\S]*?)\n {2}let pinch/)![1]!
+    const run = new Function(`return (${rule})`)() as typeof swipeStep
+    expect(run(start(0, 0), 0, -10, () => false)).toEqual({ dx: 0, dy: 10 })
   })
 })
 

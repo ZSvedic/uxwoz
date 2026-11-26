@@ -67,8 +67,9 @@ least 36 px high.
   The keys work anywhere outside a text field (Ctrl in place of ⌘ off a Mac), also while a mock has
   the focus. Where the device cannot hover, menus leave out their keys.
 - **A window 720 px or wider** adds, while they fit: the four boxes as buttons with their counts,
-  right of **→**, and **−**, **+** and **⛶** (Fit all) around the zoom. When the boxes do not fit
-  they stay in the dropdown only. The bar never scrolls sideways.
+  right of **→**, and **−**, **+** and **⌖** (100%, the current mock, ⌘0) around the zoom. Fit all
+  stays in the zoom's menu and on ⇧1. When the boxes do not fit they stay in the dropdown only. The
+  bar never scrolls sideways.
 
 Menus close on Esc, on a press outside them, or on a click into a mock.
 
@@ -179,16 +180,23 @@ when the user branches.
 - **100%** is the starting view: the current mock as a card with its name above, its buttons under
   and its ropes showing, as large as the canvas allows, at most 1.5 times the mock's real size.
   Opening a project, choosing a mock and a tap on a link all show the current mock this way, at
-  the zoom the user has. The zoom goes from 10% to 200%.
+  the zoom the user has. The zoom goes from 10% to 200%. On a phone 100% fits the part of the
+  window the browser's own bars leave free, so the buttons under the mock show.
 - **Fit all** shows the whole tree and the boxes.
 - **The glide**: when another mock or box becomes current, the canvas glides to it in a straight
-  line, 0.6 s, at the current zoom. With the system's reduced-motion setting it jumps.
+  line, 0.6 s, at the current zoom. With the system's reduced-motion setting it jumps. When the
+  dropdown, **←** **→** (and ⌘[ ⌘], Back and Forward) or the bar's boxes make it current and the
+  zoom is below 75% of its 100%, the glide ends at 75%; it never zooms out. A tap on a mock or a
+  click inside one keeps the zoom.
 - **Pan and zoom** with a mouse or trackpad: scroll or drag the sky to pan. Over a mock the scroll
   moves the mock's content first while it can, then the canvas. Pinch or Ctrl/Cmd + scroll zooms
   around the pointer, also over a mock. The zoom menu, **+**, **−** and the keys zoom around the
   current mock or box. The stars zoom with the canvas.
 - **Touch**: one finger on a mock belongs to the mock: it scrolls its content, and a tap clicks.
-  One finger on the sky, or two fingers anywhere, move the canvas. Two fingers pinch to zoom.
+  When the content reaches its end, the rest of that swipe moves the canvas, so the buttons below
+  come into view. One finger on the sky, or two fingers anywhere, move the canvas. Two fingers
+  pinch to zoom: they only pan until their spread has changed by more than 5%, then the zoom
+  follows them, so a pan does not wobble the zoom.
 - **The window**: when its size really changes (or it moves to another display), the canvas shows
   the current mock or box at 100% again, unless the user zoomed or panned by hand since. A
   keyboard that opens on a phone moves nothing. Nothing makes the page wider than the window.

@@ -76,20 +76,22 @@ export function boxShown() {
   renderToolbar()
 }
 
-/** Bring a box into view and make it current; in the tour nothing is marked seen, since that would change it. */
+/** Bring a box into view and make it current; in the tour nothing is marked seen, since that would change it. A
+ *  navigation: the glide ends at 75% of the box's 100% at least. */
 export function showBox(box: Box) {
   if (side.el.hidden) return
-  if (state.tour) { focusBox(box); canvas.showBox(side.sections[box]) } else lookAt(box)
+  canvas.navigate(() => { if (state.tour) { focusBox(box); canvas.showBox(side.sections[box]) } else lookAt(box) })
   boxShown()
 }
 
-/** Make a mock current and glide to it, or a box (`box:<name>`). */
+/** Make a mock current and glide to it, or a box (`box:<name>`): the dropdown, ← →, Back and Forward, so the glide
+ *  ends at 75% of the target's 100% at least. */
 export function goTo(step: string) {
   if (step.startsWith('box:')) return showBox(step.slice(4) as Box)
   if (!state.entries.get(step)?.versions.length) return
   canvas.moved = performance.now()
   setCurrent(step)
-  canvas.reveal(step)
+  canvas.navigate(() => canvas.reveal(step))
 }
 
 /** The tour's last mock (the deepest) came into view: counted once in this browser. */

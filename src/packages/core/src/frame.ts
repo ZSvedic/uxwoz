@@ -72,6 +72,33 @@ export function scrollsFirst(chain: Scrollable[], dx: number, dy: number): boole
   return false
 }
 
+/** One finger on a screen: where it was (on the device's screen, which stays put while the frame moves under the
+ *  finger), where it started, the swipe's axis once known, and whether the canvas has the swipe. */
+export interface Swipe { x: number; y: number; x0: number; y0: number; across: boolean | null; canvas: boolean }
+
+/**
+ * One step of one finger to (x, y) on the device's screen. The swipe's axis is fixed once it has gone 6 px; while the
+ * page under the finger can scroll that way (`takes`, the wheel's rule) the page has it and this gives null. Once it
+ * cannot, the canvas has the rest of the swipe, both ways: this gives the step to scroll it by. Copied into the frame
+ * as source, so it uses nothing from outside.
+ */
+export function swipeStep(s: Swipe, x: number, y: number, takes: (dx: number, dy: number) => boolean): { dx: number; dy: number } | null {
+  const dx = s.x - x, dy = s.y - y
+  s.x = x
+  s.y = y
+  if (s.across == null) {
+    const ax = Math.abs(x - s.x0), ay = Math.abs(y - s.y0)
+    if (ax + ay < 6) return null
+    s.across = ax > ay
+  }
+  if (!s.canvas) {
+    const d = s.across ? dx : dy
+    if (!d || takes(s.across ? dx : 0, s.across ? 0 : dy)) return null
+    s.canvas = true
+  }
+  return { dx, dy }
+}
+
 // Our script, before the model's markup: clicks on data-action controls become messages to the app,
 // and the frame never navigates. While the screen streams (`final` false), controls do nothing.
 const bootstrap = (final: boolean) => `(() => {
@@ -222,12 +249,25 @@ const bootstrap = (final: boolean) => `(() => {
     e.preventDefault()
     parent.postMessage({ uxwoz: 'wheel', dx: e.deltaX, dy: e.deltaY }, '*')
   }, { passive: false })
-  // Touch: one finger belongs to the screen (the page scrolls natively, a tap clicks); two fingers move and zoom the
+  // Touch: one finger belongs to the screen (the page scrolls natively, a tap clicks) until nothing under it can scroll
+  // that way: then the rest of the swipe moves the canvas, as the wheel does (swipeStep). Two fingers move and zoom the
   // canvas. Points go out in the frame's pixels; \`start\` begins a gesture (or a new count of fingers).
-  let pinch = null
+  const swipeStep = ${swipeStep}
+  let pinch = null, swipe = null
   const at = (ts) => { const a = ts[0], b = ts[1]; return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2, d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) } }
-  const begin = (e) => { pinch = e.touches.length > 1 ? { start: true } : null }
+  const begin = (e) => {
+    pinch = e.touches.length > 1 ? { start: true } : null
+    const t = e.touches.length === 1 ? e.touches[0] : null
+    swipe = t ? { x: t.screenX, y: t.screenY, x0: t.screenX, y0: t.screenY, across: null, canvas: false } : null
+  }
   for (const n of ['touchstart', 'touchend', 'touchcancel']) addEventListener(n, begin, { passive: true })
+  addEventListener('touchmove', (e) => {
+    if (!swipe || e.touches.length !== 1) return
+    const s = swipeStep(swipe, e.touches[0].screenX, e.touches[0].screenY, (dx, dy) => scrollsFirst(chain(e.target), dx, dy))
+    if (!s) return
+    if (e.cancelable) e.preventDefault()
+    if (s.dx || s.dy) parent.postMessage({ uxwoz: 'wheel', dx: s.dx, dy: s.dy }, '*')
+  }, { passive: false })
   addEventListener('touchmove', (e) => {
     if (!pinch || e.touches.length < 2) return
     e.preventDefault()

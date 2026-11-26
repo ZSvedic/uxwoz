@@ -7,7 +7,7 @@ import type { CacheEntry } from '@uxwoz/core'
 import type { Device } from '@uxwoz/core/frame'
 import type { Box } from './boxes.ts'
 
-/** A window this wide or wider has the wordmark, the boxes while they fit, and − + ⛶. */
+/** A window this wide or wider has the wordmark, the boxes while they fit, and − + ⌖ (100%). */
 export const WIDE = 720
 
 /** The size a window is offered in Design for: under 400 px a small phone, under 720 a large one, under 1600 a laptop, else a monitor. */

@@ -1,6 +1,6 @@
 // The canvas worked out with no page: rows of equal height, the 100% scale, where a glide ends, and the ropes.
 import { describe, expect, test } from 'bun:test'
-import { BOX_MAX_W, BUTTONS_H, NAME_H, ROPE_SHOW, boxHundred, boxWidth, curve, frameOf, glideAt, headH, hundred, landing, placeTree, rope, sizeOf, touchStep } from '../packages/web/src/canvas.ts'
+import { BOX_MAX_W, BUTTONS_H, NAME_H, ROPE_SHOW, boxHundred, boxWidth, curve, fingersAt, frameOf, glideAt, glideZoom, headH, hundred, landing, placeTree, rope, sizeOf, touchStep } from '../packages/web/src/canvas.ts'
 
 const small = sizeOf('small-phone'), laptop = sizeOf('laptop')
 
@@ -148,22 +148,67 @@ describe('the glide', () => {
 })
 
 describe('touch and the pointer', () => {
-  test('two fingers move the canvas with their middle and zoom by their spread', () => {
-    expect(touchStep({ x: 100, y: 300, d: 100 }, { x: 110, y: 250, d: 100 })).toEqual({ zoom: 1, dx: -10, dy: 50 })
-    expect(touchStep({ x: 0, y: 0, d: 100 }, { x: 0, y: 0, d: 150 }).zoom).toBe(1.5)
+  test('two fingers move the canvas with their middle; out of the dead zone they zoom by their spread', () => {
+    const s = touchStep(fingersAt({ x: 100, y: 300, d: 100 }), { x: 110, y: 250, d: 100 })
+    expect([s.zoom, s.dx, s.dy]).toEqual([1, -10, 50])
+    expect(touchStep(fingersAt({ x: 0, y: 0, d: 100 }), { x: 0, y: 0, d: 150 }).zoom).toBe(1.5)
+  })
+
+  test('two fingers that pan with their spread wobbling under 5% only pan: the zoom does not bounce', () => {
+    let f = fingersAt({ x: 200, y: 400, d: 200 }), z = 1, dy = 0
+    for (const d of [204, 196, 208, 193, 205]) {
+      const s = touchStep(f, { x: 200, y: f.y - 20, d })
+      z *= s.zoom
+      dy += s.dy
+      f = s.next
+    }
+    expect(z).toBe(1)
+    expect(dy).toBe(100)
+  })
+
+  test('once the spread changes by more than 5% from the start, the zoom follows from there, without a jump', () => {
+    let f = fingersAt({ x: 0, y: 0, d: 100 }), z = 1
+    const zooms: number[] = []
+    for (const d of [103, 106, 112, 110]) {
+      const s = touchStep(f, { x: 0, y: 0, d })
+      zooms.push(s.zoom)
+      z *= s.zoom
+      f = s.next
+    }
+    expect(zooms[0]).toBe(1) // 3%: in the dead zone
+    expect(zooms[1]).toBeCloseTo(106 / 103) // 6%: out of it, by this step only
+    expect(zooms[3]).toBeCloseTo(110 / 112) // and back in: it zooms on, for the rest of the gesture
+    expect(z).toBeCloseTo(110 / 103)
   })
 
   test('two fingers that move apart and along both zoom and pan, step by step', () => {
     // The sky follows the fingers' middle on every move, as the canvas does over the sky and over a mock.
-    let last = { x: 200, y: 400, d: 100 }, z = 1, dx = 0
+    let f = fingersAt({ x: 200, y: 400, d: 100 }), z = 1, dx = 0
     for (const now of [{ x: 190, y: 400, d: 110 }, { x: 170, y: 400, d: 121 }]) {
-      const s = touchStep(last, now)
+      const s = touchStep(f, now)
       z *= s.zoom
       dx += s.dx
-      last = now
+      f = s.next
     }
     expect(z).toBeCloseTo(1.21)
     expect(dx).toBe(30)
+  })
+})
+
+describe('the zoom a glide ends at', () => {
+  test('a navigation far out ends at 75% of the target\'s 100%', () => {
+    expect(glideZoom(0.2, 0.8, false, true)).toBeCloseTo(0.6)
+  })
+
+  test('a navigation never zooms out: at 75% or closer the zoom stays', () => {
+    expect(glideZoom(0.6, 0.8, false, true)).toBe(0.6)
+    expect(glideZoom(1.2, 0.8, false, true)).toBe(1.2)
+  })
+
+  test('a tap on a mock or a click in one keeps the zoom; at 100% still, the target\'s own 100%', () => {
+    expect(glideZoom(0.2, 0.8, false, false)).toBe(0.2)
+    expect(glideZoom(0.8, 0.5, true, false)).toBe(0.5)
+    expect(glideZoom(0.8, 0.5, true, true)).toBe(0.5)
   })
 })
 

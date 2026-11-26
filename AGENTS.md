@@ -51,7 +51,7 @@ src/packages/core/src/       engine; frame.ts, keys.ts and tree.ts also run in t
   tree.ts        the tree worked out: links, planned screens, shortest-path levels, the paper's titles and lines
   cache.ts       the screens: entries and versions, Undo and Redo, draws, settle, rename, delete, the JSON file (v6), IDs
   cache-boxes.ts the boxes: components as entries, rules, tables, a box's states and Undo, the fixer's notes, the paper
-  frame.ts       the page inside a mock's frame and its script (clicks, scroll, pinch, parts for comments); the sizes
+  frame.ts       the page inside a mock's frame and its script (clicks, scroll, swipe, pinch, parts for comments); the sizes
   zip.ts         a zip of stored entries, for Export project
 src/packages/web/src/        the server
   server.ts      Bun.serve and every route's entry; request checks; each route works on the request's desk

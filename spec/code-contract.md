@@ -236,11 +236,14 @@ only from a card's own frame.
                                      // or Esc: the app handles it as if pressed outside the screen
 { uxwoz: 'scroll', above, below }    // whether content lies beyond the frame's top and bottom edge, at load and
                                      // as it changes: the card's scroll corners, and the pins asked for again
-{ uxwoz: 'wheel', dx, dy }           // a scroll over the screen that nothing in it can take: the canvas pans
+{ uxwoz: 'wheel', dx, dy }           // a scroll over the screen that nothing in it can take: the canvas pans;
+                                     // also the rest of a one-finger swipe once the page under it is at its
+                                     // end, its steps measured on the device's screen (swipeStep)
 { uxwoz: 'zoom', dy, x, y }          // Ctrl/Cmd + scroll or a pinch over the screen, at (x, y) in
                                      // the frame: zooms the canvas around that point
 { uxwoz: 'pinch', x, y, d, start }   // two fingers over the screen: their middle and their spread `d`;
-                                     // the canvas follows the middle and zooms by how the spread grew
+                                     // the canvas follows the middle and, once the spread changed by more
+                                     // than 5% (touchStep), zooms by how it grew
 { uxwoz: 'part', text, tag, nth, x, y, w, h } // the part clicked after the page sent { uxwoz: 'name-part' }:
                                      // its words (60 characters), tag, place among the parts with the same
                                      // tag and words, and its rectangle in the frame's own pixels; while
@@ -250,8 +253,8 @@ only from a card's own frame.
                                      // found outside the view (their part is still there, its pin hides)
 ```
 
-A frame has its device's size and scrolls inside, so it reports no size, and one finger on it never
-moves the canvas. An `action` also carries `part`, the control clicked as above. The page sends the frame
+A frame has its device's size and scrolls inside, so it reports no size; one finger on it moves the
+canvas only once the page under it can scroll no further that way. An `action` also carries `part`, the control clicked as above. The page sends the frame
 `{ uxwoz: 'name-part' }` to pick a part, `{ uxwoz: 'name-part', off: true }` to stop picking, and
 `{ uxwoz: 'locate', anchors: [{ id, text, tag, nth }] }` (at most 200) to find parts again: the `nth`
 element with that tag and words (the first if there are fewer), else the first part of any tag with
