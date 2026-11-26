@@ -85,9 +85,10 @@ export function talkButton(field: HTMLTextAreaElement | HTMLInputElement, fail: 
   const b = document.createElement('button')
   b.type = 'button'
   b.className = 'talk'
-  // The words shorten to 🎙️ Talk on a card with no room for them (cards.css).
+  // The words shorten to 🎙️ Hold, then to 🎙️ alone, on a card with no room for them (cards.css); its name stays.
   b.append('🎙️ ', Object.assign(document.createElement('span'), { className: 'long', textContent: 'Hold to talk' }),
-    Object.assign(document.createElement('span'), { className: 'short', textContent: 'Talk' }))
+    Object.assign(document.createElement('span'), { className: 'short', textContent: 'Hold' }))
+  b.setAttribute('aria-label', 'Hold to talk')
   b.title = 'Hold and speak, then let go. In Chrome the audio goes to Google to be turned into text.'
   const voice = new HoldToTalk((v) => { field.value = v; field.dispatchEvent(new Event('input', { bubbles: true })) }, fail)
   const down = () => { b.classList.add('on'); voice.press(field.value) }

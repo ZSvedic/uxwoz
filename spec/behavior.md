@@ -274,8 +274,9 @@ mock flips back first.
 - **ℹ️ Info**: **Asked for** (the words the model was told to draw, from the link that opened the
   mock or from the user), **Drawn as** (the model's own line about what it drew), **Link ID**
   (*@plant-page*), **Reached by** (the links that lead here: *A plant's row in Home*), **Model**
-  (*Claude Haiku 5.5 in 2.9 s for $0.0010*), **Added to the boxes** (what filing took from this
-  mock, or why it failed), and for a project with share links its thumbs and **Comments** (see
+  (*Claude Haiku 5.5 in 2.9 s for $0.0010*, or *… in 3.7 s, free* for a design that cost nothing,
+  as a replayed example), **Added to the boxes** (what filing took from this mock, or why it
+  failed), and for a project with share links its thumbs and **Comments** (see
   Sharing), counted on the button (*ℹ️ 2*).
 
 ## Voice
@@ -283,7 +284,8 @@ mock flips back first.
 The user can say words instead of typing them. Every field for the model has 🎙️ **Hold to talk**
 beside it: New project's prompt box, Edit (a mock's and a box's) and Describe it differently. On a
 card the field's own button comes first, on one line, and 🎙️ Hold to talk to its right in the room
-left; where that is too narrow it reads 🎙️ **Talk**.
+left; where that is too narrow it reads 🎙️ **Hold**, and where even that does not fit, 🎙️ alone (its
+name stays *Hold to talk*).
 
 1. Hold the button and speak. The words show in the field as the browser hears them, after any
    text already typed there.
@@ -610,13 +612,13 @@ page before it, so the app teaches itself. Shapes and limits: [public.md](public
   and the first 🎲 are free there.
 - **Live designs.** A visitor's own sentence, Draw again, an Edit, a box's Edit, Run fixer, and a
   click or 🎲 with no recording behind it call the models, and count against the visitor's free
-  screens. The first time a mock's design is made by a model (it cost more than 0), a hint at the
+  mocks. The first time a mock's design is made by a model (it cost more than 0), a hint at the
   bottom of the canvas says *This design was drawn fresh for you, so it used one of your free
-  screens.*, until the visitor's next click, Edit, Undo or a press on it. It is the only hint: the
+  mocks.*, until the visitor's next click, Edit, Undo or a press on it. It is the only hint: the
   tour teaches the rest.
 - **The account** is a line in the menu, for the public only (not the owner). A visitor's reads
-  *👤 25 free screens · Register* (*No free screens left* at none); a registered user's shows the
-  email, cut short at the panel's edge, the screens left, **Ask for more** (at none), **Sign out**
+  *👤 25 free mocks · Register* (*No free mocks left* at none); a registered user's shows the
+  email, cut short at the panel's edge, the mocks left, **Ask for more** (at none), **Sign out**
   and **Delete my account…**. The count is read again after every live call ends (for a filing or
   a visit, when it ends), after a refusal, and when the tab gets focus, so a gift from the owner
   shows without a reload. **Delete my account…** opens the account card: *Delete your account? Its
@@ -625,25 +627,25 @@ page before it, so the app teaches itself. Shapes and limits: [public.md](public
   every `uxwoz:` key this browser kept but the one that counted its arrival. After Sign out or
   Delete the page starts again; after Delete it says briefly *Your account is deleted.*
 - **The account card** opens over the dimmed canvas when a live design is refused for lack of free
-  screens, or from **Register**. After a sign-up the request that was refused is sent again: a
+  mocks, or from **Register**. After a sign-up the request that was refused is sent again: a
   first Home, a click into a new mock, Another, Draw again or an Edit. If the person closes the
   card instead of a refused first Home, New project opens with the sentence still in it. Esc or a
   press outside closes it. What was typed and the step stay while it is closed; Enter sends; a
   refusal (*Sign-ups are full for today.*) shows in the card in the server's words.
-  - A visitor: *You have used your free screens. Register to get about 37 more.* (from
-    **Register**: *Register to get about 37 more free screens.*; for the network's day: *This
-    network has used today's free screens. Register to carry on.*; for the guests' day: *Today's
-    free screens for guests are used up. Register to carry on.*) The number is what a new account
+  - A visitor: *You have used your free mocks. Register to get about 37 more.* (from
+    **Register**: *Register to get about 37 more free mocks.*; for the network's day: *This
+    network has used today's free mocks. Register to carry on.*; for the guests' day: *Today's
+    free mocks for guests are used up. Register to carry on.*) The number is what a new account
     adds, as `/api/me` says (`more`). An email field, **Send the code**, and *No password: we
     email you a six-digit code.* with a link to Privacy.
   - Then *We sent a code to ana@example.com.*, a field for it, **Verify** and *Send a new one*. A
     wrong code says *That code is not right.*
-  - Verified, a new account: its free screens are there at once, and the card says *Thanks. You
-    have about 37 more free screens.*, the number it promised; it leaves by itself after 3 s, or
+  - Verified, a new account: its free mocks are there at once, and the card says *Thanks. You
+    have about 37 more free mocks.*, the number it promised; it leaves by itself after 3 s, or
     at a press outside.
   - Verified, an account that exists: the card closes and the projects made as a visitor are in
     Recent.
-  - A registered user with none left: *You have used your free screens.* A field *What are you
+  - A registered user with none left: *You have used your free mocks.* A field *What are you
     building?*, **Ask for more**, then *Asked. The answer comes by email.*
 - **Paused.** When the owner switched the public to examples only, or the day's or the month's cap
   is reached, a live design answers with the red pill: *Live designs are paused for now. The

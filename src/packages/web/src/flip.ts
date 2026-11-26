@@ -103,7 +103,7 @@ export function mockFields(e: CacheEntry, parent: { name: string; label: string 
     ['Drawn as', v.idea || '–'],
     ['Link ID', `@${e.name ?? 'home'}`],
     ['Reached by', parent ? `${parent.label || 'A click'} in ${parent.name}` : e.action ? '–' : 'Home: the project opens here'],
-    ['Model', `${model(v.model)} in ${fmtS(v.totalMs)}${v.costUsd == null ? '' : ` for ${v.costEstimated ? '~' : ''}${fmtUsd(v.costUsd)}`}`],
+    ['Model', `${model(v.model)} in ${fmtS(v.totalMs)}${v.costUsd == null ? '' : v.costUsd === 0 ? ', free' : ` for ${v.costEstimated ? '~' : ''}${fmtUsd(v.costUsd)}`}`],
     ['Added to the boxes', filed],
   ]
 }

@@ -22,13 +22,17 @@
 .flip .row > .primary { flex: 2 0 auto; white-space: nowrap; box-shadow: var(--pick-shadow); }
 .flip .primary:focus-visible { box-shadow: 0 0 0 2px var(--focus-in), var(--pick-shadow); }
 /* Hold to talk: its words cannot be selected, so a finger can hold it; dark while held. On a card it is right of the
-   primary button, in the room left, and says 🎙️ Talk where Hold to talk does not fit. */
+   primary button, in the room left, and says 🎙️ Hold where Hold to talk does not fit, 🎙️ alone where that does not. */
 .talk { white-space: nowrap; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
 .talk.on { background: var(--text); color: var(--surface); }
 .pane .row { flex-wrap: nowrap; }
-.flip .row > .talk { flex: 1 1 120px; min-width: 84px; container: talk / inline-size; }
+.flip .row > .talk { flex: 1 1 120px; min-width: 44px; container: talk / inline-size; }
 .talk .short { display: none; }
 @container talk (width < 96px) { .talk .long { display: none; } .talk .short { display: inline; } }
+@container talk (width < 50px) { .talk .short { display: none; } }
+/* A card too narrow even for the button and 🎙️ (zoomed out): 🎙️ goes under the button, whose words may break. */
+.flip .pane { container: pane / inline-size; }
+@container pane (width < 182px) { .pane .row { flex-wrap: wrap; } .flip .row > .primary { flex-shrink: 1; white-space: normal; } }
 /* Delete this mock…: at the card's bottom, a plain underlined word until it asks. */
 .flip .del { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
 .flip .link { align-self: flex-start; padding: 4px 0; border: 0; background: none; color: var(--muted); text-decoration: underline; }

@@ -15,15 +15,15 @@ describe('the account\'s line in the menu', () => {
     expect(shows(fresh, true)).toBe(true)
   })
 
-  test('a visitor: the free screens and Register on one line; at none, no free screens left', () => {
-    expect(lineOf(visitor)).toEqual([{ kind: 'register', text: '👤 14 free screens · Register' }])
-    expect(lineOf({ ...visitor, screensLeft: 1 })[0]!.text).toBe('👤 1 free screen · Register')
-    expect(lineOf({ ...visitor, screensLeft: 0 })[0]!.text).toBe('👤 No free screens left · Register')
+  test('a visitor: the free mocks and Register on one line; at none, no free mocks left', () => {
+    expect(lineOf(visitor)).toEqual([{ kind: 'register', text: '👤 14 free mocks · Register' }])
+    expect(lineOf({ ...visitor, screensLeft: 1 })[0]!.text).toBe('👤 1 free mock · Register')
+    expect(lineOf({ ...visitor, screensLeft: 0 })[0]!.text).toBe('👤 No free mocks left · Register')
   })
 
   test('a registered user: the email, the screens left, Ask for more at none, Sign out and Delete my account…', () => {
-    expect(lineOf(user).map((r) => r.text)).toEqual(['👤 ana@example.com', 'No free screens left', 'Ask for more', 'Sign out', 'Delete my account…'])
-    expect(lineOf({ ...user, screensLeft: 5 }).map((r) => r.text)).toEqual(['👤 ana@example.com', '5 free screens left', 'Sign out', 'Delete my account…'])
+    expect(lineOf(user).map((r) => r.text)).toEqual(['👤 ana@example.com', 'No free mocks left', 'Ask for more', 'Sign out', 'Delete my account…'])
+    expect(lineOf({ ...user, screensLeft: 5 }).map((r) => r.text)).toEqual(['👤 ana@example.com', '5 free mocks left', 'Sign out', 'Delete my account…'])
     expect(lineOf({ ...user, request: { at: 1 } }).some((r) => r.kind === 'ask')).toBe(false)
     expect(lineOf({ ...user, request: { at: 1, answer: 'refused' } }).some((r) => r.kind === 'ask')).toBe(true)
   })
@@ -32,14 +32,14 @@ describe('the account\'s line in the menu', () => {
 describe('the account card', () => {
   test('a visitor: why it opened, the email, Send the code, the line on the code with Privacy', () => {
     const c = cardOf(visitor, 'allowance', 'email', '')
-    expect(c.lead).toBe('You have used your free screens. Register to get about 30 more.')
-    expect(cardOf(visitor, 'register', 'email', '').lead).toBe('Register to get about 30 more free screens.')
-    expect(cardOf(fresh, 'allowance', 'email', '').lead).toBe('You have used your free screens. Register to get about 21 more.')
-    expect(cardOf(visitor, 'guests', 'email', '').lead).toBe('Today\'s free screens for guests are used up. Register to carry on.')
+    expect(c.lead).toBe('You have used your free mocks. Register to get about 30 more.')
+    expect(cardOf(visitor, 'register', 'email', '').lead).toBe('Register to get about 30 more free mocks.')
+    expect(cardOf(fresh, 'allowance', 'email', '').lead).toBe('You have used your free mocks. Register to get about 21 more.')
+    expect(cardOf(visitor, 'guests', 'email', '').lead).toBe('Today\'s free mocks for guests are used up. Register to carry on.')
     expect([c.field?.kind, c.send, c.note, c.privacy, c.again]).toEqual(['email', 'Send the code', 'No password: we email you a six-digit code.', true, false])
     expect(cardOf(visitor, 'share', 'email', '').lead).toBe('Register to share a project.')
     expect(cardOf(visitor, 'export', 'email', '').lead).toBe('Register to export it.')
-    expect(cardOf(visitor, 'address', 'email', '').lead).toBe('This network has used today\'s free screens. Register to carry on.')
+    expect(cardOf(visitor, 'address', 'email', '').lead).toBe('This network has used today\'s free mocks. Register to carry on.')
     expect(cardOf(fresh, 'register', 'email', '').field?.kind).toBe('email')
   })
 
@@ -51,7 +51,7 @@ describe('the account card', () => {
 
   test('verified into a new account: thanks with the screens the card promised, nothing to fill in, no word of waiting', () => {
     const c = cardOf({ ...user, screensLeft: 52 }, 'allowance', 'thanks', 'ana@example.com', 37)
-    expect(c.lead).toBe('Thanks. You have about 37 more free screens.')
+    expect(c.lead).toBe('Thanks. You have about 37 more free mocks.')
     expect([c.field, c.send]).toEqual([null, null])
   })
 
@@ -63,7 +63,7 @@ describe('the account card', () => {
 
   test('a registered user with none left asks for more, once', () => {
     const c = cardOf(user, 'allowance', 'email', '')
-    expect([c.lead, c.field?.label, c.send]).toEqual(['You have used your free screens.', 'What are you building?', 'Ask for more'])
+    expect([c.lead, c.field?.label, c.send]).toEqual(['You have used your free mocks.', 'What are you building?', 'Ask for more'])
     expect(cardOf(user, 'ask', 'asked', '').lead).toBe('Asked. The answer comes by email.')
     expect(cardOf({ ...user, request: { at: 1 } }, 'ask', 'email', '').lead).toBe('Asked. The answer comes by email.')
     expect(cardOf({ ...user, request: { at: 1, answer: 'refused' } }, 'ask', 'email', '').send).toBe('Ask for more')
@@ -88,6 +88,7 @@ describe('a refused request', () => {
     expect(sideOf('Today\'s free screens for guests are used up. Register to carry on.', fresh)).toEqual({ text: 'Register', why: 'guests' })
     expect(sideOf('This network has used today\'s free screens. Register to carry on.', visitor)).toEqual({ text: 'Register', why: 'address' })
     expect(sideOf('Your free screens are used up.', user)).toEqual({ text: 'Ask for more', why: 'ask' })
+    expect(sideOf('Your free mocks are used up.', user)).toEqual({ text: 'Ask for more', why: 'ask' })
     expect(sideOf('the model timed out', visitor)).toBeNull()
     expect(sideOf('Your free screens are used up.', { role: 'owner' })).toBeNull()
   })
@@ -111,7 +112,7 @@ describe('after Delete my account', () => {
 
 describe('the live hint', () => {
   test('a live design brings it, in plain words; the next click or key ends it for good', () => {
-    expect(LIVE_HINT).toBe('This design was drawn fresh for you, so it used one of your free screens.')
+    expect(LIVE_HINT).toBe('This design was drawn fresh for you, so it used one of your free mocks.')
     expect(liveHint(null, 'live')).toBe('due')
     expect(liveHint('due', 'live')).toBe('due') // still due after a reload: the next live design shows it
     expect(liveHint('due', 'act')).toBe('done')

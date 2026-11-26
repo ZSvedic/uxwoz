@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { LIMITS, ScreenCache, applyFiling, elementEnd, markCurrent, numberParts, parseFiling, pasteComponents, type Fetch, type Version } from '@uxwoz/core'
 import { createServer } from '@uxwoz/web/src/server.ts'
-import { boxesMarkdown, nextVisit, visitLine } from '../packages/web/src/boxes.ts'
+import { boxesMarkdown, countLabel, nextVisit, visitLine } from '../packages/web/src/boxes.ts'
 
 describe('the boxes on the canvas', () => {
   test('the fixer\'s notes end with the mocks left before the next visit', () => {
@@ -19,6 +19,11 @@ describe('the boxes on the canvas', () => {
     expect(visitLine({ screens: 5, changes: [1], ms: 2400, costUsd: 0.0012 })).toBe('Read 5 mocks, made 1 change · 2.4 s · ~$0.0012')
     expect(visitLine({ screens: 1, changes: [1, 2] })).toBe('Read 1 mock, made 2 changes')
     expect(visitLine({ screens: 4, changes: [], ms: 0, costUsd: 0 })).toBe('Read 4 mocks, changed nothing')
+  })
+
+  test('a box\'s header counts against its limit; the fixer\'s, its visits, one in the singular', () => {
+    expect([countLabel(0, 'notes'), countLabel(1, 'notes'), countLabel(2, 'notes')]).toEqual(['0 visits', '1 visit', '2 visits'])
+    expect(countLabel(1, 'rules')).toBe(`1 of ${LIMITS.rules}`)
   })
 
   test('Export the boxes writes the rules and the tables as markdown', () => {

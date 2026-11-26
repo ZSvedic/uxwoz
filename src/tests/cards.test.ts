@@ -87,6 +87,11 @@ describe('Info', () => {
     ])
   })
 
+  test('a design that cost nothing, as a replayed example, says free, not $0.0000', () => {
+    const e = mock({ versions: [v(1, { costUsd: 0, totalMs: 3700 })] })
+    expect(Object.fromEntries(mockFields(e, null, () => 'Claude Haiku 5.5')).Model).toBe('Claude Haiku 5.5 in 3.7 s, free')
+  })
+
   test('Home asks for the project\'s sentence and is reached by nothing; a failed filing says why', () => {
     const home = mock({ key: 'plants', action: null, name: 'home', parent: null, filed: { at: '', screen: '', ms: 1, costUsd: 0, added: [], changed: [], refused: [], error: 'no answer' } })
     const f = Object.fromEntries(mockFields(home, null, (id) => id))

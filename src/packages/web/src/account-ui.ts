@@ -10,7 +10,7 @@ export interface Me {
   left?: number
   allowance?: number
   screensLeft?: number
-  /** A visitor's: about how many free screens a new account adds. */
+  /** A visitor's: about how many free mocks a new account adds. */
   more?: number
   request?: { at: number; answer?: string }
   paused?: boolean
@@ -27,13 +27,13 @@ export type CardStep = 'email' | 'code' | 'thanks' | 'asked' | 'delete'
 /** What a new account adds when /api/me does not say. */
 export const MORE = 21
 const LEADS: Record<Why, (more: number) => string> = {
-  allowance: (n) => `You have used your free screens. Register to get about ${n} more.`,
-  address: () => 'This network has used today\'s free screens. Register to carry on.',
-  guests: () => 'Today\'s free screens for guests are used up. Register to carry on.',
-  register: (n) => `Register to get about ${n} more free screens.`,
+  allowance: (n) => `You have used your free mocks. Register to get about ${n} more.`,
+  address: () => 'This network has used today\'s free mocks. Register to carry on.',
+  guests: () => 'Today\'s free mocks for guests are used up. Register to carry on.',
+  register: (n) => `Register to get about ${n} more free mocks.`,
   share: () => 'Register to share a project.',
   export: () => 'Register to export it.',
-  ask: (n) => `Register to get about ${n} more free screens.`,
+  ask: (n) => `Register to get about ${n} more free mocks.`,
 }
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`
 
@@ -57,10 +57,10 @@ const view = (lead: string, rest: Partial<CardView> = {}): CardView => ({ lead, 
 /** What the card shows for `me`, given why it opened and where the sign-in is; `promised`, the screens it promised. */
 export function cardOf(me: Me, why: Why, step: CardStep, email: string, promised = me.more ?? MORE): CardView {
   if (step === 'delete') return view('Delete your account? Its projects and its links go at once, for good. Type your email once more.', { field: { kind: 'confirm', placeholder: 'Your email' }, send: 'Delete', cancel: true })
-  if (step === 'thanks') return view(`Thanks. You have about ${plural(promised, 'more free screen')}.`)
+  if (step === 'thanks') return view(`Thanks. You have about ${plural(promised, 'more free mock')}.`)
   if (me.role === 'user') {
     if (step === 'asked' || (me.request && !me.request.answer)) return view('Asked. The answer comes by email.')
-    return view('You have used your free screens.', { field: { kind: 'note', label: 'What are you building?', placeholder: 'e.g. a booking app for my dog walking business' }, send: 'Ask for more' })
+    return view('You have used your free mocks.', { field: { kind: 'note', label: 'What are you building?', placeholder: 'e.g. a booking app for my dog walking business' }, send: 'Ask for more' })
   }
   // The email's hyphens are shown as non-breaking ones, so the line never breaks inside the address.
   if (step === 'code') return view(`We sent a code to ${email.replaceAll('-', '\u2011')}.`, { field: { kind: 'code', placeholder: 'Six digits' }, send: 'Verify', again: true })
@@ -73,12 +73,12 @@ export const shows = (me: Me | null, isPublic: boolean) => isPublic && !!me && m
 export type Row = { kind: 'text' | 'email' | 'register' | 'ask' | 'signout' | 'delete'; text: string }
 
 /**
- * The account in the menu, top to bottom: a visitor's one line (the free screens and Register); a registered user's
+ * The account in the menu, top to bottom: a visitor's one line (the free mocks and Register); a registered user's
  * email, the screens left, Ask for more (at none, while no request waits for its answer), Sign out and Delete.
  */
 export function lineOf(me: Me): Row[] {
   const n = me.screensLeft ?? 0
-  const left = n > 0 ? plural(n, 'free screen') : 'No free screens left'
+  const left = n > 0 ? plural(n, 'free mock') : 'No free mocks left'
   if (me.role !== 'user') return [{ kind: 'register', text: `👤 ${left} · Register` }]
   return [
     { kind: 'email', text: `👤 ${me.email ?? ''}` },
@@ -99,11 +99,11 @@ export function refusalOf(status: number, body: { error?: string; reason?: strin
 }
 
 /**
- * A side of an A OR B the meter refused (its message speaks of free screens): the button under the words, Register
+ * A side of an A OR B the meter refused (its message speaks of free screens or mocks): the button under the words, Register
  * for a visitor or Ask for more for a registered user, and why the card opens.
  */
 export function sideOf(message: string, me: Me | null): { text: string; why: Why } | null {
-  if (!me || me.role === 'owner' || !/free screens/i.test(message)) return null
+  if (!me || me.role === 'owner' || !/free (screens|mocks)/i.test(message)) return null
   if (me.role === 'user') return { text: 'Ask for more', why: 'ask' }
   return { text: 'Register', why: /guests/i.test(message) ? 'guests' : /network/i.test(message) ? 'address' : 'allowance' }
 }
@@ -114,8 +114,8 @@ export function forget(s: Pick<Storage, 'length' | 'key' | 'removeItem'>) {
   for (const k of ours) s.removeItem(k)
 }
 
-/** The one hint (spec/behavior.md, The public): a model drew this design, so it cost a free screen. */
-export const LIVE_HINT = 'This design was drawn fresh for you, so it used one of your free screens.'
+/** The one hint (spec/behavior.md, The public): a model drew this design, so it cost a free mock. */
+export const LIVE_HINT = 'This design was drawn fresh for you, so it used one of your free mocks.'
 /**
  * The hint's record in this browser (`uxwoz:hint`) after `event`: a live design brings it ('due', on show) until the
  * visitor's next click or key (`act`) ends it for good ('done'); a browser first seen with mockups in Recent
@@ -183,7 +183,7 @@ export function initAccount(d: AccountDeps, cfg: { public?: boolean }) {
   $('accountField').addEventListener('input', (e) => { const v = (e.target as HTMLInputElement).value; if (fieldKind()) card[fieldKind()!] = v })
   $('accountClose').addEventListener('click', () => dismiss())
   $('accountAgain').addEventListener('click', () => { if (card.step === 'delete') dismiss(); else signIn() })
-  // The free screens left, read again when the tab comes back (the owner may have given more).
+  // The free mocks left, read again when the tab comes back (the owner may have given more).
   addEventListener('focus', () => loadMe())
   addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape' && !form.hidden) dismiss() })
   document.addEventListener('pointerdown', (e) => {

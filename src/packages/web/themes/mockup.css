@@ -9,7 +9,7 @@
   --sk-ink: #222;
   --sk-paper: #fdfcf7;
   --sk-wobble: 255px 15px 225px 15px / 15px 225px 15px 255px;
-  --pico-font-family: "Comic Neue", "Chalkboard SE", "Marker Felt", "Bradley Hand", "Segoe Print", "Comic Sans MS", sans-serif;
+  --pico-font-family: "Comic Neue", "Chalkboard SE", "Marker Felt", "Comic Sans MS", sans-serif;
   --pico-font-family-sans-serif: var(--pico-font-family);
   --pico-background-color: var(--sk-paper);
   --pico-color: var(--sk-ink);

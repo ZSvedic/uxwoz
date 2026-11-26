@@ -114,7 +114,7 @@ const typing = (box: HTMLElement) => document.activeElement instanceof HTMLEleme
 
 /** How many entries (or visits) a box has, and that against its limit: the fixer's notes have none. */
 export const countOf = (boxes: Boxes, components: CacheEntry[], name: Box) => name === 'notes' ? boxes.visits?.length ?? 0 : name === 'components' ? components.length : boxes[name].length
-export const countLabel = (n: number, name: Box) => name === 'notes' ? `${n} visits` : `${n} of ${LIMITS[name]}`
+export const countLabel = (n: number, name: Box) => name === 'notes' ? `${n} visit${n === 1 ? '' : 's'}` : `${n} of ${LIMITS[name]}`
 
 /** Mark the current box: a gold border. */
 export const markBox = (side: ReturnType<typeof createSide>, current: Box | null) => { for (const [name, s] of Object.entries(side.sections)) s.classList.toggle('current', name === current) }
