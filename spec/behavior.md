@@ -108,7 +108,8 @@ fixer's notes and no older versions.
   line and the controls that lead to it. Planned mocks are listed as *Not drawn yet*.
 - `rules.md`, `data.md` (the tables), `components.md` (each with where it belongs and its HTML).
 - `screens/<name>.html`: each drawn mock as a page of its own, the version showing, components
-  pasted, the Mockup theme inside it, as wide as its size. It opens from disk: a control that names
+  pasted, the Mockup theme inside it, as wide as its size (from disk its font cannot load, so it
+  shows in a handwriting font the system has, else sans-serif). It opens from disk: a control that names
   a drawn mock opens that page, `back` goes back, any other control does nothing. Home is
   `home.html`.
 
@@ -138,14 +139,21 @@ Four mocks that explain UXWoz in the app itself: *This is Bill.*, *Meet Woz.*, *
 the last project, and the tour is in the menu.
 
 - **It is a project like any other**, read from saved files: the four mocks hang under each other
-  on ropes, the button at the end of each leads to the next, and its boxes hold three rules, one
+  on ropes, the button at the foot of each leads to the next, and its boxes hold three rules, one
   component, one table and one fixer's note. No model is called, so it costs nothing.
 - **It is read-only.** All four buttons under a mock are grey, and a tap says *Off in the tour.*
   The boxes cannot be changed. The dropdown, ← →, the zoom and moving the canvas work, so *Try it
   now: pick Rules in the dropdown, then press ←* can be tried. The app does not check that it was.
-- **A tour mock never scrolls.** All of its text and its button, which comes after the text, fit a
-  small phone. It has no title inside: its name is on the tag above it. Every window shows the same
-  four mocks, scaled to fit.
+- **A tour mock never scrolls.** All of its text and its button fit a small phone (360 × 500), the
+  button at the bottom of the mock, in the same place on all four, however long the text above it.
+  It has no title inside: its name is on the tag above it. Every window shows the same four mocks,
+  scaled to fit.
+- **The text has a shape, not a wall.** Lines that belong together sit tight, groups have a gap
+  between them. The numbers that carry the story are bold (*Change. **10 min.*** against *Change.
+  **3 sec.***; **40h** against **4h**), a punchline is in italics with more room above it (*He still
+  doesn't like the app.*, *Bill is smart. Be like Bill.*), an aside is grey italics (*(Bill was me,
+  by the way.)*), and *How Woz works* opens its lists with short bold lead-ins (**Under the mock:**,
+  **Right of Home:**, **Get around:**). The tour calls the fixer's box **Fixer**.
 - **Bill**, a stick figure, stands at the right of the first and last mocks, a quarter of the
   width, the text beside him.
 - **The last button**, *Try another example*, opens New project.
@@ -665,6 +673,12 @@ of the current mock or box. The sparkle of the logo is yellow. Ropes are tan wit
 
 UXWoz has one look. It does not follow the system's dark setting: the app, the player, the
 admin's page and the privacy page look the same with it on or off.
+
+**Too old a browser** (a 10-year-old iPad) cannot run the app at all. Rather than a broken page,
+the app's page and the player show one plain line: *This browser is too old for UXWoz. Please open
+it in a newer browser.* A small script at the top of each page tries what the app needs (`?.`,
+`??`, `??=`, `Array.prototype.at`, `Object.hasOwn`) and, when one is missing, puts that line in
+place of the page. Nothing else is done for such a browser.
 
 Sounds are off by default; **Sound** in the menu turns them on, kept in this browser: a whoosh
 when a mock is drawn and when a card flips. Turning them on plays it once. With the system's

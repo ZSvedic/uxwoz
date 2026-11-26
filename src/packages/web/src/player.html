@@ -3,6 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+// Too old a browser (a 10-year-old iPad) runs none of the app's code: a plain notice instead of a broken page.
+(function () {
+  try { new Function('var a = {}; a.c ??= a?.b ?? 1'); if (![].at || !Object.hasOwn) throw 0 } catch (e) {
+    document.addEventListener('DOMContentLoaded', function () {
+      var old = document.querySelectorAll('link[rel=stylesheet], style')
+      for (var i = 0; i < old.length; i++) old[i].parentNode.removeChild(old[i])
+      document.body.className = ''
+      document.body.setAttribute('style', 'margin:0;padding:40px 20px;font:18px/1.4 Helvetica, Arial, sans-serif;text-align:center')
+      document.body.innerHTML = '<p>This browser is too old for UXWoz. Please open it in a newer browser.</p>'
+    })
+  }
+})()
+</script>
 <title>UXWoz mock</title>
 <meta property="og:title" content="UXWoz mock">
 <meta property="og:description" content="A clickable mock to try: click through it and say what you think.">

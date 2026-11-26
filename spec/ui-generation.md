@@ -61,8 +61,12 @@ Before it shows a stored screen, the app makes two changes to its HTML, and stor
 
 The model never sees the theme, so a theme changes looks and nothing else. A theme is a drop-in
 stylesheet loaded instead of, or after, Pico: override the `--pico-*` variables (font, colours,
-radius, borders). A hand-drawn wireframe look needs a handwriting font, thick dark borders and
-irregular corners (`border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px`). Clean keeps the
+radius, borders). Mockup's font is Comic Neue (OFL; latin, regular and bold, 13 KB each), served
+by the app at `/themes/comic-neue-{400,700}.woff2` with `Access-Control-Allow-Origin: *` (the
+frame has no origin) and a year's cache, `font-display: swap`. Before it loads, and where it
+cannot (an exported page opened from disk), the handwriting fonts the system has stand in, then
+sans-serif: not `cursive`, which on Android is a script font. A hand-drawn wireframe look needs a
+handwriting font, thick dark borders and irregular corners (`border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px`). Clean keeps the
 model's colours; Mockup turns them grey with a filter on each topmost part of the screen that holds
 no control opening another screen. Those controls are blue in both themes (our frame CSS), and
 Pico's own blue becomes a neutral ink, so blue always means "opens a screen". Blue links have no

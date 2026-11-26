@@ -222,6 +222,8 @@ scheme from `X-Forwarded-Proto` (its first value) when present, else the request
 - `GET /og.png`: the share preview image (1200×630, `design/brand/og.png`) that `player.html`'s `og:image` names.
 - `GET /themes/{pico,mockup}.css`: the stylesheets. Theme `clean` is `pico.css`; `mockup` is
   `pico.css` followed by `mockup.css`.
+- `GET /themes/comic-neue-{400,700}.woff2`: Mockup's font, to any origin
+  (`Access-Control-Allow-Origin: *`), `Cache-Control: public, max-age=31536000, immutable`.
 
 ## Frame messages
 

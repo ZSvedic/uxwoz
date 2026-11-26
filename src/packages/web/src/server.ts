@@ -23,6 +23,8 @@ const THEMES_DIR = resolve(import.meta.dir, '../themes')
 /** Theme ids and labels; the first is the default. `clean` is Pico alone, `mockup` is Pico plus mockup.css. */
 const THEMES = { mockup: 'Mockup (sketch)', clean: 'Clean (Pico)' } as const
 const THEME_FILES = new Set(['pico', 'mockup'])
+/** Comic Neue, Mockup's font (latin, regular and bold), which mockup.css loads from /themes/. */
+const FONT_FILES = new Set(['comic-neue-400.woff2', 'comic-neue-700.woff2'])
 
 /** One line of a /api/screen or /api/revise stream: one design. */
 export type { ScreenEvent as DrawEvent, Revise } from './drawing.ts'
@@ -185,6 +187,10 @@ export function createServer(opts: ServerOptions = {}) {
       '/healthz': () => new Response('ok', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }),
       '/og.png': () => new Response(Bun.file(join(import.meta.dir, 'design/brand/og.png')), { headers: { 'Content-Type': 'image/png' } }),
       '/themes/:name': (req) => {
+        // Mockup's font: any origin may fetch it (a mock's frame has none), and it never changes.
+        if (FONT_FILES.has(req.params.name)) return new Response(Bun.file(join(THEMES_DIR, req.params.name)), { headers: {
+          'Content-Type': 'font/woff2', 'Cache-Control': 'public, max-age=31536000, immutable', 'Access-Control-Allow-Origin': '*',
+        } })
         const name = req.params.name.replace(/\.css$/, '')
         if (!THEME_FILES.has(name)) return new Response('Not found', { status: 404 })
         return new Response(Bun.file(join(THEMES_DIR, `${name}.css`)), { headers: { 'Content-Type': 'text/css' } })
