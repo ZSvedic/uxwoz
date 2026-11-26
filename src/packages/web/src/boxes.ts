@@ -1,9 +1,12 @@
-// The boxes right of Home: Rules, the fixer's notes, Components (the canvas puts the cards in) and Data, each a page
-// of the ruled pad with its buttons under it while current (cards.ts draws them and the cards a box flips to). Rules
-// and tables are edited in place, and added there empty. Export writes markdown.
+// The boxes right of Home: Rules, Components (the canvas puts the cards in), Data and Fixer (the fixer's notes), each
+// a page of the ruled pad with its buttons under it while current (cards.ts draws them and the cards a box flips to).
+// Rules and tables are edited in place, and added there empty. Export writes markdown. A page or a card that scrolls
+// shows its scroll corners (`watchEdges`).
 
 import type { BoxName, Boxes, CacheEntry, Table } from '@uxwoz/core'
-import { BOX_TITLES, LIMITS, VISIT_EVERY, tableMarkdown } from '@uxwoz/core/keys'
+import { LIMITS, VISIT_EVERY, tableMarkdown } from '@uxwoz/core/keys'
+import { BOXES as BAR } from './bar.ts'
+import { boxTitle, edgesOf } from './flip.ts'
 
 /** A box: the three the models read, and the fixer's notes. */
 export type Box = BoxName | 'notes'
@@ -58,16 +61,34 @@ const HINTS: Record<Box, string> = {
   data: 'Example data that several mocks show. Tap a cell to change it.',
   notes: 'Every 5 mocks the fixer tidies the boxes and redraws mocks that break a rule.',
 }
-const BOXES = Object.keys(BOX_TITLES) as Box[]
+/** The boxes left to right, in the bar's and the dropdown's order: Fixer last. */
+export const BOX_ORDER: Box[] = BAR.map(([b]) => b)
+
+/** Scroll corners, as a mock's: `el` gets `above` and `below` while it has more beyond that edge, checked as it
+ *  scrolls, changes size or gets new content (at most once a frame). Returns what stops it. */
+export function watchEdges(el: HTMLElement): () => void {
+  let queued = false
+  const now = () => { queued = false; const e = edgesOf(el); el.classList.toggle('above', e.above); el.classList.toggle('below', e.below) }
+  const soon = () => { if (!queued) { queued = true; requestAnimationFrame(now) } }
+  const sizes = new ResizeObserver(soon)
+  const watch = () => { sizes.disconnect(); for (const x of [el, ...el.children]) sizes.observe(x); soon() }
+  const content = new MutationObserver(watch)
+  content.observe(el, { childList: true, subtree: true, characterData: true })
+  el.addEventListener('scroll', soon, { passive: true })
+  watch()
+  return () => { sizes.disconnect(); content.disconnect(); el.removeEventListener('scroll', soon) }
+}
 
 /** The boxes: their sections, each with a place for its buttons (`.acts`), and where the canvas puts the component
  *  cards (`components`). */
 export function createSide() {
   const root = el('div', 'boxes')
   const sections = {} as Record<Box, HTMLElement>
-  for (const name of BOXES) {
-    const s = el('section', `box box-${name}`, el('h3'), el('p', 'box-hint', HINTS[name]), el('div', 'box-body'), el('div', 'acts box-acts'))
+  for (const name of BOX_ORDER) {
+    const body = el('div', 'box-body')
+    const s = el('section', `box box-${name}`, el('h3'), el('p', 'box-hint', HINTS[name]), body, el('div', 'acts box-acts'))
     s.dataset.box = name
+    watchEdges(body)
     sections[name] = s
     root.append(s)
   }
@@ -103,10 +124,10 @@ export function renderSide(side: ReturnType<typeof createSide>, v: { boxes: Boxe
   readOnly = !!v.tour
   const visits = [...v.boxes.visits ?? []].reverse()
   markBox(side, v.current)
-  for (const name of BOXES) {
+  for (const name of BOX_ORDER) {
     const s = side.sections[name]
     const n = countOf(v.boxes, v.components, name)
-    s.querySelector('h3')!.replaceChildren(BOX_TITLES[name], el('small', '', ` ${countLabel(n, name)}`))
+    s.querySelector('h3')!.replaceChildren(boxTitle(name), el('small', '', ` ${countLabel(n, name)}`))
     if (!typing(s)) s.querySelector<HTMLElement>('.box-hint')!.hidden = n > 0
   }
   const rules = side.sections.rules.querySelector<HTMLElement>('.box-body')!

@@ -11,7 +11,7 @@ input, select, button, textarea { font: inherit; color: inherit; }
 button, select { padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); cursor: pointer; }
 button:disabled { color: var(--disabled); cursor: default; }
 button.primary { background: var(--pick); border-color: var(--pick); color: var(--on-pick); font-weight: 600; }
-.toolbar button, .recent button, .flip .close { border-color: transparent; background: none; }
+.toolbar button, .recent button { border-color: transparent; background: none; }
 /* The logo, inline SVG: the mark (the drawn W, its sparkle) or the wordmark (UX and oz in Fredoka, the W between). */
 .brand { display: block; overflow: visible; } .brand text { font: 700 38px Fredoka, system-ui, sans-serif; fill: currentColor; }
 .brand polyline { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; } .brand path { fill: var(--sparkle); }

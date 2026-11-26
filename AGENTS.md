@@ -77,7 +77,7 @@ src/packages/web/src/        the page
   menu.ts        the menu panel and New project; Export project
   cards.ts       the cards a mock, box or component flips to (Edit, History, Info, Describe it differently); `boxOp`
   flip.ts        what the cards say (no DOM, tested)
-  boxes.ts       the four boxes: their entries, editing in place
+  boxes.ts       the four boxes in the bar's order: their entries, editing in place; scroll corners (`watchEdges`)
   voice.ts       hold to talk: `Talk` (no DOM, tested), the speech recognition, the 🎙️ button
   net.ts         fetches and NDJSON streams, theme CSS, the red pill, hints, the note while drawing
   account-ui.ts  the public's account line and card; what each shows as functions (no DOM, tested)

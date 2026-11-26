@@ -78,13 +78,16 @@ export class HoldToTalk {
 }
 
 /** 🎙️ Hold to talk beside a field: held, the browser's words go into the field after its text; let go, they stay.
- *  None where the browser has no speech recognition. `fail` shows a problem in the red pill. */
+ *  None where the browser has no speech recognition. `fail` shows a problem in the red pill. A mouse, a finger (its
+ *  text cannot be selected, cards.css) and Space on the focused button all hold it. */
 export function talkButton(field: HTMLTextAreaElement | HTMLInputElement, fail: (message: string) => void): HTMLButtonElement | null {
   if (!speechSupported()) return null
   const b = document.createElement('button')
   b.type = 'button'
   b.className = 'talk'
-  b.textContent = '🎙️ Hold to talk'
+  // The words shorten to 🎙️ Talk on a card with no room for them (cards.css).
+  b.append('🎙️ ', Object.assign(document.createElement('span'), { className: 'long', textContent: 'Hold to talk' }),
+    Object.assign(document.createElement('span'), { className: 'short', textContent: 'Talk' }))
   b.title = 'Hold and speak, then let go. In Chrome the audio goes to Google to be turned into text.'
   const voice = new HoldToTalk((v) => { field.value = v; field.dispatchEvent(new Event('input', { bubbles: true })) }, fail)
   const down = () => { b.classList.add('on'); voice.press(field.value) }
@@ -96,7 +99,9 @@ export function talkButton(field: HTMLTextAreaElement | HTMLInputElement, fail: 
     down()
   })
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, up)
-  b.addEventListener('contextmenu', (e) => e.preventDefault()) // a long press on a phone
+  // A long press on a phone would select the words or open a menu, which cancels the press: the touch is the button's.
+  b.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false })
+  b.addEventListener('contextmenu', (e) => e.preventDefault())
   // Space held on the focused button talks too; a click alone does nothing.
   b.addEventListener('keydown', (e) => { if (e.key === ' ' && !e.repeat) { e.preventDefault(); down() } })
   b.addEventListener('keyup', (e) => { if (e.key === ' ') up() })

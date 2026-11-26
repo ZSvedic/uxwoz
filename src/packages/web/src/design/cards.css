@@ -4,10 +4,11 @@
 .flip { position: absolute; inset: 0; z-index: 3; zoom: max(1, calc(1 / var(--z))); display: flex; flex-direction: column;
   gap: 10px; padding: 16px 18px; overflow: auto; border-radius: inherit; background: var(--surface); color: var(--text);
   font-size: 14px; }
-.card.flipped .screen { mask-image: none; border-radius: 10px; }
 .flip h4 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; font-size: 18px; font-weight: 600; }
 .flip h4 span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.flip .close { flex: none; min-width: 32px; color: var(--muted); }
+/* ✕: a dark disc with room for a finger round it. */
+.flip .close { flex: none; width: 40px; height: 40px; margin: -8px -10px -8px 0; padding: 0; border: 0; border-radius: 50%;
+  background: var(--close); color: var(--text); font-size: 16px; }
 .flip p { margin: 0; }
 .flip h5 { margin: 8px 0 0; color: var(--label); }
 .pane { display: flex; flex-direction: column; gap: 8px; }
@@ -18,11 +19,16 @@
 /* A button that waits is grey, as the grey buttons under a mock. */
 .flip button:disabled { color: var(--disabled); border-color: var(--border); background: var(--surface); box-shadow: none; opacity: .55; }
 /* Make the change and Draw again: the ember button, as Draw it. */
-.flip .row > .primary { flex: 2; box-shadow: var(--pick-shadow); }
+.flip .row > .primary { flex: 2 0 auto; white-space: nowrap; box-shadow: var(--pick-shadow); }
 .flip .primary:focus-visible { box-shadow: 0 0 0 2px var(--focus-in), var(--pick-shadow); }
-/* Hold to talk: dark while held. */
-.talk { white-space: nowrap; }
+/* Hold to talk: its words cannot be selected, so a finger can hold it; dark while held. On a card it is right of the
+   primary button, in the room left, and says 🎙️ Talk where Hold to talk does not fit. */
+.talk { white-space: nowrap; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
 .talk.on { background: var(--text); color: var(--surface); }
+.pane .row { flex-wrap: nowrap; }
+.flip .row > .talk { flex: 1 1 120px; min-width: 84px; container: talk / inline-size; }
+.talk .short { display: none; }
+@container talk (width < 96px) { .talk .long { display: none; } .talk .short { display: inline; } }
 /* Delete this mock…: at the card's bottom, a plain underlined word until it asks. */
 .flip .del { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
 .flip .link { align-self: flex-start; padding: 4px 0; border: 0; background: none; color: var(--muted); text-decoration: underline; }

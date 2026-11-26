@@ -1,10 +1,13 @@
 // The cards a mock or a box flips to, worked out with no page (web/src/flip.ts): History's list and its marks, when
 // Undo and Redo are live, when 🎲 asks for new words, Info's fields, each box's buttons.
 import { describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
 import type { Boxes, CacheEntry, Version } from '@uxwoz/core'
 import {
-  ago, anotherAsks, boxButtons, boxFields, boxRows, boxUndoLive, componentFields, mockFields, pressedOf, redoAt, titleOf, undoLive, versionRows,
+  ago, anotherAsks, boxButtons, boxFields, boxRows, boxTitle, boxUndoLive, componentFields, edgesOf, mockFields, pressedOf, redoAt, titleOf,
+  undoLive, versionRows,
 } from '../packages/web/src/flip.ts'
+import { BOX_ORDER } from '../packages/web/src/boxes.ts'
 
 const NOW = Date.parse('2026-11-24T12:00:00Z')
 const v = (min: number, more: Partial<Version> = {}): Version => ({
@@ -112,5 +115,30 @@ describe('the buttons under a box', () => {
     expect(names(boxButtons('data'))).toEqual(['➕ Add table', '✏️ Edit', '⏪ History', 'ℹ️ Info'])
     expect(names(boxButtons('notes'))).toEqual(['▶️ Run fixer', '✏️ Edit', '⏪ History', 'ℹ️ Info'])
     expect(names(boxButtons('components'))).toEqual(['✏️ Edit', '⏪ History', 'ℹ️ Info'])
+  })
+})
+
+describe('the boxes right of Home', () => {
+  test('stand in the bar\'s and the dropdown\'s order, Fixer last, and the fixer\'s box is called Fixer', () => {
+    expect(BOX_ORDER).toEqual(['rules', 'components', 'data', 'notes'])
+    const html = readFileSync(new URL('../packages/web/src/index.html', import.meta.url), 'utf8')
+    for (const list of ['drop-boxes', 'barBoxes']) {
+      const part = html.slice(html.indexOf(list), html.indexOf(list) + 1200)
+      expect([...part.matchAll(/data-look="(\w+)"/g)].slice(0, 4).map((m) => m[1])).toEqual(BOX_ORDER)
+    }
+    expect(BOX_ORDER.map(boxTitle)).toEqual(['Rules', 'Components', 'Data', 'Fixer'])
+    expect([titleOf('edit', boxTitle('notes')), titleOf('history', boxTitle('notes'))]).toEqual(['Edit Fixer', 'History of Fixer'])
+  })
+})
+
+describe('scroll corners of a card or a box\'s page', () => {
+  test('an edge has more beyond it once it is more than a pixel away', () => {
+    const at = (scrollTop: number, clientHeight = 300, scrollHeight = 900) => edgesOf({ scrollTop, clientHeight, scrollHeight })
+    expect(at(0)).toEqual({ above: false, below: true })
+    expect(at(1)).toEqual({ above: false, below: true })
+    expect(at(300)).toEqual({ above: true, below: true })
+    expect(at(599.5)).toEqual({ above: true, below: false })
+    expect(at(0, 300, 300)).toEqual({ above: false, below: false })
+    expect(at(0, 300, 301)).toEqual({ above: false, below: false })
   })
 })

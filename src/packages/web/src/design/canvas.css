@@ -33,13 +33,17 @@
 /* The current mock: a gold ring around the frame and a gold glow; none after a tap on the sky. */
 .surface:not(.loose) .card.current .screen { box-shadow: 0 0 0 7px var(--frame), 0 0 0 calc(7px + 2px / var(--z)) var(--current),
   0 0 calc(30px / var(--z)) var(--gold-glow), var(--lift); }
-/* Scroll corners: an edge with more beyond it has flat corners and fades into the sky. */
-.card.above .screen { border-top-left-radius: 0; border-top-right-radius: 0; mask-image: linear-gradient(transparent 20px, black 46px); }
-.card.below .screen { border-bottom-left-radius: 0; border-bottom-right-radius: 0;
-  mask-image: linear-gradient(black calc(100% - 46px), transparent calc(100% - 20px)); }
-.card.above.below .screen { mask-image: linear-gradient(transparent 20px, black 46px, black calc(100% - 46px), transparent calc(100% - 20px)); }
+/* Scroll corners: an edge with more beyond it has flat corners and fades. A mock (its frame tells .card) and the card
+   it flips to (.flip) fade into the sky; a box's card and its page (.box-body) into their paper. */
+:is(.card.above:not(.flipped) .screen, .screen:has(> .flip.above), .box > .flip.above, .box-body.above) {
+  border-top-left-radius: 0; border-top-right-radius: 0; mask-image: linear-gradient(transparent 20px, black 46px); }
+:is(.card.below:not(.flipped) .screen, .screen:has(> .flip.below), .box > .flip.below, .box-body.below) {
+  border-bottom-left-radius: 0; border-bottom-right-radius: 0; mask-image: linear-gradient(black calc(100% - 46px), transparent calc(100% - 20px)); }
+:is(.card.above.below:not(.flipped) .screen, .screen:has(> .flip.above.below), .box > .flip.above.below, .box-body.above.below) {
+  mask-image: linear-gradient(transparent 20px, black 46px, black calc(100% - 46px), transparent calc(100% - 20px)); }
 /* The mask reaches 20 px past the top and bottom, and out to the sides, so the frame and the ring still show there. */
-:is(.card.above, .card.below) .screen { mask-position: 0 -20px; mask-size: 100% calc(100% + 40px); mask-repeat: repeat-x; mask-clip: no-clip; }
+:is(.card:is(.above, .below):not(.flipped) .screen, .screen:has(> .flip:is(.above, .below)), .box > .flip:is(.above, .below),
+  .box-body:is(.above, .below)) { mask-position: 0 -20px; mask-size: 100% calc(100% + 40px); mask-repeat: repeat-x; mask-clip: no-clip; }
 .card iframe { display: block; border: 0; background: var(--screen); }
 /* The name: a parchment tag above the mock, at the canvas's scale from 100% up, a readable size zoomed out. */
 .card .head { position: absolute; left: 0; bottom: 100%; width: 100%; padding-bottom: calc(8px / min(1, var(--z)));

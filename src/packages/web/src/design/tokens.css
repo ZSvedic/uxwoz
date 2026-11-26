@@ -20,7 +20,7 @@
   /* A screen's ivory frame and its fine edges; the gold glow of the current one; a box's margin line and ruled lines. */
   --frame-line: #ddd3bf; --frame-edge: #fff8; --gold-glow: #f5c54299; --margin-ink: #ff6a2b88; --ruling: #7f8cff26;
   /* Each box's paper, light with dark ink, and its pin, the dark of the same colour: a legal pad's yellow for Rules,
-     a faint red for Fixer's notes, a light blue for Components, a light green for Data. */
+     a faint red for Fixer, a light blue for Components, a light green for Data. */
   --pad-yellow: #fff4bd; --pad-red: #fdeceb; --pad-blue: #e4eefc; --pad-green: #e5f4e4;
   --pin-amber: #8f5a00; --pin-red: #9e1c1c; --pin-blue: #1f3f94; --pin-green: #1d6a3a;
   /* A pin's lit face and its shadow; the gold coin of the OR: a lit face, a glow, a shadow under it. */
@@ -44,6 +44,8 @@
   --disabled: var(--dull); --err: var(--red); --shadow: var(--lift);
   /* A label over a value on a card (Asked for, Model): ink, bold, so it stands out from the muted rest. */
   --label: var(--ink);
+  /* ✕ on a card: a disc darker than the parchment. */
+  --close: var(--ch2);
   /* UXWoz's actions (Generate, Make the change, Pick) are ember with dark text; ember also marks what is new. */
   --pick: var(--ember); --on-pick: var(--brown); --mark: var(--ember-ink); --sky-mark: var(--ember);
   /* Gold: the current screen or box, the OR, the box numbers, the focus ring (with a dark inner ring). */
