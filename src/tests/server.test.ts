@@ -219,6 +219,26 @@ describe('web server', () => {
     expect((await fetch(new URL('/themes/clean.css', server.url))).status).toBe(404)
   })
 
+  test('Mockup\'s font is served to any origin, cached for a year, both weights under 60 KB together', async () => {
+    const css = await (await fetch(new URL('/themes/mockup.css', server.url))).text()
+    let bytes = 0
+    for (const w of [400, 700]) {
+      expect(css).toContain(`url(/themes/comic-neue-${w}.woff2)`)
+      const res = await fetch(new URL(`/themes/comic-neue-${w}.woff2`, server.url), { headers: { Origin: 'null' } })
+      expect(res.status).toBe(200)
+      expect(res.headers.get('content-type')).toBe('font/woff2')
+      expect(res.headers.get('access-control-allow-origin')).toBe('*')
+      expect(res.headers.get('cache-control')).toContain('max-age=31536000')
+      const body = new Uint8Array(await res.arrayBuffer())
+      expect(new TextDecoder().decode(body.slice(0, 4))).toBe('wOF2')
+      bytes += body.length
+    }
+    expect(bytes).toBeLessThan(60_000)
+    expect(css).toContain('font-display: swap')
+    expect(css).not.toMatch(/\bcursive\b/)
+    expect((await fetch(new URL('/themes/comic-neue-900.woff2', server.url))).status).toBe(404)
+  })
+
   test('another web page cannot spend model credits', async () => {
     expect((await post('/api/screen', { app: 'Other app' }, { Origin: 'https://evil.example' })).status).toBe(403)
     expect((await post('/api/revise', { key: 'a tiny bakery website' }, { 'Sec-Fetch-Site': 'cross-site' })).status).toBe(403)

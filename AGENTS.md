@@ -89,7 +89,7 @@ src/packages/web/src/        the page
   index.html, privacy.html     the app's page, the privacy page
   design/        the look: tokens.css (every colour), base.css, one file per part, motion.css, index.css;
                  fx.ts (sound); player.css and admin.css apart; sheet.html and sheet.ts (/design); brand/ (logo, icons)
-src/packages/web/themes/     pico.css (vendored), mockup.css (the sketch theme)
+src/packages/web/themes/     pico.css (vendored), mockup.css (the sketch theme), its font Comic Neue (woff2, OFL)
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest;
                              fixtures/demo-cache.json is the demo project
 src/scripts/                 demo.ts (`bun run demo`), make-demo-cache.ts, record-starters.ts

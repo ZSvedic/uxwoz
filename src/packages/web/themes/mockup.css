@@ -1,12 +1,15 @@
 /* Mockup: the default theme, a hand-drawn wireframe loaded after Pico, so a screen reads as a
    sketch and not a finished product. Black and white, handwriting font, thick dark borders,
-   wobbly corners. No web font: a null-origin frame cannot fetch one, so this uses handwriting
-   fonts the OS already has. */
+   wobbly corners. The font is Comic Neue (OFL, LICENSE-comic-neue.txt), served by the app at
+   /themes/ with CORS, so the null-origin frame can fetch it; until it loads, or where it cannot
+   (an exported page opened from disk), the handwriting fonts the OS has, then sans-serif. */
+@font-face { font-family: "Comic Neue"; font-weight: 400; font-display: swap; src: url(/themes/comic-neue-400.woff2) format("woff2"); }
+@font-face { font-family: "Comic Neue"; font-weight: 700; font-display: swap; src: url(/themes/comic-neue-700.woff2) format("woff2"); }
 :root {
   --sk-ink: #222;
   --sk-paper: #fdfcf7;
   --sk-wobble: 255px 15px 225px 15px / 15px 225px 15px 255px;
-  --pico-font-family: "Comic Neue", "Chalkboard SE", "Marker Felt", "Bradley Hand", "Segoe Print", "Comic Sans MS", cursive;
+  --pico-font-family: "Comic Neue", "Chalkboard SE", "Marker Felt", "Bradley Hand", "Segoe Print", "Comic Sans MS", sans-serif;
   --pico-font-family-sans-serif: var(--pico-font-family);
   --pico-background-color: var(--sk-paper);
   --pico-color: var(--sk-ink);

@@ -95,5 +95,6 @@ The owner's page is `/admin`.
 ## Licence
 
 [MIT](LICENSE). Two vendored pieces keep their own: the Fredoka font
-([OFL](src/packages/web/src/design/brand/LICENSE-fredoka.md)) and Pico CSS
+([OFL](src/packages/web/src/design/brand/LICENSE-fredoka.md)), the Comic Neue font of the Mockup
+theme ([OFL](src/packages/web/themes/LICENSE-comic-neue.txt)) and Pico CSS
 ([MIT](src/packages/web/themes/LICENSE-pico.md)).
