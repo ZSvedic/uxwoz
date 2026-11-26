@@ -169,7 +169,7 @@ same time only in different parts.
 | Engine | core: `models`, `prompt`, `providers`, `generate`, `starters`, `recordings` | `generate-screen`, `cut-off`, `recordings` | `prompt-screen.md`, `ui-generation.md` |
 | Cache | core: `cache`, `cache-boxes`, `keys`, `tree` | `cache`, `boxes`, `tree`, `demo-cache` | contract: Types |
 | Server | web: `server`, `drawing`, `desks`, `public`, `export`, `people`, `mail`, `admin`, `account`, `tour`; core: `filing`, `fixer`, `zip` | `server`, `races`, `fixer`, `export`, `desks`, `public`, `people`, `mail`, `admin`, `account`, `signin`, `replay`, `journey`, `bursts`, `tour` | contract: HTTP API, `public.md` |
-| Canvas | web: `app`, `state`, `screens`, `nav`, `address`, `canvas`, `bar`, `menu`, `net`, `account-ui`; core: `frame` | `ropes`, `frame`, `bar`, `address`, `account-ui` | behavior: Top bar to A mock, Navigation |
+| Canvas | web: `app`, `state`, `screens`, `nav`, `address`, `canvas`, `bar`, `menu`, `net`, `account-ui`; core: `frame` | `ropes`, `frame`, `bar`, `address`, `account-ui`, `old-browser` | behavior: Top bar to A mock, Navigation |
 | Boxes and cards | web: `boxes`, `cards`, `flip`, `voice` | `boxes`, `cards`, `voice` | behavior: The buttons under a mock, Voice, Boxes |
 | Sharing | web: `share`, `sharing`, `comments`, `pins`, `player.*` | `share`, `comments`, `pins` | behavior: Sharing |
 | Design | web: `design/` | `design`, `fx` | **Design** above |
