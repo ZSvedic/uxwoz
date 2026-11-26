@@ -19,10 +19,10 @@ export const FILE_CAP = 5 * 1024 * 1024
 export const WARM_MS = 4 * 60_000
 
 export const REASONS: Record<Reason, string> = {
-  allowance: 'Your free screens are used up.',
-  address: 'This network has used today\'s free screens. Register to carry on.',
+  allowance: 'Your free mocks are used up.',
+  address: 'This network has used today\'s free mocks. Register to carry on.',
   paused: 'Live designs are paused for now. The starters still work.',
-  guests: 'Today\'s free screens for guests are used up. Register to carry on.',
+  guests: 'Today\'s free mocks for guests are used up. Register to carry on.',
   blocked: 'This account is closed.',
 }
 

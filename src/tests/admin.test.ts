@@ -126,13 +126,13 @@ test('answer: approve adds the amount and emails it; refuse emails the refusal; 
   const a = await ok({ op: 'answer', request: r1, approved: true, usd: 1 })
   expect(a.requests[0]).toEqual(expect.objectContaining({ id: r1, answer: 'approved', usd: 1, email: 'ana@example.com', note: 'A vet clinic app' }))
   expect(a.people[0].allowance).toBeCloseTo(1.25)
-  expect(mails.at(-1)).toEqual(expect.objectContaining({ to: ['ana@example.com'], subject: 'You have more free screens', text: expect.stringContaining('about 250 more') }))
+  expect(mails.at(-1)).toEqual(expect.objectContaining({ to: ['ana@example.com'], subject: 'You have more free mocks', text: expect.stringContaining('about 250 more') }))
   expect(await status({ op: 'answer', request: r1, approved: false })).toBe(409)
 
   const r2 = store.ask(u.id, 'More please') as number
   await ok({ op: 'answer', request: r2, approved: false })
   expect(store.person(u.id)!.allowance).toBeCloseTo(1.25)
-  expect(mails.at(-1)).toEqual(expect.objectContaining({ subject: 'About your request for more screens' }))
+  expect(mails.at(-1)).toEqual(expect.objectContaining({ subject: 'About your request for more mocks' }))
 
   const r3 = store.ask(u.id, 'Default amount') as number
   await ok({ op: 'answer', request: r3, approved: true })

@@ -59,7 +59,7 @@ test('the texts', () => {
   const two = requestMail('o@x.co', [{ email: 'a@x.co', note: 'one', spent: 0, allowance: 0.25 }, { email: null, note: 'two', spent: 0, allowance: 0.25 }], 'u')
   expect(two.subject).toBe('UXWoz: 2 people ask for more')
   expect(two.text).toMatch(/one[\s\S]*someone spent[\s\S]*two/)
-  expect(answerMail('a@b.co', true, 0.5, 'u').text).toContain('about 125 more screens')
+  expect(answerMail('a@b.co', true, 0.5, 'u').text).toContain('about 125 more mocks')
   expect(answerMail('a@b.co', false, 0.5, 'u').subject).toContain('request')
   for (const m of [codeMail('a', '1'), r, two, answerMail('a', true, 1, 'u'), answerMail('a', false, 1, 'u')])
     expect(m.subject + m.text).not.toContain('—')

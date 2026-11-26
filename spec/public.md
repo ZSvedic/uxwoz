@@ -13,7 +13,7 @@ POST /api/screen {app: "a dog walking app"}     no cookie
   → a Haiku design streams; the call's cost is taken from the person when it ends
 GET /api/me → {role: "visitor", left: 0.0984, allowance: 0.1, screensLeft: 24, more: 37, …}
 …
-POST /api/screen → 402 {error: "Your free screens are used up.", reason: "allowance"}
+POST /api/screen → 402 {error: "Your free mocks are used up.", reason: "allowance"}
 POST /api/signin {email} → 204, a six-digit code by email
 POST /api/verify {email, code} → {me, created?}; the $0.15 top-up is in the allowance at once
 ```
@@ -90,9 +90,9 @@ store's methods take and give USD. Times are milliseconds since 1970, days and m
 
 | `reason` | When | `error` |
 |---|---|---|
-| `allowance` | the person's `spent` is at or over their `allowance`, or with the running calls' reservations over it | *Your free screens are used up.* |
-| `address` | a visitor, and visitors from this address spent $0.30 today | *This network has used today's free screens. Register to carry on.* |
-| `guests` | a visitor, and the public spent 70% of the day's cap (`dayUsd`) today, the running calls' reservations counted | *Today's free screens for guests are used up. Register to carry on.* |
+| `allowance` | the person's `spent` is at or over their `allowance`, or with the running calls' reservations over it | *Your free mocks are used up.* |
+| `address` | a visitor, and visitors from this address spent $0.30 today | *This network has used today's free mocks. Register to carry on.* |
+| `guests` | a visitor, and the public spent 70% of the day's cap (`dayUsd`) today, the running calls' reservations counted | *Today's free mocks for guests are used up. Register to carry on.* |
 | `paused` | the mode is `starters`, or the public spent $3 today or $20 this month | *Live designs are paused for now. The examples still work.* |
 | `blocked` | the owner blocked the person | *This account is closed. Write to <contact>.* (`UXWOZ_CONTACT`, else `UXWOZ_ADMIN_EMAIL`; with neither, the first sentence only) |
 

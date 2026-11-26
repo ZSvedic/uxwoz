@@ -58,5 +58,5 @@ export const requestMail = (to: string, open: Asking[], adminUrl: string): Mail 
 
 /** The owner's answer to a quota request, to the user. */
 export const answerMail = (to: string, approved: boolean, usd: number, appUrl: string): Mail => approved
-  ? { to, subject: 'You have more free screens', text: `Your request was approved: ${about(usd)} more screens are ready in UXWoz.\n\n${appUrl}\n` }
-  : { to, subject: 'About your request for more screens', text: `Sorry, we cannot give more free screens right now. Your mockups stay open: look, click, export.\n\n${appUrl}\n` }
+  ? { to, subject: 'You have more free mocks', text: `Your request was approved: ${about(usd)} more mocks are ready in UXWoz.\n\n${appUrl}\n` }
+  : { to, subject: 'About your request for more mocks', text: `Sorry, we cannot give more free mocks right now. Your projects stay open: look, click, export.\n\n${appUrl}\n` }

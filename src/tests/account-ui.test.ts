@@ -72,7 +72,7 @@ describe('the account card', () => {
 
 describe('a refused request', () => {
   test('402 for free screens opens the card; paused and blocked are the red pill with the server\'s words', () => {
-    expect(refusalOf(402, { error: 'Your free screens are used up.', reason: 'allowance' })).toEqual({ card: 'allowance' })
+    expect(refusalOf(402, { error: 'Your free mocks are used up.', reason: 'allowance' })).toEqual({ card: 'allowance' })
     expect(refusalOf(402, { error: 'x', reason: 'address' })).toEqual({ card: 'address' })
     expect(refusalOf(402, { error: 'Live designs are paused for now. The starters still work.', reason: 'paused' })).toEqual({ pill: 'Live designs are paused for now. The starters still work.' })
     expect(refusalOf(402, { error: 'This account is closed.', reason: 'blocked' })).toEqual({ pill: 'This account is closed.' })
@@ -80,17 +80,17 @@ describe('a refused request', () => {
   })
 
   test('402 for the guests\' day opens the card too', () => {
-    expect(refusalOf(402, { error: 'Today\'s free screens for guests are used up. Register to carry on.', reason: 'guests' })).toEqual({ card: 'guests' })
+    expect(refusalOf(402, { error: 'Today\'s free mocks for guests are used up. Register to carry on.', reason: 'guests' })).toEqual({ card: 'guests' })
   })
 
   test('a side of an A OR B the meter refused: Register for a visitor, Ask for more for a user', () => {
-    expect(sideOf('Your free screens are used up.', visitor)).toEqual({ text: 'Register', why: 'allowance' })
-    expect(sideOf('Today\'s free screens for guests are used up. Register to carry on.', fresh)).toEqual({ text: 'Register', why: 'guests' })
-    expect(sideOf('This network has used today\'s free screens. Register to carry on.', visitor)).toEqual({ text: 'Register', why: 'address' })
-    expect(sideOf('Your free screens are used up.', user)).toEqual({ text: 'Ask for more', why: 'ask' })
+    expect(sideOf('Your free mocks are used up.', visitor)).toEqual({ text: 'Register', why: 'allowance' })
+    expect(sideOf('Today\'s free mocks for guests are used up. Register to carry on.', fresh)).toEqual({ text: 'Register', why: 'guests' })
+    expect(sideOf('This network has used today\'s free mocks. Register to carry on.', visitor)).toEqual({ text: 'Register', why: 'address' })
+    expect(sideOf('Your free mocks are used up.', user)).toEqual({ text: 'Ask for more', why: 'ask' })
     expect(sideOf('Your free mocks are used up.', user)).toEqual({ text: 'Ask for more', why: 'ask' })
     expect(sideOf('the model timed out', visitor)).toBeNull()
-    expect(sideOf('Your free screens are used up.', { role: 'owner' })).toBeNull()
+    expect(sideOf('Your free mocks are used up.', { role: 'owner' })).toBeNull()
   })
 
   test('anything else is not the account\'s', () => {

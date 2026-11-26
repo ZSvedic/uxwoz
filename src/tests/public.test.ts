@@ -127,7 +127,7 @@ describe('public mode', () => {
     expect(personOf(ana).spent).toBeCloseTo(0.02, 6)
     expect((await ana.me()).left).toBe(0)
     const r = await screen(ana, 'App three')
-    expect(r).toMatchObject({ status: 402, body: { reason: 'allowance', error: 'Your free screens are used up.' } })
+    expect(r).toMatchObject({ status: 402, body: { reason: 'allowance', error: 'Your free mocks are used up.' } })
     expect(personOf(ana).steps).toContain('limit')
     // A cache hit is free.
     expect((await screen(ana, 'App one')).status).toBe(200)
@@ -149,7 +149,7 @@ describe('public mode', () => {
     expect((await screen(browser('10.0.0.2'), 'Cy\'s app')).status).toBe(200)
     // At 70% of the day's cap guests stop, before their allowance or address is asked.
     store.setCaps({ dayUsd: store.spent().today / 0.8 })
-    expect((await screen(browser('10.0.0.4'), 'Ed\'s app')).body).toEqual({ reason: 'guests', error: 'Today\'s free screens for guests are used up. Register to carry on.' })
+    expect((await screen(browser('10.0.0.4'), 'Ed\'s app')).body).toEqual({ reason: 'guests', error: 'Today\'s free mocks for guests are used up. Register to carry on.' })
     // The day's cap pauses everyone.
     store.setCaps({ dayUsd: store.spent().today })
     expect((await screen(browser('10.0.0.3'), 'Di\'s app')).body).toMatchObject({ reason: 'paused' })
