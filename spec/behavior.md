@@ -25,7 +25,7 @@ mock at a time fills the view, and a larger window shows more of the same canvas
 6. He opens the dropdown under the name. The four boxes are one row at its top, *Rules* with a 2 on
    its corner: two rules were added since he last looked. Below is the tree: *Home*, and one step in,
    *Camera* and a grey *Settings · not made yet*.
-7. After the fifth mock he clicked on from, the fixer visits. Its note, in Fixer's notes, reads
+7. After the fifth mock he clicked on from, the fixer visits. Its note, in the Fixer box, reads
    *merged `box-level` into `box-levels`; redrew settings: paste tab-bar*, with an Undo beside each.
 
 ```
@@ -230,7 +230,8 @@ Four buttons on the canvas, centred under the current mock, narrow, with room be
 zoom with the mock. No other mock shows any.
 
 Edit, History and Info **flip** the mock: it turns over in place to a card of the same size, with
-one clean edge and ✕ in its corner; on an Info card each label (*Asked for*, *Model*) is bold ink
+one clean edge and ✕ in its corner, on a dark disc a finger can hit (about 40 px). A card that
+scrolls has the same scroll corners as a mock. On an Info card each label (*Asked for*, *Model*) is bold ink
 over its value. The pressed button is dark. ✕, Esc or the same
 button again flips back to the mock; another button turns the card to that one. Choosing another
 mock flips back first.
@@ -238,12 +239,12 @@ mock flips back first.
 - **🎲 Another** draws one more design of the mock from the same words, asked to be clearly
   different, and shows it in place of the first. Both stay in History. After two designs from the
   same words, the next press flips to **Describe it differently**: *Neither design fits? Say what
-  this mock should be.*, the mock's words in a field, 🎙️ **Hold to talk** and **Draw again**, which
+  this mock should be.*, the mock's words in a field, **Draw again** and 🎙️ **Hold to talk**, which
   draws a design from the new words. Then 🎲 gives one more, and the press after that asks again.
   An Edit does not reset the count. For Home the words are the project's sentence, and the project
   takes the new sentence as its name; a sentence another project already has is refused.
-- **✏️ Edit**: *What should change?*, a field, 🎙️ **Hold to talk** and **Make the change** (or
-  Enter). The card flips back, the mock's note says *Making the change…*, and the model returns
+- **✏️ Edit**: *What should change?*, a field, **Make the change** (or Enter) and 🎙️ **Hold to
+  talk**. The card flips back, the mock's note says *Making the change…*, and the model returns
   the same mock with only that change, as a new version in place. At the card's bottom, **Delete
   this mock…** asks, then deletes the mock and the mocks only it leads to. A mock that a link in
   another mock also reaches stays, under that mock. Home's card has no Delete: the project's is in
@@ -264,13 +265,18 @@ mock flips back first.
 ## Voice
 
 The user can say words instead of typing them. Every field for the model has 🎙️ **Hold to talk**
-beside it: New project's prompt box, Edit (a mock's and a box's) and Describe it differently.
+beside it: New project's prompt box, Edit (a mock's and a box's) and Describe it differently. On a
+card the field's own button comes first, on one line, and 🎙️ Hold to talk to its right in the room
+left; where that is too narrow it reads 🎙️ **Talk**.
 
 1. Hold the button and speak. The words show in the field as the browser hears them, after any
    text already typed there.
 2. Let go. The words stay in the field, to correct by hand.
 3. Press the field's own button (**Make the change**, **Draw again**, **Draw it**). Voice never
    sends by itself.
+
+On a phone a finger holds the button as a mouse does: a long press selects none of its words and
+opens no menu. On a laptop the mouse or Space on the focused button holds it.
 
 The browser asks for the microphone the first time. In a browser that cannot turn speech into text
 the button is not there. Its tooltip says that in Chrome the audio goes to Google to be turned into
@@ -282,10 +288,11 @@ browser's word for it>).*
 ## Boxes
 
 Right of Home, in its row, four labelled boxes stand side by side, tops level with Home: **Rules**,
-**Fixer's notes**, **Components**, **Data**. A box is as wide as the project's mock, at most 520
+**Components**, **Data**, **Fixer** (the fixer's notes), the order of the bar and the dropdown. A box is as wide as the project's mock, at most 520
 px: 360 or 412 in a phone project, 520 in a laptop or monitor project. A box has room for 10
 ruled lines to start and grows with what it holds up to 20 lines, the same rule for all four;
-past 20 lines the rest scrolls inside it, with the same scroll corners as a mock. The cap holds
+past 20 lines the rest scrolls inside it, with the same scroll corners as a mock: its writing
+fades into the paper on a side with more. The cap holds
 even where 20 lines are taller than Home. Their bottoms differ, and each box's buttons sit under
 its own bottom. A child of Home that does not fit below Home goes right, under the boxes; the row
 of Home's children and the ropes into it start below the tallest box and its buttons. Components is the
@@ -294,10 +301,10 @@ stand close together, 40 px apart. Every model call reads Components, Rules and 
 what is in them is what the mocks share.
 
 A box is a page of ruled paper with dark ink, as a mock is white paper: Rules a light yellow
-legal pad, Fixer's notes a very light red, Components a light blue, Data a light green. Its pin is
+legal pad, Fixer a very light red, Components a light blue, Data a light green. Its pin is
 the dark of its own colour: dark amber, dark red, dark blue, dark green. Each entry is a line or
 two of writing on the ruling with no frame round it. A box flipped to Edit, History or Info shows
-a parchment card of the box's size. A tap in a box, or on its button in the dropdown or the bar, makes
+a parchment card of the box's size; where it scrolls its words fade into the parchment. A tap in a box, or on its button in the dropdown or the bar, makes
 it current: a gold ring, the top bar's name (*📐 Rules*), and its buttons under it. A box's buttons
 are a mock's four with its own action in 🎲's place:
 
@@ -305,13 +312,13 @@ are a mock's four with its own action in 🎲's place:
 |---|---|---|
 | 📐 Rules | ➕ **Add rule** | ✏️ Edit, ⏪ History, ℹ️ Info |
 | 🗄️ Data | ➕ **Add table** | ✏️ Edit, ⏪ History, ℹ️ Info |
-| 🕵️ Fixer's notes | ▶️ **Run fixer** | ✏️ Edit, ⏪ History, ℹ️ Info |
+| 🕵️ Fixer | ▶️ **Run fixer** | ✏️ Edit, ⏪ History, ℹ️ Info |
 | 🧩 Components | none | ✏️ Edit, ⏪ History, ℹ️ Info, centred |
 
-- **✏️ Edit** flips the box to *What should change in Rules?* (or the box's name), a field, 🎙️
-  and **Make the change**. The request goes to the fixer as a visit that starts from it: the fixer
+- **✏️ Edit** flips the box to *What should change in Rules?* (or the box's name), a field,
+  **Make the change** and 🎙️. The request goes to the fixer as a visit that starts from it: the fixer
   does what the user asks first, and may then change entries the user wrote in that box; then it
-  tidies up as on any visit. Each change gets its line and Undo in Fixer's notes, under *You
+  tidies up as on any visit. Each change gets its line and Undo in Fixer, under *You
   asked: …*. While a visit runs, Make the change and Run fixer wait (Add rule and Add table do
   not). An Edit asked for before Home is drawn says *Wait for Home.*
 - **⏪ History** flips to **↶ Undo** and the changes it can take back, newest first, each with
@@ -321,12 +328,12 @@ are a mock's four with its own action in 🎲's place:
   change). Each box keeps its last 10 states; Undo again goes further back. A box has no Redo. A
   component the Undo drops leaves its HTML in the mocks that paste it; one it brings back is
   pasted on no mock until a mock pastes it again. An ID the Undo drops is not used again. On
-  Fixer's notes the list is the visits (*Visit, 4 changes*), an undone one struck through, and
+  Fixer the list is the visits (*Visit, 4 changes*), an undone one struck through, and
   Undo undoes every change of the newest visit not undone yet; a change it cannot undo (the user
   changed the entry since, a full box) is skipped and named in the red pill, and its own Undo
   stays.
 - **ℹ️ Info** flips to the box's count against its limit, a table's limits, how many entries are
-  the user's, how many are new since the user looked; for Fixer's notes, the visits kept and the
+  the user's, how many are new since the user looked; for Fixer, the visits kept and the
   mocks left before the next one.
 
 What each box holds:
@@ -386,7 +393,7 @@ dropped; a line about a mock or entry deleted meanwhile is refused, and a mock t
 during the visit is not redrawn. A mock settled while a visit runs brings no visit: the next one
 reads it. At most 5 redraws keeps a visit's cost to about a cent.
 
-**Fixer's notes** holds a note per visit, newest first: when, what the user asked (for an Edit),
+**Fixer** holds the fixer's notes, one per visit, newest first: when, what the user asked (for an Edit),
 how many mocks it read, each change on its line with the fixer's reason and an **Undo**, the lines
 code refused and why, time and cost (the redraws included), and last *The next visit comes after 3
 more mocks.* Undo of a merge or a remove puts the entry back with its ID and place, of an added

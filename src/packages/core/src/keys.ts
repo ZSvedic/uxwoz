@@ -50,7 +50,7 @@ export const VERSIONS = 10
 export const VISIT_EVERY = 5
 export const VISITS_KEPT = 20
 
-/** The boxes in the order they show, by their titles; `notes` is the fixer's notes. */
+/** The boxes by the titles the models read; `notes` is the fixer's notes. The page shows them in bar.ts's order, it as Fixer. */
 export const BOX_TITLES = { rules: 'Rules', notes: 'Fixer\'s notes', components: 'Components', data: 'Data' }
 
 /** A box entry's ID: 1 to 4 lowercase words joined by dashes. */

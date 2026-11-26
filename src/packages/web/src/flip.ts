@@ -1,9 +1,11 @@
 // What a flipped card says (spec/behavior.md, The buttons under a mock, and Boxes): History's list and its marks, when
-// Undo and Redo are live, when 🎲 asks for new words, Info's fields, each box's buttons. No DOM: cards.ts draws them.
+// Undo and Redo are live, when 🎲 asks for new words, Info's fields, each box's buttons, a box's name, the scroll edges.
+// No DOM: cards.ts and boxes.ts draw them.
 
-import { BOX_STATES, BOX_TITLES, LIMITS, VISIT_EVERY, VISITS_KEPT } from '@uxwoz/core/keys'
+import { BOX_STATES, LIMITS, VISIT_EVERY, VISITS_KEPT } from '@uxwoz/core/keys'
 import type { Boxes, CacheEntry, Past, Version } from '@uxwoz/core'
 import type { Box } from './boxes.ts'
+import { BOXES } from './bar.ts'
 
 /** The card a mock or a box flips to; `describe` is 🎲's *Describe it differently*. */
 export type Tool = 'edit' | 'history' | 'info' | 'describe'
@@ -140,5 +142,9 @@ export function titleOf(tool: Tool, name: string): string {
   return tool === 'edit' ? `Edit ${name}` : tool === 'history' ? `History of ${name}` : tool === 'info' ? `Info on ${name}` : 'Describe it differently'
 }
 
-/** A box's name in a card. */
-export const boxTitle = (box: Box) => BOX_TITLES[box]
+/** A box's name, in its header and its cards: the fixer's box is *Fixer*. */
+export const boxTitle = (box: Box) => BOXES.find(([b]) => b === box)![2]
+
+/** The scroll edges of a card or a box's page, as a mock's frame works them out: more above, more below. */
+export const edgesOf = (s: { scrollTop: number; clientHeight: number; scrollHeight: number }) =>
+  ({ above: s.scrollTop > 1, below: s.scrollTop + s.clientHeight < s.scrollHeight - 1 })

@@ -6,7 +6,7 @@
 import { screenKey } from '@uxwoz/core/keys'
 import { isComponent } from '@uxwoz/core/tree'
 import type { CacheEntry } from '@uxwoz/core'
-import { addEmpty, boxesMarkdown, button, el, markBox, type Box, type BoxOp } from './boxes.ts'
+import { addEmpty, boxesMarkdown, button, el, markBox, watchEdges, type Box, type BoxOp } from './boxes.ts'
 import { canvas, side } from './app.ts'
 import { hint, post, showError } from './net.ts'
 import { loadMe, refused } from './account-ui.ts'
@@ -170,8 +170,9 @@ function onBoxTool(box: Box, tool: string) {
 
 // ---- The cards
 
-/** The card on show: where it lies, what it shows (`sig`: drawn again only when that changed), and its element. */
-let shown: { host: HTMLElement; sig: string; el: HTMLElement } | null = null
+/** The card on show: where it lies, what it shows (`sig`: drawn again only when that changed), its element, and what
+ *  stops its scroll corners. */
+let shown: { host: HTMLElement; sig: string; el: HTMLElement; stop: () => void } | null = null
 /** What was typed in an Edit or Describe field, by target, kept while the card flips back and forth. */
 const drafts = new Map<string, string>()
 
@@ -199,7 +200,8 @@ export function renderCards() {
   // The same card drawn again (Resolve, Reopen) keeps its scroll; a detached element cannot hold one.
   if (!fresh) card.scrollTop = scroll
   host.closest('.card, .box')?.classList.add('flipped')
-  shown = { host, sig, el: card }
+  // Its scroll corners, as a mock's: the card says which edges have more (canvas.css).
+  shown = { host, sig, el: card, stop: watchEdges(card) }
   update(t)
   if (state.flip === 'info') showRing(card)
   if (fresh) card.querySelector<HTMLTextAreaElement>('textarea')?.focus({ preventScroll: true })
@@ -208,6 +210,7 @@ export function renderCards() {
 function drop() {
   if (!shown) return
   shown.host.closest('.card, .box')?.classList.remove('flipped')
+  shown.stop()
   shown.el.remove()
   shown = null
 }
@@ -249,7 +252,7 @@ function build(t: Target, tool: Tool): Node[] {
   return [head, ...tool === 'edit' ? editCard(t) : tool === 'describe' ? describeCard(t) : tool === 'history' ? historyCard(t) : infoCard(t)]
 }
 
-/** A field, 🎙️ Hold to talk and its button, in a form: Enter sends, Shift+Enter adds a line. */
+/** A field, then its button and 🎙️ Hold to talk right of it, in a form: Enter sends, Shift+Enter adds a line. */
 function fieldForm(t: Target, label: string, text: string, go: string, send: (text: string) => void, placeholder = '') {
   const id = `${idOf(t)}|${state.flip}`
   const field = el('textarea')
@@ -257,7 +260,7 @@ function fieldForm(t: Target, label: string, text: string, go: string, send: (te
   field.addEventListener('input', () => drafts.set(id, field.value))
   const make = el('button', 'primary', go)
   make.type = 'submit'
-  const form = el('form', 'pane', el('label', '', label), field, el('div', 'row', ...[talkButton(field, showError)].filter((b) => b != null), make))
+  const form = el('form', 'pane', el('label', '', label), field, el('div', 'row', make, ...[talkButton(field, showError)].filter((b) => b != null)))
   form.addEventListener('submit', (ev) => {
     ev.preventDefault()
     const v = field.value.trim()

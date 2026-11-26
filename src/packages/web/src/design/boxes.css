@@ -3,7 +3,7 @@
 /* A box is a page of paper in the box's colour with dark ink: ruled lines and an ember margin line under the title, a pin
    in the dark of its colour, an edge that glows in the box's colour (gold and stronger while current). As wide as a mock,
    at most 520 px (--box-w, canvas.ts); room for 10 ruled lines, growing with its content to 20, then it scrolls inside.
-   Rules, Data and Fixer's notes lean a little and stand straight while current; Components holds live screens and never
+   Rules, Data and Fixer lean a little and stand straight while current; Components holds live screens and never
    leans. A transform does not move the layout, so sizes stay. */
 .box { --glow: var(--rules-glow); --sheet: var(--rules-paper); --tack: var(--rules-pin); position: relative; flex: none;
   display: flex; flex-direction: column; width: var(--box-w); min-height: calc(46px + 10 * 24px + 18px);
@@ -25,7 +25,7 @@
 .box-hint { margin: 0; color: var(--muted); font-size: 13px; }
 .box-btn { padding: 1px 8px; font-size: 12px; color: var(--muted); }
 .box-btn:hover { color: var(--text); border-color: var(--current); }
-/* The fixer's notes: a visit per entry, each change with its note and Undo. */
+/* Fixer, the fixer's notes: a visit per entry, each change with its note and Undo. */
 .visit { margin: 0 0 12px; font-size: 14px; }
 .visit ul { margin: 4px 0 0; padding-left: 20px; }
 .visit small, .visit .refused, .yours { color: var(--muted); }
@@ -43,6 +43,9 @@
 .box .card .head.open { background: var(--surface-2); }
 .box .card :is(.more, .note) { color: var(--mark); }
 .box-body { min-height: 0; overflow-y: auto; }
+/* A box flipped to a card is parchment under it, so the card's words fade into parchment where it scrolls. */
+.box.flipped { background: var(--surface); }
+.box.flipped > :not(.flip, .box-acts) { visibility: hidden; }
 .box-components .box-body { display: flex; flex-direction: column; }
 /* A component card: room above for its name; far out, its name is shorter. */
 .box-components .card { position: relative; flex: none; margin-top: calc(62px / var(--z) + 8px); min-height: 190px; }
