@@ -633,7 +633,8 @@ export class Canvas {
     if (!c || (s && s.html === html && s.final === final && s.css === css)) return
     c.shown = { html, final, css }
     c.pins.replaceChildren()
-    c.el.classList.remove('above', 'below')
+    // The scroll corners stay until the new page says its own (it always does once loaded): cleared here, a design
+    // that streams in, its frame rebuilt every few hundred ms, would flick its corners round and flat each time.
     pinHook.rebuilt(c.key)
     c.frame.srcdoc = framePage(html, css, final)
   }
