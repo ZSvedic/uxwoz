@@ -105,6 +105,20 @@ export function touchStep(last: Fingers, now: { x: number; y: number; d: number 
   return { zoom, dx: last.x - now.x, dy: last.y - now.y, next: { ...now, d0: last.d0, zooming } }
 }
 
+/**
+ * Two fingers over a mock, on the window: a pinch message's points (`x`, `y`, `d` in the frame's pixels; `sx`, `sy`,
+ * `sd` on the device's screen) with the frame's rect `r` and scale `k` now. The first step (no `offset`) is put on the
+ * window by the rect and gives the screen's offset from the window; later steps are the screen's points less it, so
+ * the frame moving under the fingers does not count. A message without screen points uses the rect every step.
+ */
+export function pinchPoint(m: Record<string, unknown>, r: { left: number; top: number }, k: number, offset: { x: number; y: number } | null) {
+  const n = (v: unknown) => Number(v) || 0
+  const screen = ['sx', 'sy', 'sd'].every((f) => Number.isFinite(m[f]))
+  if (offset && screen) return { x: n(m.sx) - offset.x, y: n(m.sy) - offset.y, d: n(m.sd), offset }
+  const p = { x: r.left + n(m.x) * k, y: r.top + n(m.y) * k, d: n(m.d) * k }
+  return { ...p, ...screen && { d: n(m.sd) }, offset: screen ? { x: n(m.sx) - p.x, y: n(m.sy) - p.y } : null }
+}
+
 /** The zoom a glide ends at, from the zoom `z` the user has: at 100% still (`fitted`), the target's own 100% (`h`);
  *  after a navigation (`near`), at least 75% of it, never further out than now; else the zoom stays. */
 export const NEAR = 0.75
@@ -727,6 +741,8 @@ export class Canvas {
 
   /** The last middle and spread of two fingers a frame handed on, on the window. */
   private touch: Fingers | null = null
+  /** The device's screen less the window, from the first step of two fingers over a mock (null: the screen's points are not usable). */
+  private screenOffset: { x: number; y: number } | null = null
 
   /** Clicks, links out, scroll edges, keys and gestures from a mock's frame (see the frame script). */
   private onFrameMessage(e: MessageEvent) {
@@ -754,15 +770,17 @@ export class Canvas {
       this.moved = performance.now()
       this.zoomBy(Number(d.dy) || 0, r.left + (Number(d.x) || 0) * k, r.top + (Number(d.y) || 0) * k)
     } else if (d.uxwoz === 'pinch') {
-      // Two fingers over the mock: their middle and spread in the frame's pixels, put on the window as the frame is
-      // now, so the canvas moving under the fingers does not count as the fingers moving.
-      const r = c.frame.getBoundingClientRect(), k = r.width / (c.frame.offsetWidth || 1)
-      const now = { x: r.left + (Number(d.x) || 0) * k, y: r.top + (Number(d.y) || 0) * k, d: (Number(d.d) || 0) * k }
+      // Two fingers over the mock. A step's points in the frame's pixels were taken where the frame was when the
+      // fingers moved, which the canvas may have changed since: put on the window as the frame is now, every step
+      // would overshoot the last and the zoom swing. So only the first step is put on the window that way; it gives
+      // the screen's offset from the window, and the steps after it use the screen's points (`pinchStep`).
       const last = d.start ? null : this.touch
       this.moved = performance.now()
       this.fitted = this.whole = false
       this.stopGlide()
-      if (!last) { this.touch = fingersAt(now); return }
+      const r = c.frame.getBoundingClientRect(), k = r.width / (c.frame.offsetWidth || 1)
+      const now = pinchPoint(d, r, k, d.start ? null : this.screenOffset)
+      if (!last) { this.screenOffset = now.offset; this.touch = fingersAt(now); return }
       const s = touchStep(last, now)
       this.touch = s.next
       if (s.zoom !== 1) this.setScale(this.z * s.zoom, now.x, now.y)

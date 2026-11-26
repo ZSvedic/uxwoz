@@ -76,7 +76,7 @@ Menus close on Esc, on a press outside them, or on a click into a mock.
 ## The menu
 
 A tap on the logo opens a panel at the window's left edge, over the dimmed canvas. It holds what
-the bar has no room for. Esc, ✕ or a press outside closes it.
+the bar has no room for. Esc, ✕ (on the same disc as a card's) or a press outside closes it.
 
 - **➕ New project** opens the New project panel (below).
 - **🕘 Recent**: the last ten projects, the open one ticked; choosing one opens it. The list comes

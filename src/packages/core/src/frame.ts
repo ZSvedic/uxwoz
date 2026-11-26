@@ -251,10 +251,12 @@ const bootstrap = (final: boolean) => `(() => {
   }, { passive: false })
   // Touch: one finger belongs to the screen (the page scrolls natively, a tap clicks) until nothing under it can scroll
   // that way: then the rest of the swipe moves the canvas, as the wheel does (swipeStep). Two fingers move and zoom the
-  // canvas. Points go out in the frame's pixels; \`start\` begins a gesture (or a new count of fingers).
+  // canvas. Points go out in the frame's pixels and, as sx, sy, sd, on the device's screen, which stays put while the
+  // canvas moves and zooms this frame under the fingers; \`start\` begins a gesture (or a new count of fingers).
   const swipeStep = ${swipeStep}
   let pinch = null, swipe = null
-  const at = (ts) => { const a = ts[0], b = ts[1]; return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2, d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) } }
+  const mid = (a, b, x, y) => ({ x: (a[x] + b[x]) / 2, y: (a[y] + b[y]) / 2, d: Math.hypot(a[x] - b[x], a[y] - b[y]) })
+  const at = (ts) => { const c = mid(ts[0], ts[1], 'clientX', 'clientY'), s = mid(ts[0], ts[1], 'screenX', 'screenY'); return { ...c, sx: s.x, sy: s.y, sd: s.d } }
   const begin = (e) => {
     pinch = e.touches.length > 1 ? { start: true } : null
     const t = e.touches.length === 1 ? e.touches[0] : null
@@ -272,7 +274,7 @@ const bootstrap = (final: boolean) => `(() => {
     if (!pinch || e.touches.length < 2) return
     e.preventDefault()
     const p = at(e.touches)
-    parent.postMessage({ uxwoz: 'pinch', x: p.x, y: p.y, d: p.d, start: pinch.start }, '*')
+    parent.postMessage({ uxwoz: 'pinch', x: p.x, y: p.y, d: p.d, sx: p.sx, sy: p.sy, sd: p.sd, start: pinch.start }, '*')
     pinch.start = false
   }, { passive: false })
   addEventListener('gesturestart', (e) => e.preventDefault()) // Safari's own pinch would zoom the page

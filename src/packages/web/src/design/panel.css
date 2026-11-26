@@ -6,7 +6,7 @@
 .generate h2 { margin: 0; font-size: 21px; font-weight: 600; }
 .generate h3 { margin: 0 0 6px; }
 .gen-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-:is(.generate, .side-menu) .close { flex: none; min-width: 36px; min-height: 36px; border-color: transparent; background: none; font-size: 16px; }
+:is(.generate, .side-menu) .close { flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: var(--close); color: var(--text); font-size: 16px; }
 #prompt { width: 100%; resize: none; padding: 10px 12px; border: 2px solid var(--border); border-radius: 10px; background: var(--field);
   font-size: 15px; field-sizing: content; min-height: 3.2em; max-height: 14em; }
 .gen-for { display: flex; gap: 8px; align-items: center; color: var(--muted); }

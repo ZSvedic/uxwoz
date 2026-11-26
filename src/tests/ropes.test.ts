@@ -1,6 +1,20 @@
 // The canvas worked out with no page: rows of equal height, the 100% scale, where a glide ends, and the ropes.
 import { describe, expect, test } from 'bun:test'
-import { BOX_MAX_W, BUTTONS_H, NAME_H, ROPE_SHOW, boxHundred, boxWidth, curve, fingersAt, frameOf, glideAt, glideZoom, headH, hundred, landing, placeTree, rope, sizeOf, touchStep } from '../packages/web/src/canvas.ts'
+import { BOX_MAX_W, BUTTONS_H, NAME_H, ROPE_SHOW, boxHundred, boxWidth, curve, fingersAt, frameOf, glideAt, glideZoom, headH, hundred, landing, pinchPoint, placeTree, rope, sizeOf, touchStep } from '../packages/web/src/canvas.ts'
+
+describe('two fingers over a mock (pinchPoint)', () => {
+  test('the first step is put on the window by the frame; later steps by the screen, whatever the frame did since', () => {
+    // The frame at (50, 100), shown at 2×: fingers at (10, 20) in it are (70, 140) on the window, (170, 340) on the screen.
+    const first = pinchPoint({ x: 10, y: 20, d: 30, sx: 170, sy: 340, sd: 60 }, { left: 50, top: 100 }, 2, null)
+    expect(first).toEqual({ x: 70, y: 140, d: 60, offset: { x: 100, y: 200 } })
+    // The canvas has zoomed and moved the frame since; the frame's own points are stale, the screen's are not.
+    const next = pinchPoint({ x: 99, y: 99, d: 99, sx: 180, sy: 330, sd: 66 }, { left: -400, top: -900 }, 3, first.offset)
+    expect(next).toEqual({ x: 80, y: 130, d: 66, offset: { x: 100, y: 200 } })
+  })
+  test('a frame that sends no screen points is put on the window by its rect every step', () => {
+    expect(pinchPoint({ x: 10, y: 20, d: 30 }, { left: 50, top: 100 }, 2, { x: 1, y: 1 })).toEqual({ x: 70, y: 140, d: 60, offset: null })
+  })
+})
 
 const small = sizeOf('small-phone'), laptop = sizeOf('laptop')
 

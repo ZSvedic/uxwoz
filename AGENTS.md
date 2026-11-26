@@ -93,7 +93,8 @@ src/packages/web/themes/     pico.css (vendored), mockup.css (the sketch theme),
 src/tests/                   bun tests; cassette.ts replays cassettes/, no-network.ts blocks the rest;
                              fixtures/demo-cache.json is the demo project
 src/scripts/                 demo.ts (`bun run demo`), make-demo-cache.ts, record-starters.ts
-                             (`bun run starters:record [id…] [--device <id>]`), backup.sh
+                             (`bun run starters:record [id…] [--device <id>]`), backup.sh, touch-check.ts
+                             (two fingers in headless Chrome over a mock; the pane cannot touch)
 recordings/                  the examples' recordings, 28 files; copied into the image
 tour/                        the tour's four mocks and boxes, edited by hand; copied into the image
 ```

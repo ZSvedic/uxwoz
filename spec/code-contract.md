@@ -243,9 +243,12 @@ only from a card's own frame.
                                      // end, its steps measured on the device's screen (swipeStep)
 { uxwoz: 'zoom', dy, x, y }          // Ctrl/Cmd + scroll or a pinch over the screen, at (x, y) in
                                      // the frame: zooms the canvas around that point
-{ uxwoz: 'pinch', x, y, d, start }   // two fingers over the screen: their middle and their spread `d`;
-                                     // the canvas follows the middle and, once the spread changed by more
-                                     // than 5% (touchStep), zooms by how it grew
+{ uxwoz: 'pinch', x, y, d, sx, sy, sd, start } // two fingers over the screen: their middle and spread
+                                     // `d` in the frame, and the same on the device's screen (sx, sy, sd);
+                                     // the first step is put on the window by the frame's place, the later
+                                     // ones by the screen's points (pinchPoint), so the frame moving under
+                                     // the fingers does not count; the canvas follows the middle and, once
+                                     // the spread changed by more than 5% (touchStep), zooms by how it grew
 { uxwoz: 'part', text, tag, nth, x, y, w, h } // the part clicked after the page sent { uxwoz: 'name-part' }:
                                      // its words (60 characters), tag, place among the parts with the same
                                      // tag and words, and its rectangle in the frame's own pixels; while

@@ -242,17 +242,19 @@ describe('a mock scrolls inside its frame', () => {
 
   test('one finger is the page\'s own; two fingers pinch the canvas', () => {
     const f = fakeFrame()
-    const t = (x: number, y: number) => ({ clientX: x, clientY: y })
-    f.fire('touchstart', { touches: [t(10, 10)] })
-    const one = f.fire('touchmove', { touches: [t(10, 60)] })
+    const t = (x: number, y: number) => ({ clientX: x, clientY: y, screenX: x + 100, screenY: y + 200 })
+    const t1 = (x: number, y: number) => ({ clientX: x, clientY: y }) // one finger: the swipe has its own tests
+    f.fire('touchstart', { touches: [t1(10, 10)] })
+    const one = f.fire('touchmove', { touches: [t1(10, 60)] })
     expect(one.defaultPrevented).toBe(false)
     expect(f.sent).toHaveLength(0)
     f.fire('touchstart', { touches: [t(10, 10), t(50, 10)] })
     expect(f.fire('touchmove', { touches: [t(10, 10), t(50, 40)] }).defaultPrevented).toBe(true)
     f.fire('touchmove', { touches: [t(0, 10), t(60, 10)] })
-    expect(f.of('pinch')).toEqual([{ uxwoz: 'pinch', x: 30, y: 25, d: 50, start: true }, { uxwoz: 'pinch', x: 30, y: 10, d: 60, start: false }])
-    f.fire('touchend', { touches: [t(0, 10)] })
-    f.fire('touchmove', { touches: [t(0, 40)] })
+    expect(f.of('pinch')).toEqual([{ uxwoz: 'pinch', x: 30, y: 25, d: 50, sx: 130, sy: 225, sd: 50, start: true },
+      { uxwoz: 'pinch', x: 30, y: 10, d: 60, sx: 130, sy: 210, sd: 60, start: false }])
+    f.fire('touchend', { touches: [t1(0, 10)] })
+    f.fire('touchmove', { touches: [t1(0, 40)] })
     expect(f.of('pinch')).toHaveLength(2)
   })
 
